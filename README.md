@@ -76,19 +76,20 @@ cp deploy/configs/config-backtest.json ~/ft_userdata/user_data/
 cp deploy/configs/strategy-template.json ~/ft_userdata/user_data/configs/MyStrategy.json
 ```
 
-### 3. Configure a Strategy
+### 3. Copy Strategies & Configs
 
-Edit `~/ft_userdata/user_data/configs/MyStrategy.json`:
+```bash
+# All 9 strategies included — copy them all
+cp deploy/strategies/*.py ~/ft_userdata/user_data/strategies/
 
-- Change `bot_name`, `db_url` to match your strategy name
-- Change `api_server.jwt_secret_key` and `password` (security)
+# Copy all strategy configs (already sanitized — update credentials)
+cp deploy/configs/*.json ~/ft_userdata/user_data/configs/
+```
+
+Then edit each config in `~/ft_userdata/user_data/configs/`:
+- Change `api_server.jwt_secret_key` and `password` (search for `CHANGE-ME`)
 - Set `exchange.key` and `exchange.secret` for live trading (leave empty for dry-run)
-- Adjust `dry_run_wallet`, `max_open_trades`, `stake_amount`
-- For multiple dip-buyer bots, add `OffsetFilter` to pairlists to prevent overlap (see template comments)
-
-### 4. Add Strategy Files
-
-Place your `.py` strategy files in `~/ft_userdata/user_data/strategies/`.
+- Adjust `dry_run_wallet`, `max_open_trades` as needed
 
 ### 5. Add a Bot to docker-compose.yml
 
