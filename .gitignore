@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Data
+*.csv
+*.parquet
+*.h5
+*.hdf5
+data/raw/
+data/live/
+
+# Secrets
+.env
+*.key
+*.pem
+config/secrets.yaml
+config/api_keys.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Trading specific
+logs/
+backtest_results/
+*.log
