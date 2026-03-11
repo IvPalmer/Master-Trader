@@ -36,7 +36,7 @@
 | Bot Ecosystem | Best | Good | Limited | Avoid |
 | Min Capital | $0 | $0 (Alpaca) | ~R$1000 | Avoid |
 | Market Hours | 24/7 | 6.5h/day | 7h/day | Avoid |
-| Tax (Brazil) | 15-22.5% >R$35K/mo | 15% all gains | 15-20% | Avoid |
+| Tax (Brazil) | Domestic: exempt <R$35K/mo; Foreign (Binance): 15% all gains | 15% all gains | 15-20% | Avoid |
 | Volatility | High | Medium | Medium | Avoid |
 | From Brazil | Easy (Pix) | IOF 0.38% | Native | **AVOID** |
 

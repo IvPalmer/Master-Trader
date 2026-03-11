@@ -72,13 +72,13 @@
 ### US Market Access
 
 #### Interactive Brokers (IBKR)
-- **Access from Brazil:** Yes, supports Brazilian residents
-- **API:** TWS API (Java, Python, C++, C#), REST API
+- **Access from Brazil:** Yes, confirmed. **As of Dec 2025, IBKR added direct B3 access.**
+- **API:** TWS API (Java, Python, C++, C#), Client Portal Web API, FIX CTCI
 - **Minimum deposit:** $0 (was $10K, removed)
 - **Fees:** $0 for US equities (IBKR Lite), $0.0035/share (IBKR Pro)
-- **Markets:** US, Europe, Asia, options, futures, forex, bonds
-- **Bot frameworks:** Supported by Backtrader, NautilusTrader, ib_insync (Python wrapper)
-- **Verdict:** Best choice for stock trading from Brazil. Widest market access.
+- **Markets:** US, Europe, Asia, **Brazil (B3)**, options, futures, forex, bonds - 150+ markets in 33 countries
+- **Bot frameworks:** Supported by QuantConnect/Lean, Backtrader, NautilusTrader, ib_insync (Python wrapper)
+- **Verdict:** Best choice for trading from Brazil. Only broker with US + B3 access via a single API.
 
 #### Alpaca
 - **Access from Brazil:** Yes, supports international accounts
@@ -97,11 +97,18 @@
 ### Brazil Stock Market (B3)
 
 #### Current State of B3 API Access
-- **No direct retail API access** like US brokers offer
-- B3 uses FIX protocol (institutional only, very expensive)
-- MetaTrader 5 is available through some Brazilian brokers (Clear, XP)
-- **Profit/MetaTrader route:** Some Brazilian brokers (Clear, Rico) offer MetaTrader 5 with Expert Advisors
-- **Limitations:** Latency, limited API features vs US brokers
+- B3 uses PUMA platform (Platform Unified Multi Asset-class) with FIX protocol
+- **Nelogica Profit Pro** is the dominant platform in Latin America for B3 trading
+  - Strategy Automation module for building robot traders
+  - B3 Data API (DLL) for real-time data feeds
+  - Available through XP, Clear, Rico, BTG, Genial, Itau, Toro
+- **SmarttBot** - Brazil's largest automated day trading platform (smarttbot.com)
+  - Cloud-based robot hosting
+  - Strategy marketplace
+  - Works with B3 equities and futures (mini-indice, mini-dolar)
+- **OnTick** - Automated platform partnered with XP (free up to certain limits)
+- MetaTrader 5 available through some Brazilian brokers (Clear, XP)
+- **NEW: Interactive Brokers now offers direct B3 access** (Dec 2025) - use Python + TWS API
 
 #### Brazilian Brokers with Some Automation
 | Broker | Platform | Automation |
@@ -145,13 +152,42 @@
 
 ## LLM/AI-Powered Trading Projects
 
-### Notable Projects (2024-2026)
-- **FinGPT** - Open-source financial LLM. Fine-tuned for sentiment analysis on financial data.
-- **TradingGPT** - Multi-agent system using LLMs for trading decisions
-- **Various sentiment bots** - Using GPT-4/Claude APIs to analyze news and generate signals
+### Major Projects (2024-2026)
+
+#### TradingAgents (~31.8K stars - fastest growing)
+- **URL:** https://github.com/TauricResearch/TradingAgents
+- Multi-agent LLM framework mirroring real trading firms
+- Specialized agents: fundamental analyst, sentiment analyst, technical analyst, bull/bear researchers, risk management, portfolio manager
+- Supports GPT, Claude, Gemini, Grok, Ollama (local models)
+- Built on LangGraph for modularity
+
+#### FinGPT (~18.8K stars)
+- Open-source financial LLM fine-tuning framework
+- Financial sentiment analysis achieving 0.882 F1 (competitive with GPT-4)
+- Trainable on a single RTX 3090 (~$17 vs BloombergGPT's $2.67M)
+- FinGPT-Forecaster: stock price movement prediction from news
+
+#### AI-Trader (HKUDS, ~11.6K stars)
+- Competitive benchmark: AI models battle autonomously on NASDAQ 100, SSE 50, crypto
+- Live dashboard at ai4trade.ai
+- Uses MCP (Model Context Protocol) for tool access
+
+#### Other Notable
+- **FinMem** - LLM trading with layered memory (IJCAI2024 paper)
+- **LLM_trader** - Multi-agent with Vision AI chart analysis
+- **OctoBot AI** - OpenAI/Ollama integration for ready-to-use bot
+- **Alpaca MCP Server** - Trade from Claude/LLMs in plain English
+
+### MCP (Model Context Protocol) - Emerging Pattern
+- **Alpaca MCP Server:** Trade stocks, ETFs, crypto, options from Claude
+- **Hummingbot MCP Server:** AI agent integration for market making
+- **CCXT MCP Server:** Exchange connectivity for LLMs
+- Enables conversational trading: "Buy 100 shares of AAPL if RSI drops below 30"
 
 ### Realistic Assessment
 - LLMs are best used for **sentiment analysis** and **information processing**, not direct price prediction
-- Useful for: earnings call analysis, news sentiment scoring, macro analysis
+- Useful for: earnings call analysis, news sentiment scoring, macro analysis, strategy ideation
 - NOT useful for: tick-by-tick trading decisions, short-term price prediction
-- The edge is in processing information faster than manual traders, not in predicting price movements
+- Sentiment features are most valuable around earnings and event-driven volatility
+- The edge is in processing information faster than manual traders, not predicting prices
+- LLM API costs can be significant for real-time trading

@@ -122,13 +122,29 @@
 - **Foxbit:** Has API, smaller volume
 - **NovaDAX:** Binance-backed, BRL pairs
 
-### Tax Implications (Brazil)
-- Crypto gains over R$35,000/month are taxable (15-22.5% progressive)
-- Monthly reporting via DARF for gains
-- Annual declaration required via Receita Federal
-- Automated trading generates many taxable events - you need to track every trade
-- Tools like Koinly or CoinTracker can help with tax reporting
-- **Important:** High-frequency bot trading can generate hundreds of taxable events per month
+### Tax Implications (Brazil) - Updated 2026
+
+**CRITICAL DISTINCTION: Domestic vs Foreign Exchanges**
+
+**Domestic exchanges (Mercado Bitcoin, Foxbit, NovaDAX):**
+- Monthly exemption: Sales up to R$35,000/month are **TAX-FREE** regardless of profit
+- Progressive rates on gains above exemption: 15% (up to R$5M), 17.5%, 20%, 22.5%
+- Monthly DARF payment via GCAP
+
+**Foreign exchanges (Binance, Bybit, OKX, KuCoin):**
+- Fixed 15% rate on **ALL gains** (Lei 14.754/2023)
+- **NO monthly R$35,000 exemption** - every real of profit is taxed
+- Annual declaration in Ajuste Anual
+- No cross-regime loss compensation with domestic holdings
+
+**New in 2026:**
+- **DeCripto system** (July 2026): All exchanges must report Brazilian client transactions to Receita Federal
+- **BCB Resolutions 519-521** (Feb 2026): All exchanges need formal Banco Central authorization
+- Monthly transactions >R$30K (R$35K from July 2026) on foreign exchanges must be reported via Coleta Nacional
+
+**For bot trading:** Using a domestic exchange (Mercado Bitcoin) is significantly more tax-efficient for smaller traders due to the R$35K exemption. Bot trading on Binance means every gain is taxed at 15%.
+
+**Tax tracking tools:** Koinly, CoinTracker, or manual tracking via Freqtrade trade exports
 
 ---
 

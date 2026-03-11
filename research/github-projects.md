@@ -80,6 +80,35 @@ Ranked by: maturity, community, documentation, and suitability for an experience
 - **Pros:** Cloud + self-hosted, web UI, social trading
 - **Cons:** Smaller community
 
+## Tier B+ - Emerging/High-Potential
+
+### 11. TradingAgents (NEW - Hot)
+- **Stars:** ~31.8K (!!) | **Language:** Python | **Last Update:** Feb 2026 (v0.2.0)
+- **URL:** https://github.com/TauricResearch/TradingAgents
+- **Best for:** LLM-powered multi-agent trading research
+- **Features:** Deploys specialized AI agents (fundamental analyst, sentiment expert, technical analyst, risk manager) that collaboratively evaluate markets. Supports GPT, Claude, Gemini, Grok, Ollama.
+- **Pros:** Cutting-edge approach, multi-model support, novel architecture
+- **Cons:** Very new, experimental, LLM API costs, not battle-tested
+
+### 12. CCXT
+- **Stars:** ~41K | **Language:** JS/TS/Python/C#/PHP/Go | **Last Update:** Active daily
+- **URL:** https://github.com/ccxt/ccxt
+- **Best for:** Exchange connectivity (not a bot itself)
+- **Features:** Unified API for 107+ cryptocurrency exchanges. Foundation for most crypto bots.
+- **Verdict:** Essential building block. If you build custom, you'll use this.
+
+### 13. AI-Trader (HKUDS)
+- **Stars:** ~11.6K | **Language:** Python | **Last Update:** Active
+- **URL:** https://github.com/HKUDS/AI-Trader
+- **Best for:** AI trading benchmarks and competitions
+- **Features:** AI models battle autonomously on NASDAQ 100, SSE 50, crypto. Live dashboard.
+
+### 14. FinGPT
+- **Stars:** ~18.8K | **Language:** Python | **Last Update:** Active
+- **URL:** https://github.com/AI4Finance-Foundation/FinGPT
+- **Best for:** Financial sentiment analysis via LLM
+- **Features:** Open-source financial LLM. Fine-tunable on single RTX 3090 (~$17). 0.882 F1 on financial sentiment.
+
 ## Tier C - Specialized/Niche
 
 ### 11. HFTBacktest
