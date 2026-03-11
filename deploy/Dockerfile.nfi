@@ -1,0 +1,2 @@
+FROM freqtradeorg/freqtrade:stable
+RUN pip install --no-cache-dir pandas-ta python-rapidjson
