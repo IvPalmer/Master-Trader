@@ -6,15 +6,17 @@ Research repository for AI-powered automated trading systems. Covers crypto, sto
 
 ```
 research/
-  REPORT.md              # Synthesized findings & recommendations (START HERE)
-  crypto-bots.md         # Crypto bot ecosystem, exchanges, platforms
-  stock-trading.md       # Stock/equities automation, broker APIs
-  strategies-and-ml.md   # Deep dive: strategies, ML, risk management, data
-  github-projects.md     # Top 15 open-source projects ranked
-  brazil-setup.md        # Tax, regulations, infrastructure for Brazil
+  REPORT.md                  # Synthesized findings & recommendations (START HERE)
+  crypto-bots.md             # Crypto bot ecosystem, exchanges, platforms
+  stock-trading.md           # Stock/equities automation, broker APIs
+  strategies-and-ml.md       # Deep dive: strategies, ML, risk management, data
+  github-projects.md         # Top 20 open-source projects ranked
+  brazil-setup.md            # Tax, regulations, infrastructure for Brazil
+  trading-agents.md          # TradingAgents deep dive (multi-agent LLM framework)
+  freqtrade-paper-trading.md # Zero-risk paper trading setup guide
 
-strategies/              # Strategy implementations (future)
-docs/                    # Implementation documentation (future)
+strategies/                  # Strategy implementations (future)
+docs/                        # Implementation documentation (future)
 ```
 
 ## Quick Summary
