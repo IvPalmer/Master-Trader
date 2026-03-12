@@ -1,9 +1,22 @@
 ---
+# Pinned Binance IPs for VPN bypass (used by extra_hosts below)
+# If Binance changes IPs, update these and the bypass_vpn_binance.sh routes
+x-binance-hosts: &binance-hosts
+  - "api.binance.com:13.226.219.154"
+  - "api1.binance.com:13.226.219.154"
+  - "api2.binance.com:13.226.219.154"
+  - "api3.binance.com:13.226.219.154"
+  - "fapi.binance.com:108.138.85.11"
+  - "dapi.binance.com:13.226.219.154"
+  - "data.binance.com:13.226.219.154"
+  - "stream.binance.com:13.112.187.8"
+
 services:
   cluchanix:
     image: freqtradeorg/freqtrade:stable
     restart: unless-stopped
     container_name: ft-cluchanix
+    extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
@@ -32,6 +45,7 @@ services:
     image: freqtradeorg/freqtrade:stable
     restart: unless-stopped
     container_name: ft-nasosv5
+    extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
@@ -46,6 +60,7 @@ services:
     image: freqtradeorg/freqtrade:stable
     restart: unless-stopped
     container_name: ft-elliotv5
+    extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
@@ -60,6 +75,7 @@ services:
     image: freqtradeorg/freqtrade:stable
     restart: unless-stopped
     container_name: ft-supertrendstrategy
+    extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
@@ -88,6 +104,7 @@ services:
     image: freqtradeorg/freqtrade:stable
     restart: unless-stopped
     container_name: ft-mastertraderv1
+    extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
@@ -102,6 +119,7 @@ services:
     image: freqtradeorg/freqtrade:stable_freqai
     restart: unless-stopped
     container_name: ft-mastertraderai
+    extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
@@ -113,7 +131,7 @@ services:
       --strategy MasterTraderAI
       --freqaimodel LightGBMRegressor
 
-  # nostalgiaforinfinityx6:  # KILLED — 0 trades in weeks, slot available for rotation
+  # nostalgiaforinfinityx6:  # KILLED — 0 trades in weeks, replaced by BollingerRSIMeanReversion
   #   build:
   #     context: .
   #     dockerfile: Dockerfile.nfi
@@ -128,6 +146,21 @@ services:
   #     --logfile /freqtrade/user_data/logs/NostalgiaForInfinityX6.log
   #     --config /freqtrade/user_data/configs/NostalgiaForInfinityX6.json
   #     --strategy NostalgiaForInfinityX6
+
+  bollingerrsimeanreversion:
+    image: freqtradeorg/freqtrade:stable
+    restart: unless-stopped
+    container_name: ft-bollinger-rsi
+    extra_hosts: *binance-hosts
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8089:8080"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/BollingerRSIMeanReversion.log
+      --config /freqtrade/user_data/configs/BollingerRSIMeanReversion.json
+      --strategy BollingerRSIMeanReversion
 
   # ── Monitoring Stack ───────────────────────────────────────────────
 
@@ -149,6 +182,7 @@ services:
       - supertrendstrategy
       - mastertraderv1
       - mastertraderai
+      - bollingerrsimeanreversion
       # - nostalgiaforinfinityx6  # KILLED
 
   prometheus:

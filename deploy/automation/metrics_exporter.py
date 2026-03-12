@@ -29,7 +29,8 @@ BOTS = [
     {"service": "supertrendstrategy",     "strategy": "SupertrendStrategy"},
     {"service": "mastertraderv1",         "strategy": "MasterTraderV1"},
     {"service": "mastertraderai",         "strategy": "MasterTraderAI"},
-    {"service": "nostalgiaforinfinityx6", "strategy": "NostalgiaForInfinityX6"},
+    {"service": "bollingerrsimeanreversion", "strategy": "BollingerRSIMeanReversion"},
+    # {"service": "nostalgiaforinfinityx6", "strategy": "NostalgiaForInfinityX6"},  # KILLED
 ]
 
 AUTH = HTTPBasicAuth("freqtrader", "mastertrader")

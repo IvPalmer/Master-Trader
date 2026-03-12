@@ -50,6 +50,7 @@ BOTS = {
     "SupertrendStrategy": {"port": 8084, "container": "ft-supertrendstrategy", "timeframe": "1h"},
     "MasterTraderV1":     {"port": 8086, "container": "ft-mastertraderv1", "timeframe": "1h"},
     "MasterTraderAI":     {"port": 8087, "container": "ft-mastertraderai", "timeframe": "1h"},
+    "BollingerRSIMeanReversion": {"port": 8089, "container": "ft-bollinger-rsi", "timeframe": "15m"},
 }
 
 API_USER = "freqtrader"

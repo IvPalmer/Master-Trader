@@ -46,6 +46,7 @@ BOTS = {
     # "DoubleEMACrossoverWithTrend":  {"port": 8085, "container": "ft-doubleemacrossoverwithtrend"},  # PAUSED
     "MasterTraderV1":               {"port": 8086, "container": "ft-mastertraderv1"},
     "MasterTraderAI":               {"port": 8087, "container": "ft-mastertraderai"},
+    "BollingerRSIMeanReversion":    {"port": 8089, "container": "ft-bollinger-rsi"},
     # "NostalgiaForInfinityX6":       {"port": 8089, "container": "ft-nostalgiaforinfinityx6"},  # KILLED — 0 trades
 }
 

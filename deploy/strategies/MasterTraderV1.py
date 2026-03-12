@@ -39,7 +39,7 @@ class MasterTraderV1(IStrategy):
     process_only_new_candles = True
 
     # Use exit signal
-    use_exit_signal = True
+    use_exit_signal = False
     exit_profit_only = False
     ignore_roi_if_entry_signal = False
 
