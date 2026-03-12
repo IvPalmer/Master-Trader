@@ -19,14 +19,14 @@ class SupertrendStrategy(IStrategy):
     }
 
     minimal_roi = {
-        "0": 0.087, "372": 0.058, "861": 0.029, "2221": 0
+        "0": 0.05, "360": 0.03, "720": 0.02, "1440": 0.01
     }
 
     stoploss = -0.10  # MAE data: worst winner MAE was -4.90%, -10% for 1h buffer
     trailing_stop = True
-    trailing_stop_positive = 0.05
-    trailing_stop_positive_offset = 0.144
-    trailing_only_offset_is_reached = False
+    trailing_stop_positive = 0.02    # Trail by 2% once offset is reached
+    trailing_stop_positive_offset = 0.03  # Start trailing at +3% (was 14.4% — never activated)
+    trailing_only_offset_is_reached = True  # Only trail after hitting +3%
     timeframe = '1h'
     startup_candle_count = 199
 

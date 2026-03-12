@@ -112,6 +112,7 @@ def run_hyperopt(
         "--epochs", str(epochs),
         "--timerange", timerange,
         "--print-json",
+        "--disable-param-export",  # CRITICAL: don't auto-write strategy JSON overrides
         "-j", "1",  # Single job to avoid OOM kills
     ]
 
