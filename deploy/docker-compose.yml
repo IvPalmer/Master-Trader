@@ -113,21 +113,21 @@ services:
       --strategy MasterTraderAI
       --freqaimodel LightGBMRegressor
 
-  nostalgiaforinfinityx6:
-    build:
-      context: .
-      dockerfile: Dockerfile.nfi
-    restart: unless-stopped
-    container_name: ft-nostalgiaforinfinityx6
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8089:8080"
-    command: >
-      trade
-      --logfile /freqtrade/user_data/logs/NostalgiaForInfinityX6.log
-      --config /freqtrade/user_data/configs/NostalgiaForInfinityX6.json
-      --strategy NostalgiaForInfinityX6
+  # nostalgiaforinfinityx6:  # KILLED — 0 trades in weeks, slot available for rotation
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.nfi
+  #   restart: unless-stopped
+  #   container_name: ft-nostalgiaforinfinityx6
+  #   volumes:
+  #     - "./user_data:/freqtrade/user_data"
+  #   ports:
+  #     - "127.0.0.1:8089:8080"
+  #   command: >
+  #     trade
+  #     --logfile /freqtrade/user_data/logs/NostalgiaForInfinityX6.log
+  #     --config /freqtrade/user_data/configs/NostalgiaForInfinityX6.json
+  #     --strategy NostalgiaForInfinityX6
 
   # ── Monitoring Stack ───────────────────────────────────────────────
 
@@ -149,7 +149,7 @@ services:
       - supertrendstrategy
       - mastertraderv1
       - mastertraderai
-      - nostalgiaforinfinityx6
+      # - nostalgiaforinfinityx6  # KILLED
 
   prometheus:
     image: prom/prometheus:latest

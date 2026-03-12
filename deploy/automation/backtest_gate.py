@@ -63,7 +63,7 @@ STRATEGY_IMAGES = {
     "SupertrendStrategy": "freqtradeorg/freqtrade:stable",
     "MasterTraderV1": "freqtradeorg/freqtrade:stable",
     "MasterTraderAI": "freqtradeorg/freqtrade:stable_freqai",
-    "NostalgiaForInfinityX6": "ft_userdata-nostalgiaforinfinityx6",  # Custom built image
+    # "NostalgiaForInfinityX6": "ft_userdata-nostalgiaforinfinityx6",  # KILLED — 0 trades
 }
 
 ALL_STRATEGIES = list(STRATEGY_IMAGES.keys())
@@ -76,7 +76,7 @@ STRATEGY_PORTS = {
     "SupertrendStrategy": 8084,
     "MasterTraderV1": 8086,
     "MasterTraderAI": 8087,
-    "NostalgiaForInfinityX6": 8089,
+    # "NostalgiaForInfinityX6": 8089,  # KILLED
 }
 
 # Backtest pass/fail thresholds — per timeframe
@@ -643,7 +643,7 @@ BOTS_TIMEFRAMES = {
     "SupertrendStrategy": "1h",
     "MasterTraderV1": "1h",
     "MasterTraderAI": "1h",
-    "NostalgiaForInfinityX6": "5m",
+    # "NostalgiaForInfinityX6": "5m",  # KILLED
 }
 
 

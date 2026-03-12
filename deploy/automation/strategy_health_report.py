@@ -39,7 +39,7 @@ BOTS = {
     "SupertrendStrategy":     {"port": 8084, "timeframe": "1h", "type": "trend-follower"},
     "MasterTraderV1":         {"port": 8086, "timeframe": "1h", "type": "hybrid"},
     "MasterTraderAI":         {"port": 8087, "timeframe": "1h", "type": "ml-based"},
-    "NostalgiaForInfinityX6": {"port": 8089, "timeframe": "5m", "type": "multi-signal"},
+    # "NostalgiaForInfinityX6": {"port": 8089, "timeframe": "5m", "type": "multi-signal"},  # KILLED
 }
 
 API_USER = "freqtrader"

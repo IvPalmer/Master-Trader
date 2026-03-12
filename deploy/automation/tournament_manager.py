@@ -46,7 +46,7 @@ BOTS = {
     # "DoubleEMACrossoverWithTrend":  {"port": 8085, "container": "ft-doubleemacrossoverwithtrend"},  # PAUSED
     "MasterTraderV1":               {"port": 8086, "container": "ft-mastertraderv1"},
     "MasterTraderAI":               {"port": 8087, "container": "ft-mastertraderai"},
-    "NostalgiaForInfinityX6":       {"port": 8089, "container": "ft-nostalgiaforinfinityx6"},
+    # "NostalgiaForInfinityX6":       {"port": 8089, "container": "ft-nostalgiaforinfinityx6"},  # KILLED — 0 trades
 }
 
 API_USER = "freqtrader"
@@ -62,7 +62,7 @@ MAX_ALLOC = TOTAL_CAPITAL * MAX_ALLOC_PCT
 ROLLING_DAYS = 30
 WIN_RATE_WINDOW = 50
 NEW_STRATEGY_DAYS = 7
-PAUSE_NEGATIVE_SHARPE_DAYS = 14
+PAUSE_NEGATIVE_SHARPE_DAYS = 5
 EMA_SPAN = 14              # EMA span for return smoothing
 
 # Health-score integration
