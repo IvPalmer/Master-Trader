@@ -57,7 +57,7 @@ class ClucHAnix(IStrategy):
             {"method": "CooldownPeriod", "stop_duration_candles": 5},
             {"method": "StoplossGuard", "lookback_period_candles": 24, "trade_limit": 3, "stop_duration_candles": 12, "only_per_pair": True},
             {"method": "LowProfitPairs", "lookback_period_candles": 72, "trade_limit": 2, "stop_duration_candles": 72, "required_profit": -0.02},
-            {"method": "MaxDrawdown", "lookback_period_candles": 576, "max_allowed_drawdown": 0.10, "stop_duration_candles": 72, "trade_limit": 1, "only_per_pair": True},
+            {"method": "MaxDrawdown", "lookback_period_candles": 576, "max_allowed_drawdown": 0.20, "stop_duration_candles": 72, "trade_limit": 1},
         ]
 
     order_types = {

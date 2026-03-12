@@ -54,7 +54,7 @@ STRATEGY_IMAGES = {
     "SupertrendStrategy": "freqtradeorg/freqtrade:stable",
     "MasterTraderV1": "freqtradeorg/freqtrade:stable",
     "MasterTraderAI": "freqtradeorg/freqtrade:stable_freqai",
-    "NostalgiaForInfinityX6": "ft_userdata-nostalgiaforinfinityx6",
+    "BollingerRSIMeanReversion": "freqtradeorg/freqtrade:stable",
 }
 
 # Strategies that support hyperopt (exclude ML-based)

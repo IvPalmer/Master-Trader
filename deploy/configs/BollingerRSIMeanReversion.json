@@ -7,7 +7,7 @@
     "stake_currency": "USDT",
     "stake_amount": "unlimited",
     "tradable_balance_ratio": 0.99,
-    "fiat_display_currency": "BRL",
+    "fiat_display_currency": "",
     "max_open_trades": 5,
     "amount_reserve_percent": 0.05,
     "unfilledtimeout": {
@@ -147,8 +147,7 @@
         "enable_openapi": true,
         "jwt_secret_key": "master-trader-dev-key-change-for-prod",
         "CORS_origins": [
-            "http://localhost:8080",
-            "http://localhost:8084"
+            "http://localhost:8089"
         ],
         "username": "freqtrader",
         "password": "mastertrader"
