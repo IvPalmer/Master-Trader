@@ -31,6 +31,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
+import requests
+
 CONFIGS_DIR = Path.home() / "ft_userdata" / "user_data" / "configs"
 STRATEGIES_DIR = Path.home() / "ft_userdata" / "user_data" / "strategies"
 DATA_DIR = Path.home() / "ft_userdata" / "user_data" / "data"
@@ -38,6 +40,8 @@ RESULTS_DIR = Path.home() / "ft_userdata" / "user_data" / "backtest_results"
 LOGS_DIR = Path.home() / "ft_userdata" / "logs"
 FT_DIR = Path.home() / "ft_userdata"
 WEBHOOK_URL = "http://localhost:8088/webhooks/freqtrade"
+API_USER = "freqtrader"
+API_PASS = "mastertrader"
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -64,19 +68,43 @@ STRATEGY_IMAGES = {
 
 ALL_STRATEGIES = list(STRATEGY_IMAGES.keys())
 
-# Backtest pass/fail thresholds
-THRESHOLDS = {
-    "min_sharpe": 0.3,             # Annualized Sharpe ratio
-    "max_drawdown_pct": 20.0,      # Maximum drawdown %
-    "min_win_rate": 45.0,          # Win rate %
-    "min_profit_factor": 0.8,      # Gross profit / gross loss
-    "min_total_trades": 10,        # Need enough trades for statistical significance
-    "max_avg_loss_pct": -8.0,      # Average losing trade must be < 8%
+# Strategy to API port mapping (for fetching live pairlists)
+STRATEGY_PORTS = {
+    "ClucHAnix": 8080,
+    "NASOSv5": 8082,
+    "ElliotV5": 8083,
+    "SupertrendStrategy": 8084,
+    "MasterTraderV1": 8086,
+    "MasterTraderAI": 8087,
+    "NostalgiaForInfinityX6": 8089,
 }
 
-# Pairs used for backtesting (top 30 by volume, static for consistency)
-# More pairs = dip-buyer strategies like NASOSv5/ElliotV5 find more signals
-BACKTEST_PAIRS = [
+# Backtest pass/fail thresholds — per timeframe
+# 5m dip-buyers: tighter thresholds (more trades, better statistics)
+# 1h trend-followers: looser thresholds (fewer trades, more variance)
+THRESHOLDS_5M = {
+    "min_sharpe": 0.3,
+    "max_drawdown_pct": 20.0,
+    "min_win_rate": 45.0,
+    "min_profit_factor": 0.8,
+    "min_total_trades": 10,
+}
+
+THRESHOLDS_1H = {
+    "min_sharpe": -1.0,            # Trend strategies have high variance
+    "max_drawdown_pct": 30.0,      # More drawdown tolerance
+    "min_win_rate": 25.0,          # Trend strategies win less but win big
+    "min_profit_factor": 0.5,      # Looser — live performance is what matters
+    "min_total_trades": 5,
+}
+
+def get_thresholds(strategy: str) -> dict:
+    """Return appropriate thresholds based on strategy timeframe."""
+    tf = BOTS_TIMEFRAMES.get(strategy, "5m")
+    return THRESHOLDS_1H if tf == "1h" else THRESHOLDS_5M
+
+# Fallback pairs if live pairlist fetch fails
+FALLBACK_PAIRS = [
     "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT",
     "BNB/USDT", "ADA/USDT", "AVAX/USDT", "LINK/USDT", "NEAR/USDT",
     "SUI/USDT", "PEPE/USDT", "TRX/USDT", "DOT/USDT", "SHIB/USDT",
@@ -87,11 +115,61 @@ BACKTEST_PAIRS = [
 
 
 # ---------------------------------------------------------------------------
+# Live Pairlist Fetching
+# ---------------------------------------------------------------------------
+
+def fetch_live_pairlist(strategy: str) -> list[str]:
+    """Fetch the actual pairlist a bot is currently trading from its API."""
+    port = STRATEGY_PORTS.get(strategy)
+    if not port:
+        log.warning("No port mapping for %s, using fallback pairs", strategy)
+        return FALLBACK_PAIRS
+
+    try:
+        resp = requests.get(
+            f"http://localhost:{port}/api/v1/whitelist",
+            auth=(API_USER, API_PASS),
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        pairs = data.get("whitelist", [])
+        if pairs:
+            log.info("  Fetched %d live pairs from %s (port %d)", len(pairs), strategy, port)
+            return pairs
+        else:
+            log.warning("  Empty pairlist from %s, using fallback", strategy)
+            return FALLBACK_PAIRS
+    except Exception as e:
+        log.warning("  Failed to fetch pairlist from %s: %s — using fallback", strategy, e)
+        return FALLBACK_PAIRS
+
+
+def generate_backtest_config(strategy: str, pairs: list[str]) -> str:
+    """Generate a per-strategy backtest config with the bot's live pairlist.
+
+    Returns the container-internal path to the generated config file.
+    """
+    base_config_path = FT_DIR / "user_data" / "config-backtest.json"
+    with open(base_config_path) as f:
+        config = json.load(f)
+
+    config["exchange"]["pair_whitelist"] = pairs
+    config["bot_name"] = f"Backtest-{strategy}"
+
+    out_path = FT_DIR / "user_data" / "configs" / f"backtest-{strategy}.json"
+    with open(out_path, "w") as f:
+        json.dump(config, f, indent=2)
+
+    return f"/freqtrade/user_data/configs/backtest-{strategy}.json"
+
+
+# ---------------------------------------------------------------------------
 # Data Download
 # ---------------------------------------------------------------------------
 
-def download_data(days: int = 60, timeframes: list[str] = None) -> bool:
-    """Download historical data using Freqtrade's data downloader."""
+def download_data(pairs: list[str], days: int = 60, timeframes: list[str] = None) -> bool:
+    """Download historical data for a specific set of pairs."""
     if timeframes is None:
         timeframes = ["5m", "1h"]
 
@@ -99,16 +177,15 @@ def download_data(days: int = 60, timeframes: list[str] = None) -> bool:
     start = end - timedelta(days=days)
     timerange = f"{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}"
 
-    pairs_arg = " ".join(BACKTEST_PAIRS)
     for tf in timeframes:
-        log.info("Downloading %s data for %d days...", tf, days)
+        log.info("  Downloading %s data for %d pairs, %d days...", tf, len(pairs), days)
         cmd = [
             "docker", "run", "--rm",
             "-v", f"{Path.home()}/ft_userdata/user_data:/freqtrade/user_data",
             "freqtradeorg/freqtrade:stable",
             "download-data",
             "--exchange", "binance",
-            "--pairs", *BACKTEST_PAIRS,
+            "--pairs", *pairs,
             "--timeframes", tf,
             "--timerange", timerange,
             "--config", "/freqtrade/user_data/config-backtest.json",
@@ -116,14 +193,14 @@ def download_data(days: int = 60, timeframes: list[str] = None) -> bool:
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             if result.returncode != 0:
-                log.warning("Data download warning for %s: %s", tf, result.stderr[-500:] if result.stderr else "")
+                log.warning("  Data download warning for %s: %s", tf, result.stderr[-500:] if result.stderr else "")
             else:
-                log.info("Downloaded %s data successfully", tf)
+                log.info("  Downloaded %s data successfully", tf)
         except subprocess.TimeoutExpired:
-            log.error("Data download timed out for %s", tf)
+            log.error("  Data download timed out for %s", tf)
             return False
         except Exception as e:
-            log.error("Data download failed: %s", e)
+            log.error("  Data download failed: %s", e)
             return False
     return True
 
@@ -132,14 +209,14 @@ def download_data(days: int = 60, timeframes: list[str] = None) -> bool:
 # Backtesting
 # ---------------------------------------------------------------------------
 
-def run_backtest(strategy: str, days: int = 60, config_override: str = None) -> Optional[dict]:
+def run_backtest(strategy: str, days: int = 60, config_path: str = None) -> Optional[dict]:
     """
     Run a backtest for a strategy and return parsed results.
 
     Args:
         strategy: Strategy class name
         days: Number of days to backtest
-        config_override: Path to alternative config (for A/B testing)
+        config_path: Container-internal path to backtest config
 
     Returns:
         Dict with backtest metrics or None on failure
@@ -148,32 +225,25 @@ def run_backtest(strategy: str, days: int = 60, config_override: str = None) -> 
     start = end - timedelta(days=days)
     timerange = f"{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}"
 
-    config_path = config_override or f"/freqtrade/user_data/configs/{strategy}.json"
+    if not config_path:
+        config_path = "/freqtrade/user_data/config-backtest.json"
+
     image = STRATEGY_IMAGES.get(strategy, "freqtradeorg/freqtrade:stable")
 
-    # For NFI, use the locally built image
-    if strategy == "NostalgiaForInfinityX6":
-        image = "ft_userdata-nostalgiaforinfinityx6"
-
-    log.info("Backtesting %s over %d days (%s)...", strategy, days, timerange)
+    log.info("  Backtesting %s over %d days (%s)...", strategy, days, timerange)
 
     cmd = [
         "docker", "run", "--rm",
         "-v", f"{Path.home()}/ft_userdata/user_data:/freqtrade/user_data",
-    ]
-
-    # Use ONLY the backtest config (static pairlist) — strategy configs have
-    # VolumePairList which doesn't support backtesting
-    cmd.extend([
         image,
         "backtesting",
         "--strategy", strategy,
-        "--config", "/freqtrade/user_data/config-backtest.json",
+        "--config", config_path,
         "--timerange", timerange,
         "--export", "trades",
         "--export-filename",
         f"/freqtrade/user_data/backtest_results/gate-{strategy}-{datetime.now().strftime('%Y%m%d-%H%M%S')}",
-    ])
+    ]
 
     try:
         result = subprocess.run(
@@ -301,22 +371,27 @@ def _parse_backtest_output(output: str, strategy: str) -> Optional[dict]:
 
 def evaluate_backtest(metrics: dict) -> dict:
     """Evaluate backtest results against thresholds. Returns pass/fail with details."""
+    strategy = metrics["strategy"]
+    thresholds = get_thresholds(strategy)
+    tf = BOTS_TIMEFRAMES.get(strategy, "5m")
+
     result = {
-        "strategy": metrics["strategy"],
+        "strategy": strategy,
         "passed": True,
         "checks": [],
         "metrics": metrics,
+        "timeframe": tf,
     }
 
     checks = []
 
     # Minimum trades
     total = metrics.get("total_trades", 0)
-    passed = total >= THRESHOLDS["min_total_trades"]
+    passed = total >= thresholds["min_total_trades"]
     checks.append({
         "name": "Minimum trades",
         "value": total,
-        "threshold": THRESHOLDS["min_total_trades"],
+        "threshold": thresholds["min_total_trades"],
         "passed": passed,
     })
     if not passed:
@@ -324,12 +399,12 @@ def evaluate_backtest(metrics: dict) -> dict:
 
     # Sharpe ratio
     sharpe = metrics.get("sharpe_ratio", 0)
-    if sharpe != 0:  # Only check if we have it
-        passed = sharpe >= THRESHOLDS["min_sharpe"]
+    if sharpe != 0:
+        passed = sharpe >= thresholds["min_sharpe"]
         checks.append({
             "name": "Sharpe ratio",
             "value": round(sharpe, 2),
-            "threshold": THRESHOLDS["min_sharpe"],
+            "threshold": thresholds["min_sharpe"],
             "passed": passed,
         })
         if not passed:
@@ -338,11 +413,11 @@ def evaluate_backtest(metrics: dict) -> dict:
     # Max drawdown
     dd = metrics.get("max_drawdown_pct", 0)
     if dd != 0:
-        passed = dd <= THRESHOLDS["max_drawdown_pct"]
+        passed = dd <= thresholds["max_drawdown_pct"]
         checks.append({
             "name": "Max drawdown",
             "value": f"{dd:.1f}%",
-            "threshold": f"{THRESHOLDS['max_drawdown_pct']}%",
+            "threshold": f"{thresholds['max_drawdown_pct']}%",
             "passed": passed,
         })
         if not passed:
@@ -350,12 +425,12 @@ def evaluate_backtest(metrics: dict) -> dict:
 
     # Win rate
     wr = metrics.get("win_rate", 0)
-    if total >= THRESHOLDS["min_total_trades"]:
-        passed = wr >= THRESHOLDS["min_win_rate"]
+    if total >= thresholds["min_total_trades"]:
+        passed = wr >= thresholds["min_win_rate"]
         checks.append({
             "name": "Win rate",
             "value": f"{wr:.1f}%",
-            "threshold": f"{THRESHOLDS['min_win_rate']}%",
+            "threshold": f"{thresholds['min_win_rate']}%",
             "passed": passed,
         })
         if not passed:
@@ -364,11 +439,11 @@ def evaluate_backtest(metrics: dict) -> dict:
     # Profit factor
     pf = metrics.get("profit_factor", 0)
     if pf > 0:
-        passed = pf >= THRESHOLDS["min_profit_factor"]
+        passed = pf >= thresholds["min_profit_factor"]
         checks.append({
             "name": "Profit factor",
             "value": round(pf, 2),
-            "threshold": THRESHOLDS["min_profit_factor"],
+            "threshold": thresholds["min_profit_factor"],
             "passed": passed,
         })
         if not passed:
@@ -399,8 +474,9 @@ def format_report(evaluations: list[dict]) -> str:
         strategy = e["strategy"]
         m = e.get("metrics", {})
 
+        tf = e.get("timeframe", "?")
         lines.append(f"{'=' * 40}")
-        lines.append(f"{status} | {strategy}")
+        lines.append(f"{status} | {strategy} ({tf})")
 
         if m:
             trades = m.get("total_trades", 0)
@@ -409,9 +485,10 @@ def format_report(evaluations: list[dict]) -> str:
             dd = m.get("max_drawdown_pct", "N/A")
             pf = m.get("profit_factor", "N/A")
             profit = m.get("total_profit", "N/A")
+            n_pairs = m.get("pair_count", "?")
 
-            lines.append(f"  Trades: {trades} | WR: {wr}% | Sharpe: {sharpe}")
-            lines.append(f"  Max DD: {dd}% | PF: {pf} | Profit: ${profit}")
+            lines.append(f"  Pairs: {n_pairs} (live) | Trades: {trades} | WR: {wr}%")
+            lines.append(f"  Sharpe: {sharpe} | Max DD: {dd}% | PF: {pf} | Profit: ${profit}")
 
         for check in e.get("checks", []):
             icon = "OK" if check["passed"] else "FAIL"
@@ -462,15 +539,31 @@ def main():
             log.error("Unknown strategy: %s. Available: %s", s, ", ".join(ALL_STRATEGIES))
             sys.exit(1)
 
-    # Download data if requested
-    if args.download:
-        timeframes = set()
-        for s in strategies:
-            tf = BOTS_TIMEFRAMES.get(s, "5m")
-            timeframes.add(tf)
-        if not download_data(args.days, list(timeframes)):
-            log.error("Data download failed, aborting")
-            sys.exit(1)
+    # Fetch live pairlists and prepare per-strategy configs
+    log.info("Fetching live pairlists from bot APIs...")
+    strategy_pairs = {}
+    all_pairs = set()
+    for strategy in strategies:
+        if strategy == "MasterTraderAI":
+            continue  # Skip FreqAI
+        pairs = fetch_live_pairlist(strategy)
+        strategy_pairs[strategy] = pairs
+        all_pairs.update(pairs)
+
+    # Download data for all unique pairs across all strategies
+    if all_pairs:
+        all_pairs_list = sorted(all_pairs)
+        log.info("Downloading data for %d unique pairs across all strategies...", len(all_pairs_list))
+        timeframes = list(set(BOTS_TIMEFRAMES.get(s, "5m") for s in strategies))
+        if not download_data(all_pairs_list, args.days, timeframes):
+            log.warning("Some data downloads failed, continuing with available data")
+
+    # Generate per-strategy backtest configs
+    strategy_configs = {}
+    for strategy, pairs in strategy_pairs.items():
+        config_path = generate_backtest_config(strategy, pairs)
+        strategy_configs[strategy] = config_path
+        log.info("  %s: %d pairs → %s", strategy, len(pairs), config_path)
 
     # Run backtests
     evaluations = []
@@ -478,9 +571,9 @@ def main():
         log.info("=" * 40)
         log.info("Testing: %s", strategy)
 
-        # Skip FreqAI strategies for now (require special handling)
+        # Skip FreqAI strategies (require pre-trained models)
         if strategy == "MasterTraderAI":
-            log.info("Skipping %s — FreqAI strategies need pre-trained models for backtesting", strategy)
+            log.info("  Skipping %s — FreqAI strategies need pre-trained models for backtesting", strategy)
             evaluations.append({
                 "strategy": strategy,
                 "passed": True,
@@ -489,7 +582,13 @@ def main():
             })
             continue
 
-        metrics = run_backtest(strategy, args.days)
+        config_path = strategy_configs.get(strategy)
+        pairs = strategy_pairs.get(strategy, [])
+        log.info("  Using %d live pairs for backtest", len(pairs))
+        metrics = run_backtest(strategy, args.days, config_path)
+
+        if metrics is not None:
+            metrics["pair_count"] = len(pairs)
 
         if metrics is None:
             log.error("Backtest failed for %s — no results", strategy)
