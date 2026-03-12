@@ -2633,11 +2633,11 @@ class NostalgiaForInfinityX6(IStrategy):
     informative_1d["RSI_14_diff"] = informative_1d["RSI_14"] - informative_1d["RSI_14"].shift(1)
     # BB 20 - STD2
     bbands_20_2 = pta.bbands(informative_1d["close"], length=20)
-    informative_1d["BBL_20_2.0"] = bbands_20_2["BBL_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_1d["BBM_20_2.0"] = bbands_20_2["BBM_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_1d["BBU_20_2.0"] = bbands_20_2["BBU_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_1d["BBB_20_2.0"] = bbands_20_2["BBB_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_1d["BBP_20_2.0"] = bbands_20_2["BBP_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_1d["BBL_20_2.0_2.0"] = bbands_20_2["BBL_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_1d["BBM_20_2.0_2.0"] = bbands_20_2["BBM_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_1d["BBU_20_2.0_2.0"] = bbands_20_2["BBU_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_1d["BBB_20_2.0_2.0"] = bbands_20_2["BBB_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_1d["BBP_20_2.0_2.0"] = bbands_20_2["BBP_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
     # MFI
     informative_1d["MFI_14"] = pta.mfi(
       informative_1d["high"], informative_1d["low"], informative_1d["close"], informative_1d["volume"], length=14
@@ -2772,11 +2772,11 @@ class NostalgiaForInfinityX6(IStrategy):
     informative_4h["EMA_200"] = pta.ema(informative_4h["close"], length=200, fillna=0.0)
     # BB 20 - STD2
     bbands_20_2 = pta.bbands(informative_4h["close"], length=20)
-    informative_4h["BBL_20_2.0"] = bbands_20_2["BBL_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_4h["BBM_20_2.0"] = bbands_20_2["BBM_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_4h["BBU_20_2.0"] = bbands_20_2["BBU_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_4h["BBB_20_2.0"] = bbands_20_2["BBB_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_4h["BBP_20_2.0"] = bbands_20_2["BBP_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_4h["BBL_20_2.0_2.0"] = bbands_20_2["BBL_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_4h["BBM_20_2.0_2.0"] = bbands_20_2["BBM_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_4h["BBU_20_2.0_2.0"] = bbands_20_2["BBU_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_4h["BBB_20_2.0_2.0"] = bbands_20_2["BBB_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_4h["BBP_20_2.0_2.0"] = bbands_20_2["BBP_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
     # MFI
     informative_4h["MFI_14"] = pta.mfi(
       informative_4h["high"], informative_4h["low"], informative_4h["close"], informative_4h["volume"], length=14
@@ -2945,11 +2945,11 @@ class NostalgiaForInfinityX6(IStrategy):
     informative_1h["SMA_16"] = pta.sma(informative_1h["close"], length=16)
     # BB 20 - STD2
     bbands_20_2 = pta.bbands(informative_1h["close"], length=20)
-    informative_1h["BBL_20_2.0"] = bbands_20_2["BBL_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_1h["BBM_20_2.0"] = bbands_20_2["BBM_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_1h["BBU_20_2.0"] = bbands_20_2["BBU_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_1h["BBB_20_2.0"] = bbands_20_2["BBB_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    informative_1h["BBP_20_2.0"] = bbands_20_2["BBP_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_1h["BBL_20_2.0_2.0"] = bbands_20_2["BBL_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_1h["BBM_20_2.0_2.0"] = bbands_20_2["BBM_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_1h["BBU_20_2.0_2.0"] = bbands_20_2["BBU_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_1h["BBB_20_2.0_2.0"] = bbands_20_2["BBB_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    informative_1h["BBP_20_2.0_2.0"] = bbands_20_2["BBP_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
     # MFI
     informative_1h["MFI_14"] = pta.mfi(
       informative_1h["high"], informative_1h["low"], informative_1h["close"], informative_1h["volume"], length=14
@@ -3258,11 +3258,11 @@ class NostalgiaForInfinityX6(IStrategy):
     df["SMA_200"] = pta.sma(df["close"], length=200)
     # BB 20 - STD2
     bbands_20_2 = pta.bbands(df["close"], length=20)
-    df["BBL_20_2.0"] = bbands_20_2["BBL_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    df["BBM_20_2.0"] = bbands_20_2["BBM_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    df["BBU_20_2.0"] = bbands_20_2["BBU_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    df["BBB_20_2.0"] = bbands_20_2["BBB_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
-    df["BBP_20_2.0"] = bbands_20_2["BBP_20_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    df["BBL_20_2.0_2.0"] = bbands_20_2["BBL_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    df["BBM_20_2.0_2.0"] = bbands_20_2["BBM_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    df["BBU_20_2.0_2.0"] = bbands_20_2["BBU_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    df["BBB_20_2.0_2.0"] = bbands_20_2["BBB_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
+    df["BBP_20_2.0_2.0"] = bbands_20_2["BBP_20_2.0_2.0"] if isinstance(bbands_20_2, pd.DataFrame) else np.nan
     # MFI
     df["MFI_14"] = pta.mfi(df["high"], df["low"], df["close"], df["volume"], length=14)
     # CMF
@@ -11719,7 +11719,7 @@ class NostalgiaForInfinityX6(IStrategy):
             (df["EMA_26"] > df["EMA_12"])
             & ((df["EMA_26"] - df["EMA_12"]) > (df["open"] * 0.034))
             & ((df["EMA_26"].shift() - df["EMA_12"].shift()) > (df["open"] / 100.0))
-            & (df["close"] < (df["BBL_20_2.0"] * 0.999))
+            & (df["close"] < (df["BBL_20_2.0_2.0"] * 0.999))
           )
 
         # Condition #2 - Normal mode (Long).
@@ -14711,7 +14711,7 @@ class NostalgiaForInfinityX6(IStrategy):
           long_entry_logic.append(df["STOCHRSIk_14_14_3_3"] < 20.0)
           long_entry_logic.append(df["WILLR_84_1h"] < -70.0)
           long_entry_logic.append(df["STOCHRSIk_14_14_3_3_1h"] < 20.0)
-          long_entry_logic.append(df["BBB_20_2.0_1h"] > 16.0)
+          long_entry_logic.append(df["BBB_20_2.0_2.0_1h"] > 16.0)
           long_entry_logic.append(df["close_max_48"] >= (df["close"] * 1.10))
 
         # Condition #43 - Quick mode (Long).
@@ -14922,7 +14922,7 @@ class NostalgiaForInfinityX6(IStrategy):
           long_entry_logic.append((df["EMA_26"] - df["EMA_12"]) > (df["open"] * 0.024))
           long_entry_logic.append((df["EMA_26"].shift() - df["EMA_12"].shift()) > (df["open"] / 100.0))
           long_entry_logic.append(df["close"] < (df["EMA_20"] * 0.958))
-          long_entry_logic.append(df["close"] < (df["BBL_20_2.0"] * 0.992))
+          long_entry_logic.append(df["close"] < (df["BBL_20_2.0_2.0"] * 0.992))
 
         # Condition #44 - Quick mode (Long).
         if long_entry_condition_index == 44:
@@ -15688,7 +15688,7 @@ class NostalgiaForInfinityX6(IStrategy):
           long_entry_logic.append(df["STOCHRSIk_14_14_3_3_15m"] < 20.0)
           long_entry_logic.append(df["WILLR_84_1h"] < -70.0)
           long_entry_logic.append(df["STOCHRSIk_14_14_3_3_1h"] < 20.0)
-          long_entry_logic.append(df["BBB_20_2.0_1h"] > 12.0)
+          long_entry_logic.append(df["BBB_20_2.0_2.0_1h"] > 12.0)
           long_entry_logic.append(df["close_max_48"] >= (df["close"] * 1.10))
 
         # Condition #61 - Rebuy mode (Long).
@@ -16002,7 +16002,7 @@ class NostalgiaForInfinityX6(IStrategy):
           long_entry_logic.append(df["STOCHRSIk_14_14_3_3_15m"] < 70.0)
           long_entry_logic.append(df["WILLR_84_1h"] < -70.0)
           long_entry_logic.append(df["STOCHRSIk_14_14_3_3_1h"] < 30.0)
-          long_entry_logic.append(df["BBB_20_2.0_1h"] > 12.0)
+          long_entry_logic.append(df["BBB_20_2.0_2.0_1h"] > 12.0)
           long_entry_logic.append(df["close_max_48"] >= (df["close"] * 1.12))
 
         # Condition #101 - Rapid mode (Long).
@@ -16909,7 +16909,7 @@ class NostalgiaForInfinityX6(IStrategy):
           # Logic
           long_entry_logic.append(df["WILLR_14"] < -95.0)
           long_entry_logic.append(df["STOCHRSIk_14_14_3_3"] < 10.0)
-          long_entry_logic.append(df["close"] < (df["BBL_20_2.0"] * 0.999))
+          long_entry_logic.append(df["close"] < (df["BBL_20_2.0_2.0"] * 0.999))
           long_entry_logic.append(df["close"] < (df["EMA_20"] * 0.960))
 
         # Condition #103 - Rapid mode (Long).
@@ -17898,7 +17898,7 @@ class NostalgiaForInfinityX6(IStrategy):
           long_entry_logic.append(df["STOCHRSIk_14_14_3_3"] < 30.0)
           long_entry_logic.append(df["STOCHRSIk_14_14_3_3_15m"] < 30.0)
           long_entry_logic.append(df["STOCHRSIk_14_14_3_3_1h"] < 30.0)
-          long_entry_logic.append(df["BBB_20_2.0_1h"] > 12.0)
+          long_entry_logic.append(df["BBB_20_2.0_2.0_1h"] > 12.0)
           long_entry_logic.append(df["close_max_48"] >= (df["close"] * 1.10))
 
         # Condition #161 - Scalp mode (Long).
@@ -18236,8 +18236,8 @@ class NostalgiaForInfinityX6(IStrategy):
           long_entry_logic.append(
             (df["close"] > df["EMA_200_4h"].infer_objects(copy=False).fillna(np.nan)) & df["EMA_200_4h"].notna()
           )
-          long_entry_logic.append(df["BBB_20_2.0"] > 1.5)
-          long_entry_logic.append(df["BBB_20_2.0_1h"] > 6.0)
+          long_entry_logic.append(df["BBB_20_2.0_2.0"] > 1.5)
+          long_entry_logic.append(df["BBB_20_2.0_2.0_1h"] > 6.0)
 
         # Condition #162 - Scalp mode (Long).
         if long_entry_condition_index == 162:
@@ -19205,7 +19205,7 @@ class NostalgiaForInfinityX6(IStrategy):
           short_entry_logic.append(df["EMA_12"] > df["EMA_26"])
           short_entry_logic.append((df["EMA_12"] - df["EMA_26"]) > (df["open"] * 0.030))
           short_entry_logic.append((df["EMA_12"].shift() - df["EMA_26"].shift()) > (df["open"] / 100.0))
-          short_entry_logic.append(df["close"] > (df["BBU_20_2.0"] * 1.004))
+          short_entry_logic.append(df["close"] > (df["BBU_20_2.0_2.0"] * 1.004))
 
         # Condition #502 - Normal mode (Short).
         if short_entry_condition_index == 502:
@@ -19404,7 +19404,7 @@ class NostalgiaForInfinityX6(IStrategy):
           short_entry_logic.append(df["AROOND_14"] < 25.0)
           short_entry_logic.append(df["STOCHRSIk_14_14_3_3"] > 80.0)
           short_entry_logic.append(df["close"] > (df["EMA_20"] * 1.060))
-          short_entry_logic.append(df["close"] > (df["BBU_20_2.0"] * 0.995))
+          short_entry_logic.append(df["close"] > (df["BBU_20_2.0_2.0"] * 0.995))
           short_entry_logic.append(df["AROOND_14_15m"] < 25.0)
 
         # Condition #503 - Normal mode (Short).
@@ -20054,7 +20054,7 @@ class NostalgiaForInfinityX6(IStrategy):
           short_entry_logic.append(df["STOCHRSIk_14_14_3_3"] > 80.0)
           short_entry_logic.append(df["WILLR_84_1h"] > -30.0)
           short_entry_logic.append(df["STOCHRSIk_14_14_3_3_1h"] > 80.0)
-          short_entry_logic.append(df["BBB_20_2.0_1h"] > 20.0)
+          short_entry_logic.append(df["BBB_20_2.0_2.0_1h"] > 20.0)
           short_entry_logic.append(df["close_min_48"] <= (df["close"] * 0.90))
 
         # Condition #543 - Rapid mode (Short).
@@ -20178,7 +20178,7 @@ class NostalgiaForInfinityX6(IStrategy):
           short_entry_logic.append((df["EMA_26"] - df["EMA_12"]) > (df["open"] * 0.024))
           short_entry_logic.append((df["EMA_26"].shift() - df["EMA_12"].shift()) > (df["open"] / 100.0))
           short_entry_logic.append(df["close"] < (df["EMA_20"] * 0.958))
-          short_entry_logic.append(df["close"] < (df["BBL_20_2.0"] * 0.992))
+          short_entry_logic.append(df["close"] < (df["BBL_20_2.0_2.0"] * 0.992))
 
         # # Condition #620 - Grind mode (Short).
         # if short_entry_condition_index == 620:
@@ -20734,7 +20734,7 @@ class NostalgiaForInfinityX6(IStrategy):
             short_entry_logic.append(df["close"] < df["EMA_200_4h"])
           else:
             short_entry_logic.append(pd.Series([False]))
-          short_entry_logic.append(df["BBB_20_2.0_1h"] > 4.0)
+          short_entry_logic.append(df["BBB_20_2.0_2.0_1h"] > 4.0)
 
         ###############################################################################################
 
@@ -22884,11 +22884,11 @@ class NostalgiaForInfinityX6(IStrategy):
     # Sell signal 1
     if (
       (last_candle["RSI_14"] > 84.0)
-      and (last_candle["close"] > last_candle["BBU_20_2.0"])
-      and (previous_candle_1["close"] > previous_candle_1["BBU_20_2.0"])
-      and (previous_candle_2["close"] > previous_candle_2["BBU_20_2.0"])
-      and (previous_candle_3["close"] > previous_candle_3["BBU_20_2.0"])
-      and (previous_candle_4["close"] > previous_candle_4["BBU_20_2.0"])
+      and (last_candle["close"] > last_candle["BBU_20_2.0_2.0"])
+      and (previous_candle_1["close"] > previous_candle_1["BBU_20_2.0_2.0"])
+      and (previous_candle_2["close"] > previous_candle_2["BBU_20_2.0_2.0"])
+      and (previous_candle_3["close"] > previous_candle_3["BBU_20_2.0_2.0"])
+      and (previous_candle_4["close"] > previous_candle_4["BBU_20_2.0_2.0"])
     ):
       if last_candle["close"] > last_candle["EMA_200"]:
         if current_profit > 0.01:
@@ -22900,9 +22900,9 @@ class NostalgiaForInfinityX6(IStrategy):
     # Sell signal 2
     elif (
       (last_candle["RSI_14"] > 86.0)
-      and (last_candle["close"] > last_candle["BBU_20_2.0"])
-      and (previous_candle_1["close"] > previous_candle_1["BBU_20_2.0"])
-      and (previous_candle_2["close"] > previous_candle_2["BBU_20_2.0"])
+      and (last_candle["close"] > last_candle["BBU_20_2.0_2.0"])
+      and (previous_candle_1["close"] > previous_candle_1["BBU_20_2.0_2.0"])
+      and (previous_candle_2["close"] > previous_candle_2["BBU_20_2.0_2.0"])
     ):
       if last_candle["close"] > last_candle["EMA_200"]:
         if current_profit > 0.01:
@@ -22948,7 +22948,7 @@ class NostalgiaForInfinityX6(IStrategy):
     #       return True, f"exit_{mode_name}_7_2_1"
 
     # Sell signal 8
-    elif last_candle["close"] > last_candle["BBU_20_2.0_1h"] * 1.14:
+    elif last_candle["close"] > last_candle["BBU_20_2.0_2.0_1h"] * 1.14:
       if last_candle["close"] > last_candle["EMA_200"]:
         if current_profit > 0.01:
           return True, f"exit_{mode_name}_8_1_1"
@@ -40779,7 +40779,7 @@ class NostalgiaForInfinityX6(IStrategy):
         # and (last_candle["close"] > (last_candle["high_max_6_1h"] * 0.85))
         # and (last_candle["close"] > (last_candle["high_max_12_1h"] * 0.80))
         and (last_candle["close"] < (last_candle["EMA_26"] * 0.960))
-        and (last_candle["close"] < (last_candle["BBL_20_2.0"] * 0.999))
+        and (last_candle["close"] < (last_candle["BBL_20_2.0_2.0"] * 0.999))
       )
     ):
       return True
@@ -40873,7 +40873,7 @@ class NostalgiaForInfinityX6(IStrategy):
         and (last_candle["close"] > (last_candle["high_max_6_1h"] * 0.85))
         and (last_candle["close"] > (last_candle["high_max_12_1h"] * 0.80))
         and (last_candle["close"] < (last_candle["EMA_26"] * 0.962))
-        and (last_candle["close"] < (last_candle["BBL_20_2.0"] * 0.999))
+        and (last_candle["close"] < (last_candle["BBL_20_2.0_2.0"] * 0.999))
       )
       or (
         (last_candle["RSI_14"] < 35.0)
@@ -40942,7 +40942,7 @@ class NostalgiaForInfinityX6(IStrategy):
         and (last_candle["WILLR_84_1h"] < -70.0)
         # and (last_candle["STOCHRSIk_14_14_3_3_1h"] < 40.0)
         and (last_candle["close"] < (last_candle["low_min_24_4h"] * 1.30))
-        and (last_candle["BBB_20_2.0_1h"] > 12.0)
+        and (last_candle["BBB_20_2.0_2.0_1h"] > 12.0)
         and (last_candle["close_max_48"] >= (last_candle["close"] * 1.10))
       )
       or (
@@ -40984,7 +40984,7 @@ class NostalgiaForInfinityX6(IStrategy):
         and (last_candle["RSI_3_1d"] > 10.0)
         and (last_candle["STOCHRSIk_14_14_3_3"] < 20.0)
         and (last_candle["close"] < (last_candle["SMA_30"] * 0.978))
-        and (last_candle["close"] < (last_candle["BBL_20_2.0"] * 0.999))
+        and (last_candle["close"] < (last_candle["BBL_20_2.0_2.0"] * 0.999))
       )
       or (
         (last_candle["RSI_14"] < 36.0)
@@ -41028,7 +41028,7 @@ class NostalgiaForInfinityX6(IStrategy):
         and (last_candle["RSI_3_1h"] > 10.0)
         and (last_candle["RSI_3_4h"] > 10.0)
         and (last_candle["close"] < (last_candle["EMA_12"] * 0.999))
-        and (last_candle["close"] < (last_candle["BBL_20_2.0"] * 0.996))
+        and (last_candle["close"] < (last_candle["BBL_20_2.0_2.0"] * 0.996))
       )
     ):
       return True
@@ -41043,7 +41043,7 @@ class NostalgiaForInfinityX6(IStrategy):
       or (last_candle["RSI_14"] > 70.0)
       or (last_candle["WILLR_14"] > -0.1)
       or (last_candle["STOCHRSIk_14_14_3_3"] > 95.0)
-      or (last_candle["close"] > (last_candle["BBU_20_2.0"] * 1.01))
+      or (last_candle["close"] > (last_candle["BBU_20_2.0_2.0"] * 1.01))
       or ((last_candle["RSI_3"] > 90.0) and (last_candle["RSI_14"] < 50.0))
     ):
       return True
@@ -41058,7 +41058,7 @@ class NostalgiaForInfinityX6(IStrategy):
       or (last_candle["RSI_14"] > 70.0)
       or (last_candle["WILLR_14"] > -0.1)
       or (last_candle["STOCHRSIk_14_14_3_3"] > 95.0)
-      or (last_candle["close"] > (last_candle["BBU_20_2.0"] * 1.01))
+      or (last_candle["close"] > (last_candle["BBU_20_2.0_2.0"] * 1.01))
       or ((last_candle["RSI_3"] > 90.0) and (last_candle["RSI_14"] < 50.0))
     ):
       return True
@@ -43230,7 +43230,7 @@ class NostalgiaForInfinityX6(IStrategy):
           and (last_candle["AROONU_14_1h"] > last_candle["AROOND_14_1h"])
           and (last_candle["AROONU_14_4h"] > last_candle["AROOND_14_4h"])
           and (last_candle["close"] < (last_candle["EMA_26"] * 0.978))
-          and (last_candle["close"] < (last_candle["BBL_20_2.0"] * 0.999))
+          and (last_candle["close"] < (last_candle["BBL_20_2.0_2.0"] * 0.999))
         )
         or (
           (last_candle["RSI_14"] < 36.0)
@@ -47056,11 +47056,11 @@ class NostalgiaForInfinityX6(IStrategy):
     # Sell signal 1
     if (
       (last_candle["RSI_14"] < 16.0)
-      and (last_candle["close"] < last_candle["BBL_20_2.0"])
-      and (previous_candle_1["close"] < previous_candle_1["BBL_20_2.0"])
-      and (previous_candle_2["close"] < previous_candle_2["BBL_20_2.0"])
-      and (previous_candle_3["close"] < previous_candle_3["BBL_20_2.0"])
-      and (previous_candle_4["close"] < previous_candle_4["BBL_20_2.0"])
+      and (last_candle["close"] < last_candle["BBL_20_2.0_2.0"])
+      and (previous_candle_1["close"] < previous_candle_1["BBL_20_2.0_2.0"])
+      and (previous_candle_2["close"] < previous_candle_2["BBL_20_2.0_2.0"])
+      and (previous_candle_3["close"] < previous_candle_3["BBL_20_2.0_2.0"])
+      and (previous_candle_4["close"] < previous_candle_4["BBL_20_2.0_2.0"])
     ):
       if last_candle["close"] < last_candle["EMA_200"]:
         if current_profit > 0.01:
@@ -47072,9 +47072,9 @@ class NostalgiaForInfinityX6(IStrategy):
     # Sell signal 2
     elif (
       (last_candle["RSI_14"] < 14.0)
-      and (last_candle["close"] < last_candle["BBL_20_2.0"])
-      and (previous_candle_1["close"] < previous_candle_1["BBL_20_2.0"])
-      and (previous_candle_2["close"] < previous_candle_2["BBL_20_2.0"])
+      and (last_candle["close"] < last_candle["BBL_20_2.0_2.0"])
+      and (previous_candle_1["close"] < previous_candle_1["BBL_20_2.0_2.0"])
+      and (previous_candle_2["close"] < previous_candle_2["BBL_20_2.0_2.0"])
     ):
       if last_candle["close"] < last_candle["EMA_200"]:
         if current_profit > 0.01:
@@ -47120,7 +47120,7 @@ class NostalgiaForInfinityX6(IStrategy):
     #       return True, f"exit_{mode_name}_7_2_1"
 
     # Sell signal 8
-    elif last_candle["close"] < last_candle["BBL_20_2.0_1h"] * 0.86:
+    elif last_candle["close"] < last_candle["BBL_20_2.0_2.0_1h"] * 0.86:
       if last_candle["close"] < last_candle["EMA_200"]:
         if current_profit > 0.01:
           return True, f"exit_{mode_name}_8_1_1"
@@ -64934,7 +64934,7 @@ class NostalgiaForInfinityX6(IStrategy):
         # and (last_candle["close"] < (last_candle["low_min_6_1h"] * 1.18))
         # and (last_candle["close"] < (last_candle["low_min_12_1h"] * 1.25))
         and (last_candle["close"] > (last_candle["EMA_26"] * 1.040))
-        and (last_candle["close"] > (last_candle["BBU_20_2.0"] * 1.001))
+        and (last_candle["close"] > (last_candle["BBU_20_2.0_2.0"] * 1.001))
       )
     ):
       return True
@@ -65028,7 +65028,7 @@ class NostalgiaForInfinityX6(IStrategy):
         and (last_candle["close"] < (last_candle["low_min_6_1h"] * 1.18))
         and (last_candle["close"] < (last_candle["low_min_12_1h"] * 1.25))
         and (last_candle["close"] > (last_candle["EMA_26"] * 1.038))
-        and (last_candle["close"] > (last_candle["BBU_20_2.0"] * 1.0))
+        and (last_candle["close"] > (last_candle["BBU_20_2.0_2.0"] * 1.0))
       )
       or (
         (last_candle["RSI_14"] > 65.0)
@@ -65097,7 +65097,7 @@ class NostalgiaForInfinityX6(IStrategy):
         and (last_candle["WILLR_84_1h"] > -30.0)
         # and (last_candle["STOCHRSIk_14_14_3_3_1h"] < 40.0)
         and (last_candle["close"] < (last_candle["high_max_24_4h"] * 0.77))
-        and (last_candle["BBB_20_2.0_1h"] > 12.0)
+        and (last_candle["BBB_20_2.0_2.0_1h"] > 12.0)
         and (last_candle["close_min_48"] <= (last_candle["close"] * 0.90))
       )
       or (
@@ -65139,7 +65139,7 @@ class NostalgiaForInfinityX6(IStrategy):
         and (last_candle["RSI_3_1d"] < 90.0)
         and (last_candle["STOCHRSIk_14_14_3_3"] > 80.0)
         and (last_candle["close"] > (last_candle["SMA_30"] * 1.022))
-        and (last_candle["close"] > (last_candle["BBU_20_2.0"] * 1.0))
+        and (last_candle["close"] > (last_candle["BBU_20_2.0_2.0"] * 1.0))
       )
       or (
         (last_candle["RSI_14"] > 64.0)
@@ -65183,7 +65183,7 @@ class NostalgiaForInfinityX6(IStrategy):
         and (last_candle["RSI_3_1h"] < 90.0)
         and (last_candle["RSI_3_4h"] < 90.0)
         and (last_candle["close"] > (last_candle["EMA_12"] * 1.001))
-        and (last_candle["close"] > (last_candle["BBL_20_2.0"] * 1.004))
+        and (last_candle["close"] > (last_candle["BBL_20_2.0_2.0"] * 1.004))
       )
     ):
       return True
@@ -65198,7 +65198,7 @@ class NostalgiaForInfinityX6(IStrategy):
       or (last_candle["RSI_14"] < 30.0)
       or (last_candle["WILLR_14"] < -99.9)
       or (last_candle["STOCHRSIk_14_14_3_3"] > 5.0)
-      or (last_candle["close"] < (last_candle["BBL_20_2.0"] * 0.99))
+      or (last_candle["close"] < (last_candle["BBL_20_2.0_2.0"] * 0.99))
       or ((last_candle["RSI_3"] < 10.0) and (last_candle["RSI_14"] > 50.0))
     ):
       return True
@@ -65213,7 +65213,7 @@ class NostalgiaForInfinityX6(IStrategy):
       or (last_candle["RSI_14"] < 30.0)
       or (last_candle["WILLR_14"] < -99.9)
       or (last_candle["STOCHRSIk_14_14_3_3"] < 5.0)
-      or (last_candle["close"] < (last_candle["BBL_20_2.0"] * 0.99))
+      or (last_candle["close"] < (last_candle["BBL_20_2.0_2.0"] * 0.99))
       or ((last_candle["RSI_3"] < 10.0) and (last_candle["RSI_14"] > 50.0))
     ):
       return True
@@ -67323,7 +67323,7 @@ class NostalgiaForInfinityX6(IStrategy):
           and (last_candle["AROONU_14_1h"] < last_candle["AROOND_14_1h"])
           and (last_candle["AROONU_14_4h"] < last_candle["AROOND_14_4h"])
           and (last_candle["close"] > (last_candle["EMA_26"] * 1.022))
-          and (last_candle["close"] > (last_candle["BBL_20_2.0"] * 1.001))
+          and (last_candle["close"] > (last_candle["BBL_20_2.0_2.0"] * 1.001))
         )
         or (
           (last_candle["RSI_14"] > 64.0)

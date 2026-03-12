@@ -54,7 +54,7 @@ STRATEGY_IMAGES = {
     "SupertrendStrategy": "freqtradeorg/freqtrade:stable",
     "MasterTraderV1": "freqtradeorg/freqtrade:stable",
     "MasterTraderAI": "freqtradeorg/freqtrade:stable_freqai",
-    "NostalgiaForInfinityX6": "ft-nfi",
+    "NostalgiaForInfinityX6": "ft_userdata-nostalgiaforinfinityx6",
 }
 
 # Strategies that support hyperopt (exclude ML-based)
@@ -102,7 +102,7 @@ def run_hyperopt(
 
     cmd = [
         "docker", "run", "--rm",
-        "-v", f"{FT_DIR}/user_data:/freqtrade/user_data",
+        "-v", f"{Path.home()}/ft_userdata/user_data:/freqtrade/user_data",
         image,
         "hyperopt",
         "--strategy", strategy,
@@ -112,6 +112,7 @@ def run_hyperopt(
         "--epochs", str(epochs),
         "--timerange", timerange,
         "--print-json",
+        "-j", "1",  # Single job to avoid OOM kills
     ]
 
     try:

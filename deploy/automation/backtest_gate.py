@@ -59,7 +59,7 @@ STRATEGY_IMAGES = {
     "SupertrendStrategy": "freqtradeorg/freqtrade:stable",
     "MasterTraderV1": "freqtradeorg/freqtrade:stable",
     "MasterTraderAI": "freqtradeorg/freqtrade:stable_freqai",
-    "NostalgiaForInfinityX6": "ft-nfi",  # Custom built image
+    "NostalgiaForInfinityX6": "ft_userdata-nostalgiaforinfinityx6",  # Custom built image
 }
 
 ALL_STRATEGIES = list(STRATEGY_IMAGES.keys())
@@ -74,10 +74,15 @@ THRESHOLDS = {
     "max_avg_loss_pct": -8.0,      # Average losing trade must be < 8%
 }
 
-# Pairs used for backtesting (the top 10 by volume, static for consistency)
+# Pairs used for backtesting (top 30 by volume, static for consistency)
+# More pairs = dip-buyer strategies like NASOSv5/ElliotV5 find more signals
 BACKTEST_PAIRS = [
     "BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT", "DOGE/USDT",
     "BNB/USDT", "ADA/USDT", "AVAX/USDT", "LINK/USDT", "NEAR/USDT",
+    "SUI/USDT", "PEPE/USDT", "TRX/USDT", "DOT/USDT", "SHIB/USDT",
+    "UNI/USDT", "MATIC/USDT", "FIL/USDT", "APT/USDT", "ARB/USDT",
+    "OP/USDT", "ATOM/USDT", "FET/USDT", "RENDER/USDT", "INJ/USDT",
+    "AAVE/USDT", "LTC/USDT", "ICP/USDT", "XLM/USDT", "ALGO/USDT",
 ]
 
 
@@ -99,7 +104,7 @@ def download_data(days: int = 60, timeframes: list[str] = None) -> bool:
         log.info("Downloading %s data for %d days...", tf, days)
         cmd = [
             "docker", "run", "--rm",
-            "-v", f"{FT_DIR}/user_data:/freqtrade/user_data",
+            "-v", f"{Path.home()}/ft_userdata/user_data:/freqtrade/user_data",
             "freqtradeorg/freqtrade:stable",
             "download-data",
             "--exchange", "binance",
@@ -148,13 +153,13 @@ def run_backtest(strategy: str, days: int = 60, config_override: str = None) -> 
 
     # For NFI, use the locally built image
     if strategy == "NostalgiaForInfinityX6":
-        image = "ft-nfi"
+        image = "ft_userdata-nostalgiaforinfinityx6"
 
     log.info("Backtesting %s over %d days (%s)...", strategy, days, timerange)
 
     cmd = [
         "docker", "run", "--rm",
-        "-v", f"{FT_DIR}/user_data:/freqtrade/user_data",
+        "-v", f"{Path.home()}/ft_userdata/user_data:/freqtrade/user_data",
     ]
 
     # Use ONLY the backtest config (static pairlist) — strategy configs have
