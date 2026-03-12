@@ -126,7 +126,7 @@ class MasterTraderV1(IStrategy):
                 | (dataframe[rsi_col] > self.rsi_sell_limit.value)
             )
             & (dataframe["volume"] > 0)
-            | (dataframe['regime_atr_14'] > 2.5 * dataframe['regime_atr_sma_50']),  # Exit on volatility spike
+            | ((dataframe['regime_atr_14'] > 2.5 * dataframe['regime_atr_sma_50']) & (dataframe["volume"] > 0)),  # Exit on volatility spike
             "exit_long",
         ] = 1
 

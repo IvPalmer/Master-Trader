@@ -29,10 +29,10 @@ class ClucHAnix(IStrategy):
 
     sell_params = {
         "pHSL": -0.08,
-        "pPF_1": 0.02,
-        "pPF_2": 0.047,
-        "pSL_1": 0.02,
-        "pSL_2": 0.046,
+        "pPF_1": 0.016,   # DecimalParameter default (was 0.02 — zero cushion)
+        "pPF_2": 0.080,   # DecimalParameter default (was 0.047)
+        "pSL_1": 0.011,   # DecimalParameter default (was 0.02)
+        "pSL_2": 0.040,   # DecimalParameter default (was 0.046)
         'sell-fisher': 0.38414,
         'sell-bbmiddle-close': 1.07634
     }
@@ -219,7 +219,7 @@ class ClucHAnix(IStrategy):
             (dataframe['ema_fast'] > dataframe['ha_close']) &
             ((dataframe['ha_close'] * self.sell_params['sell-bbmiddle-close']) > dataframe['bb_middleband']) &
             (dataframe['volume'] > 0) |
-            (dataframe['regime_atr_14'] > 2.5 * dataframe['regime_atr_sma_50']),  # Exit on volatility spike
+            ((dataframe['regime_atr_14'] > 2.5 * dataframe['regime_atr_sma_50']) & (dataframe['volume'] > 0)),  # Exit on volatility spike
             'exit_long'
         ] = 1
         return dataframe

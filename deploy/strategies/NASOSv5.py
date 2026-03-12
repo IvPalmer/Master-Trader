@@ -100,9 +100,6 @@ class NASOSv5(IStrategy):
 
     # Trailing stop:
     trailing_stop = False
-    trailing_stop_positive = 0.001
-    trailing_stop_positive_offset = 0.016
-    trailing_only_offset_is_reached = True
 
     # Exit signal
     use_exit_signal = True
@@ -159,7 +156,7 @@ class NASOSv5(IStrategy):
             return 0.005
         elif (current_profit > 0.018):
             return 0.005
-        return 0.08  # Match hard stoploss at -8%
+        return -1  # Defer to strategy-level stoploss (-8%)
 
     def _atr_stoploss(self, pair: str, current_rate: float, multiplier: float = 3.0):
         """ATR-based dynamic stoploss."""
