@@ -48,7 +48,7 @@ class MasterTraderAI(IStrategy):
             {"method": "CooldownPeriod", "stop_duration_candles": 5},
             {"method": "StoplossGuard", "lookback_period_candles": 48, "trade_limit": 4, "stop_duration_candles": 12, "only_per_pair": False},
             {"method": "LowProfitPairs", "lookback_period_candles": 288, "trade_limit": 4, "stop_duration_candles": 48, "required_profit": -0.05},
-            {"method": "MaxDrawdown", "lookback_period_candles": 576, "max_allowed_drawdown": 0.10, "stop_duration_candles": 288, "trade_limit": 1},
+            {"method": "MaxDrawdown", "lookback_period_candles": 576, "max_allowed_drawdown": 0.20, "stop_duration_candles": 72, "trade_limit": 1},
         ]
 
     # --- Max open trades ---

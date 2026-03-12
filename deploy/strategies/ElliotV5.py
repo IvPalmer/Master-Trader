@@ -100,13 +100,15 @@ class ElliotV5(IStrategy):
             time_sl = stoploss_from_open(-0.03, current_profit)
             if time_sl != -0.99:
                 return time_sl
+            else:
+                return -0.001  # already past -3%, force close now
         elif trade_duration > 2:
             atr_sl = self._atr_stoploss(pair, current_rate, multiplier=2.0)
             if atr_sl is not None:
                 return atr_sl
 
-        # Default: use the hard stoploss (-18.9%)
-        return -0.99
+        # Default: defer to strategy-level stoploss (-8%)
+        return -1
 
     def _atr_stoploss(self, pair: str, current_rate: float, multiplier: float = 3.0):
         """ATR-based dynamic stoploss."""

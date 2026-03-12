@@ -41,7 +41,7 @@ class ClucHAnix(IStrategy):
         "70": 0
     }
 
-    stoploss = -0.99  # uses custom stoploss
+    stoploss = -0.10  # safety net for custom_stoploss failures/restarts
     trailing_stop = False
     timeframe = '5m'  # Changed from 1m for practical backtesting
     use_exit_signal = True
@@ -100,10 +100,12 @@ class ClucHAnix(IStrategy):
             # Force close after 8h — 5m dip thesis is dead
             return -0.001
         elif trade_duration > 4:
-            # Tight stop: accept max -3% loss
+            # Tight stop: accept max -3% loss (if already past -3%, force close)
             time_sl = stoploss_from_open(-0.03, current_profit)
             if time_sl != -0.99:
                 return time_sl
+            else:
+                return -0.001  # already past -3%, force close now
         elif trade_duration > 2:
             # Tighten via ATR 2x
             atr_sl = self._atr_stoploss(pair, current_rate, multiplier=2.0)
@@ -125,7 +127,7 @@ class ClucHAnix(IStrategy):
             sl_profit = HSL
 
         if (sl_profit >= current_profit):
-            return -0.99
+            return HSL  # maintain hard stoploss floor (was -0.99 which disabled SL entirely)
         return stoploss_from_open(sl_profit, current_profit)
 
     def _atr_stoploss(self, pair: str, current_rate: float, multiplier: float = 3.0):
