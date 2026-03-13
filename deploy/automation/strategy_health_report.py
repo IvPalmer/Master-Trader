@@ -54,14 +54,21 @@ LOGS_DIR = Path.home() / "ft_userdata" / "logs"
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(LOGS_DIR / "health_report.log"),
-        logging.StreamHandler(sys.stdout),
-    ],
-)
+def _setup_logging(json_mode: bool = False) -> logging.Logger:
+    """Configure logging. In --json mode, console logs go to stderr to keep stdout clean."""
+    stream = sys.stderr if json_mode else sys.stdout
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            logging.FileHandler(LOGS_DIR / "health_report.log"),
+            logging.StreamHandler(stream),
+        ],
+    )
+    return logging.getLogger("health-report")
+
+
+# Placeholder — replaced in main() after arg parsing
 log = logging.getLogger("health-report")
 
 # ---------------------------------------------------------------------------
@@ -69,7 +76,7 @@ log = logging.getLogger("health-report")
 # ---------------------------------------------------------------------------
 
 # A strategy is HEALTHY if:
-#   - Win rate >= 55%
+#   - Win rate >= 55% (or >= 30% for trend-followers with R:R >= 2.0)
 #   - Risk/reward ratio >= 1.0 (avg_win / avg_loss)
 #   - Profit factor >= 1.0
 #   - Force-exit rate < 20% of total exits
@@ -81,6 +88,14 @@ log = logging.getLogger("health-report")
 #   50-69:  Warning
 #   30-49:  Poor
 #   0-29:   Critical — recommend pausing
+#
+# IMPORTANT: Scores are discounted when sample size < 10 trades (insufficient data)
+# Strategy type affects win rate expectations:
+#   - trend-follower: low WR (30-40%) is normal if R:R >= 2.0
+#   - dip-buyer / mean-reversion: expect WR >= 55%
+
+# Minimum trades for a score to be considered reliable
+MIN_TRADES_RELIABLE = 10
 
 SCORE_WEIGHTS = {
     "win_rate": 20,          # Max 20 points
@@ -311,16 +326,31 @@ def _trade_age_hours(trade: dict) -> float:
 
 def _compute_health_score(m: dict) -> int:
     score = 0
+    strategy_type = m.get("type", "unknown")
+    is_trend_follower = strategy_type == "trend-follower"
 
-    # Win rate: 55%+ = full points, linear scale 30-55%
+    # Win rate scoring — adjusted by strategy type
+    # Trend-followers: 30%+ WR with R:R >= 2.0 is perfectly healthy
+    # Others: 55%+ expected
     wr = m.get("win_rate", 0)
-    if wr >= 55:
-        score += SCORE_WEIGHTS["win_rate"]
-    elif wr >= 30:
-        score += int(SCORE_WEIGHTS["win_rate"] * (wr - 30) / 25)
+    rr = m.get("risk_reward", 0)
+
+    if is_trend_follower:
+        # Trend-follower: score on combined WR * R:R (expectancy proxy)
+        # 30% WR with 2.0 R:R = full points; scale down from there
+        if wr >= 30 and rr >= 2.0:
+            score += SCORE_WEIGHTS["win_rate"]
+        elif wr >= 25 and rr >= 1.5:
+            score += int(SCORE_WEIGHTS["win_rate"] * 0.7)
+        elif wr >= 20:
+            score += int(SCORE_WEIGHTS["win_rate"] * 0.3)
+    else:
+        if wr >= 55:
+            score += SCORE_WEIGHTS["win_rate"]
+        elif wr >= 30:
+            score += int(SCORE_WEIGHTS["win_rate"] * (wr - 30) / 25)
 
     # Risk/reward: 1.5+ = full points, linear 0-1.5
-    rr = m.get("risk_reward", 0)
     if rr >= 1.5:
         score += SCORE_WEIGHTS["risk_reward"]
     elif rr > 0:
@@ -360,6 +390,13 @@ def _compute_health_score(m: dict) -> int:
     elif total > 0:
         score += 2  # At least it has traded
 
+    # --- Sample size discount ---
+    # With < MIN_TRADES_RELIABLE trades, scores are unreliable.
+    # Discount proportionally: 1 trade = 10% of score, 5 trades = 50%, 10+ = 100%
+    if total < MIN_TRADES_RELIABLE:
+        discount = total / MIN_TRADES_RELIABLE
+        score = int(score * discount)
+
     return min(score, 100)
 
 
@@ -379,11 +416,19 @@ def _score_label(score: int) -> str:
 def _generate_flags(m: dict) -> None:
     flags = m["flags"]
     recs = m["recommendations"]
+    strategy_type = m.get("type", "unknown")
+    total_trades = m.get("total_trades", 0)
+    is_trend_follower = strategy_type == "trend-follower"
 
-    # Risk/reward inverted
-    if m.get("risk_reward", 0) < 1.0 and m.get("total_trades", 0) >= 5:
-        flags.append(f"Risk/reward inverted: {m['risk_reward']:.2f} (avg win ${m['avg_win']:.2f} < avg loss ${m['avg_loss']:.2f})")
-        recs.append("Consider tightening stoploss or widening take-profit targets")
+    # --- Sample size warning (most important flag) ---
+    if 0 < total_trades < MIN_TRADES_RELIABLE:
+        flags.append(f"Low sample size: {total_trades} trades (need {MIN_TRADES_RELIABLE}+ for reliable metrics)")
+
+    # Risk/reward inverted — but NOT for trend-followers (they compensate with high R:R)
+    rr = m.get("risk_reward", 0)
+    if rr < 1.0 and total_trades >= MIN_TRADES_RELIABLE:
+        flags.append(f"Risk/reward inverted: {rr:.2f} (avg win ${m['avg_win']:.2f} < avg loss ${m['avg_loss']:.2f})")
+        recs.append("Monitor closely — avg losses exceed avg wins")
 
     # Negative closed P&L
     if m.get("closed_pnl", 0) < -10:
@@ -394,39 +439,52 @@ def _generate_flags(m: dict) -> None:
         flags.append(f"High force-exit rate: {m['force_exit_rate']:.0f}%")
         recs.append("Review time-based exit thresholds — trades getting stuck")
 
-    # Single trade dominates losses
+    # Single trade dominates losses — flag but note it may be a historical outlier
     if m.get("worst_trade_loss_pct", 0) > 50:
         wt = m.get("worst_trade", {})
         flags.append(f"Single trade caused {m['worst_trade_loss_pct']:.0f}% of all losses: {wt.get('pair', '?')} ${wt.get('profit', 0):.2f}")
+        # Only recommend action if this is a recent trade (stoploss bugs were fixed 2026-03-12)
+        if total_trades < 20:
+            recs.append("Outlier trade dominates stats — metrics will normalize as more trades accumulate")
 
     # Stale positions
     if m.get("stale_positions", 0) > 0:
         flags.append(f"{m['stale_positions']} stale positions (>8h open)")
 
-    # Low win rate
-    if m.get("win_rate", 0) < 50 and m.get("total_trades", 0) >= 5:
-        flags.append(f"Low win rate: {m['win_rate']:.0f}%")
+    # Low win rate — strategy-type-aware
+    wr = m.get("win_rate", 0)
+    if total_trades >= MIN_TRADES_RELIABLE:
+        if is_trend_follower:
+            # Trend-followers: only flag if WR < 25% (very low even for trend)
+            if wr < 25:
+                flags.append(f"Very low win rate for trend-follower: {wr:.0f}%")
+        else:
+            if wr < 50:
+                flags.append(f"Low win rate: {wr:.0f}%")
 
     # No recent trades
-    if m.get("trades_24h", 0) == 0 and m.get("total_trades", 0) > 0:
+    if m.get("trades_24h", 0) == 0 and total_trades > 0:
         flags.append("No trades in last 24h")
 
     # Very high avg duration for 5m strategy
     if m.get("timeframe") == "5m" and m.get("avg_duration_min", 0) > 120:
-        flags.append(f"Avg trade duration {m['avg_duration_min']:.0f}min — too long for 5m strategy")
-        recs.append("Time-based exits may need tightening")
+        flags.append(f"Avg trade duration {m['avg_duration_min']:.0f}min — long for 5m strategy")
 
     # Profit factor < 1 means losing money per trade on average
-    if m.get("profit_factor", 0) < 1.0 and m.get("total_trades", 0) >= 5:
+    if m.get("profit_factor", 0) < 1.0 and total_trades >= MIN_TRADES_RELIABLE:
         flags.append(f"Profit factor below 1.0: {m['profit_factor']:.2f}")
-        recs.append("Strategy is net-negative — consider pausing or parameter adjustment")
+        recs.append("Strategy is net-negative — monitor for improvement or consider parameter adjustment")
 
-    # Score-based recommendation
+    # Score-based recommendation (only if enough trades for reliable score)
     score = m.get("health_score", 0)
-    if score < 30:
-        recs.append(f"CRITICAL: Health score {score}/100 — strongly recommend pausing this strategy")
-    elif score < 50:
-        recs.append(f"POOR: Health score {score}/100 — reduce allocation and monitor closely")
+    if total_trades >= MIN_TRADES_RELIABLE:
+        if score < 30:
+            recs.append(f"CRITICAL: Health score {score}/100 — strongly recommend pausing this strategy")
+        elif score < 50:
+            recs.append(f"POOR: Health score {score}/100 — reduce allocation and monitor closely")
+    elif total_trades > 0:
+        # Score is unreliable with few trades — say so
+        recs.append(f"Score {score}/100 is preliminary ({total_trades} trades) — wait for {MIN_TRADES_RELIABLE}+ trades before acting")
 
 
 # ---------------------------------------------------------------------------
@@ -609,9 +667,11 @@ def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dic
         pnl_delta = trend.get("pnl_delta", 0)
         arrow = "+" if pnl_delta > 0 else ""
 
-        line = f"  {score:3d}/100 {label:9s} | {m['strategy']}"
+        stype = m.get("type", "?")
+        sample_note = "" if trades >= MIN_TRADES_RELIABLE else f" [{trades} trades — preliminary]"
+        line = f"  {score:3d}/100 {label:9s} | {m['strategy']} ({stype}){sample_note}"
         lines.append(line)
-        lines.append(f"    P&L: ${true_pnl:+.2f} (24h: {arrow}${pnl_delta:.2f}) | WR: {wr:.0f}% | R:R {rr:.1f} | {trades} trades")
+        lines.append(f"    P&L: ${true_pnl:+.2f} (24h: {arrow}${pnl_delta:.2f}) | WR: {wr:.0f}% | R:R {rr:.1f} | PF: {m.get('profit_factor', 0):.2f} | {trades} trades")
 
         # Exit reason summary
         exits = m.get("exit_reasons", {})
@@ -673,10 +733,13 @@ def send_telegram(message: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def main():
+    global log
     parser = argparse.ArgumentParser(description="Daily Strategy Health Report")
     parser.add_argument("--stdout", action="store_true", help="Print report to stdout only")
     parser.add_argument("--json", action="store_true", help="Output raw JSON metrics")
     args = parser.parse_args()
+
+    log = _setup_logging(json_mode=args.json)
 
     log.info("=" * 50)
     log.info("Strategy Health Report - %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
