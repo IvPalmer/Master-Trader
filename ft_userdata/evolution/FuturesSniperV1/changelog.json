@@ -1,0 +1,17 @@
+[
+  {
+    "timestamp": "2026-03-15T01:53:45Z",
+    "description": "Stoploss tightened from -7.5% to -3% (2x leverage). stoploss_on_exchange_interval added (60s). cancel_open_orders_on_exit enabled.",
+    "params_after": {
+      "stoploss": -0.03,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.005,
+      "trailing_stop_positive_offset": 0.01,
+      "timeframe": "1h",
+      "can_short": "False",
+      "minimal_roi": "\"0\": 0.025,     # 2.5% (= 5% at 2x)\n        \"30\": 0.015,    # 1.5% (= 3% at 2x)\n        \"60\": 0.01,     # 1% (= 2% at 2x)\n        \"120\": 0.005,   # 0.5% (= 1% at 2x)",
+      "_file_hash": "a1cc4bc74e48"
+    },
+    "file_hash": "a1cc4bc74e48"
+  }
+]

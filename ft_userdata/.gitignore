@@ -1,0 +1,34 @@
+# === Heavy data (3GB+) ===
+user_data/models/
+user_data/logs/
+user_data/data/
+user_data/backtest_results/
+user_data/hyperopt_results/
+user_data/plot/
+walk_forward_results/
+optimization_proposals/
+
+# === Trade databases (binary, change constantly) ===
+user_data/*.sqlite
+user_data/*.sqlite-wal
+user_data/*.sqlite-shm
+
+# === Runtime state (regenerated) ===
+__pycache__/
+*.pyc
+logs/
+health_report_state.json
+rotation_state.json
+tournament_state.json
+
+# === Sensitive (API keys in configs when going live) ===
+# NOTE: Configs are tracked because keys are empty in dry-run.
+# BEFORE going live: move secrets to environment variables or a
+# separate .env file, NEVER commit real API keys.
+
+# === Grafana data (regenerated from config) ===
+grafana/data/
+
+# === Evolution snapshots (tracked separately, can get large) ===
+# Keep the tracker script but ignore daily snapshot data
+# evolution/

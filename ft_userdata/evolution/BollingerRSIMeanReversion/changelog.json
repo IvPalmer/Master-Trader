@@ -1,0 +1,16 @@
+[
+  {
+    "timestamp": "2026-03-15T01:53:44Z",
+    "description": "Stoploss tightened from -6% to -5%. stoploss_on_exchange enabled.",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.01,
+      "trailing_stop_positive_offset": 0.02,
+      "timeframe": "15m",
+      "minimal_roi": "\"0\": 0.04,\n        \"30\": 0.025,\n        \"60\": 0.015,\n        \"120\": 0.005",
+      "_file_hash": "48dc50414607"
+    },
+    "file_hash": "48dc50414607"
+  }
+]

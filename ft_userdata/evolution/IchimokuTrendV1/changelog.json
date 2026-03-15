@@ -1,0 +1,16 @@
+[
+  {
+    "timestamp": "2026-03-15T01:53:44Z",
+    "description": "Stoploss tightened from -10% to -5%. AXS/USDT (+2.2%) emergency-exited as collateral on restart. stoploss_on_exchange enabled.",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.04,
+      "timeframe": "1h",
+      "minimal_roi": "\"0\": 0.08, \"360\": 0.05, \"720\": 0.03, \"1440\": 0.01",
+      "_file_hash": "27067b1717f9"
+    },
+    "file_hash": "27067b1717f9"
+  }
+]

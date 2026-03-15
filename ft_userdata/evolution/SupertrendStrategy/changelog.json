@@ -1,0 +1,16 @@
+[
+  {
+    "timestamp": "2026-03-15T01:53:44Z",
+    "description": "Stoploss tightened from -10% to -5%. Data showed 0% recovery past -7%, 92% of winners never dip past -3%. stoploss_on_exchange enabled.",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.03,
+      "timeframe": "1h",
+      "minimal_roi": "\"0\": 0.05, \"360\": 0.03, \"720\": 0.02, \"1440\": 0.01",
+      "_file_hash": "ca4d5bb1f187"
+    },
+    "file_hash": "ca4d5bb1f187"
+  }
+]

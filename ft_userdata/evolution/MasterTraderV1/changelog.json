@@ -1,0 +1,16 @@
+[
+  {
+    "timestamp": "2026-03-15T01:53:44Z",
+    "description": "Stoploss tightened from -15% to -5%. DEGO/USDT emergency-exited at -9.9% on restart. stoploss_on_exchange enabled.",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.01,
+      "trailing_stop_positive_offset": 0.02,
+      "timeframe": "1h",
+      "minimal_roi": "\"0\": 0.05,      # 5% profit immediately\n        \"30\": 0.03,     # 3% after 30 min\n        \"60\": 0.02,     # 2% after 1h\n        \"120\": 0.01,    # 1% after 2h",
+      "_file_hash": "68c92f90e92a"
+    },
+    "file_hash": "68c92f90e92a"
+  }
+]

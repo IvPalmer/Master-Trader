@@ -1,0 +1,40 @@
+{
+    "dry_run": true,
+    "dry_run_wallet": 1000,
+    "trading_mode": "spot",
+    "margin_mode": "",
+    "stake_currency": "USDT",
+    "stake_amount": "unlimited",
+    "tradable_balance_ratio": 0.99,
+    "fiat_display_currency": "",
+    "max_open_trades": 5,
+    "amount_reserve_percent": 0.05,
+    "entry_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "exit_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "exchange": {
+        "name": "binance",
+        "key": "",
+        "secret": "",
+        "pair_whitelist": [
+            "AAVE/USDT","ACX/USDT","ADA/USDT","ALGO/USDT","API3/USDT","APT/USDT","ARB/USDT",
+            "ATOM/USDT","AVAX/USDT","BCH/USDT","BNB/USDT","BTC/USDT","COMP/USDT","DEGO/USDT",
+            "DOGE/USDT","DOT/USDT","ENA/USDT","ETH/USDT","FET/USDT","FIL/USDT","FLOW/USDT",
+            "HBAR/USDT","ICP/USDT","INJ/USDT","LINK/USDT","LTC/USDT","NEAR/USDT","OP/USDT",
+            "PAXG/USDT","PENGU/USDT","PEPE/USDT","RENDER/USDT","SEI/USDT","SHIB/USDT",
+            "SOL/USDT","SUI/USDT","TAO/USDT","TRUMP/USDT","TRX/USDT","UNI/USDT",
+            "VIRTUAL/USDT","WLD/USDT","XAI/USDT","XLM/USDT","XRP/USDT","ZEC/USDT","ZRO/USDT"
+        ],
+        "pair_blacklist": []
+    },
+    "pairlists": [
+        {"method": "StaticPairList"}
+    ]
+}
