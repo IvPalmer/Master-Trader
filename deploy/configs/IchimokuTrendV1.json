@@ -157,16 +157,16 @@
         "enable_openapi": true,
         "jwt_secret_key": "master-trader-dev-key-change-for-prod",
         "CORS_origins": [
-            "http://localhost:8089"
+            "http://localhost:8080"
         ],
         "username": "freqtrader",
         "password": "mastertrader"
     },
-    "bot_name": "BollingerRSI MR",
+    "bot_name": "Ichimoku Trend",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {
         "process_throttle_secs": 5
     },
-    "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.BollingerRSIMeanReversion.sqlite"
+    "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.IchimokuTrendV1.sqlite"
 }

@@ -32,6 +32,7 @@ import requests
 FT_DIR = Path.home() / "ft_userdata"
 PROMPT_TEMPLATE_FULL = FT_DIR / "report_prompt.md"
 PROMPT_TEMPLATE_BRIEF = FT_DIR / "report_prompt_brief.md"
+PROMPT_TEMPLATE_WEEKLY = FT_DIR / "report_prompt_weekly.md"
 STATE_FILE = FT_DIR / "health_report_state.json"
 LOGS_DIR = FT_DIR / "logs"
 WEBHOOK_URL = "http://localhost:8088/webhooks/freqtrade"
@@ -46,15 +47,22 @@ SAO_PAULO_TZ = timezone(timedelta(hours=-3))
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(LOGS_DIR / "ai_health_report.log"),
-        logging.StreamHandler(sys.stdout),
-    ],
-)
 log = logging.getLogger("ai-health-report")
+
+
+def _setup_logging(stdout_mode: bool = False) -> None:
+    """Configure logging. In --stdout mode, console goes to stderr to keep stdout clean."""
+    global log
+    log.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+
+    file_handler = logging.FileHandler(LOGS_DIR / "ai_health_report.log")
+    file_handler.setFormatter(formatter)
+    log.addHandler(file_handler)
+
+    console_handler = logging.StreamHandler(sys.stderr if stdout_mode else sys.stdout)
+    console_handler.setFormatter(formatter)
+    log.addHandler(console_handler)
 
 
 # ---------------------------------------------------------------------------
@@ -199,9 +207,14 @@ def load_dynamic_context() -> str:
     return "\n".join(context_parts)
 
 
-def build_prompt(metrics: dict, previous: Optional[dict], brief: bool = False) -> str:
+def build_prompt(metrics: dict, previous: Optional[dict], mode: str = "full") -> str:
     """Assemble the full prompt with injected data."""
-    template_path = PROMPT_TEMPLATE_BRIEF if brief else PROMPT_TEMPLATE_FULL
+    if mode == "brief":
+        template_path = PROMPT_TEMPLATE_BRIEF
+    elif mode == "weekly":
+        template_path = PROMPT_TEMPLATE_WEEKLY
+    else:
+        template_path = PROMPT_TEMPLATE_FULL
     template = template_path.read_text()
 
     # Dynamic context from project memory
@@ -296,8 +309,13 @@ def main():
     parser = argparse.ArgumentParser(description="AI Health Report")
     parser.add_argument("--stdout", action="store_true", help="Print to stdout only")
     parser.add_argument("--brief", action="store_true", help="Short status update (morning/evening)")
+    parser.add_argument("--weekly", action="store_true", help="Weekly deep review (Sunday)")
     parser.add_argument("--json-only", action="store_true", help="Just gather and print data")
     args = parser.parse_args()
+
+    _setup_logging(stdout_mode=args.stdout or args.json_only)
+
+    mode = "weekly" if args.weekly else ("brief" if args.brief else "full")
 
     log.info("=" * 50)
     log.info("AI Health Report - %s", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -317,8 +335,8 @@ def main():
         return 0
 
     # Step 2: Build prompt
-    log.info("Building prompt (mode=%s)...", "brief" if args.brief else "full")
-    prompt = build_prompt(metrics, previous, brief=args.brief)
+    log.info("Building prompt (mode=%s)...", mode)
+    prompt = build_prompt(metrics, previous, mode=mode)
     log.info("Prompt size: %d chars", len(prompt))
 
     # Step 3: Run Claude
@@ -328,7 +346,8 @@ def main():
     if report:
         # Prefix with timestamp
         now = datetime.now(SAO_PAULO_TZ).strftime("%Y-%m-%d %H:%M")
-        label = "STATUS UPDATE" if args.brief else "PORTFOLIO REPORT"
+        labels = {"brief": "STATUS UPDATE", "weekly": "WEEKLY REVIEW", "full": "PORTFOLIO REPORT"}
+        label = labels.get(mode, "PORTFOLIO REPORT")
         header = f"AI {label} — {now} (São Paulo)\n{'=' * 40}\n\n"
         report = header + report
         log.info("Claude analysis complete (%d chars)", len(report))

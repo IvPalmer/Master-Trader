@@ -27,7 +27,7 @@ class MasterTraderV1(IStrategy):
     }
 
     # Stoploss
-    stoploss = -0.15  # 15% — evidence: 5% < 1 daily SD for alts, causes whipsaws on 1h
+    stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%
 
     # Trailing stop
     trailing_stop = True

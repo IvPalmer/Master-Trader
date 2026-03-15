@@ -22,7 +22,7 @@ class SupertrendStrategy(IStrategy):
         "0": 0.05, "360": 0.03, "720": 0.02, "1440": 0.01
     }
 
-    stoploss = -0.10  # MAE data: worst winner MAE was -4.90%, -10% for 1h buffer
+    stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%
     trailing_stop = True
     trailing_stop_positive = 0.02    # Trail by 2% once offset is reached
     trailing_stop_positive_offset = 0.03  # Start trailing at +3% (was 14.4% — never activated)

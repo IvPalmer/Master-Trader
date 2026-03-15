@@ -23,7 +23,7 @@ class BollingerRSIMeanReversion(IStrategy):
         "120": 0.005
     }
 
-    stoploss = -0.06
+    stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%
     trailing_stop = True
     trailing_stop_positive = 0.01
     trailing_stop_positive_offset = 0.02
