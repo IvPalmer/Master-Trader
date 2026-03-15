@@ -1,0 +1,27 @@
+{
+  "id": "20260315_020425",
+  "timestamp": "2026-03-15T02:04:25Z",
+  "note": "test snapshot",
+  "parameters": {
+    "stoploss": -0.05,
+    "trailing_stop": "True",
+    "trailing_stop_positive": 0.02,
+    "trailing_stop_positive_offset": 0.03,
+    "timeframe": "1h",
+    "minimal_roi": "\"0\": 0.05, \"360\": 0.03, \"720\": 0.02, \"1440\": 0.01",
+    "_file_hash": "0a7ec7ade411"
+  },
+  "config": {
+    "dry_run": true,
+    "dry_run_wallet": 1000,
+    "max_open_trades": 5,
+    "stake_amount": "unlimited",
+    "stoploss_on_exchange": true,
+    "trading_mode": "spot"
+  },
+  "metrics": {
+    "total_trades": 0,
+    "open_trades": 0,
+    "open_stake": 0
+  }
+}

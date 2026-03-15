@@ -767,7 +767,7 @@
     },
     {
       "id": 6,
-      "title": "\u25cf TRX/USDT",
+      "title": "\u25cf TAO/USDT",
       "type": "candlestick",
       "gridPos": {
         "h": 10,
@@ -887,7 +887,7 @@
           },
           "type": "json",
           "source": "url",
-          "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=TRX/USDT&timeframe=1h&limit=2000&markers=true",
+          "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=TAO/USDT&timeframe=1h&limit=2000&markers=true",
           "url_options": {
             "method": "GET"
           },
@@ -2509,7 +2509,7 @@
         },
         {
           "id": 16,
-          "title": "TAO/USDT  (closed)",
+          "title": "TRX/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
@@ -2629,7 +2629,7 @@
               },
               "type": "json",
               "source": "url",
-              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=TAO/USDT&timeframe=1h&limit=2000&markers=true",
+              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=TRX/USDT&timeframe=1h&limit=2000&markers=true",
               "url_options": {
                 "method": "GET"
               },

@@ -12,6 +12,8 @@ import requests
 from requests.auth import HTTPBasicAuth
 from prometheus_client import start_http_server, Gauge, Info
 
+from api_utils import api_get as _api_get_with_retry
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -21,14 +23,42 @@ log = logging.getLogger("ft-exporter")
 # ── Bot configuration ────────────────────────────────────────────────
 # Inside Docker compose network, all bots listen on internal port 8080.
 # We reach them by service name.
-BOTS = [
-    {"service": "ichimokutrendv1",          "strategy": "IchimokuTrendV1"},
-    {"service": "emacrossoverv1",           "strategy": "EMACrossoverV1"},
-    {"service": "supertrendstrategy",       "strategy": "SupertrendStrategy"},
-    {"service": "mastertraderv1",           "strategy": "MasterTraderV1"},
-    {"service": "bollingerrsimeanreversion", "strategy": "BollingerRSIMeanReversion"},
-    {"service": "futuressniper",            "strategy": "FuturesSniperV1"},
-]
+def _load_bots_config() -> list[dict]:
+    """Load bot registry from shared config, fall back to hardcoded defaults."""
+    import json
+    from pathlib import Path
+    config_path = Path(__file__).parent / "bots_config.json"
+    try:
+        with open(config_path) as f:
+            data = json.load(f)
+        bots = []
+        for name, info in data["bots"].items():
+            if not info.get("active", True):
+                continue
+            service = info.get("service", name.lower().replace("v1", "").replace("strategy", ""))
+            # Handle known service name mappings
+            service_map = {
+                "IchimokuTrendV1": "ichimokutrendv1",
+                "EMACrossoverV1": "emacrossoverv1",
+                "SupertrendStrategy": "supertrendstrategy",
+                "MasterTraderV1": "mastertraderv1",
+                "BollingerRSIMeanReversion": "bollingerrsimeanreversion",
+                "FuturesSniperV1": "futuressniper",
+            }
+            service = service_map.get(name, service)
+            bots.append({"service": service, "strategy": name})
+        return bots
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return [
+            {"service": "ichimokutrendv1",          "strategy": "IchimokuTrendV1"},
+            {"service": "emacrossoverv1",           "strategy": "EMACrossoverV1"},
+            {"service": "supertrendstrategy",       "strategy": "SupertrendStrategy"},
+            {"service": "mastertraderv1",           "strategy": "MasterTraderV1"},
+            {"service": "bollingerrsimeanreversion", "strategy": "BollingerRSIMeanReversion"},
+            {"service": "futuressniper",            "strategy": "FuturesSniperV1"},
+        ]
+
+BOTS = _load_bots_config()
 
 AUTH = HTTPBasicAuth("freqtrader", "mastertrader")
 API_PORT = 8080
@@ -105,24 +135,18 @@ portfolio_value_total = Gauge(
 )
 
 
-def fetch_json(url: str, timeout: int = 10) -> dict | None:
-    """GET JSON from a Freqtrade API endpoint. Returns None on any error."""
-    try:
-        resp = requests.get(url, auth=AUTH, timeout=timeout)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as exc:
-        log.warning("Failed to fetch %s: %s", url, exc)
-        return None
+def fetch_json(service: str, endpoint: str, timeout: int = 10) -> dict | None:
+    """GET JSON from a Freqtrade API endpoint with retry logic."""
+    return _api_get_with_retry(API_PORT, endpoint, timeout=timeout, base_host=service)
 
 
 def scrape_bot(bot: dict) -> float | None:
     """Scrape one bot and update its Prometheus metrics. Returns true P&L or None."""
-    base = f"http://{bot['service']}:{API_PORT}/api/v1"
+    service = bot["service"]
     strategy = bot["strategy"]
 
     # ── /profit ──────────────────────────────────────────────────
-    data = fetch_json(f"{base}/profit")
+    data = fetch_json(service, "profit")
     if data is None:
         bot_up.labels(strategy=strategy).set(0)
         return None
@@ -154,7 +178,7 @@ def scrape_bot(bot: dict) -> float | None:
 
     # ── /status (open trades + unrealized P&L) ───────────────────
     bot_true_pnl = closed_pnl
-    status_data = fetch_json(f"{base}/status")
+    status_data = fetch_json(service, "status")
     if isinstance(status_data, list):
         trades_open.labels(strategy=strategy).set(len(status_data))
         open_pnl = sum(t.get("profit_abs", 0) for t in status_data)
@@ -167,7 +191,7 @@ def scrape_bot(bot: dict) -> float | None:
         true_pnl.labels(strategy=strategy).set(closed_pnl)
 
     # ── /balance ─────────────────────────────────────────────────
-    bal_data = fetch_json(f"{base}/balance")
+    bal_data = fetch_json(service, "balance")
     if bal_data:
         balance.labels(strategy=strategy).set(
             bal_data.get("total", 0)

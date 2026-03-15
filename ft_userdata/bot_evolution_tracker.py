@@ -27,14 +27,24 @@ STRATEGY_DIR = Path(__file__).parent / "user_data" / "strategies"
 CONFIG_DIR = Path(__file__).parent / "user_data" / "configs"
 TRADE_DB_DIR = Path(__file__).parent / "user_data"
 
-ACTIVE_BOTS = [
-    "SupertrendStrategy",
-    "MasterTraderV1",
-    "BollingerRSIMeanReversion",
-    "IchimokuTrendV1",
-    "EMACrossoverV1",
-    "FuturesSniperV1",
-]
+def _load_active_bots() -> list[str]:
+    """Load active bot names from shared config, fall back to hardcoded defaults."""
+    config_path = Path(__file__).parent / "bots_config.json"
+    try:
+        with open(config_path) as f:
+            data = json.load(f)
+        return [name for name, info in data["bots"].items() if info.get("active", True)]
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return [
+            "SupertrendStrategy",
+            "MasterTraderV1",
+            "BollingerRSIMeanReversion",
+            "IchimokuTrendV1",
+            "EMACrossoverV1",
+            "FuturesSniperV1",
+        ]
+
+ACTIVE_BOTS = _load_active_bots()
 
 GRADUATION = {
     "min_trades": 30,

@@ -15,14 +15,24 @@ FT_DIR = Path(__file__).parent.parent / "ft_userdata"
 CONFIG_DIR = FT_DIR / "user_data" / "configs"
 STRATEGY_DIR = FT_DIR / "user_data" / "strategies"
 
-ACTIVE_BOTS = [
-    "SupertrendStrategy",
-    "MasterTraderV1",
-    "BollingerRSIMeanReversion",
-    "IchimokuTrendV1",
-    "EMACrossoverV1",
-    "FuturesSniperV1",
-]
+def _load_active_bots() -> list:
+    """Load active bot names from shared config, fall back to hardcoded defaults."""
+    config_path = Path(__file__).parent.parent / "ft_userdata" / "bots_config.json"
+    try:
+        with open(config_path) as f:
+            data = json.load(f)
+        return [name for name, info in data["bots"].items() if info.get("active", True)]
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return [
+            "SupertrendStrategy",
+            "MasterTraderV1",
+            "BollingerRSIMeanReversion",
+            "IchimokuTrendV1",
+            "EMACrossoverV1",
+            "FuturesSniperV1",
+        ]
+
+ACTIVE_BOTS = _load_active_bots()
 
 
 def load_config(name):

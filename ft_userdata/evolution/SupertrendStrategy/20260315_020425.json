@@ -1,6 +1,6 @@
 {
-  "id": "20260315_022428",
-  "timestamp": "2026-03-15T02:24:28Z",
+  "id": "20260315_020425",
+  "timestamp": "2026-03-15T02:04:25Z",
   "note": "test snapshot",
   "parameters": {
     "stoploss": -0.05,
@@ -20,30 +20,29 @@
     "trading_mode": "spot"
   },
   "metrics": {
-    "total_trades": 28,
+    "total_trades": 27,
     "open_trades": 5,
-    "open_stake": 1033.68,
-    "winners": 17,
+    "open_stake": 1033.22,
+    "winners": 16,
     "losers": 11,
-    "win_rate": 60.7,
-    "profit_factor": 4.78,
-    "risk_reward": 3.09,
-    "avg_win": 5.12,
+    "win_rate": 59.3,
+    "profit_factor": 4.66,
+    "risk_reward": 3.2,
+    "avg_win": 5.3,
     "avg_loss": 1.66,
-    "total_pnl": 68.82,
+    "total_pnl": 66.59,
     "worst_loss_abs": -4.74,
     "worst_loss_pct": -2.4,
     "max_drawdown": 4.91,
     "max_consec_losses": 4,
     "unique_pairs": 18,
-    "days_running": 3,
+    "days_running": 2,
     "exit_reasons": {
       "exit_signal": 14,
-      "roi": 10,
+      "roi": 9,
       "trailing_stop_loss": 4
     },
     "force_exits": 0,
-    "trades_per_day": 9.3
-  },
-  "_peak_reason": "New peak PF: 4.78x"
+    "trades_per_day": 13.5
+  }
 }

@@ -39,20 +39,41 @@ from typing import Any, Optional
 import requests
 import numpy as np
 
+from api_utils import api_get as _api_get_with_retry
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
-BOTS = {
-    "ClucHAnix":          {"port": 8080, "container": "ft-cluchanix", "timeframe": "5m"},
-    "NASOSv5":            {"port": 8082, "container": "ft-nasosv5", "timeframe": "5m"},
-    "ElliotV5":           {"port": 8083, "container": "ft-elliotv5", "timeframe": "5m"},
-    "SupertrendStrategy": {"port": 8084, "container": "ft-supertrendstrategy", "timeframe": "1h"},
-    "MasterTraderV1":     {"port": 8086, "container": "ft-mastertraderv1", "timeframe": "1h"},
-    "MasterTraderAI":     {"port": 8087, "container": "ft-mastertraderai", "timeframe": "1h"},
-    "BollingerRSIMeanReversion": {"port": 8089, "container": "ft-bollinger-rsi", "timeframe": "15m"},
-    "FuturesSniperV1":    {"port": 8090, "container": "ft-futures-sniper", "timeframe": "1h"},
-}
+def _load_bots_config() -> dict:
+    """Load bot registry from shared config, fall back to hardcoded defaults."""
+    config_path = Path(__file__).parent / "bots_config.json"
+    try:
+        with open(config_path) as f:
+            data = json.load(f)
+        bots = {}
+        for name, info in data["bots"].items():
+            if not info.get("active", True):
+                continue
+            container = f"ft-{name.lower().replace('v1', '').replace('strategy', '')}"
+            # Use container from config if present, otherwise generate
+            bots[name] = {
+                "port": info["port"],
+                "container": info.get("container", container),
+                "timeframe": info.get("timeframe", "1h"),
+            }
+        return bots
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return {
+            "SupertrendStrategy": {"port": 8084, "container": "ft-supertrendstrategy", "timeframe": "1h"},
+            "MasterTraderV1":     {"port": 8086, "container": "ft-mastertraderv1", "timeframe": "1h"},
+            "BollingerRSIMeanReversion": {"port": 8089, "container": "ft-bollinger-rsi", "timeframe": "15m"},
+            "IchimokuTrendV1":    {"port": 8080, "container": "ft-ichimokutrendv1", "timeframe": "1h"},
+            "EMACrossoverV1":     {"port": 8083, "container": "ft-emacrossoverv1", "timeframe": "1h"},
+            "FuturesSniperV1":    {"port": 8090, "container": "ft-futures-sniper", "timeframe": "1h"},
+        }
+
+BOTS = _load_bots_config()
 
 API_USER = "freqtrader"
 API_PASS = "mastertrader"
@@ -88,18 +109,8 @@ log = logging.getLogger("bot-rotator")
 # ---------------------------------------------------------------------------
 
 def api_get(port: int, endpoint: str) -> Optional[Any]:
-    """Fetch from Freqtrade API."""
-    try:
-        r = requests.get(
-            f"http://127.0.0.1:{port}/api/v1/{endpoint}",
-            auth=(API_USER, API_PASS),
-            timeout=10,
-        )
-        if r.status_code == 200:
-            return r.json()
-    except Exception as e:
-        log.warning("API error port %d/%s: %s", port, endpoint, e)
-    return None
+    """Fetch from Freqtrade API with retry logic."""
+    return _api_get_with_retry(port, endpoint)
 
 
 def parse_date(s: str) -> datetime:

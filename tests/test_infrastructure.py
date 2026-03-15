@@ -47,14 +47,28 @@ live = pytest.mark.skipif(
     reason="Docker not running"
 )
 
-BOT_PORTS = {
-    "IchimokuTrendV1": 8080,
-    "EMACrossoverV1": 8083,
-    "SupertrendStrategy": 8084,
-    "MasterTraderV1": 8086,
-    "BollingerRSIMeanReversion": 8089,
-    "FuturesSniperV1": 8090,
-}
+def _load_bot_ports() -> dict:
+    """Load bot name→port mapping from shared config, fall back to hardcoded defaults."""
+    config_path = Path(__file__).parent.parent / "ft_userdata" / "bots_config.json"
+    try:
+        with open(config_path) as f:
+            data = json.load(f)
+        return {
+            name: info["port"]
+            for name, info in data["bots"].items()
+            if info.get("active", True)
+        }
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return {
+            "IchimokuTrendV1": 8080,
+            "EMACrossoverV1": 8083,
+            "SupertrendStrategy": 8084,
+            "MasterTraderV1": 8086,
+            "BollingerRSIMeanReversion": 8089,
+            "FuturesSniperV1": 8090,
+        }
+
+BOT_PORTS = _load_bot_ports()
 
 
 # ── Docker containers ─────────────────────────────────────────────

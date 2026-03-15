@@ -28,18 +28,35 @@ from typing import Any, Optional
 import requests
 from requests.auth import HTTPBasicAuth
 
+from api_utils import api_get as _api_get_with_retry
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
-BOTS = {
-    "IchimokuTrendV1":        {"port": 8080, "timeframe": "1h", "type": "trend-follower"},
-    "EMACrossoverV1":         {"port": 8083, "timeframe": "1h", "type": "trend-follower"},
-    "SupertrendStrategy":     {"port": 8084, "timeframe": "1h", "type": "trend-follower"},
-    "MasterTraderV1":         {"port": 8086, "timeframe": "1h", "type": "hybrid"},
-    "BollingerRSIMeanReversion": {"port": 8089, "timeframe": "15m", "type": "mean-reversion"},
-    "FuturesSniperV1":        {"port": 8090, "timeframe": "1h", "type": "trend-follower"},
-}
+def _load_bots_config() -> dict:
+    """Load bot registry from shared config, fall back to hardcoded defaults."""
+    config_path = Path(__file__).parent / "bots_config.json"
+    try:
+        with open(config_path) as f:
+            data = json.load(f)
+        # Extract only active bots, keeping port/timeframe/type fields
+        return {
+            name: {k: v for k, v in info.items() if k != "active"}
+            for name, info in data["bots"].items()
+            if info.get("active", True)
+        }
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return {
+            "IchimokuTrendV1":        {"port": 8080, "timeframe": "1h", "type": "trend-follower"},
+            "EMACrossoverV1":         {"port": 8083, "timeframe": "1h", "type": "trend-follower"},
+            "SupertrendStrategy":     {"port": 8084, "timeframe": "1h", "type": "trend-follower"},
+            "MasterTraderV1":         {"port": 8086, "timeframe": "1h", "type": "hybrid"},
+            "BollingerRSIMeanReversion": {"port": 8089, "timeframe": "15m", "type": "mean-reversion"},
+            "FuturesSniperV1":        {"port": 8090, "timeframe": "1h", "type": "trend-follower"},
+        }
+
+BOTS = _load_bots_config()
 
 API_USER = "freqtrader"
 API_PASS = "mastertrader"
@@ -109,33 +126,28 @@ SCORE_WEIGHTS = {
 # Data Collection
 # ---------------------------------------------------------------------------
 
-def fetch_json(url: str, timeout: int = 10) -> Optional[Any]:
-    try:
-        resp = requests.get(url, auth=AUTH, timeout=timeout)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as exc:
-        log.warning("Failed to fetch %s: %s", url, exc)
-        return None
+def fetch_json(port: int, endpoint: str, timeout: int = 10) -> Optional[Any]:
+    """Fetch JSON from Freqtrade API with retry logic."""
+    return _api_get_with_retry(port, endpoint, timeout=timeout)
 
 
 def get_trades_from_api(port: int, limit: int = 500) -> Optional[list]:
-    data = fetch_json(f"http://127.0.0.1:{port}/api/v1/trades?limit={limit}")
+    data = fetch_json(port, f"trades?limit={limit}")
     if data and "trades" in data:
         return data["trades"]
     return data if isinstance(data, list) else None
 
 
 def get_open_trades(port: int) -> Optional[list]:
-    return fetch_json(f"http://127.0.0.1:{port}/api/v1/status")
+    return fetch_json(port, "status")
 
 
 def get_profit_data(port: int) -> Optional[dict]:
-    return fetch_json(f"http://127.0.0.1:{port}/api/v1/profit")
+    return fetch_json(port, "profit")
 
 
 def get_bot_config(port: int) -> Optional[dict]:
-    return fetch_json(f"http://127.0.0.1:{port}/api/v1/show_config")
+    return fetch_json(port, "show_config")
 
 
 # ---------------------------------------------------------------------------

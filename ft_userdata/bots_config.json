@@ -1,0 +1,10 @@
+{
+  "bots": {
+    "SupertrendStrategy": {"port": 8084, "timeframe": "1h", "type": "trend-follower", "active": true},
+    "MasterTraderV1": {"port": 8086, "timeframe": "1h", "type": "hybrid", "active": true},
+    "BollingerRSIMeanReversion": {"port": 8089, "timeframe": "15m", "type": "mean-reversion", "active": true},
+    "IchimokuTrendV1": {"port": 8080, "timeframe": "1h", "type": "trend-follower", "active": true},
+    "EMACrossoverV1": {"port": 8083, "timeframe": "1h", "type": "trend-follower", "active": true},
+    "FuturesSniperV1": {"port": 8090, "timeframe": "1h", "type": "trend-follower", "active": true, "trading_mode": "futures"}
+  }
+}
