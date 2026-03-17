@@ -559,7 +559,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
+          "expr": "sum by (strategy) (freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
@@ -674,7 +674,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
+          "expr": "sum by (strategy) (freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
@@ -923,7 +923,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
+          "expr": "sum by (strategy) (freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1020,7 +1020,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"} - 88",
+          "expr": "sum by (strategy) (freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}) - 88",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1094,7 +1094,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_win_rate{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
+          "expr": "sum by (strategy) (freqtrade_win_rate{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1166,7 +1166,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
+          "expr": "sum by (strategy) (freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1240,7 +1240,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_drawdown{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"} * 100",
+          "expr": "sum by (strategy) (freqtrade_drawdown{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}) * 100",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1356,7 +1356,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "clamp_min((max_over_time(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}[6h]) - freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}) / max_over_time(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}[6h]) * 100, 0)",
+          "expr": "clamp_min((max_over_time(sum by (strategy) (freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})[6h]) - sum by (strategy) (freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})) / max_over_time(sum by (strategy) (freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})[6h]) * 100, 0)",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
@@ -1485,7 +1485,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
+          "expr": "sum by (strategy) (freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
@@ -1604,7 +1604,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
+          "expr": "sum by (strategy) (freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
@@ -1670,7 +1670,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_true_pnl{strategy=\"SupertrendStrategy\"}",
+          "expr": "sum by (strategy) (freqtrade_true_pnl{strategy=\"SupertrendStrategy\"})",
           "legendFormat": "Supertrend",
           "refId": "A"
         }
@@ -1731,7 +1731,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_true_pnl{strategy=\"MasterTraderV1\"}",
+          "expr": "sum by (strategy) (freqtrade_true_pnl{strategy=\"MasterTraderV1\"})",
           "legendFormat": "MasterV1",
           "refId": "A"
         }
@@ -1792,7 +1792,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_true_pnl{strategy=\"BollingerRSIMeanReversion\"}",
+          "expr": "sum by (strategy) (freqtrade_true_pnl{strategy=\"BollingerRSIMeanReversion\"})",
           "legendFormat": "BollingerRSI",
           "refId": "A"
         }
@@ -1853,7 +1853,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_true_pnl{strategy=\"FuturesSniperV1\"}",
+          "expr": "sum by (strategy) (freqtrade_true_pnl{strategy=\"FuturesSniperV1\"})",
           "legendFormat": "FuturesSniper",
           "refId": "A"
         }
