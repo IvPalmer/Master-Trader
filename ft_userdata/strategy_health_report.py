@@ -194,8 +194,8 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
         return metrics
 
     # --- P&L ---
-    closed_pnl = sum(t.get("profit_abs", 0) for t in closed)
-    open_pnl = sum(t.get("profit_abs", 0) for t in open_list)
+    closed_pnl = sum((t.get("profit_abs", 0) or 0) for t in closed)
+    open_pnl = sum((t.get("profit_abs", 0) or 0) for t in open_list)
     true_pnl = closed_pnl + open_pnl
 
     metrics["closed_pnl"] = round(closed_pnl, 2)
@@ -211,16 +211,16 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
     metrics["losers"] = len(losers)
 
     # --- Average Win vs Average Loss ---
-    avg_win = sum(t.get("profit_abs", 0) for t in winners) / len(winners) if winners else 0
-    avg_loss = abs(sum(t.get("profit_abs", 0) for t in losers) / len(losers)) if losers else 0
+    avg_win = sum((t.get("profit_abs", 0) or 0) for t in winners) / len(winners) if winners else 0
+    avg_loss = abs(sum((t.get("profit_abs", 0) or 0) for t in losers) / len(losers)) if losers else 0
     risk_reward = avg_win / avg_loss if avg_loss > 0 else (10.0 if avg_win > 0 else 0)
     metrics["avg_win"] = round(avg_win, 2)
     metrics["avg_loss"] = round(avg_loss, 2)
     metrics["risk_reward"] = round(risk_reward, 2)
 
     # --- Profit Factor ---
-    gross_profit = sum(t.get("profit_abs", 0) for t in winners)
-    gross_loss = abs(sum(t.get("profit_abs", 0) for t in losers))
+    gross_profit = sum((t.get("profit_abs", 0) or 0) for t in winners)
+    gross_loss = abs(sum((t.get("profit_abs", 0) or 0) for t in losers))
     profit_factor = gross_profit / gross_loss if gross_loss > 0 else (10.0 if gross_profit > 0 else 0)
     metrics["profit_factor"] = round(profit_factor, 2)
 
@@ -251,16 +251,16 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
 
     # --- Worst Single Trade ---
     if closed:
-        worst = min(closed, key=lambda t: t.get("profit_abs", 0))
+        worst = min(closed, key=lambda t: (t.get("profit_abs", 0) or 0))
         metrics["worst_trade"] = {
             "pair": worst.get("pair", "?"),
-            "profit": round(worst.get("profit_abs", 0), 2),
-            "pct": round(worst.get("profit_pct", 0), 1),
+            "profit": round(worst.get("profit_abs", 0) or 0, 2),
+            "pct": round(worst.get("profit_pct", 0) or 0, 1),
             "exit_reason": worst.get("exit_reason", "?"),
         }
         # Check if single trade dominates losses
         if gross_loss > 0:
-            worst_pct_of_loss = abs(worst.get("profit_abs", 0)) / gross_loss * 100
+            worst_pct_of_loss = abs(worst.get("profit_abs", 0) or 0) / gross_loss * 100
             metrics["worst_trade_loss_pct"] = round(worst_pct_of_loss, 1)
 
     # --- Return Consistency (daily returns std) ---
@@ -277,15 +277,15 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
     now = datetime.now(timezone.utc)
     last_24h = [t for t in closed if _parse_date(t.get("close_date")) >= now - timedelta(hours=24)]
     metrics["trades_24h"] = len(last_24h)
-    metrics["pnl_24h"] = round(sum(t.get("profit_abs", 0) for t in last_24h), 2)
+    metrics["pnl_24h"] = round(sum((t.get("profit_abs", 0) or 0) for t in last_24h), 2)
 
     # --- Open Position Health ---
     if open_list:
-        worst_open = min(open_list, key=lambda t: t.get("profit_abs", 0))
+        worst_open = min(open_list, key=lambda t: (t.get("profit_abs", 0) or 0))
         metrics["worst_open"] = {
             "pair": worst_open.get("pair", "?"),
-            "profit": round(worst_open.get("profit_abs", 0), 2),
-            "pct": round(worst_open.get("profit_pct", 0), 1),
+            "profit": round(worst_open.get("profit_abs", 0) or 0, 2),
+            "pct": round(worst_open.get("profit_pct", 0) or 0, 1),
         }
         stale_trades = [t for t in open_list if _trade_age_hours(t) > 8]
         metrics["stale_positions"] = len(stale_trades)
@@ -309,7 +309,7 @@ def _compute_daily_returns(trades: list) -> list:
         close_dt = _parse_date(t.get("close_date"))
         if close_dt:
             day = close_dt.strftime("%Y-%m-%d")
-            daily[day] += t.get("profit_abs", 0)
+            daily[day] += (t.get("profit_abs", 0) or 0)
     return list(daily.values())
 
 

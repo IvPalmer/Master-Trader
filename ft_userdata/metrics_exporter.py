@@ -65,7 +65,7 @@ API_PORT = 8080
 SCRAPE_INTERVAL = 60  # seconds
 
 # ── Circuit Breaker ───────────────────────────────────────────────
-INITIAL_CAPITAL = 5500.0  # Total across all bots (5x$1000 spot + $500 futures)
+INITIAL_CAPITAL = 3500.0  # Total across active bots (3x$1000 spot + $500 futures)
 CIRCUIT_BREAKER_PCT = 10.0  # Trigger at 10% portfolio drawdown ($700)
 CIRCUIT_BREAKER_COOLDOWN = 3600  # Don't re-alert for 1 hour after triggering
 WEBHOOK_URL = "http://host.docker.internal:8088/webhooks/freqtrade"

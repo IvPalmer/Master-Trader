@@ -252,12 +252,11 @@ services:
     container_name: ft-metrics-exporter
     volumes:
       - "./metrics_exporter.py:/app/metrics_exporter.py:ro"
+      - "./api_utils.py:/app/api_utils.py:ro"
+      - "./bots_config.json:/app/bots_config.json:ro"
     ports:
       - "127.0.0.1:9090:9090"
     depends_on:
-      - ichimokutrendv1
-
-      - emacrossoverv1
       - supertrendstrategy
       - mastertraderv1
       - bollingerrsimeanreversion

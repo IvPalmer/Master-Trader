@@ -19,13 +19,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 BOTS = {
-    "ClucHAnix": {"url": "http://cluchanix:8080", "timeframe": "5m"},
-    "NASOSv5": {"url": "http://nasosv5:8080", "timeframe": "5m"},
-    "ElliotV5": {"url": "http://elliotv5:8080", "timeframe": "5m"},
     "SupertrendStrategy": {"url": "http://supertrendstrategy:8080", "timeframe": "1h"},
     "MasterTraderV1": {"url": "http://mastertraderv1:8080", "timeframe": "1h"},
-    "MasterTraderAI": {"url": "http://mastertraderai:8080", "timeframe": "5m"},
-    "BollingerRSI": {"url": "http://bollingerrsimeanreversion:8080", "timeframe": "5m"},
+    "BollingerRSIMeanReversion": {"url": "http://bollingerrsimeanreversion:8080", "timeframe": "15m"},
     "FuturesSniperV1": {"url": "http://futuressniper:8080", "timeframe": "1h"},
 }
 
