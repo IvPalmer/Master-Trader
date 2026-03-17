@@ -1,6 +1,6 @@
 {
     "dry_run": true,
-    "dry_run_wallet": 500,
+    "dry_run_wallet": 88,
     "cancel_open_orders_on_exit": true,
     "trading_mode": "spot",
     "margin_mode": "",
@@ -8,7 +8,7 @@
     "stake_amount": "unlimited",
     "tradable_balance_ratio": 0.99,
     "fiat_display_currency": "",
-    "max_open_trades": 5,
+    "max_open_trades": 3,
     "amount_reserve_percent": 0.05,
     "unfilledtimeout": {
         "entry": 10,

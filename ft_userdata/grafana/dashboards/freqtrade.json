@@ -136,7 +136,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "(sum(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}) / 2000) * 100",
+          "expr": "(sum(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}) / 352) * 100",
           "legendFormat": "Return %",
           "refId": "A"
         }

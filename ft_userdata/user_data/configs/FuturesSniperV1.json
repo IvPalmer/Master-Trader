@@ -1,6 +1,6 @@
 {
     "dry_run": true,
-    "dry_run_wallet": 500,
+    "dry_run_wallet": 88,
     "cancel_open_orders_on_exit": true,
     "trading_mode": "futures",
     "margin_mode": "isolated",
