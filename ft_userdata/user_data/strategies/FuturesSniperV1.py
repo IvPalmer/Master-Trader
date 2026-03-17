@@ -40,21 +40,23 @@ class FuturesSniperV1(IStrategy):
     # Supertrend-based strategies work on 4h; EMA crossover needs more frequent data
     timeframe = "1h"
 
-    # ── ROI: tightened for 2x leverage ────────────────────────────
+    # ── ROI: widened to let winners run at 2x leverage ─────────────
+    # Old: 2.5%/1.5%/1%/0.5% — cutting winners too early
+    # At 2x leverage, 5% ROI = 10% dollar gain. Let trends develop.
     minimal_roi = {
-        "0": 0.025,     # 2.5% (= 5% at 2x)
-        "30": 0.015,    # 1.5% (= 3% at 2x)
-        "60": 0.01,     # 1% (= 2% at 2x)
-        "120": 0.005,   # 0.5% (= 1% at 2x)
+        "0": 0.075,     # 7.5% (= 15% at 2x)
+        "360": 0.05,    # 5% after 6h (= 10% at 2x)
+        "720": 0.035,   # 3.5% after 12h (= 7% at 2x)
+        "1440": 0.015,  # 1.5% after 24h (= 3% at 2x)
     }
 
     # -2% stoploss at 2x = -4% dollar risk
     stoploss = -0.02
 
-    # Trailing stop — 1% trail after 2% profit
+    # Trailing stop — 1.5% trail after 3% profit (widened from 1%/2%)
     trailing_stop = True
-    trailing_stop_positive = 0.01
-    trailing_stop_positive_offset = 0.02
+    trailing_stop_positive = 0.015
+    trailing_stop_positive_offset = 0.03
     trailing_only_offset_is_reached = True
 
     process_only_new_candles = True
@@ -251,15 +253,23 @@ class FuturesSniperV1(IStrategy):
             & (dataframe['btc_usdt_rsi_1h'] > 35)
         ).astype(int)
 
+        # Neutral: BTC above SMA200 but not fully bullish — still safe for longs
+        # Closes the dead zone where neither bullish nor bearish was true
+        dataframe['btc_long_ok'] = (
+            btc_above_sma200
+            | (btc_ema_bullish & (dataframe['btc_usdt_rsi_1h'] > 40))
+        ).astype(int)
+
         # Bear mode: BTC below SMA200 with declining slope
         dataframe['btc_bearish'] = (
             (~btc_above_sma200 & btc_sma200_declining)
             | (~btc_ema_bullish & btc_sma200_declining & (dataframe['btc_usdt_adx_1h'] > 20))
         ).astype(int)
 
-        # --- Per-pair downtrend state (for continuation entries) ---
+        # --- Per-pair trend state ---
         ema_f = f"ema_{self.ema_fast.value}"
         ema_s = f"ema_{self.ema_slow.value}"
+        dataframe['in_uptrend'] = (dataframe[ema_f] > dataframe[ema_s]).astype(int)
         dataframe['in_downtrend'] = (dataframe[ema_f] < dataframe[ema_s]).astype(int)
 
         return dataframe
@@ -271,20 +281,55 @@ class FuturesSniperV1(IStrategy):
         ema_s = f"ema_{self.ema_slow.value}"
         rsi_col = f"rsi_{self.rsi_period.value}"
 
-        # ── LONG entries: BTC must be bullish ─────────────────────
-        dataframe.loc[
+        # ── LONG entries: three types, BTC must be at least neutral ──
+        # Old logic required crossover event + full BTC bullish → 1 trade in 3 days
+        # New: ride trends (Ionita approach), don't just catch crosses
+
+        long_base = (
+            (dataframe["volume"] > 0)
+            & (dataframe['regime_volatile'] == 0)
+            & (dataframe['btc_long_ok'] == 1)
+        )
+
+        # Type 1: INITIATION — fresh EMA golden cross (original logic, relaxed)
+        long_initiation = (
             (
                 (dataframe[ema_f] > dataframe[ema_s])
                 & (dataframe[ema_f].shift(1) <= dataframe[ema_s].shift(1))
-                & (dataframe[rsi_col] > self.rsi_buy_limit.value)
-                & (dataframe[rsi_col] < 70)
-                & (dataframe['macd_hist'] > 0)
-                & (dataframe["volume"] > dataframe["volume_sma_20"])
-                & (dataframe["volume"] > 0)
-                & (dataframe['regime_volatile'] == 0)
-                & (dataframe['regime_trending'] == 1)
-                & (dataframe['btc_bullish'] == 1)
-            ),
+            )
+            & (dataframe[rsi_col] > self.rsi_buy_limit.value)
+            & (dataframe[rsi_col] < 70)
+            & (dataframe["volume"] > dataframe["volume_sma_20"])
+        )
+
+        # Type 2: CONTINUATION — pullback buy in established uptrend
+        # Price dips toward EMA slow then bounces — the workhorse entry
+        long_continuation = (
+            (dataframe['in_uptrend'] == 1)
+            # Price pulled back DOWN toward EMA slow (within 1%)
+            & (dataframe['close'] > dataframe[ema_s] * 0.99)
+            & (dataframe['close'] < dataframe[ema_s] * 1.01)
+            # Candle closed green (bounce)
+            & (dataframe['close'] > dataframe['open'])
+            # RSI dipped but recovering
+            & (dataframe[rsi_col] > 35)
+            & (dataframe[rsi_col] < 60)
+            # MACD still positive (trend intact)
+            & (dataframe['macd_hist'] > 0)
+        )
+
+        # Type 3: BREAKOUT — new swing high on volume (momentum continuation)
+        long_breakout = (
+            (dataframe['close'] > dataframe['high'].rolling(10).max().shift(1))
+            & (dataframe[rsi_col] > 50)
+            & (dataframe[rsi_col] < 75)
+            & (dataframe["volume"] > dataframe["volume_sma_20"] * 1.5)
+            & (dataframe['in_uptrend'] == 1)
+            & (dataframe['regime_trending'] == 1)
+        )
+
+        dataframe.loc[
+            long_base & (long_initiation | long_continuation | long_breakout),
             "enter_long",
         ] = 1
 
