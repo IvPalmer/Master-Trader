@@ -38,25 +38,21 @@ import numpy as np
 # ---------------------------------------------------------------------------
 
 BOTS = {
-    "ClucHAnix":                    {"port": 8080, "container": "ft-cluchanix"},
-    # "CombinedBinHAndCluc":          {"port": 8081, "container": "ft-combinedbinhandcluc"},  # PAUSED
-    "NASOSv5":                      {"port": 8082, "container": "ft-nasosv5"},
-    "ElliotV5":                     {"port": 8083, "container": "ft-elliotv5"},
     "SupertrendStrategy":           {"port": 8084, "container": "ft-supertrendstrategy"},
-    # "DoubleEMACrossoverWithTrend":  {"port": 8085, "container": "ft-doubleemacrossoverwithtrend"},  # PAUSED
     "MasterTraderV1":               {"port": 8086, "container": "ft-mastertraderv1"},
-    "MasterTraderAI":               {"port": 8087, "container": "ft-mastertraderai"},
     "BollingerRSIMeanReversion":    {"port": 8089, "container": "ft-bollinger-rsi"},
-    # "NostalgiaForInfinityX6":       {"port": 8089, "container": "ft-nostalgiaforinfinityx6"},  # KILLED — 0 trades
+    "FuturesSniperV1":              {"port": 8090, "container": "ft-futures-sniper"},
+    "AlligatorTrendV1":             {"port": 8091, "container": "ft-alligator-trend"},
+    "GaussianChannelV1":            {"port": 8092, "container": "ft-gaussian-channel"},
 }
 
 API_USER = "freqtrader"
 API_PASS = "mastertrader"
 BASE_URL = "http://127.0.0.1"
 
-TOTAL_CAPITAL = 7000.0
-MIN_ALLOC_PCT = 0.05       # 5%  -> $350
-MAX_ALLOC_PCT = 0.30       # 30% -> $2100
+TOTAL_CAPITAL = 528.0      # R$3,000 = $528 USDT (6x R$500/bot)
+MIN_ALLOC_PCT = 0.10       # 10% -> $52.80
+MAX_ALLOC_PCT = 0.30       # 30% -> $158.40
 MIN_ALLOC = TOTAL_CAPITAL * MIN_ALLOC_PCT
 MAX_ALLOC = TOTAL_CAPITAL * MAX_ALLOC_PCT
 

@@ -61,7 +61,7 @@ BOTS = _load_bots_config()
 API_USER = "freqtrader"
 API_PASS = "mastertrader"
 AUTH = HTTPBasicAuth(API_USER, API_PASS)
-INITIAL_CAPITAL = 7500.0  # 7x$1000 spot + $500 futures
+INITIAL_CAPITAL = 528.0   # 6x R$500/bot = R$3,000 = $528 USDT
 WEBHOOK_URL = "http://localhost:8088/webhooks/freqtrade"
 DB_DIR = Path.home() / "ft_userdata" / "user_data"
 STATE_FILE = Path.home() / "ft_userdata" / "health_report_state.json"
@@ -568,6 +568,7 @@ def compute_portfolio_metrics(bot_metrics: list[dict]) -> dict:
         "total_trades": total_trades,
         "open_positions": total_open,
         "bots_online": bots_online,
+        "bots_total": len(BOTS),
         "best_bot": best["strategy"],
         "best_pnl": best.get("true_pnl", 0),
         "worst_bot": worst["strategy"],
@@ -667,7 +668,7 @@ def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dic
     lines.append(f"  Open P&L: ${portfolio['open_pnl']:+.2f}")
     lines.append(f"  True P&L: ${portfolio['true_pnl']:+.2f}")
     lines.append(f"  Trades: {portfolio['total_trades']} closed, {portfolio['open_positions']} open")
-    lines.append(f"  Bots: {portfolio['bots_online']}/7 online")
+    lines.append(f"  Bots: {portfolio['bots_online']}/{portfolio.get('bots_total', portfolio['bots_online'])} online")
     lines.append(f"  Avg Health: {portfolio['avg_health_score']:.0f}/100")
     lines.append("")
 
