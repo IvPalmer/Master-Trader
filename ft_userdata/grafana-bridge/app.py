@@ -303,8 +303,14 @@ def generate_dashboard():
         tf = config["timeframe"]
         open_pairs, closed_pairs = _get_bot_trade_pairs(bot_name)
 
+        # If no trades at all, show top whitelist pairs so the bot is visible
+        watching_pairs = []
         if not open_pairs and not closed_pairs:
-            continue
+            whitelist = _get_whitelist(bot_name)
+            # Show top 3 whitelist pairs as "watching" charts
+            watching_pairs = sorted(whitelist)[:3]
+            if not watching_pairs:
+                continue
 
         n_open = len(open_pairs)
         n_closed = len(closed_pairs)
@@ -367,6 +373,32 @@ def generate_dashboard():
             })
             pid += 1
             y += 1
+
+        # ── Watching row (bots with no trades yet) ──
+        if watching_pairs:
+            header = f"{bot_name}  \u2014  watching {len(watching_pairs)} pairs  [{tf}]"
+            panels.append({
+                "type": "row",
+                "title": header,
+                "gridPos": {"h": 1, "w": 24, "x": 0, "y": y},
+                "collapsed": False,
+                "id": pid,
+                "panels": [],
+                "repeat": None,
+            })
+            pid += 1
+            y += 1
+
+            for wi, pair in enumerate(watching_pairs):
+                title = f"\u25cb {pair}  (no trades)"
+                w = 24 if len(watching_pairs) == 1 else 12
+                h = 10
+                x = (wi % 2) * 12 if len(watching_pairs) > 1 else 0
+                if wi > 0 and wi % 2 == 0:
+                    y += 10
+                panels.append(_panel(pid, title, bot_name, pair, tf, x, y, w, h))
+                pid += 1
+            y += 10
 
         y += 1  # spacer
 
