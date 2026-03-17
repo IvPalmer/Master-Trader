@@ -106,13 +106,12 @@ def test_all_containers_running():
 
     expected_services = [
         "bollingerrsimeanreversion",
-        "emacrossoverv1",
         "supertrendstrategy",
         "mastertraderv1",
         "futuressniper",
-        "ichimokutrendv1",
         "prometheus",
         "grafana",
+        "grafana-bridge",
         "metrics-exporter",
     ]
 

@@ -1,10 +1,16 @@
 import logging
+from datetime import datetime
 from numpy.lib import math
-from freqtrade.strategy import IStrategy, IntParameter
+from freqtrade.strategy import IStrategy, IntParameter, informative
 from pandas import DataFrame
 import talib.abstract as ta
 import numpy as np
 import pandas as pd
+
+from market_intelligence import FearGreedIndex, PositionTracker, MAX_BOTS_PER_PAIR
+
+logger = logging.getLogger(__name__)
+
 
 class SupertrendStrategy(IStrategy):
     INTERFACE_VERSION: int = 3
@@ -28,7 +34,11 @@ class SupertrendStrategy(IStrategy):
     trailing_stop_positive_offset = 0.03  # Start trailing at +3% (was 14.4% — never activated)
     trailing_only_offset_is_reached = True  # Only trail after hitting +3%
     timeframe = '1h'
-    startup_candle_count = 199
+    process_only_new_candles = True
+    use_exit_signal = True
+    exit_profit_only = False
+    ignore_roi_if_entry_signal = False
+    startup_candle_count = 200  # BTC SMA200 needs 200 candles
 
     @property
     def protections(self):
@@ -51,6 +61,15 @@ class SupertrendStrategy(IStrategy):
     sell_p1 = IntParameter(7, 21, default=14)
     sell_p2 = IntParameter(7, 21, default=14)
     sell_p3 = IntParameter(7, 21, default=14)
+
+    # ── BTC Market Guard (informative pair) ───────────────────────
+
+    @informative('1h', 'BTC/{stake}')
+    def populate_indicators_btc_1h(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
+        dataframe['sma200'] = ta.SMA(dataframe['close'], timeperiod=200)
+        dataframe['adx'] = ta.ADX(dataframe, timeperiod=14)
+        return dataframe
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         new_cols = []
@@ -88,16 +107,49 @@ class SupertrendStrategy(IStrategy):
             dataframe = pd.concat([dataframe] + new_cols, axis=1)
 
         # --- Regime Detection ---
-        # ATR regime — detect crash/high volatility periods
         dataframe['regime_atr_14'] = ta.ATR(dataframe, timeperiod=14)
         dataframe['regime_atr_sma_50'] = dataframe['regime_atr_14'].rolling(50).mean()
         dataframe['regime_volatile'] = (dataframe['regime_atr_14'] > 2.0 * dataframe['regime_atr_sma_50']).astype(int)
 
-        # ADX regime — detect trending vs ranging
         dataframe['regime_adx_14'] = ta.ADX(dataframe, timeperiod=14)
         dataframe['regime_trending'] = (dataframe['regime_adx_14'] > 25).astype(int)
 
+        # --- BTC Market Guard composite ---
+        dataframe['btc_bullish'] = (
+            (dataframe['btc_usdt_close_1h'] > dataframe['btc_usdt_sma200_1h'])
+            & (dataframe['btc_usdt_rsi_1h'] > 35)
+        ).astype(int)
+
         return dataframe
+
+    # ── Entry gate: cross-bot + sentiment checks ─────────────────
+
+    def confirm_trade_entry(self, pair: str, order_type: str, amount: float,
+                            rate: float, time_in_force: str, current_time: datetime,
+                            entry_tag: str | None, side: str, **kwargs) -> bool:
+        bot_name = self.config.get('bot_name', 'Supertrend')
+
+        # Cross-bot position check
+        other_bots = PositionTracker.count_bots_holding(pair, exclude_bot=bot_name)
+        if other_bots >= MAX_BOTS_PER_PAIR:
+            logger.info("BLOCKED %s: %d other bots already hold this pair", pair, other_bots)
+            return False
+
+        # Fear & Greed: block during extreme greed
+        if FearGreedIndex.is_extreme_greed():
+            logger.info("BLOCKED %s: Fear & Greed in extreme greed (%d)",
+                         pair, FearGreedIndex.get()["value"])
+            return False
+
+        PositionTracker.register(bot_name, pair, amount * rate)
+        return True
+
+    def confirm_trade_exit(self, pair: str, trade, order_type: str, amount: float,
+                           rate: float, time_in_force: str, exit_reason: str,
+                           current_time: datetime, **kwargs) -> bool:
+        bot_name = self.config.get('bot_name', 'Supertrend')
+        PositionTracker.unregister(bot_name, pair)
+        return True
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe.loc[
@@ -107,7 +159,8 @@ class SupertrendStrategy(IStrategy):
                (dataframe[f'supertrend_3_buy_{self.buy_m3.value}_{self.buy_p3.value}'] == 'up') &
                (dataframe['volume'] > 0) &
                (dataframe['regime_volatile'] == 0) &  # Don't enter during high volatility
-               (dataframe['regime_trending'] == 1)  # Trend following: only enter in trending markets (ADX > 25)
+               (dataframe['regime_trending'] == 1) &  # Trend following: only enter in trending markets
+               (dataframe['btc_bullish'] == 1)  # BTC market guard
             ),
             'enter_long'] = 1
         return dataframe

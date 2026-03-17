@@ -64,21 +64,42 @@
     "pairlists": [
         {
             "method": "VolumePairList",
-            "number_assets": 30,
+            "number_assets": 20,
             "sort_key": "quoteVolume",
-            "refresh_period": 1800
-        },
-        {
-            "method": "SpreadFilter",
-            "max_spread_ratio": 0.005
+            "min_value": 20000000,
+            "refresh_period": 86400,
+            "lookback_days": 3,
+            "lookback_timeframe": "1d"
         },
         {
             "method": "AgeFilter",
-            "min_days_listed": 30
+            "min_days_listed": 180
+        },
+        {
+            "method": "SpreadFilter",
+            "max_spread_ratio": 0.003
         },
         {
             "method": "PriceFilter",
-            "min_price": 1e-07
+            "min_price": 0.01,
+            "low_price_ratio": 0.02
+        },
+        {
+            "method": "VolatilityFilter",
+            "lookback_days": 14,
+            "min_volatility": 0.02,
+            "max_volatility": 0.50,
+            "refresh_period": 86400
+        },
+        {
+            "method": "RangeStabilityFilter",
+            "lookback_days": 10,
+            "min_rate_of_change": 0.02,
+            "max_rate_of_change": 0.40,
+            "refresh_period": 86400
+        },
+        {
+            "method": "PrecisionFilter"
         }
     ],
     "webhook": {
