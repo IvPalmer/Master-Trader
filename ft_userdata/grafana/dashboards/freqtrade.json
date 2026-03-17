@@ -392,7 +392,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_portfolio_drawdown_pct",
+          "expr": "max(freqtrade_portfolio_drawdown_pct)",
           "legendFormat": "Drawdown %",
           "refId": "A"
         }
