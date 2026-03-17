@@ -160,7 +160,7 @@ class AlligatorTrendV1(IStrategy):
         if dataframe is None or dataframe.empty:
             return self.stoploss
 
-        last = dataframe.iloc[-1]
+        last = dataframe.iloc[-2]  # Use last COMPLETED candle, not potentially incomplete current one
         atr = last.get('atr', 0)
         if atr <= 0:
             return self.stoploss

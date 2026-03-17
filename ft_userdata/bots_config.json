@@ -1,6 +1,6 @@
 {
   "bots": {
-    "SupertrendStrategy": {"port": 8084, "timeframe": "1h", "type": "trend-follower", "active": true},
+    "SupertrendStrategy": {"port": 8084, "timeframe": "4h", "type": "trend-follower", "active": true},
     "MasterTraderV1": {"port": 8086, "timeframe": "1h", "type": "hybrid", "active": true},
     "BollingerRSIMeanReversion": {"port": 8089, "timeframe": "15m", "type": "mean-reversion", "active": true},
     "IchimokuTrendV1": {"port": 8080, "timeframe": "1h", "type": "trend-follower", "active": false},

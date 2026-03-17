@@ -25,7 +25,8 @@ class MasterTraderV1(IStrategy):
 
     INTERFACE_VERSION = 3
 
-    # Timeframe
+    # Keeping 1h: EMA 9/21 crossover generates only 8 trades/6mo on 4h (too restrictive)
+    # 4H migration would need longer EMAs (21/55) — revisit after current evaluation period
     timeframe = "1h"
 
     # ROI table - widened to let winners run (trend-following)

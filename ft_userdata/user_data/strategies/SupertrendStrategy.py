@@ -35,7 +35,8 @@ class SupertrendStrategy(IStrategy):
     trailing_stop_positive = 0.02    # Trail by 2% once offset is reached
     trailing_stop_positive_offset = 0.04  # Start trailing at +4% (widened from 3%)
     trailing_only_offset_is_reached = True  # Only trail after hitting +3%
-    timeframe = '1h'
+    # 4H minimum per Michael Ionita research — sub-4H structurally disadvantaged for retail
+    timeframe = '4h'
     process_only_new_candles = True
     use_exit_signal = True
     exit_profit_only = False
@@ -44,11 +45,12 @@ class SupertrendStrategy(IStrategy):
 
     @property
     def protections(self):
+        # Candle counts adjusted for 4h timeframe (÷4 from 1h values to keep same time windows)
         return [
-            {"method": "CooldownPeriod", "stop_duration_candles": 2},
-            {"method": "StoplossGuard", "lookback_period_candles": 48, "trade_limit": 2, "stop_duration_candles": 24, "only_per_pair": True},
-            {"method": "LowProfitPairs", "lookback_period_candles": 288, "trade_limit": 4, "stop_duration_candles": 48, "required_profit": -0.05},
-            {"method": "MaxDrawdown", "lookback_period_candles": 48, "max_allowed_drawdown": 0.20, "stop_duration_candles": 12, "trade_limit": 1},
+            {"method": "CooldownPeriod", "stop_duration_candles": 1},  # 4h cooldown
+            {"method": "StoplossGuard", "lookback_period_candles": 12, "trade_limit": 2, "stop_duration_candles": 6, "only_per_pair": True},  # 48h lookback, 24h lock
+            {"method": "LowProfitPairs", "lookback_period_candles": 72, "trade_limit": 4, "stop_duration_candles": 12, "required_profit": -0.05},  # 12d lookback, 48h lock
+            {"method": "MaxDrawdown", "lookback_period_candles": 12, "max_allowed_drawdown": 0.20, "stop_duration_candles": 3, "trade_limit": 1},  # 48h lookback, 12h lock
         ]
 
     buy_m1 = IntParameter(1, 7, default=4)
@@ -66,8 +68,8 @@ class SupertrendStrategy(IStrategy):
 
     # ── BTC Market Guard (informative pair) ───────────────────────
 
-    @informative('1h', 'BTC/{stake}')
-    def populate_indicators_btc_1h(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+    @informative('4h', 'BTC/{stake}')
+    def populate_indicators_btc_4h(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
         dataframe['sma200'] = ta.SMA(dataframe['close'], timeperiod=200)
         dataframe['adx'] = ta.ADX(dataframe, timeperiod=14)
@@ -118,8 +120,8 @@ class SupertrendStrategy(IStrategy):
 
         # --- BTC Market Guard composite ---
         dataframe['btc_bullish'] = (
-            (dataframe['btc_usdt_close_1h'] > dataframe['btc_usdt_sma200_1h'])
-            & (dataframe['btc_usdt_rsi_1h'] > 35)
+            (dataframe['btc_usdt_close_4h'] > dataframe['btc_usdt_sma200_4h'])
+            & (dataframe['btc_usdt_rsi_4h'] > 35)
         ).astype(int)
 
         return dataframe

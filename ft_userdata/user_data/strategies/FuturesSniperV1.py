@@ -36,6 +36,8 @@ class FuturesSniperV1(IStrategy):
     INTERFACE_VERSION = 3
 
     can_short = True
+    # Keeping 1h: EMA 9/21 crossover + regime filters = only 6 trades/6mo on 4h
+    # Supertrend-based strategies work on 4h; EMA crossover needs more frequent data
     timeframe = "1h"
 
     # ── ROI: tightened for 2x leverage ────────────────────────────
@@ -92,24 +94,18 @@ class FuturesSniperV1(IStrategy):
             {"method": "CooldownPeriod", "stop_duration_candles": 2},
             {
                 "method": "StoplossGuard",
-                "lookback_period_candles": 48,
-                "trade_limit": 2,
-                "stop_duration_candles": 24,
-                "only_per_pair": True,
+                "lookback_period_candles": 48, "trade_limit": 2,
+                "stop_duration_candles": 24, "only_per_pair": True,
             },
             {
                 "method": "LowProfitPairs",
-                "lookback_period_candles": 288,
-                "trade_limit": 4,
-                "stop_duration_candles": 48,
-                "required_profit": -0.05,
+                "lookback_period_candles": 288, "trade_limit": 4,
+                "stop_duration_candles": 48, "required_profit": -0.05,
             },
             {
                 "method": "MaxDrawdown",
-                "lookback_period_candles": 48,
-                "max_allowed_drawdown": 0.15,
-                "stop_duration_candles": 24,
-                "trade_limit": 1,
+                "lookback_period_candles": 48, "max_allowed_drawdown": 0.15,
+                "stop_duration_candles": 24, "trade_limit": 1,
             },
         ]
 

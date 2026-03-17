@@ -725,11 +725,13 @@ BOTS_TIMEFRAMES = {
     "ClucHAnix": "5m",
     "NASOSv5": "5m",
     "ElliotV5": "5m",
-    "SupertrendStrategy": "1h",
+    "SupertrendStrategy": "4h",
     "MasterTraderV1": "1h",
+    "FuturesSniperV1": "1h",
     "MasterTraderAI": "1h",
     "BollingerRSIMeanReversion": "15m",
-    # "NostalgiaForInfinityX6": "5m",  # KILLED
+    "GaussianChannelV1": "1d",
+    "AlligatorTrendV1": "1d",
 }
 
 
