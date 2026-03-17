@@ -1,7 +1,7 @@
 {
-  "id": "20260317_001910",
-  "timestamp": "2026-03-17T00:19:10Z",
-  "note": "test snapshot",
+  "id": "20260316_010000",
+  "timestamp": "2026-03-16T01:00:00Z",
+  "note": "daily auto-snapshot",
   "parameters": {
     "stoploss": -0.05,
     "trailing_stop": "True",
@@ -9,7 +9,7 @@
     "trailing_stop_positive_offset": 0.03,
     "timeframe": "1h",
     "minimal_roi": "\"0\": 0.05, \"360\": 0.03, \"720\": 0.02, \"1440\": 0.01",
-    "_file_hash": "628308b17dfc"
+    "_file_hash": "ca4d5bb1f187"
   },
   "config": {
     "dry_run": true,
@@ -20,31 +20,30 @@
     "trading_mode": "spot"
   },
   "metrics": {
-    "total_trades": 37,
+    "total_trades": 30,
     "open_trades": 5,
-    "open_stake": 1087.95,
-    "winners": 26,
+    "open_stake": 1041.4,
+    "winners": 19,
     "losers": 11,
-    "win_rate": 70.3,
-    "profit_factor": 7.44,
-    "risk_reward": 3.15,
-    "avg_win": 5.21,
+    "win_rate": 63.3,
+    "profit_factor": 5.17,
+    "risk_reward": 2.99,
+    "avg_win": 4.96,
     "avg_loss": 1.66,
-    "total_pnl": 117.27,
+    "total_pnl": 75.95,
     "worst_loss_abs": -4.74,
     "worst_loss_pct": -2.4,
     "max_drawdown": 4.91,
     "max_consec_losses": 4,
-    "unique_pairs": 22,
-    "days_running": 5,
+    "unique_pairs": 19,
+    "days_running": 4,
     "exit_reasons": {
       "exit_signal": 14,
-      "roi": 18,
+      "roi": 11,
       "trailing_stop_loss": 4,
       "stoploss_on_exchange": 1
     },
     "force_exits": 0,
-    "trades_per_day": 7.4
-  },
-  "_peak_reason": "New peak PF: 7.44x"
+    "trades_per_day": 7.5
+  }
 }

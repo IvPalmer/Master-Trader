@@ -1,0 +1,26 @@
+{
+  "Supertrend": {
+    "ETH/USDT": {
+      "stake_amount": 219.48601634388,
+      "timestamp": "2026-03-16T21:36:13.010515"
+    },
+    "PUMP/USDT": {
+      "stake_amount": 221.22026153172,
+      "timestamp": "2026-03-16T22:14:14.134977"
+    },
+    "AVAX/USDT": {
+      "stake_amount": 221.22026153172,
+      "timestamp": "2026-03-16T22:06:54.465828"
+    },
+    "DOGE/USDT": {
+      "stake_amount": 221.63697387612,
+      "timestamp": "2026-03-17T01:35:33.647848"
+    }
+  },
+  "BollingerRSI MR": {
+    "PENGU/USDT": {
+      "stake_amount": 29.4382987810824,
+      "timestamp": "2026-03-17T13:00:06.038752"
+    }
+  }
+}

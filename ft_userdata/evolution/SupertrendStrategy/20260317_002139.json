@@ -1,6 +1,6 @@
 {
-  "id": "20260317_001910",
-  "timestamp": "2026-03-17T00:19:10Z",
+  "id": "20260317_002139",
+  "timestamp": "2026-03-17T00:21:39Z",
   "note": "test snapshot",
   "parameters": {
     "stoploss": -0.05,
@@ -9,7 +9,7 @@
     "trailing_stop_positive_offset": 0.03,
     "timeframe": "1h",
     "minimal_roi": "\"0\": 0.05, \"360\": 0.03, \"720\": 0.02, \"1440\": 0.01",
-    "_file_hash": "628308b17dfc"
+    "_file_hash": "a36db3ecd0c7"
   },
   "config": {
     "dry_run": true,
@@ -45,6 +45,5 @@
     },
     "force_exits": 0,
     "trades_per_day": 7.4
-  },
-  "_peak_reason": "New peak PF: 7.44x"
+  }
 }
