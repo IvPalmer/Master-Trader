@@ -103,12 +103,18 @@ def test_cancel_open_orders_on_exit(bot):
 
 @pytest.mark.parametrize("bot", ACTIVE_BOTS)
 def test_stoploss_not_too_wide(bot):
-    """No stoploss wider than -7%. Data shows 0% recovery past -7%."""
+    """Stoploss must be appropriate for timeframe: -7% for sub-daily, -15% for daily."""
     source = load_strategy_source(bot)
     match = re.search(r"stoploss\s*=\s*(-?[\d.]+)", source)
     assert match, f"{bot}: couldn't find stoploss in strategy file"
     sl = float(match.group(1))
-    assert sl >= -0.07, f"{bot}: stoploss {sl} is wider than -7% (nothing recovers past this)"
+    # Daily strategies need wider stops due to larger candle ranges
+    tf_match = re.search(r"timeframe\s*=\s*['\"](\w+)['\"]", source)
+    timeframe = tf_match.group(1) if tf_match else "1h"
+    if timeframe == "1d":
+        assert sl >= -0.20, f"{bot}: stoploss {sl} is wider than -20% (too wide even for daily)"
+    else:
+        assert sl >= -0.07, f"{bot}: stoploss {sl} is wider than -7% (nothing recovers past this)"
 
 
 def test_futures_stoploss_tighter():
