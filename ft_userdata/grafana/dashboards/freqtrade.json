@@ -75,7 +75,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "Portfolio P/L",
           "refId": "A"
         }
@@ -136,7 +136,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "(sum(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}) / 6500) * 100",
+          "expr": "(sum(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}) / 2000) * 100",
           "legendFormat": "Return %",
           "refId": "A"
         }
@@ -197,7 +197,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "Closed P&L",
           "refId": "A"
         }
@@ -262,7 +262,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "Unrealized P&L",
           "refId": "A"
         }
@@ -327,7 +327,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "Open Positions",
           "refId": "A"
         }
@@ -449,7 +449,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "Closed Trades",
           "refId": "A"
         }
@@ -559,12 +559,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}",
+          "expr": "freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
         {
-          "expr": "sum(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "PORTFOLIO",
           "refId": "B"
         }
@@ -674,12 +674,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}",
+          "expr": "freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
         {
-          "expr": "sum(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "PORTFOLIO",
           "refId": "B"
         }
@@ -824,12 +824,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "Total Profit",
           "refId": "A"
         },
         {
-          "expr": "sum(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "Total Balance",
           "refId": "B"
         }
@@ -923,7 +923,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}",
+          "expr": "freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1020,7 +1020,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"} - 1000",
+          "expr": "freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"} - 1000",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1094,7 +1094,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_win_rate{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}",
+          "expr": "freqtrade_win_rate{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1166,7 +1166,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}",
+          "expr": "freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1240,7 +1240,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_drawdown{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"} * 100",
+          "expr": "freqtrade_drawdown{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"} * 100",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1356,7 +1356,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "clamp_min((max_over_time(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}[6h]) - freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}) / max_over_time(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}[6h]) * 100, 0)",
+          "expr": "clamp_min((max_over_time(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}[6h]) - freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}) / max_over_time(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}[6h]) * 100, 0)",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
@@ -1485,12 +1485,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}",
+          "expr": "freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
         {
-          "expr": "sum(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "TOTAL",
           "refId": "B"
         }
@@ -1604,12 +1604,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"}",
+          "expr": "freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
         {
-          "expr": "sum(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "TOTAL",
           "refId": "B"
         }
@@ -1645,7 +1645,7 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 3,
+        "w": 5,
         "x": 0,
         "y": 3
       },
@@ -1706,8 +1706,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 3,
-        "x": 3,
+        "w": 5,
+        "x": 5,
         "y": 3
       },
       "id": 104,
@@ -1767,8 +1767,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 3,
-        "x": 6,
+        "w": 5,
+        "x": 10,
         "y": 3
       },
       "id": 106,
@@ -1828,8 +1828,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 3,
-        "x": 9,
+        "w": 5,
+        "x": 15,
         "y": 3
       },
       "id": 107,
@@ -1868,189 +1868,6 @@
       },
       "fieldConfig": {
         "defaults": {
-          "decimals": 2,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 12,
-        "y": 3
-      },
-      "id": 108,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "value",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.1",
-      "targets": [
-        {
-          "expr": "freqtrade_true_pnl{strategy=\"IchimokuTrendV1\"}",
-          "legendFormat": "Ichimoku",
-          "refId": "A"
-        }
-      ],
-      "title": "Ichimoku",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 2,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 15,
-        "y": 3
-      },
-      "id": 109,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "value",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.1",
-      "targets": [
-        {
-          "expr": "freqtrade_true_pnl{strategy=\"MACDTrendV1\"}",
-          "legendFormat": "MACDTrend",
-          "refId": "A"
-        }
-      ],
-      "title": "MACDTrend",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 2,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 18,
-        "y": 3
-      },
-      "id": 110,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "value",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.1",
-      "targets": [
-        {
-          "expr": "freqtrade_true_pnl{strategy=\"EMACrossoverV1\"}",
-          "legendFormat": "EMACross",
-          "refId": "A"
-        }
-      ],
-      "title": "EMACross",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
           "decimals": 0,
           "mappings": [],
           "thresholds": {
@@ -2058,15 +1875,15 @@
             "steps": [
               {
                 "color": "red",
-                "value": 0
+                "value": null
               },
               {
                 "color": "yellow",
-                "value": 5
+                "value": 2
               },
               {
                 "color": "green",
-                "value": 7
+                "value": 4
               }
             ]
           },
@@ -2076,8 +1893,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 3,
-        "x": 21,
+        "w": 4,
+        "x": 20,
         "y": 3
       },
       "id": 7,
@@ -2101,7 +1918,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(freqtrade_bot_up{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|IchimokuTrendV1|MACDTrendV1|EMACrossoverV1\"})",
+          "expr": "sum(freqtrade_bot_up{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "Bots Online",
           "refId": "A"
         }

@@ -80,21 +80,23 @@
 **Goal:** Scale to 2-3 live bots, increase capital.
 
 ### Actions
-- [ ] If Phase 2 successful: add bot #2 (likely BollingerRSI or MasterTraderV1)
-- [ ] Increase total capital to R$2,000 (~$350)
-- [ ] Split: R$1,000 per bot, max 3 trades each, ~$58/trade
-- [ ] Implement anti-correlation pairlist (OffsetFilter or custom split) so bots don't hold same pairs
+- [ ] If Phase 2 successful: add remaining bots to live
+- [ ] $500 per bot (4 bots = $2,000 total). Equal allocation while all bots are probation tier
+- [ ] Once a bot graduates (30 trades, PF≥2.0), apply tier-based rebalancing (S=30%, A=20%, B=15%)
+- [ ] Anti-correlation pairlists already implemented (OffsetFilter, VolatilityFilter differentiation)
+- [ ] FuturesSniperV1 operates as bear market revenue engine (shorts during BTC < SMA200)
 - [ ] Start monthly capital contributions from salary (see Capital Plan below)
 - [ ] Review and potentially kill underperformers monthly
 
 ### Success criteria
-- 2-3 bots live, all PF > 1.5x over 30 days
+- 3-4 bots live, all PF > 1.5x over 30 days
 - Portfolio-level MaxDD < 10%
 - Monthly P/L consistently positive
+- FuturesSniperV1 profitable during bear periods (validates all-weather design)
 - Clear understanding of which market conditions favor which bot
 
-### Capital: R$2,000 ($350)
-### Expected monthly return: R$50-150 (2.5-7.5%)
+### Capital: $2,000 (4 × $500)
+### Expected monthly return: $50-150 (2.5-7.5%)
 
 ---
 
