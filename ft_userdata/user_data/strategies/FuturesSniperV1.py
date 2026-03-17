@@ -71,6 +71,21 @@ class FuturesSniperV1(IStrategy):
     MAX_CONSECUTIVE_LOSSES = 3
     SHORT_MAX_HOLD_HOURS = 48
 
+    # ── Short position sizing: 25% of normal stake ───────────────
+    # Data: short trades are net negative even in profitable systems.
+    # Adding shorts increased drawdown by 11% (Michael Ionita research).
+    # Reduce short exposure to 25% of long position size.
+    SHORT_STAKE_MULTIPLIER = 0.25
+
+    def custom_stake_amount(self, current_time, current_rate, proposed_stake,
+                            min_stake, max_stake, leverage, entry_tag, side,
+                            **kwargs) -> float:
+        if side == "short":
+            reduced = proposed_stake * self.SHORT_STAKE_MULTIPLIER
+            logger.info(f"Short trade: reducing stake from {proposed_stake:.2f} to {reduced:.2f} (25%)")
+            return max(reduced, min_stake) if min_stake else reduced
+        return proposed_stake
+
     @property
     def protections(self):
         return [

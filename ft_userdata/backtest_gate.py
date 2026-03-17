@@ -100,10 +100,87 @@ THRESHOLDS_1H = {
     "min_total_trades": 5,
 }
 
+THRESHOLDS_1D = {
+    "min_sharpe": -1.0,
+    "max_drawdown_pct": 35.0,      # Daily strategies may have higher DD
+    "min_win_rate": 20.0,          # Trend strategies on daily can have very low WR
+    "min_profit_factor": 0.5,
+    "min_total_trades": 3,
+}
+
 def get_thresholds(strategy: str) -> dict:
     """Return appropriate thresholds based on strategy timeframe."""
     tf = BOTS_TIMEFRAMES.get(strategy, "5m")
-    return THRESHOLDS_1H if tf == "1h" else THRESHOLDS_5M
+    if tf == "1d":
+        return THRESHOLDS_1D
+    return THRESHOLDS_1H if tf in ("1h", "4h") else THRESHOLDS_5M
+
+# ── Multi-Asset Robustness Gate ─────────────────────────────────────
+# A strategy must work across diverse assets, not just 1-2 coins.
+# Tests same params on 10+ coins. Fails if >30% have excessive drawdown.
+
+ROBUSTNESS_PAIRS = [
+    "BTC/USDT", "ETH/USDT", "SOL/USDT", "ADA/USDT", "AVAX/USDT",
+    "DOGE/USDT", "XRP/USDT", "LINK/USDT", "DOT/USDT", "MATIC/USDT",
+    "NEAR/USDT", "FET/USDT",
+]
+ROBUSTNESS_MAX_DD_PER_PAIR = 50.0  # Max DD% per individual pair
+ROBUSTNESS_FAIL_THRESHOLD = 0.30   # Fail if >30% of pairs exceed max DD
+
+
+def robustness_check(strategy: str, days: int = 180) -> dict:
+    """
+    Run backtests across ROBUSTNESS_PAIRS with the same strategy params.
+    Returns pass/fail and per-pair breakdown.
+    """
+    log.info("Running robustness check for %s across %d pairs...", strategy, len(ROBUSTNESS_PAIRS))
+
+    results = []
+    failed_pairs = []
+
+    for pair in ROBUSTNESS_PAIRS:
+        try:
+            # Run backtest for this single pair
+            pair_result = run_backtest(strategy, days=days, pairs_override=[pair])
+            if pair_result is None:
+                results.append({"pair": pair, "status": "error", "dd": 0, "profit": 0})
+                continue
+
+            dd = pair_result.get("max_drawdown_pct", 0)
+            profit = pair_result.get("total_profit_pct", 0)
+            results.append({"pair": pair, "status": "ok", "dd": dd, "profit": profit})
+
+            if dd > ROBUSTNESS_MAX_DD_PER_PAIR:
+                failed_pairs.append(pair)
+                log.warning("  %s: DD %.1f%% exceeds %.0f%% threshold", pair, dd, ROBUSTNESS_MAX_DD_PER_PAIR)
+            else:
+                log.info("  %s: DD %.1f%%, Profit %.1f%% — OK", pair, dd, profit)
+
+        except Exception as e:
+            log.error("  %s: Error — %s", pair, e)
+            results.append({"pair": pair, "status": "error", "dd": 0, "profit": 0})
+
+    valid_results = [r for r in results if r["status"] == "ok"]
+    fail_rate = len(failed_pairs) / len(valid_results) if valid_results else 1.0
+    passed = fail_rate <= ROBUSTNESS_FAIL_THRESHOLD
+
+    summary = {
+        "passed": passed,
+        "pairs_tested": len(valid_results),
+        "pairs_failed": len(failed_pairs),
+        "fail_rate": round(fail_rate * 100, 1),
+        "failed_pairs": failed_pairs,
+        "results": results,
+    }
+
+    if passed:
+        log.info("Robustness check PASSED: %d/%d pairs failed (%.0f%% < %.0f%% threshold)",
+                 len(failed_pairs), len(valid_results), fail_rate * 100, ROBUSTNESS_FAIL_THRESHOLD * 100)
+    else:
+        log.warning("Robustness check FAILED: %d/%d pairs failed (%.0f%% > %.0f%% threshold)",
+                     len(failed_pairs), len(valid_results), fail_rate * 100, ROBUSTNESS_FAIL_THRESHOLD * 100)
+
+    return summary
 
 # Fallback pairs if live pairlist fetch fails
 FALLBACK_PAIRS = [
@@ -211,7 +288,8 @@ def download_data(pairs: list[str], days: int = 60, timeframes: list[str] = None
 # Backtesting
 # ---------------------------------------------------------------------------
 
-def run_backtest(strategy: str, days: int = 60, config_path: str = None) -> Optional[dict]:
+def run_backtest(strategy: str, days: int = 60, config_path: str = None,
+                 pairs_override: list[str] = None) -> Optional[dict]:
     """
     Run a backtest for a strategy and return parsed results.
 
@@ -219,10 +297,15 @@ def run_backtest(strategy: str, days: int = 60, config_path: str = None) -> Opti
         strategy: Strategy class name
         days: Number of days to backtest
         config_path: Container-internal path to backtest config
+        pairs_override: If set, generate a temp config with only these pairs
 
     Returns:
         Dict with backtest metrics or None on failure
     """
+    # If pairs_override, generate a temporary config for just those pairs
+    if pairs_override:
+        config_path = generate_backtest_config(strategy, pairs_override)
+        config_path = f"/freqtrade/user_data/configs/backtest-{strategy}.json"
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=days)
     timerange = f"{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}"

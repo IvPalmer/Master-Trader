@@ -224,6 +224,21 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
     profit_factor = gross_profit / gross_loss if gross_loss > 0 else (10.0 if gross_profit > 0 else 0)
     metrics["profit_factor"] = round(profit_factor, 2)
 
+    # --- Max Drawdown & Profit/Drawdown Ratio ---
+    max_dd = 0.0
+    if profit_data and isinstance(profit_data, dict):
+        max_dd = abs(profit_data.get("max_drawdown", 0)) * 100  # Convert to percentage
+    metrics["max_drawdown_pct"] = round(max_dd, 2)
+
+    # Profit/Drawdown ratio: primary ranking metric (higher = better)
+    # Formula: Net Profit % / Max Drawdown %
+    closed_profit_pct = profit_data.get("profit_closed_percent_sum", 0) if profit_data else 0
+    if max_dd > 0:
+        profit_dd_ratio = abs(closed_profit_pct) / max_dd if closed_profit_pct > 0 else -(abs(closed_profit_pct) / max_dd)
+    else:
+        profit_dd_ratio = closed_profit_pct * 10 if closed_profit_pct > 0 else 0  # No DD = excellent
+    metrics["profit_dd_ratio"] = round(profit_dd_ratio, 2)
+
     # --- Exit Reason Analysis ---
     exit_reasons = defaultdict(int)
     for t in closed:
@@ -681,7 +696,9 @@ def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dic
         sample_note = "" if trades >= MIN_TRADES_RELIABLE else f" [{trades} trades — preliminary]"
         line = f"  {score:3d}/100 {label:9s} | {m['strategy']} ({stype}){sample_note}"
         lines.append(line)
-        lines.append(f"    P&L: ${true_pnl:+.2f} (24h: {arrow}${pnl_delta:.2f}) | WR: {wr:.0f}% | R:R {rr:.1f} | PF: {m.get('profit_factor', 0):.2f} | {trades} trades")
+        dd = m.get("max_drawdown_pct", 0)
+        pdr = m.get("profit_dd_ratio", 0)
+        lines.append(f"    P&L: ${true_pnl:+.2f} (24h: {arrow}${pnl_delta:.2f}) | WR: {wr:.0f}% | R:R {rr:.1f} | PF: {m.get('profit_factor', 0):.2f} | DD: {dd:.1f}% | P/DD: {pdr:.1f} | {trades} trades")
 
         # Exit reason summary
         exits = m.get("exit_reasons", {})

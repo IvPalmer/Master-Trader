@@ -275,6 +275,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=90d"
       - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
     depends_on:
       - metrics-exporter
 

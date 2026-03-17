@@ -24,14 +24,16 @@ class SupertrendStrategy(IStrategy):
         "sell_p1": 16, "sell_p2": 18, "sell_p3": 18,
     }
 
+    # ROI widened to let winners run (trend-following should capture big moves)
+    # Old: 5%/3%/2%/1% — was cutting winners too short
     minimal_roi = {
-        "0": 0.05, "360": 0.03, "720": 0.02, "1440": 0.01
+        "0": 0.15, "720": 0.10, "1440": 0.07, "2880": 0.03
     }
 
     stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%
     trailing_stop = True
     trailing_stop_positive = 0.02    # Trail by 2% once offset is reached
-    trailing_stop_positive_offset = 0.03  # Start trailing at +3% (was 14.4% — never activated)
+    trailing_stop_positive_offset = 0.04  # Start trailing at +4% (widened from 3%)
     trailing_only_offset_is_reached = True  # Only trail after hitting +3%
     timeframe = '1h'
     process_only_new_candles = True

@@ -4,5 +4,6 @@ global:
 
 scrape_configs:
   - job_name: "freqtrade-exporter"
+    honor_labels: true
     static_configs:
       - targets: ["metrics-exporter:9090"]

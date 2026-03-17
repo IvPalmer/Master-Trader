@@ -28,21 +28,22 @@ class MasterTraderV1(IStrategy):
     # Timeframe
     timeframe = "1h"
 
-    # ROI table - take profit at these levels
+    # ROI table - widened to let winners run (trend-following)
+    # Old: 5%/3%/2%/1% — was cutting winners too short
     minimal_roi = {
-        "0": 0.05,      # 5% profit immediately
-        "30": 0.03,     # 3% after 30 min
-        "60": 0.02,     # 2% after 1h
-        "120": 0.01,    # 1% after 2h
+        "0": 0.15,      # 15% profit immediately
+        "720": 0.10,    # 10% after 12h
+        "1440": 0.07,   # 7% after 24h
+        "2880": 0.03,   # 3% after 48h
     }
 
     # Stoploss
     stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%
 
-    # Trailing stop
+    # Trailing stop - widened to let trends develop
     trailing_stop = True
-    trailing_stop_positive = 0.01       # Activate trailing at 1% profit
-    trailing_stop_positive_offset = 0.02  # Start trailing at 2% profit
+    trailing_stop_positive = 0.02       # Trail by 2% once offset is reached
+    trailing_stop_positive_offset = 0.04  # Start trailing at 4% profit (was 2%)
     trailing_only_offset_is_reached = True
 
     # Run on new candles only

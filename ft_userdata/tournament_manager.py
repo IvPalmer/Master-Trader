@@ -345,24 +345,32 @@ def compute_composite_score(m: dict) -> float:
     Composite score from metrics for ranking.
 
     Weights:
-        Sharpe ratio:   35%
-        Win rate:       20%
-        Profit factor:  20%
-        Total profit:   15%
-        Max drawdown:   10% (penalty)
+        Profit/DD ratio: 25% (primary quality metric — Net Profit % / Max Drawdown %)
+        Sharpe ratio:    25%
+        Profit factor:   20%
+        Win rate:        15%
+        Total profit:    15%
     """
     sharpe_score = np.clip(m["sharpe_ratio"] / 3.0, -1, 1)       # Normalize: 3.0 = perfect
     wr_score = np.clip((m["win_rate"] - 40) / 30, 0, 1)          # 40-70% mapped to 0-1
     pf_score = np.clip((m["profit_factor"] - 0.5) / 2.5, 0, 1)   # 0.5-3.0 mapped to 0-1
     profit_score = np.clip(m["total_profit_pct"] / 10.0, -1, 1)   # +/-10% mapped to +/-1
-    dd_penalty = np.clip(m["max_drawdown"] / 15.0, 0, 1)          # 15% DD = max penalty
+
+    # Profit/Drawdown ratio: Net Profit % / Max Drawdown %
+    # Higher is better. 5.0+ is excellent, 1.0 is break-even risk/reward
+    max_dd = m.get("max_drawdown", 0)
+    if max_dd > 0:
+        profit_dd_ratio = m["total_profit_pct"] / max_dd
+    else:
+        profit_dd_ratio = m["total_profit_pct"] * 2 if m["total_profit_pct"] > 0 else 0
+    pdd_score = np.clip(profit_dd_ratio / 5.0, -1, 1)  # 5.0 ratio = perfect score
 
     score = (
-        0.35 * sharpe_score
-        + 0.20 * wr_score
+        0.25 * pdd_score
+        + 0.25 * sharpe_score
         + 0.20 * pf_score
+        + 0.15 * wr_score
         + 0.15 * profit_score
-        - 0.10 * dd_penalty
     )
     return float(score)
 
