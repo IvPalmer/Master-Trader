@@ -225,6 +225,38 @@ services:
       --config /freqtrade/user_data/configs/FuturesSniperV1.json
       --strategy FuturesSniperV1
 
+  # ── Daily Timeframe Strategies ────────────────────────────────────
+
+  alligatortrendv1:
+    image: freqtradeorg/freqtrade:stable
+    restart: unless-stopped
+    container_name: ft-alligator-trend
+    extra_hosts: *binance-hosts
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8091:8080"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/AlligatorTrendV1.log
+      --config /freqtrade/user_data/configs/AlligatorTrendV1.json
+      --strategy AlligatorTrendV1
+
+  gaussianchannelv1:
+    image: freqtradeorg/freqtrade:stable
+    restart: unless-stopped
+    container_name: ft-gaussian-channel
+    extra_hosts: *binance-hosts
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8092:8080"
+    command: >
+      trade
+      --logfile /freqtrade/user_data/logs/GaussianChannelV1.log
+      --config /freqtrade/user_data/configs/GaussianChannelV1.json
+      --strategy GaussianChannelV1
+
   # ── Grafana Bridge (candle data proxy for dashboards) ──────────────
 
   grafana-bridge:
@@ -235,12 +267,13 @@ services:
       - "./grafana/dashboards:/dashboards"
     depends_on:
       - ichimokutrendv1
-
       - emacrossoverv1
       - supertrendstrategy
       - mastertraderv1
       - bollingerrsimeanreversion
       - futuressniper
+      - alligatortrendv1
+      - gaussianchannelv1
 
   # ── Monitoring Stack ───────────────────────────────────────────────
 
