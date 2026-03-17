@@ -44,6 +44,8 @@ def _load_bots_config() -> list[dict]:
                 "MasterTraderV1": "mastertraderv1",
                 "BollingerRSIMeanReversion": "bollingerrsimeanreversion",
                 "FuturesSniperV1": "futuressniper",
+                "AlligatorTrendV1": "alligatortrendv1",
+                "GaussianChannelV1": "gaussianchannelv1",
             }
             service = service_map.get(name, service)
             bots.append({"service": service, "strategy": name})
