@@ -674,12 +674,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum by (strategy) (freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
+          "expr": "freqtrade_unrealized_pnl{job=\"freqtrade-exporter\",strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
         {
-          "expr": "sum(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
+          "expr": "sum(freqtrade_unrealized_pnl{job=\"freqtrade-exporter\",strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})",
           "legendFormat": "PORTFOLIO",
           "refId": "B"
         }
@@ -1356,12 +1356,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "clamp_min((max_over_time(sum by (strategy) (freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})[6h]) - sum by (strategy) (freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})) / max_over_time(sum by (strategy) (freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"})[6h]) * 100, 0)",
+          "expr": "clamp_min((max_over_time(freqtrade_balance{job=\"freqtrade-exporter\",strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}[6h]) - freqtrade_balance{job=\"freqtrade-exporter\",strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}) / max_over_time(freqtrade_balance{job=\"freqtrade-exporter\",strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1\"}[6h]) * 100, 0)",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
         {
-          "expr": "freqtrade_portfolio_drawdown_pct",
+          "expr": "freqtrade_portfolio_drawdown_pct{job=\"freqtrade-exporter\"}",
           "legendFormat": "PORTFOLIO",
           "refId": "B"
         }
