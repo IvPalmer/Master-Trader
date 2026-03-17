@@ -772,11 +772,11 @@
               },
               {
                 "id": "custom.axisSoftMin",
-                "value": 6800
+                "value": 330
               },
               {
                 "id": "custom.axisSoftMax",
-                "value": 7100
+                "value": 380
               }
             ]
           },
@@ -978,8 +978,8 @@
           },
           "decimals": 2,
           "mappings": [],
-          "max": 80,
-          "min": -30,
+          "max": 15,
+          "min": -10,
           "thresholds": {
             "mode": "absolute",
             "steps": [

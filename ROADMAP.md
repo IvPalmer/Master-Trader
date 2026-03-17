@@ -250,3 +250,8 @@ This ensures that if BTC/USDT appears in SupertrendStrategy's list, it doesn't a
 | 2026-03-15 | Created graduation criteria | No bot goes live without 30 trades, 14 days, PF≥2.0, WR≥55% |
 | 2026-03-15 | Moved ft_userdata into git repo | Single source of truth, no more sync issues |
 | 2026-03-15 | Built test suite (156 tests) | Catches config errors, known bugs, infra issues before they cost money |
+| 2026-03-16 | Added market intelligence layer | BTC guard, F&G index, cross-bot position tracker, differentiated pairlists |
+| 2026-03-16 | Rebuilt FuturesSniperV1 as bear revenue engine | 3 short entry types (initiation/continuation/breakdown), MACD, multi-tier BTC regime |
+| 2026-03-16 | Killed IchimokuTrendV1, EMACrossoverV1 | -$33 and 0 trades respectively, removed from docker-compose |
+| 2026-03-17 | Dry-run wallets R$500/bot ($88 USDT) | Realistic Phase 3 simulation. Trade DBs scaled proportionally. ~$29/trade spot, $44/trade futures |
+| 2026-03-17 | Reduced max_open_trades: spot 5→3, futures stays 2 | Keep trade sizes above Binance minimums at R$500/bot |
