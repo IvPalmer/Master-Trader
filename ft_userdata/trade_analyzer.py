@@ -30,21 +30,34 @@ from requests.auth import HTTPBasicAuth
 # Configuration
 # ---------------------------------------------------------------------------
 
-BOTS = {
-    "ClucHAnix":              {"port": 8080, "timeframe": "5m", "type": "dip-buyer"},
-    "NASOSv5":                {"port": 8082, "timeframe": "5m", "type": "dip-buyer"},
-    "ElliotV5":               {"port": 8083, "timeframe": "5m", "type": "dip-buyer"},
-    "SupertrendStrategy":     {"port": 8084, "timeframe": "1h", "type": "trend-follower"},
-    "MasterTraderV1":         {"port": 8086, "timeframe": "1h", "type": "hybrid"},
-    "MasterTraderAI":         {"port": 8087, "timeframe": "1h", "type": "ml-based"},
-    "BollingerRSIMeanReversion": {"port": 8089, "timeframe": "15m", "type": "mean-reversion"},
-    # "NostalgiaForInfinityX6": {"port": 8089, "timeframe": "5m", "type": "multi-signal"},  # KILLED
-}
+def _load_bots_config() -> dict:
+    """Load bot registry from shared config, fall back to hardcoded defaults."""
+    import json as _json
+    config_path = Path(__file__).parent / "bots_config.json"
+    try:
+        with open(config_path) as f:
+            data = _json.load(f)
+        return {
+            name: {k: v for k, v in info.items() if k != "active"}
+            for name, info in data["bots"].items()
+            if info.get("active", True)
+        }
+    except (FileNotFoundError, _json.JSONDecodeError, KeyError):
+        return {
+            "SupertrendStrategy":     {"port": 8084, "timeframe": "4h", "type": "trend-follower"},
+            "MasterTraderV1":         {"port": 8086, "timeframe": "1h", "type": "hybrid"},
+            "BollingerRSIMeanReversion": {"port": 8089, "timeframe": "15m", "type": "mean-reversion"},
+            "FuturesSniperV1":        {"port": 8090, "timeframe": "1h", "type": "trend-follower"},
+            "AlligatorTrendV1":       {"port": 8091, "timeframe": "1d", "type": "trend-follower"},
+            "GaussianChannelV1":      {"port": 8092, "timeframe": "1d", "type": "trend-follower"},
+        }
+
+BOTS = _load_bots_config()
 
 API_USER = "freqtrader"
 API_PASS = "mastertrader"
 AUTH = HTTPBasicAuth(API_USER, API_PASS)
-INITIAL_CAPITAL_PER_BOT = 1000.0
+INITIAL_CAPITAL_PER_BOT = 88.0  # R$500 per bot = $88 USDT
 
 
 def fetch_json(url: str, timeout: int = 10) -> Optional[Any]:

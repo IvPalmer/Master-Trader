@@ -19,10 +19,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 BOTS = {
-    "SupertrendStrategy": {"url": "http://supertrendstrategy:8080", "timeframe": "1h"},
+    "SupertrendStrategy": {"url": "http://supertrendstrategy:8080", "timeframe": "4h"},
     "MasterTraderV1": {"url": "http://mastertraderv1:8080", "timeframe": "1h"},
     "BollingerRSIMeanReversion": {"url": "http://bollingerrsimeanreversion:8080", "timeframe": "15m"},
     "FuturesSniperV1": {"url": "http://futuressniper:8080", "timeframe": "1h"},
+    "AlligatorTrendV1": {"url": "http://alligatortrendv1:8080", "timeframe": "1d"},
+    "GaussianChannelV1": {"url": "http://gaussianchannelv1:8080", "timeframe": "1d"},
 }
 
 API_AUTH = ("freqtrader", "mastertrader")

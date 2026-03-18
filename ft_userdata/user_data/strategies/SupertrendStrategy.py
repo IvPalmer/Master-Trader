@@ -124,6 +124,11 @@ class SupertrendStrategy(IStrategy):
             & (dataframe['btc_usdt_rsi_4h'] > 35)
         ).astype(int)
 
+        # BTC crash detection: block entries if BTC dropped >3% in 6 candles (24h on 4h)
+        dataframe['btc_crash'] = (
+            dataframe['btc_usdt_close_4h'] < dataframe['btc_usdt_close_4h'].shift(6) * 0.97
+        ).astype(int)
+
         return dataframe
 
     # ── Entry gate: cross-bot + sentiment checks ─────────────────
@@ -164,7 +169,8 @@ class SupertrendStrategy(IStrategy):
                (dataframe['volume'] > 0) &
                (dataframe['regime_volatile'] == 0) &  # Don't enter during high volatility
                (dataframe['regime_trending'] == 1) &  # Trend following: only enter in trending markets
-               (dataframe['btc_bullish'] == 1)  # BTC market guard
+               (dataframe['btc_bullish'] == 1) &  # BTC market guard
+               (dataframe['btc_crash'] == 0)  # BTC crash detection
             ),
             'enter_long'] = 1
         return dataframe

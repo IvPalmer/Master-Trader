@@ -1,40 +1,41 @@
 # Master Trader — Multi-Bot Algorithmic Trading System
 
-A self-improving multi-strategy crypto trading system built on [Freqtrade](https://www.freqtrade.io/). Runs 7 concurrent bots with automated health monitoring, backtesting validation, parameter optimization, and capital rebalancing.
+A self-improving multi-strategy crypto trading system built on [Freqtrade](https://www.freqtrade.io/). Runs 6 concurrent bots with automated health monitoring, backtesting validation, parameter optimization, and capital rebalancing.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Docker Compose Stack                       │
-│                                                               │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐ │
-│  │ClucHAnix │ │ NASOSv5  │ │ElliotV5  │ │ SupertrendStrat  │ │
-│  │  :8080   │ │  :8082   │ │  :8083   │ │     :8084        │ │
-│  │  5m dip  │ │  5m dip  │ │  5m dip  │ │   1h trend       │ │
-│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘ │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────────┐              │
-│  │MasterV1  │ │MasterAI  │ │ NFI X6           │              │
-│  │  :8086   │ │  :8087   │ │  :8089           │              │
-│  │ 1h hybrid│ │ 1h ML    │ │ 5m multi-signal  │              │
-│  └──────────┘ └──────────┘ └──────────────────┘              │
-│                                                               │
-│  ┌─────────────┐  ┌────────────┐  ┌───────────┐              │
-│  │ Metrics     │→ │ Prometheus │→ │  Grafana  │              │
-│  │ Exporter    │  │   :9091    │  │   :3000   │              │
-│  │  :9090      │  │  90d ret.  │  │ Dashboard │              │
-│  └─────────────┘  └────────────┘  └───────────┘              │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                     Docker Compose Stack                          │
+│                                                                   │
+│  ┌────────────────┐ ┌────────────────┐ ┌───────────────────────┐ │
+│  │ Supertrend     │ │ MasterTraderV1 │ │ BollingerRSIMeanRev   │ │
+│  │ Strategy :8084 │ │       :8086    │ │          :8089        │ │
+│  │  4h trend      │ │    1h hybrid   │ │   15m mean-reversion  │ │
+│  └────────────────┘ └────────────────┘ └───────────────────────┘ │
+│  ┌────────────────┐ ┌────────────────┐ ┌───────────────────────┐ │
+│  │ FuturesSniperV1│ │AlligatorTrendV1│ │ GaussianChannelV1     │ │
+│  │  :8090 futures │ │     :8091      │ │        :8092          │ │
+│  │  1h long/short │ │   1d trend     │ │      1d trend         │ │
+│  └────────────────┘ └────────────────┘ └───────────────────────┘ │
+│                                                                   │
+│  ┌─────────────┐  ┌────────────┐  ┌───────────┐                  │
+│  │ Metrics     │→ │ Prometheus │→ │  Grafana  │                  │
+│  │ Exporter    │  │   :9091    │  │   :3000   │                  │
+│  │  :9090      │  │  90d ret.  │  │ Dashboard │                  │
+│  └─────────────┘  └────────────┘  └───────────┘                  │
+└──────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────────────┐
-│                   Automation Layer (cron)                     │
-│                                                               │
-│  Daily   23:00  strategy_health_report.py  → Telegram        │
-│  Weekly  Sun    backtest_gate.py           → Telegram        │
-│  Weekly  Sun    tournament_manager.py      → Rebalance       │
-│  Weekly  Sun    hyperopt_optimizer.py      → Proposals       │
-│  Monthly 1st    walk_forward.py            → Validation      │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                    Automation Layer (cron)                         │
+│                                                                   │
+│  Daily   22:00  bot_evolution_tracker.py   → Snapshots           │
+│  Daily   23:00  strategy_health_report.py  → Telegram            │
+│  Weekly  Sun    backtest_gate.py           → Telegram            │
+│  Weekly  Sun    tournament_manager.py      → Rebalance           │
+│  Weekly  Sun    hyperopt_optimizer.py      → Proposals           │
+│  Monthly 1st    walk_forward.py            → Validation          │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
@@ -116,7 +117,7 @@ cd ~/ft_userdata
 docker compose up -d
 
 # Verify bots are healthy:
-for port in 8080 8082 8083; do
+for port in 8084 8086 8089 8090 8091 8092; do
   echo -n "Port $port: "
   curl -s -u freqtrader:yourpassword http://localhost:$port/api/v1/ping
   echo
@@ -155,9 +156,9 @@ All scripts can be run manually: `python3 script.py --help`
 
 Multi-layered defense system:
 
-1. **Per-trade**: Stoploss (-8% for 5m, -10% for 1h), trailing stops
+1. **Per-trade**: Stoploss (-2% futures, -5% spot intraday, -10%/-15% daily), trailing stops
 2. **Per-bot**: Protections (StoplossGuard, MaxDrawdown, CooldownPeriod, LowProfitPairs)
-3. **Time-based**: Force-close stale trades (2h → tighten, 4h → -3% max, 8h → force exit)
+3. **Time-based**: Force-close stale trades (24h BollingerRSI, 48h MasterTraderV1)
 4. **Anti-correlation**: OffsetFilter splits pairlists so dip-buyers don't overlap
 5. **Portfolio**: Circuit breaker stops ALL bots at 10% portfolio drawdown
 6. **Automated**: Health scores auto-pause strategies scoring <30 for 3+ days
@@ -199,8 +200,7 @@ research/                        # Strategy research & evidence
   ...                            # 15+ research files
 
 deploy/                          # Everything needed to deploy
-  docker-compose.yml             # Full stack: 7 bots + monitoring
-  Dockerfile.nfi                 # Custom image for NFI strategy
+  docker-compose.yml             # Full stack: 6 bots + monitoring
   configs/
     strategy-template.json       # Template for new strategy configs
     config-backtest.json         # Backtesting config (static pairlist)

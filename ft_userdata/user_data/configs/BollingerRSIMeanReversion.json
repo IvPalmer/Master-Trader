@@ -8,7 +8,7 @@
     "stake_amount": "unlimited",
     "tradable_balance_ratio": 0.99,
     "fiat_display_currency": "",
-    "max_open_trades": 3,
+    "max_open_trades": 2,
     "amount_reserve_percent": 0.05,
     "unfilledtimeout": {
         "entry": 10,
@@ -89,14 +89,14 @@
             "lookback_days": 14,
             "min_volatility": 0.01,
             "max_volatility": 0.40,
-            "refresh_period": 86400
+            "refresh_period": 14400
         },
         {
             "method": "RangeStabilityFilter",
             "lookback_days": 10,
             "min_rate_of_change": 0.01,
             "max_rate_of_change": 0.30,
-            "refresh_period": 86400
+            "refresh_period": 14400
         },
         {
             "method": "PrecisionFilter"

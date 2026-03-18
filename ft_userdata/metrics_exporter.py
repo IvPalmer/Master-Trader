@@ -52,12 +52,12 @@ def _load_bots_config() -> list[dict]:
         return bots
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return [
-            {"service": "ichimokutrendv1",          "strategy": "IchimokuTrendV1"},
-            {"service": "emacrossoverv1",           "strategy": "EMACrossoverV1"},
             {"service": "supertrendstrategy",       "strategy": "SupertrendStrategy"},
             {"service": "mastertraderv1",           "strategy": "MasterTraderV1"},
             {"service": "bollingerrsimeanreversion", "strategy": "BollingerRSIMeanReversion"},
             {"service": "futuressniper",            "strategy": "FuturesSniperV1"},
+            {"service": "alligatortrendv1",         "strategy": "AlligatorTrendV1"},
+            {"service": "gaussianchannelv1",        "strategy": "GaussianChannelV1"},
         ]
 
 BOTS = _load_bots_config()
@@ -67,7 +67,7 @@ API_PORT = 8080
 SCRAPE_INTERVAL = 60  # seconds
 
 # ── Circuit Breaker ───────────────────────────────────────────────
-INITIAL_CAPITAL = 352.0  # Total across active bots (4x R$500 = 4x$88 USDT)
+INITIAL_CAPITAL = 528.0  # Total across active bots (6x R$500 = 6x$88 USDT)
 CIRCUIT_BREAKER_PCT = 10.0  # Trigger at 10% portfolio drawdown ($700)
 CIRCUIT_BREAKER_COOLDOWN = 3600  # Don't re-alert for 1 hour after triggering
 WEBHOOK_URL = "http://host.docker.internal:8088/webhooks/freqtrade"

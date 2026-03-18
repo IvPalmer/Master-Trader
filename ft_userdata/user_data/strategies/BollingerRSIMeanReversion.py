@@ -26,10 +26,10 @@ class BollingerRSIMeanReversion(IStrategy):
     INTERFACE_VERSION: int = 3
 
     minimal_roi = {
-        "0": 0.04,
-        "30": 0.025,
-        "60": 0.015,
-        "120": 0.005
+        "0": 0.04,      # 4% immediate
+        "30": 0.025,    # 2.5% after 7.5h
+        "60": 0.015,    # 1.5% after 15h
+        "120": 0.01,    # 1% after 30h (floor — never go below 1%)
     }
 
     stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%
@@ -94,6 +94,12 @@ class BollingerRSIMeanReversion(IStrategy):
             dataframe['btc_usdt_rsi_1h'] > 25
         ).astype(int)
 
+        # BTC crash detection for mean-reversion: block when BTC dropped >2% in 4h (16 candles on 15m)
+        # Note: BTC close is from 1h informative, resampled to 15m by Freqtrade
+        dataframe['btc_crashing'] = (
+            dataframe['btc_usdt_close_1h'] < dataframe['btc_usdt_close_1h'].shift(16) * 0.98
+        ).astype(int)
+
         return dataframe
 
     # ── Entry gate: cross-bot + sentiment checks ─────────────────
@@ -115,6 +121,12 @@ class BollingerRSIMeanReversion(IStrategy):
                          pair, FearGreedIndex.get()["value"])
             return False
 
+        # Block during extreme fear - not a dip, it's a trend
+        if FearGreedIndex.is_extreme_fear():
+            logger.info("BLOCKED %s: Fear & Greed in extreme fear (%d)",
+                         pair, FearGreedIndex.get()["value"])
+            return False
+
         PositionTracker.register(bot_name, pair, amount * rate)
         return True
 
@@ -124,6 +136,12 @@ class BollingerRSIMeanReversion(IStrategy):
         bot_name = self.config.get('bot_name', 'BollingerRSI MR')
         PositionTracker.unregister(bot_name, pair)
         return True
+
+    def custom_exit(self, pair: str, trade, current_time, current_rate, current_profit, **kwargs):
+        # Force close after 24h - mean reversion edge decays fast
+        if (current_time - trade.open_date_utc).total_seconds() > 24 * 3600:
+            return 'time_exit_24h'
+        return None
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe.loc[
@@ -135,8 +153,9 @@ class BollingerRSIMeanReversion(IStrategy):
                 (dataframe['bb_width'] > 0.02) &  # Avoid low-vol squeezes
                 (dataframe['volume'] > dataframe['volume_sma']) &
                 (dataframe['volume'] > 0) &
-                # BTC guard: only block during freefall (RSI < 25)
-                (dataframe['btc_not_crashing'] == 1)
+                # BTC guard: block during freefall (RSI < 25) and crash (>2% drop in 4h)
+                (dataframe['btc_not_crashing'] == 1) &
+                (dataframe['btc_crashing'] == 0)
             ),
             'enter_long'] = 1
         return dataframe

@@ -27,7 +27,7 @@ services:
   #     --config /freqtrade/user_data/configs/ClucHAnix.json
   #     --strategy ClucHAnix
 
-  ichimokutrendv1:
+  x-ichimokutrendv1:  # KILLED 2026-03-15 — -$33.49, 0.17 PF, 0.23 R:R
     image: freqtradeorg/freqtrade:stable
     restart: unless-stopped
     container_name: ft-ichimoku-trend
@@ -101,7 +101,7 @@ services:
   #     --config /freqtrade/user_data/configs/ElliotV5.json
   #     --strategy ElliotV5
 
-  emacrossoverv1:
+  x-emacrossoverv1:  # KILLED 2026-03-15 — 0 trades in 20h, dead on arrival
     image: freqtradeorg/freqtrade:stable
     restart: unless-stopped
     container_name: ft-ema-crossover
@@ -266,8 +266,6 @@ services:
     volumes:
       - "./grafana/dashboards:/dashboards"
     depends_on:
-      - ichimokutrendv1
-      - emacrossoverv1
       - supertrendstrategy
       - mastertraderv1
       - bollingerrsimeanreversion

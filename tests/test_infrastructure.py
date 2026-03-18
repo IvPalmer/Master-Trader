@@ -60,12 +60,12 @@ def _load_bot_ports() -> dict:
         }
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return {
-            "IchimokuTrendV1": 8080,
-            "EMACrossoverV1": 8083,
             "SupertrendStrategy": 8084,
             "MasterTraderV1": 8086,
             "BollingerRSIMeanReversion": 8089,
             "FuturesSniperV1": 8090,
+            "AlligatorTrendV1": 8091,
+            "GaussianChannelV1": 8092,
         }
 
 BOT_PORTS = _load_bot_ports()
@@ -109,6 +109,8 @@ def test_all_containers_running():
         "supertrendstrategy",
         "mastertraderv1",
         "futuressniper",
+        "alligatortrendv1",
+        "gaussianchannelv1",
         "prometheus",
         "grafana",
         "grafana-bridge",

@@ -58,6 +58,10 @@
             "DAI/USDT",
             "TUSD/USDT",
             "FDUSD/USDT",
+            "USD1/USDT",
+            "XUSD/USDT",
+            "U/USDT",
+            "EUR/USDT",
             ".*_PERP"
         ]
     },
@@ -89,14 +93,14 @@
             "lookback_days": 14,
             "min_volatility": 0.02,
             "max_volatility": 0.60,
-            "refresh_period": 86400
+            "refresh_period": 14400
         },
         {
             "method": "RangeStabilityFilter",
             "lookback_days": 10,
             "min_rate_of_change": 0.02,
             "max_rate_of_change": 0.45,
-            "refresh_period": 86400
+            "refresh_period": 14400
         },
         {
             "method": "PrecisionFilter"

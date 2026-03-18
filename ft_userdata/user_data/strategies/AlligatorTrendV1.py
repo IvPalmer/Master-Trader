@@ -76,6 +76,7 @@ class AlligatorTrendV1(IStrategy):
 
     # Stoploss managed dynamically via custom_stoploss (ATR-based)
     stoploss = -0.10  # Safety net only
+    use_custom_stoploss = True
 
     # Trailing stop for protecting large gains
     trailing_stop = True

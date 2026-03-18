@@ -58,7 +58,9 @@
             "DAI/USDT",
             "TUSD/USDT",
             "FDUSD/USDT",
-            ".*_PERP"
+            ".*_PERP",
+            "EUR/USDT",
+            "PAXG/USDT"
         ]
     },
     "pairlists": [

@@ -15,8 +15,11 @@ When BTC is bullish, this bot also takes longs (same logic as spot bots).
 Fixed 2x leverage, isolated margin. Kill switch at -5% daily.
 """
 
+import json
 import logging
+import os
 from datetime import datetime
+from pathlib import Path
 
 from freqtrade.strategy import IStrategy, DecimalParameter, IntParameter, informative
 from freqtrade.persistence import Trade
@@ -50,8 +53,8 @@ class FuturesSniperV1(IStrategy):
         "1440": 0.015,  # 1.5% after 24h (= 3% at 2x)
     }
 
-    # -2% stoploss at 2x = -4% dollar risk
-    stoploss = -0.02
+    # -3% stoploss at 2x = -6% dollar risk (was -2%, too tight — 1% price move is noise)
+    stoploss = -0.03
 
     # Trailing stop — 1.5% trail after 3% profit (widened from 1%/2%)
     trailing_stop = True
@@ -66,14 +69,50 @@ class FuturesSniperV1(IStrategy):
 
     startup_candle_count: int = 200
 
-    # ── Kill switch state ─────────────────────────────────────────
-    _daily_loss = 0.0
-    _daily_loss_date = None
-    _consecutive_losses = 0
-    _killed = False
+    # ── Kill switch state (persisted to file) ────────────────────
+    KILL_SWITCH_FILE = "/freqtrade/user_data/kill_switch_FuturesSniperV1.json"
     DAILY_LOSS_LIMIT = -0.05
     MAX_CONSECUTIVE_LOSSES = 3
     SHORT_MAX_HOLD_HOURS = 48
+
+    def _load_kill_state(self):
+        """Load kill switch state from file, or initialize defaults."""
+        try:
+            if os.path.exists(self.KILL_SWITCH_FILE):
+                with open(self.KILL_SWITCH_FILE, 'r') as f:
+                    state = json.load(f)
+                self._daily_loss = state.get('daily_loss', 0.0)
+                self._daily_loss_date = state.get('daily_loss_date', None)
+                self._consecutive_losses = state.get('consecutive_losses', 0)
+                self._killed = state.get('killed', False)
+                logger.info("SNIPER: Loaded kill state from file — killed=%s, consec_losses=%d, daily_loss=%.4f",
+                            self._killed, self._consecutive_losses, self._daily_loss)
+                return
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning("SNIPER: Failed to load kill state: %s — resetting", e)
+        self._daily_loss = 0.0
+        self._daily_loss_date = None
+        self._consecutive_losses = 0
+        self._killed = False
+
+    def _save_kill_state(self):
+        """Persist kill switch state to file."""
+        state = {
+            'daily_loss': self._daily_loss,
+            'daily_loss_date': self._daily_loss_date,
+            'consecutive_losses': self._consecutive_losses,
+            'killed': self._killed,
+        }
+        try:
+            Path(self.KILL_SWITCH_FILE).parent.mkdir(parents=True, exist_ok=True)
+            with open(self.KILL_SWITCH_FILE, 'w') as f:
+                json.dump(state, f)
+        except IOError as e:
+            logger.error("SNIPER: Failed to save kill state: %s", e)
+
+    def bot_start(self, **kwargs) -> None:
+        """Called once when the bot starts — load persisted kill switch state."""
+        self._load_kill_state()
 
     # ── Short position sizing: 25% of normal stake ───────────────
     # Data: short trades are net negative even in profitable systems.
@@ -106,7 +145,7 @@ class FuturesSniperV1(IStrategy):
             },
             {
                 "method": "MaxDrawdown",
-                "lookback_period_candles": 48, "max_allowed_drawdown": 0.15,
+                "lookback_period_candles": 48, "max_allowed_drawdown": 0.10,
                 "stop_duration_candles": 24, "trade_limit": 1,
             },
         ]
@@ -158,16 +197,18 @@ class FuturesSniperV1(IStrategy):
             logger.warning("SNIPER KILLED: Rejecting %s entry on %s", side, pair)
             return False
 
-        today = current_time.date()
+        today = str(current_time.date())
         if self._daily_loss_date != today:
             self._daily_loss = 0.0
             self._daily_loss_date = today
             if self._killed and self._consecutive_losses < self.MAX_CONSECUTIVE_LOSSES:
                 self._killed = False
                 logger.info("SNIPER: Daily reset, re-enabling trading")
+            self._save_kill_state()
 
         if self._daily_loss <= self.DAILY_LOSS_LIMIT:
             self._killed = True
+            self._save_kill_state()
             logger.error("SNIPER KILL SWITCH: Daily loss %.2f%% exceeds limit",
                          self._daily_loss * 100)
             return False
@@ -201,6 +242,8 @@ class FuturesSniperV1(IStrategy):
                 logger.error("SNIPER KILL SWITCH: %d consecutive losses", self._consecutive_losses)
         else:
             self._consecutive_losses = max(0, self._consecutive_losses - 1)
+
+        self._save_kill_state()
 
         bot_name = self.config.get('bot_name', 'FuturesSniperV1')
         PositionTracker.unregister(bot_name, pair)
@@ -247,6 +290,17 @@ class FuturesSniperV1(IStrategy):
         btc_ema_bullish = dataframe['btc_usdt_ema50_1h'] > dataframe['btc_usdt_ema200_1h']
         btc_sma200_declining = dataframe['btc_usdt_sma200_1h'] < dataframe['btc_usdt_sma200_1h'].shift(3)
 
+        # BTC crash detection: block longs if BTC dropped >3% in last 6 candles
+        dataframe['btc_crash'] = (
+            (dataframe['btc_usdt_close_1h'] < dataframe['btc_usdt_close_1h'].shift(6) * 0.97)
+        ).astype(int)
+
+        # Rapid deterioration: BTC dropped >3% in 6 candles AND RSI < 35
+        btc_rapid_bear = (
+            (dataframe['btc_usdt_close_1h'] < dataframe['btc_usdt_close_1h'].shift(6) * 0.97)
+            & (dataframe['btc_usdt_rsi_1h'] < 35)
+        )
+
         dataframe['btc_bullish'] = (
             btc_above_sma200
             & btc_ema_bullish
@@ -255,15 +309,17 @@ class FuturesSniperV1(IStrategy):
 
         # Neutral: BTC above SMA200 but not fully bullish — still safe for longs
         # Closes the dead zone where neither bullish nor bearish was true
+        # Also blocks longs during crashes (>3% drop in 6 candles)
         dataframe['btc_long_ok'] = (
-            btc_above_sma200
-            | (btc_ema_bullish & (dataframe['btc_usdt_rsi_1h'] > 40))
+            (btc_above_sma200 | (btc_ema_bullish & (dataframe['btc_usdt_rsi_1h'] > 40)))
+            & (dataframe['btc_crash'] == 0)
         ).astype(int)
 
-        # Bear mode: BTC below SMA200 with declining slope
+        # Bear mode: BTC below SMA200 with declining slope, OR rapid deterioration
         dataframe['btc_bearish'] = (
             (~btc_above_sma200 & btc_sma200_declining)
             | (~btc_ema_bullish & btc_sma200_declining & (dataframe['btc_usdt_adx_1h'] > 20))
+            | btc_rapid_bear
         ).astype(int)
 
         # --- Per-pair trend state ---

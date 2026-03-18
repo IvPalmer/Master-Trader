@@ -29,22 +29,21 @@ class MasterTraderV1(IStrategy):
     # 4H migration would need longer EMAs (21/55) — revisit after current evaluation period
     timeframe = "1h"
 
-    # ROI table - widened to let winners run (trend-following)
-    # Old: 5%/3%/2%/1% — was cutting winners too short
+    # ROI table - matched to actual MFE distribution (most trades peak 1-2.4%)
     minimal_roi = {
-        "0": 0.15,      # 15% profit immediately
-        "720": 0.10,    # 10% after 12h
-        "1440": 0.07,   # 7% after 24h
-        "2880": 0.03,   # 3% after 48h
+        "0": 0.07,      # 7% immediate (rare big move)
+        "360": 0.04,    # 4% after 6h
+        "720": 0.025,   # 2.5% after 12h
+        "1440": 0.015,  # 1.5% after 24h
     }
 
     # Stoploss
     stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%
 
-    # Trailing stop - widened to let trends develop
+    # Trailing stop - offset at 2% where trades actually reach
     trailing_stop = True
-    trailing_stop_positive = 0.02       # Trail by 2% once offset is reached
-    trailing_stop_positive_offset = 0.04  # Start trailing at 4% profit (was 2%)
+    trailing_stop_positive = 0.01       # Trail by 1% once offset is reached
+    trailing_stop_positive_offset = 0.02  # Start trailing at 2% profit
     trailing_only_offset_is_reached = True
 
     # Run on new candles only
@@ -168,6 +167,12 @@ class MasterTraderV1(IStrategy):
         ] = 1
 
         return dataframe
+
+    def custom_exit(self, pair: str, trade, current_time, current_rate, current_profit, **kwargs):
+        # Force close after 48h - edge decays for 1h EMA crossover
+        if (current_time - trade.open_date_utc).total_seconds() > 48 * 3600:
+            return 'time_exit_48h'
+        return None
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         ema_f = f"ema_{self.ema_fast.value}"

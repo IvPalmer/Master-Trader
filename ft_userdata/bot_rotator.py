@@ -65,12 +65,12 @@ def _load_bots_config() -> dict:
         return bots
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return {
-            "SupertrendStrategy": {"port": 8084, "container": "ft-supertrendstrategy", "timeframe": "1h"},
+            "SupertrendStrategy": {"port": 8084, "container": "ft-supertrendstrategy", "timeframe": "4h"},
             "MasterTraderV1":     {"port": 8086, "container": "ft-mastertraderv1", "timeframe": "1h"},
             "BollingerRSIMeanReversion": {"port": 8089, "container": "ft-bollinger-rsi", "timeframe": "15m"},
-            "IchimokuTrendV1":    {"port": 8080, "container": "ft-ichimokutrendv1", "timeframe": "1h"},
-            "EMACrossoverV1":     {"port": 8083, "container": "ft-emacrossoverv1", "timeframe": "1h"},
             "FuturesSniperV1":    {"port": 8090, "container": "ft-futures-sniper", "timeframe": "1h"},
+            "AlligatorTrendV1":   {"port": 8091, "container": "ft-alligator-trend", "timeframe": "1d"},
+            "GaussianChannelV1":  {"port": 8092, "container": "ft-gaussian-channel", "timeframe": "1d"},
         }
 
 BOTS = _load_bots_config()
@@ -164,7 +164,14 @@ def evaluate_bot(strategy: str, port: int) -> dict:
 
     # --- Zero trades check ---
     total_activity = len(recent) + len(open_trades)
+    # Daily TF bots may go weeks without trades — don't flag as dead
+    bot_tf = BOTS.get(strategy, {}).get("timeframe", "1h")
     if total_activity == 0:
+        if bot_tf == "1d":
+            result["status"] = "ok"
+            result["issues"].append(f"Zero trades in {EVAL_WINDOW_DAYS} days (normal for daily TF)")
+            result["metrics"] = {"trades": 0, "open": 0}
+            return result
         result["status"] = "dead"
         result["issues"].append(f"Zero trades in {EVAL_WINDOW_DAYS} days")
         result["metrics"] = {"trades": 0, "open": 0}
@@ -398,6 +405,65 @@ def main():
         ev = evaluate_bot(strategy, info["port"])
         evaluations.append(ev)
         log.info("%s: %s %s", strategy, ev["status"], ev.get("issues", []))
+
+    # --- Check leashed bots (accelerated kill evaluation) ---
+    leash = state.get("leash", {})
+    for strategy, lconf in list(leash.items()):
+        if lconf.get("status") != "active":
+            continue
+        ev = next((e for e in evaluations if e["strategy"] == strategy), None)
+        if not ev or ev["status"] in ("paused", "unreachable"):
+            continue
+
+        # Count trades since leash started
+        trades_at_start = lconf.get("trades_at_start", 0)
+        current_trades = ev["metrics"].get("trades", 0) + trades_at_start  # total trades
+        # Fetch actual total from API
+        port = BOTS.get(strategy, {}).get("port")
+        if port:
+            profit_data = api_get(port, "profit")
+            if profit_data:
+                current_trades = profit_data.get("closed_trade_count", current_trades)
+
+        new_trades = current_trades - trades_at_start
+        max_trades = lconf.get("max_trades", 15)
+        kill_pf = lconf.get("kill_if_pf_below", 1.0)
+
+        if new_trades >= max_trades:
+            # Evaluate PF from profit data
+            pf = 0
+            if profit_data:
+                winning_profit = profit_data.get("profit_closed_coin", 0)
+                # Approximate PF from win/loss counts
+                w = profit_data.get("winning_trades", 0)
+                l = profit_data.get("losing_trades", 0)
+                if l > 0 and w > 0:
+                    # Fetch actual trades for precise PF
+                    trades_data = api_get(port, "trades?limit=500")
+                    if trades_data:
+                        all_trades = trades_data.get("trades", trades_data) if isinstance(trades_data, dict) else trades_data
+                        closed = [t for t in all_trades if not t.get("is_open")]
+                        gross_win = sum(t.get("close_profit_abs", 0) for t in closed if t.get("close_profit_abs", 0) > 0)
+                        gross_loss = abs(sum(t.get("close_profit_abs", 0) for t in closed if t.get("close_profit_abs", 0) < 0))
+                        pf = gross_win / gross_loss if gross_loss > 0 else 999
+
+            if pf < kill_pf:
+                reason = f"LEASH EXPIRED: {new_trades} trades, PF {pf:.2f} < {kill_pf:.1f}"
+                if not args.dry_run:
+                    container = BOTS[strategy]["container"]
+                    if pause_bot(strategy, container, reason):
+                        state.setdefault("paused", []).append(strategy)
+                        actions.append(f"KILLED {strategy}: {reason}")
+                        lconf["status"] = "killed"
+                else:
+                    actions.append(f"WOULD KILL {strategy}: {reason}")
+            else:
+                actions.append(f"LEASH GRADUATED {strategy}: {new_trades} trades, PF {pf:.2f} >= {kill_pf:.1f}")
+                lconf["status"] = "graduated"
+        else:
+            log.info("LEASH %s: %d/%d trades completed", strategy, new_trades, max_trades)
+
+    state["leash"] = leash
 
     # --- Process flags and escalate ---
     flags = state.get("flags", {})

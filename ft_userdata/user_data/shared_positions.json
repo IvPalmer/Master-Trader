@@ -15,6 +15,42 @@
     "DOGE/USDT": {
       "stake_amount": 221.63697387612,
       "timestamp": "2026-03-17T01:35:33.647848"
+    },
+    "DOT/USDT": {
+      "stake_amount": 31.494356600097603,
+      "timestamp": "2026-03-18T12:00:14.847052"
+    }
+  },
+  "FuturesSniperV1": {
+    "SOL/USDT:USDT": {
+      "stake_amount": 83.6946060233184,
+      "timestamp": "2026-03-17T21:00:05.958843"
+    },
+    "ADA/USDT:USDT": {
+      "stake_amount": 83.6946060233184,
+      "timestamp": "2026-03-17T21:20:19.899578"
+    },
+    "DOGE/USDT:USDT": {
+      "stake_amount": 82.2367620882368,
+      "timestamp": "2026-03-18T04:00:10.020720"
+    },
+    "BNB/USDT:USDT": {
+      "stake_amount": 81.1376595059184,
+      "timestamp": "2026-03-18T08:00:07.826216"
+    }
+  },
+  "BollingerRSI MR": {
+    "ASTER/USDT": {
+      "stake_amount": 29.503864428482398,
+      "timestamp": "2026-03-18T09:25:38.311911"
+    },
+    "WLD/USDT": {
+      "stake_amount": 29.503864428482398,
+      "timestamp": "2026-03-18T11:15:02.173847"
+    },
+    "LINK/USDT": {
+      "stake_amount": 29.503864428482398,
+      "timestamp": "2026-03-18T11:45:02.759235"
     }
   }
 }

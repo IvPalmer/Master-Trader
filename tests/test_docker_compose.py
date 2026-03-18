@@ -48,9 +48,9 @@ def test_restart_policy(compose_content):
         "supertrendstrategy",
         "mastertraderv1",
         "bollingerrsimeanreversion",
-        "ichimokutrendv1",
-        "emacrossoverv1",
         "futuressniper",
+        "alligatortrendv1",
+        "gaussianchannelv1",
     ]
     for svc in active_services:
         # Find the service block (rough check)

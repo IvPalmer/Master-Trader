@@ -39,9 +39,9 @@ def _load_active_bots() -> list[str]:
             "SupertrendStrategy",
             "MasterTraderV1",
             "BollingerRSIMeanReversion",
-            "IchimokuTrendV1",
-            "EMACrossoverV1",
             "FuturesSniperV1",
+            "AlligatorTrendV1",
+            "GaussianChannelV1",
         ]
 
 ACTIVE_BOTS = _load_active_bots()
