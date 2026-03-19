@@ -11,6 +11,16 @@ x-binance-hosts: &binance-hosts
   - "data.binance.com:13.226.219.154"
   - "stream.binance.com:13.112.187.8"
 
+# Staggered startup delays (seconds) to avoid Binance 429 rate limits
+# when all bots cold-start simultaneously. Daily bots start first (least API pressure),
+# then higher-frequency bots with increasing delays.
+x-healthcheck: &bot-healthcheck
+  test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/v1/ping || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 5
+  start_period: 120s
+
 services:
   # cluchanix:  # KILLED 2026-03-14 — -$27.56, poor R:R (0.17)
   #   image: freqtradeorg/freqtrade:stable
@@ -118,18 +128,15 @@ services:
 
   supertrendstrategy:
     image: freqtradeorg/freqtrade:stable
-    restart: unless-stopped
+    restart: always
     container_name: ft-supertrendstrategy
     extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
       - "127.0.0.1:8084:8080"
-    command: >
-      trade
-      --logfile /freqtrade/user_data/logs/SupertrendStrategy.log
-      --config /freqtrade/user_data/configs/SupertrendStrategy.json
-      --strategy SupertrendStrategy
+    healthcheck: *bot-healthcheck
+    entrypoint: ["/bin/sh", "-c", "sleep 20 && exec freqtrade trade --logfile /freqtrade/user_data/logs/SupertrendStrategy.log --config /freqtrade/user_data/configs/SupertrendStrategy.json --strategy SupertrendStrategy"]
 
   # doubleemacrossoverwithtrend:  # PAUSED — worst performer (-4.14 USDT, 0/2 W/L)
   #   image: freqtradeorg/freqtrade:stable
@@ -147,18 +154,15 @@ services:
 
   mastertraderv1:
     image: freqtradeorg/freqtrade:stable
-    restart: unless-stopped
+    restart: always
     container_name: ft-mastertraderv1
     extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
       - "127.0.0.1:8086:8080"
-    command: >
-      trade
-      --logfile /freqtrade/user_data/logs/MasterTraderV1.log
-      --config /freqtrade/user_data/configs/MasterTraderV1.json
-      --strategy MasterTraderV1
+    healthcheck: *bot-healthcheck
+    entrypoint: ["/bin/sh", "-c", "sleep 35 && exec freqtrade trade --logfile /freqtrade/user_data/logs/MasterTraderV1.log --config /freqtrade/user_data/configs/MasterTraderV1.json --strategy MasterTraderV1"]
 
   # mastertraderai:  # KILLED 2026-03-14 — -$32.32, 30% WR, bleeding $31/day
   #   image: freqtradeorg/freqtrade:stable_freqai
@@ -194,68 +198,56 @@ services:
 
   bollingerrsimeanreversion:
     image: freqtradeorg/freqtrade:stable
-    restart: unless-stopped
+    restart: always
     container_name: ft-bollinger-rsi
     extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
       - "127.0.0.1:8089:8080"
-    command: >
-      trade
-      --logfile /freqtrade/user_data/logs/BollingerRSIMeanReversion.log
-      --config /freqtrade/user_data/configs/BollingerRSIMeanReversion.json
-      --strategy BollingerRSIMeanReversion
+    healthcheck: *bot-healthcheck
+    entrypoint: ["/bin/sh", "-c", "sleep 65 && exec freqtrade trade --logfile /freqtrade/user_data/logs/BollingerRSIMeanReversion.log --config /freqtrade/user_data/configs/BollingerRSIMeanReversion.json --strategy BollingerRSIMeanReversion"]
 
   # ── Futures Sniper Module ─────────────────────────────────────────
   # Phase 1: Long-only, 2x leverage, $500 dry-run, isolated margin
 
   futuressniper:
     image: freqtradeorg/freqtrade:stable
-    restart: unless-stopped
+    restart: always
     container_name: ft-futures-sniper
     extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
       - "127.0.0.1:8090:8080"
-    command: >
-      trade
-      --logfile /freqtrade/user_data/logs/FuturesSniperV1.log
-      --config /freqtrade/user_data/configs/FuturesSniperV1.json
-      --strategy FuturesSniperV1
+    healthcheck: *bot-healthcheck
+    entrypoint: ["/bin/sh", "-c", "sleep 50 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FuturesSniperV1.log --config /freqtrade/user_data/configs/FuturesSniperV1.json --strategy FuturesSniperV1"]
 
   # ── Daily Timeframe Strategies ────────────────────────────────────
 
   alligatortrendv1:
     image: freqtradeorg/freqtrade:stable
-    restart: unless-stopped
+    restart: always
     container_name: ft-alligator-trend
     extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
       - "127.0.0.1:8091:8080"
-    command: >
-      trade
-      --logfile /freqtrade/user_data/logs/AlligatorTrendV1.log
-      --config /freqtrade/user_data/configs/AlligatorTrendV1.json
-      --strategy AlligatorTrendV1
+    healthcheck: *bot-healthcheck
+    entrypoint: ["/bin/sh", "-c", "sleep 0 && exec freqtrade trade --logfile /freqtrade/user_data/logs/AlligatorTrendV1.log --config /freqtrade/user_data/configs/AlligatorTrendV1.json --strategy AlligatorTrendV1"]
 
   gaussianchannelv1:
     image: freqtradeorg/freqtrade:stable
-    restart: unless-stopped
+    restart: always
     container_name: ft-gaussian-channel
     extra_hosts: *binance-hosts
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
       - "127.0.0.1:8092:8080"
-    command: >
-      trade
-      --logfile /freqtrade/user_data/logs/GaussianChannelV1.log
-      --config /freqtrade/user_data/configs/GaussianChannelV1.json
-      --strategy GaussianChannelV1
+    healthcheck: *bot-healthcheck
+    entrypoint: ["/bin/sh", "-c", "sleep 10 && exec freqtrade trade --logfile /freqtrade/user_data/logs/GaussianChannelV1.log --config /freqtrade/user_data/configs/GaussianChannelV1.json --strategy GaussianChannelV1"]
 
   # ── Grafana Bridge (candle data proxy for dashboards) ──────────────
 
