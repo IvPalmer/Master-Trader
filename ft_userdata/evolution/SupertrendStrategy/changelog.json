@@ -96,5 +96,159 @@
       "_file_hash": "a36db3ecd0c7"
     },
     "file_hash": "a36db3ecd0c7"
+  },
+  {
+    "timestamp": "2026-03-17T19:07:03Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.04,
+      "timeframe": "4h",
+      "minimal_roi": "\"0\": 0.15, \"720\": 0.10, \"1440\": 0.07, \"2880\": 0.03",
+      "_file_hash": "66cc2abb4b70"
+    },
+    "file_hash": "66cc2abb4b70"
+  },
+  {
+    "timestamp": "2026-03-17T19:07:44Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.04,
+      "timeframe": "4h",
+      "minimal_roi": "\"0\": 0.15, \"720\": 0.10, \"1440\": 0.07, \"2880\": 0.03",
+      "_file_hash": "66cc2abb4b70"
+    },
+    "file_hash": "66cc2abb4b70"
+  },
+  {
+    "timestamp": "2026-03-17T19:15:12Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.04,
+      "timeframe": "4h",
+      "minimal_roi": "\"0\": 0.15, \"720\": 0.10, \"1440\": 0.07, \"2880\": 0.03",
+      "_file_hash": "66cc2abb4b70"
+    },
+    "file_hash": "66cc2abb4b70"
+  },
+  {
+    "timestamp": "2026-03-18T20:29:52Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.04,
+      "timeframe": "4h",
+      "minimal_roi": "\"0\": 0.15, \"720\": 0.10, \"1440\": 0.07, \"2880\": 0.03",
+      "_file_hash": "bad1cfd6e0eb"
+    },
+    "file_hash": "bad1cfd6e0eb"
+  },
+  {
+    "timestamp": "2026-03-18T20:31:32Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.04,
+      "timeframe": "4h",
+      "minimal_roi": "\"0\": 0.15, \"720\": 0.10, \"1440\": 0.07, \"2880\": 0.03",
+      "_file_hash": "bad1cfd6e0eb"
+    },
+    "file_hash": "bad1cfd6e0eb"
+  },
+  {
+    "timestamp": "2026-03-18T22:10:39Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.04,
+      "timeframe": "4h",
+      "minimal_roi": "\"0\": 0.15, \"720\": 0.10, \"1440\": 0.07, \"2880\": 0.03",
+      "_file_hash": "bad1cfd6e0eb"
+    },
+    "file_hash": "bad1cfd6e0eb"
+  },
+  {
+    "timestamp": "2026-03-20T00:51:28Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.03,
+      "timeframe": "1h",
+      "minimal_roi": "\"0\": 0.05, \"360\": 0.03, \"720\": 0.02, \"1440\": 0.01",
+      "_file_hash": "5f3ce97380d7"
+    },
+    "file_hash": "5f3ce97380d7"
+  },
+  {
+    "timestamp": "2026-03-20T00:51:57Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.03,
+      "timeframe": "1h",
+      "minimal_roi": "\"0\": 0.05, \"360\": 0.03, \"720\": 0.02, \"1440\": 0.01",
+      "_file_hash": "5f3ce97380d7"
+    },
+    "file_hash": "5f3ce97380d7"
+  },
+  {
+    "timestamp": "2026-03-24T19:28:39Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.03,
+      "timeframe": "1h",
+      "minimal_roi": "\"0\": 0.05, \"360\": 0.03, \"720\": 0.02, \"1440\": 0.01",
+      "_file_hash": "5f3ce97380d7"
+    },
+    "file_hash": "5f3ce97380d7"
+  },
+  {
+    "timestamp": "2026-03-24T19:29:44Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.03,
+      "timeframe": "1h",
+      "minimal_roi": "\"0\": 0.05, \"360\": 0.03, \"720\": 0.02, \"1440\": 0.01",
+      "_file_hash": "5f3ce97380d7"
+    },
+    "file_hash": "5f3ce97380d7"
+  },
+  {
+    "timestamp": "2026-03-24T19:30:39Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "True",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.03,
+      "timeframe": "1h",
+      "minimal_roi": "\"0\": 0.05, \"360\": 0.03, \"720\": 0.02, \"1440\": 0.01",
+      "_file_hash": "5f3ce97380d7"
+    },
+    "file_hash": "5f3ce97380d7"
   }
 ]

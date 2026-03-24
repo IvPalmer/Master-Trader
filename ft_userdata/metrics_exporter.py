@@ -46,6 +46,7 @@ def _load_bots_config() -> list[dict]:
                 "FuturesSniperV1": "futuressniper",
                 "AlligatorTrendV1": "alligatortrendv1",
                 "GaussianChannelV1": "gaussianchannelv1",
+                "BearCrashShortV1": "bearcrashshortv1",
             }
             service = service_map.get(name, service)
             bots.append({"service": service, "strategy": name})
@@ -54,8 +55,6 @@ def _load_bots_config() -> list[dict]:
         return [
             {"service": "supertrendstrategy",       "strategy": "SupertrendStrategy"},
             {"service": "mastertraderv1",           "strategy": "MasterTraderV1"},
-            {"service": "bollingerrsimeanreversion", "strategy": "BollingerRSIMeanReversion"},
-            {"service": "futuressniper",            "strategy": "FuturesSniperV1"},
             {"service": "alligatortrendv1",         "strategy": "AlligatorTrendV1"},
             {"service": "gaussianchannelv1",        "strategy": "GaussianChannelV1"},
         ]
@@ -67,7 +66,7 @@ API_PORT = 8080
 SCRAPE_INTERVAL = 60  # seconds
 
 # ── Circuit Breaker ───────────────────────────────────────────────
-INITIAL_CAPITAL = 528.0  # Total across active bots (6x R$500 = 6x$88 USDT)
+INITIAL_CAPITAL = 550.0  # Total across active bots (4x$88 spot + $22 short = $374) + killed bots historical
 CIRCUIT_BREAKER_PCT = 10.0  # Trigger at 10% portfolio drawdown ($700)
 CIRCUIT_BREAKER_COOLDOWN = 3600  # Don't re-alert for 1 hour after triggering
 WEBHOOK_URL = "http://host.docker.internal:8088/webhooks/freqtrade"

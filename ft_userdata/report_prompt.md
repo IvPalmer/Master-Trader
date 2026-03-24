@@ -7,12 +7,12 @@ STRATEGY TYPE EXPECTATIONS:
 - dip-buyer / mean-reversion: expect win rates >= 55%
 - hybrid / ml-based: evaluate holistically
 
-RECENT CHANGES (2026-03-18):
-- BTC crash guard added to SupertrendStrategy and FuturesSniperV1 (blocks entries during >3% BTC drops)
-- BollingerRSI: max trades reduced to 2, extreme fear blocking, 24h time exit added
-- MasterTraderV1: ROI tightened (7%/4%/2.5%/1.5%), trailing offset lowered to 2%, 48h time exit
-- FuturesSniperV1: stoploss widened -2%→-3%, MaxDD 15%→10%, kill switch now file-persisted
-- AlligatorTrendV1: ATR dynamic stoploss now ACTIVE (was missing use_custom_stoploss=True)
+RECENT CHANGES (2026-03-20):
+- Fleet reduced from 6 to 4 bots
+- KILLED: BollingerRSIMeanReversion (PF 0.50, -$3.67, structurally losing on 15m)
+- KILLED: FuturesSniperV1 (PF 0.10, 22% WR, -$6.45, 7/9 trades hit stoploss)
+- SupertrendStrategy: REVERTED from 4h back to 1h (4h migration killed PF: 7.44→1.46). ROI back to 5%/3%/2%/1%, trailing offset 3%
+- MasterTraderV1: stuck USD1/USDT position force-closed, freeing trade slot. No parameter changes — let it run.
 - Daily bots (Alligator/Gaussian): 0 trades after days is EXPECTED for 1d timeframe — do not flag as broken
 
 {CONTEXT}

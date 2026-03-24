@@ -58,6 +58,10 @@
             "DAI/USDT",
             "TUSD/USDT",
             "FDUSD/USDT",
+            "USD1/USDT",
+            "XUSD/USDT",
+            "U/USDT",
+            "EUR/USDT",
             ".*_PERP"
         ]
     },

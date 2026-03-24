@@ -177,14 +177,18 @@ def test_no_real_api_keys_committed(bot):
 # ── Trading mode consistency ──────────────────────────────────────
 
 
-def test_futures_config_correct():
-    """FuturesSniperV1 must be configured for futures trading."""
-    config = load_config("FuturesSniperV1")
-    assert config.get("trading_mode") == "futures"
-    assert config.get("margin_mode") == "isolated"
+FUTURES_BOTS = [b for b in ACTIVE_BOTS if b in ("FuturesSniperV1", "BearCrashShortV1")]
 
 
-@pytest.mark.parametrize("bot", [b for b in ACTIVE_BOTS if b != "FuturesSniperV1"])
+@pytest.mark.parametrize("bot", FUTURES_BOTS)
+def test_futures_config_correct(bot):
+    """Futures bots must be configured for futures trading."""
+    config = load_config(bot)
+    assert config.get("trading_mode") == "futures", f"{bot}: should be futures, got {config.get('trading_mode')}"
+    assert config.get("margin_mode") == "isolated", f"{bot}: should use isolated margin"
+
+
+@pytest.mark.parametrize("bot", [b for b in ACTIVE_BOTS if b not in ("FuturesSniperV1", "BearCrashShortV1")])
 def test_spot_config_correct(bot):
     """Spot bots must be configured for spot trading."""
     config = load_config(bot)

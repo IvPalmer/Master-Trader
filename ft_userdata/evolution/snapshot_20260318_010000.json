@@ -1,0 +1,124 @@
+{
+  "id": "20260318_010000",
+  "timestamp": "2026-03-18T01:00:00Z",
+  "note": "daily auto-snapshot",
+  "bots": {
+    "SupertrendStrategy": {
+      "total_trades": 40,
+      "open_trades": 3,
+      "open_stake": 57.95,
+      "winners": 27,
+      "losers": 13,
+      "win_rate": 67.5,
+      "profit_factor": 3.34,
+      "risk_reward": 1.61,
+      "avg_win": 0.45,
+      "avg_loss": 0.28,
+      "total_pnl": 8.48,
+      "worst_loss_abs": -1.01,
+      "worst_loss_pct": -5.2,
+      "max_drawdown": 2.03,
+      "max_consec_losses": 4,
+      "unique_pairs": 23,
+      "days_running": 6,
+      "exit_reasons": {
+        "exit_signal": 14,
+        "roi": 19,
+        "trailing_stop_loss": 4,
+        "stoploss_on_exchange": 3
+      },
+      "force_exits": 0,
+      "trades_per_day": 6.7
+    },
+    "MasterTraderV1": {
+      "total_trades": 22,
+      "open_trades": 1,
+      "open_stake": 17.41,
+      "winners": 14,
+      "losers": 8,
+      "win_rate": 63.6,
+      "profit_factor": 1.0,
+      "risk_reward": 0.57,
+      "avg_win": 0.19,
+      "avg_loss": 0.33,
+      "total_pnl": 0.01,
+      "worst_loss_abs": -1.75,
+      "worst_loss_pct": -9.9,
+      "max_drawdown": 2.02,
+      "max_consec_losses": 2,
+      "unique_pairs": 20,
+      "days_running": 5,
+      "exit_reasons": {
+        "exit_signal": 7,
+        "trailing_stop_loss": 1,
+        "roi": 13,
+        "emergency_exit": 1
+      },
+      "force_exits": 1,
+      "trades_per_day": 4.4
+    },
+    "BollingerRSIMeanReversion": {
+      "total_trades": 19,
+      "open_trades": 0,
+      "open_stake": 0,
+      "winners": 14,
+      "losers": 5,
+      "win_rate": 73.7,
+      "profit_factor": 1.62,
+      "risk_reward": 0.58,
+      "avg_win": 0.26,
+      "avg_loss": 0.45,
+      "total_pnl": 1.41,
+      "worst_loss_abs": -1.11,
+      "worst_loss_pct": -6.2,
+      "max_drawdown": 1.22,
+      "max_consec_losses": 2,
+      "unique_pairs": 17,
+      "days_running": 4,
+      "exit_reasons": {
+        "trailing_stop_loss": 3,
+        "roi": 9,
+        "exit_signal": 5,
+        "stop_loss": 1,
+        "stoploss_on_exchange": 1
+      },
+      "force_exits": 0,
+      "trades_per_day": 4.8
+    },
+    "FuturesSniperV1": {
+      "total_trades": 2,
+      "open_trades": 1,
+      "open_stake": 41.72,
+      "winners": 0,
+      "losers": 2,
+      "win_rate": 0.0,
+      "profit_factor": 0.0,
+      "risk_reward": 0.0,
+      "avg_win": 0,
+      "avg_loss": 2.16,
+      "total_pnl": -4.33,
+      "worst_loss_abs": -3.46,
+      "worst_loss_pct": -7.9,
+      "max_drawdown": 4.33,
+      "max_consec_losses": 2,
+      "unique_pairs": 2,
+      "days_running": 3,
+      "exit_reasons": {
+        "stop_loss": 1,
+        "stoploss_on_exchange": 1
+      },
+      "force_exits": 0,
+      "trades_per_day": 0.7
+    },
+    "AlligatorTrendV1": {
+      "total_trades": 0,
+      "open_trades": 0,
+      "open_stake": 0
+    },
+    "GaussianChannelV1": {
+      "total_trades": 0,
+      "open_trades": 0,
+      "open_stake": 0
+    }
+  }
+}

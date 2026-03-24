@@ -1,6 +1,6 @@
 # Master Trader — Multi-Bot Algorithmic Trading System
 
-A self-improving multi-strategy crypto trading system built on [Freqtrade](https://www.freqtrade.io/). Runs 6 concurrent bots with automated health monitoring, backtesting validation, parameter optimization, and capital rebalancing.
+A self-improving multi-strategy crypto trading system built on [Freqtrade](https://www.freqtrade.io/). Runs 4 concurrent bots with automated health monitoring, backtesting validation, parameter optimization, and capital rebalancing.
 
 ## Architecture
 
@@ -8,16 +8,16 @@ A self-improving multi-strategy crypto trading system built on [Freqtrade](https
 ┌──────────────────────────────────────────────────────────────────┐
 │                     Docker Compose Stack                          │
 │                                                                   │
-│  ┌────────────────┐ ┌────────────────┐ ┌───────────────────────┐ │
-│  │ Supertrend     │ │ MasterTraderV1 │ │ BollingerRSIMeanRev   │ │
-│  │ Strategy :8084 │ │       :8086    │ │          :8089        │ │
-│  │  4h trend      │ │    1h hybrid   │ │   15m mean-reversion  │ │
-│  └────────────────┘ └────────────────┘ └───────────────────────┘ │
-│  ┌────────────────┐ ┌────────────────┐ ┌───────────────────────┐ │
-│  │ FuturesSniperV1│ │AlligatorTrendV1│ │ GaussianChannelV1     │ │
-│  │  :8090 futures │ │     :8091      │ │        :8092          │ │
-│  │  1h long/short │ │   1d trend     │ │      1d trend         │ │
-│  └────────────────┘ └────────────────┘ └───────────────────────┘ │
+│  ┌────────────────┐ ┌────────────────┐                           │
+│  │ Supertrend     │ │ MasterTraderV1 │                           │
+│  │ Strategy :8084 │ │       :8086    │                           │
+│  │  1h trend      │ │    1h hybrid   │                           │
+│  └────────────────┘ └────────────────┘                           │
+│  ┌────────────────┐ ┌───────────────────────┐                    │
+│  │AlligatorTrendV1│ │ GaussianChannelV1     │                    │
+│  │     :8091      │ │        :8092          │                    │
+│  │   1d trend     │ │      1d trend         │                    │
+│  └────────────────┘ └───────────────────────┘                    │
 │                                                                   │
 │  ┌─────────────┐  ┌────────────┐  ┌───────────┐                  │
 │  │ Metrics     │→ │ Prometheus │→ │  Grafana  │                  │
@@ -117,7 +117,7 @@ cd ~/ft_userdata
 docker compose up -d
 
 # Verify bots are healthy:
-for port in 8084 8086 8089 8090 8091 8092; do
+for port in 8084 8086 8091 8092; do
   echo -n "Port $port: "
   curl -s -u freqtrader:yourpassword http://localhost:$port/api/v1/ping
   echo

@@ -42,15 +42,13 @@ def test_no_duplicate_host_ports(compose_content):
 
 
 def test_restart_policy(compose_content):
-    """Active bot services should have restart: unless-stopped."""
-    # This ensures bots come back after crashes
+    """Active bot services should have restart: always (survives compose recreate crashes)."""
     active_services = [
         "supertrendstrategy",
         "mastertraderv1",
-        "bollingerrsimeanreversion",
-        "futuressniper",
         "alligatortrendv1",
         "gaussianchannelv1",
+        "bearcrashshortv1",
     ]
     for svc in active_services:
         # Find the service block (rough check)
@@ -58,8 +56,8 @@ def test_restart_policy(compose_content):
         match = re.search(pattern, compose_content, re.DOTALL)
         if match:
             policy = match.group(1)
-            assert policy == "unless-stopped", (
-                f"{svc}: restart policy is '{policy}', should be 'unless-stopped'"
+            assert policy == "always", (
+                f"{svc}: restart policy is '{policy}', should be 'always'"
             )
 
 

@@ -57,7 +57,8 @@ def test_dashboard_shows_all_bots():
     result = run_tracker("dashboard")
     assert "SupertrendStrategy" in result.stdout
     assert "MasterTraderV1" in result.stdout
-    assert "BollingerRSI" in result.stdout
+    assert "AlligatorTrendV1" in result.stdout
+    assert "GaussianChannelV1" in result.stdout
 
 
 # ── Graduation command ────────────────────────────────────────────

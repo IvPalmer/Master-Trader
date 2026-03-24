@@ -1,8 +1,8 @@
 {
   "Supertrend": {
     "ETH/USDT": {
-      "stake_amount": 219.48601634388,
-      "timestamp": "2026-03-16T21:36:13.010515"
+      "stake_amount": 30.303037394097597,
+      "timestamp": "2026-03-23T14:00:04.413861"
     },
     "PUMP/USDT": {
       "stake_amount": 221.22026153172,
@@ -19,24 +19,32 @@
     "DOT/USDT": {
       "stake_amount": 31.494356600097603,
       "timestamp": "2026-03-18T12:00:14.847052"
+    },
+    "LINK/USDT": {
+      "stake_amount": 30.303037394097597,
+      "timestamp": "2026-03-23T14:00:03.752227"
+    },
+    "BTC/USDT": {
+      "stake_amount": 30.303037394097593,
+      "timestamp": "2026-03-23T14:00:05.043491"
     }
   },
   "FuturesSniperV1": {
-    "SOL/USDT:USDT": {
-      "stake_amount": 83.6946060233184,
-      "timestamp": "2026-03-17T21:00:05.958843"
-    },
     "ADA/USDT:USDT": {
       "stake_amount": 83.6946060233184,
       "timestamp": "2026-03-17T21:20:19.899578"
     },
-    "DOGE/USDT:USDT": {
-      "stake_amount": 82.2367620882368,
-      "timestamp": "2026-03-18T04:00:10.020720"
-    },
     "BNB/USDT:USDT": {
       "stake_amount": 81.1376595059184,
       "timestamp": "2026-03-18T08:00:07.826216"
+    },
+    "BTC/USDT:USDT": {
+      "stake_amount": 108.24742268041238,
+      "timestamp": "2026-03-19T13:59:00.688295"
+    },
+    "ETH/USDT:USDT": {
+      "stake_amount": 21.649484536082475,
+      "timestamp": "2026-03-19T13:59:01.776298"
     }
   },
   "BollingerRSI MR": {
@@ -51,6 +59,12 @@
     "LINK/USDT": {
       "stake_amount": 29.503864428482398,
       "timestamp": "2026-03-18T11:45:02.759235"
+    }
+  },
+  "MasterTraderV1": {
+    "APT/USDT": {
+      "stake_amount": 29.0322405329352,
+      "timestamp": "2026-03-23T15:00:02.549014"
     }
   }
 }

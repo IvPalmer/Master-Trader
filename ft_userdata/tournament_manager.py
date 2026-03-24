@@ -40,8 +40,6 @@ import numpy as np
 BOTS = {
     "SupertrendStrategy":           {"port": 8084, "container": "ft-supertrendstrategy"},
     "MasterTraderV1":               {"port": 8086, "container": "ft-mastertraderv1"},
-    "BollingerRSIMeanReversion":    {"port": 8089, "container": "ft-bollinger-rsi"},
-    "FuturesSniperV1":              {"port": 8090, "container": "ft-futures-sniper"},
     "AlligatorTrendV1":             {"port": 8091, "container": "ft-alligator-trend"},
     "GaussianChannelV1":            {"port": 8092, "container": "ft-gaussian-channel"},
 }

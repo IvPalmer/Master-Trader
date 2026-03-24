@@ -65,10 +65,8 @@ def _load_bots_config() -> dict:
         return bots
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return {
-            "SupertrendStrategy": {"port": 8084, "container": "ft-supertrendstrategy", "timeframe": "4h"},
+            "SupertrendStrategy": {"port": 8084, "container": "ft-supertrendstrategy", "timeframe": "1h"},
             "MasterTraderV1":     {"port": 8086, "container": "ft-mastertraderv1", "timeframe": "1h"},
-            "BollingerRSIMeanReversion": {"port": 8089, "container": "ft-bollinger-rsi", "timeframe": "15m"},
-            "FuturesSniperV1":    {"port": 8090, "container": "ft-futures-sniper", "timeframe": "1h"},
             "AlligatorTrendV1":   {"port": 8091, "container": "ft-alligator-trend", "timeframe": "1d"},
             "GaussianChannelV1":  {"port": 8092, "container": "ft-gaussian-channel", "timeframe": "1d"},
         }

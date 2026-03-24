@@ -1,12 +1,13 @@
 {
   "bots": {
-    "SupertrendStrategy": {"port": 8084, "timeframe": "4h", "type": "trend-follower", "active": true},
+    "SupertrendStrategy": {"port": 8084, "timeframe": "1h", "type": "trend-follower", "active": true},
     "MasterTraderV1": {"port": 8086, "timeframe": "1h", "type": "hybrid", "active": true},
-    "BollingerRSIMeanReversion": {"port": 8089, "timeframe": "15m", "type": "mean-reversion", "active": true},
+    "BollingerRSIMeanReversion": {"port": 8089, "timeframe": "15m", "type": "mean-reversion", "active": false},
     "IchimokuTrendV1": {"port": 8080, "timeframe": "1h", "type": "trend-follower", "active": false},
     "EMACrossoverV1": {"port": 8083, "timeframe": "1h", "type": "trend-follower", "active": false},
-    "FuturesSniperV1": {"port": 8090, "timeframe": "1h", "type": "trend-follower", "active": true, "trading_mode": "futures"},
+    "FuturesSniperV1": {"port": 8090, "timeframe": "1h", "type": "trend-follower", "active": false, "trading_mode": "futures"},
     "AlligatorTrendV1": {"port": 8091, "timeframe": "1d", "type": "trend-follower", "active": true},
-    "GaussianChannelV1": {"port": 8092, "timeframe": "1d", "type": "trend-follower", "active": true}
+    "GaussianChannelV1": {"port": 8092, "timeframe": "1d", "type": "trend-follower", "active": true},
+    "BearCrashShortV1": {"port": 8093, "timeframe": "1h", "type": "bear-short", "active": true, "trading_mode": "futures"}
   }
 }

@@ -37,20 +37,7 @@ services:
   #     --config /freqtrade/user_data/configs/ClucHAnix.json
   #     --strategy ClucHAnix
 
-  x-ichimokutrendv1:  # KILLED 2026-03-15 — -$33.49, 0.17 PF, 0.23 R:R
-    image: freqtradeorg/freqtrade:stable
-    restart: unless-stopped
-    container_name: ft-ichimoku-trend
-    extra_hosts: *binance-hosts
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8080:8080"
-    command: >
-      trade
-      --logfile /freqtrade/user_data/logs/IchimokuTrendV1.log
-      --config /freqtrade/user_data/configs/IchimokuTrendV1.json
-      --strategy IchimokuTrendV1
+  # ichimokutrendv1:  # KILLED 2026-03-15 — -$33.49, 0.17 PF, 0.23 R:R (container removed 2026-03-22)
 
   # combinedbinhandcluc:  # PAUSED — 1W/2L, -$12.41, two stop_loss hits
   #   image: freqtradeorg/freqtrade:stable
@@ -111,20 +98,7 @@ services:
   #     --config /freqtrade/user_data/configs/ElliotV5.json
   #     --strategy ElliotV5
 
-  x-emacrossoverv1:  # KILLED 2026-03-15 — 0 trades in 20h, dead on arrival
-    image: freqtradeorg/freqtrade:stable
-    restart: unless-stopped
-    container_name: ft-ema-crossover
-    extra_hosts: *binance-hosts
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8083:8080"
-    command: >
-      trade
-      --logfile /freqtrade/user_data/logs/EMACrossoverV1.log
-      --config /freqtrade/user_data/configs/EMACrossoverV1.json
-      --strategy EMACrossoverV1
+  # emacrossoverv1:  # KILLED 2026-03-15 — 0 trades in 20h, dead on arrival (container removed 2026-03-22)
 
   supertrendstrategy:
     image: freqtradeorg/freqtrade:stable
@@ -136,6 +110,10 @@ services:
     ports:
       - "127.0.0.1:8084:8080"
     healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     entrypoint: ["/bin/sh", "-c", "sleep 20 && exec freqtrade trade --logfile /freqtrade/user_data/logs/SupertrendStrategy.log --config /freqtrade/user_data/configs/SupertrendStrategy.json --strategy SupertrendStrategy"]
 
   # doubleemacrossoverwithtrend:  # PAUSED — worst performer (-4.14 USDT, 0/2 W/L)
@@ -162,6 +140,10 @@ services:
     ports:
       - "127.0.0.1:8086:8080"
     healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     entrypoint: ["/bin/sh", "-c", "sleep 35 && exec freqtrade trade --logfile /freqtrade/user_data/logs/MasterTraderV1.log --config /freqtrade/user_data/configs/MasterTraderV1.json --strategy MasterTraderV1"]
 
   # mastertraderai:  # KILLED 2026-03-14 — -$32.32, 30% WR, bleeding $31/day
@@ -196,32 +178,32 @@ services:
   #     --config /freqtrade/user_data/configs/NostalgiaForInfinityX6.json
   #     --strategy NostalgiaForInfinityX6
 
-  bollingerrsimeanreversion:
-    image: freqtradeorg/freqtrade:stable
-    restart: always
-    container_name: ft-bollinger-rsi
-    extra_hosts: *binance-hosts
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8089:8080"
-    healthcheck: *bot-healthcheck
-    entrypoint: ["/bin/sh", "-c", "sleep 65 && exec freqtrade trade --logfile /freqtrade/user_data/logs/BollingerRSIMeanReversion.log --config /freqtrade/user_data/configs/BollingerRSIMeanReversion.json --strategy BollingerRSIMeanReversion"]
+  # bollingerrsimeanreversion:  # KILLED 2026-03-20 — PF 0.50, R:R 0.30, -$3.67, structurally losing money on 15m TF
+  #   image: freqtradeorg/freqtrade:stable
+  #   restart: always
+  #   container_name: ft-bollinger-rsi
+  #   extra_hosts: *binance-hosts
+  #   volumes:
+  #     - "./user_data:/freqtrade/user_data"
+  #   ports:
+  #     - "127.0.0.1:8089:8080"
+  #   healthcheck: *bot-healthcheck
+  #   entrypoint: ["/bin/sh", "-c", "sleep 65 && exec freqtrade trade --logfile /freqtrade/user_data/logs/BollingerRSIMeanReversion.log --config /freqtrade/user_data/configs/BollingerRSIMeanReversion.json --strategy BollingerRSIMeanReversion"]
 
   # ── Futures Sniper Module ─────────────────────────────────────────
   # Phase 1: Long-only, 2x leverage, $500 dry-run, isolated margin
 
-  futuressniper:
-    image: freqtradeorg/freqtrade:stable
-    restart: always
-    container_name: ft-futures-sniper
-    extra_hosts: *binance-hosts
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8090:8080"
-    healthcheck: *bot-healthcheck
-    entrypoint: ["/bin/sh", "-c", "sleep 50 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FuturesSniperV1.log --config /freqtrade/user_data/configs/FuturesSniperV1.json --strategy FuturesSniperV1"]
+  # futuressniper:  # KILLED 2026-03-20 — PF 0.10, 22% WR, -$6.45, 7/9 trades hit stoploss
+  #   image: freqtradeorg/freqtrade:stable
+  #   restart: always
+  #   container_name: ft-futures-sniper
+  #   extra_hosts: *binance-hosts
+  #   volumes:
+  #     - "./user_data:/freqtrade/user_data"
+  #   ports:
+  #     - "127.0.0.1:8090:8080"
+  #   healthcheck: *bot-healthcheck
+  #   entrypoint: ["/bin/sh", "-c", "sleep 50 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FuturesSniperV1.log --config /freqtrade/user_data/configs/FuturesSniperV1.json --strategy FuturesSniperV1"]
 
   # ── Daily Timeframe Strategies ────────────────────────────────────
 
@@ -235,6 +217,10 @@ services:
     ports:
       - "127.0.0.1:8091:8080"
     healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     entrypoint: ["/bin/sh", "-c", "sleep 0 && exec freqtrade trade --logfile /freqtrade/user_data/logs/AlligatorTrendV1.log --config /freqtrade/user_data/configs/AlligatorTrendV1.json --strategy AlligatorTrendV1"]
 
   gaussianchannelv1:
@@ -247,7 +233,29 @@ services:
     ports:
       - "127.0.0.1:8092:8080"
     healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     entrypoint: ["/bin/sh", "-c", "sleep 10 && exec freqtrade trade --logfile /freqtrade/user_data/logs/GaussianChannelV1.log --config /freqtrade/user_data/configs/GaussianChannelV1.json --strategy GaussianChannelV1"]
+
+  # ── Bear Crash Short (futures, short-only during bear regimes) ────
+
+  bearcrashshortv1:
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-bear-crash-short
+    extra_hosts: *binance-hosts
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8093:8080"
+    healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    entrypoint: ["/bin/sh", "-c", "sleep 45 && exec freqtrade trade --logfile /freqtrade/user_data/logs/BearCrashShortV1.log --config /freqtrade/user_data/configs/BearCrashShortV1.json --strategy BearCrashShortV1"]
 
   # ── Grafana Bridge (candle data proxy for dashboards) ──────────────
 
@@ -257,13 +265,16 @@ services:
     container_name: ft-grafana-bridge
     volumes:
       - "./grafana/dashboards:/dashboards"
+    deploy:
+      resources:
+        limits:
+          memory: 192M
     depends_on:
       - supertrendstrategy
       - mastertraderv1
-      - bollingerrsimeanreversion
-      - futuressniper
       - alligatortrendv1
       - gaussianchannelv1
+      - bearcrashshortv1
 
   # ── Monitoring Stack ───────────────────────────────────────────────
 
@@ -279,11 +290,13 @@ services:
       - "./bots_config.json:/app/bots_config.json:ro"
     ports:
       - "127.0.0.1:9090:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     depends_on:
       - supertrendstrategy
       - mastertraderv1
-      - bollingerrsimeanreversion
-      - futuressniper
 
   prometheus:
     image: prom/prometheus:latest
@@ -294,6 +307,10 @@ services:
       - "prometheus_data:/prometheus"
     ports:
       - "127.0.0.1:9091:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=90d"
@@ -312,6 +329,10 @@ services:
       - "./grafana/dashboards:/var/lib/grafana/dashboards"
     ports:
       - "127.0.0.1:3000:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 384M
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin

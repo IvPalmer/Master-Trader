@@ -73,21 +73,24 @@ Technical requirements before deploying real money.
 
 ## Current Bot Status vs Criteria
 
-Updated: 2026-03-15
+Updated: 2026-03-24
 
 | Bot | Trades | Days | PF | WR | MaxDD | Max Loss | Status |
 |-----|--------|------|-----|-----|-------|----------|--------|
-| SupertrendStrategy | 27 | 2 | 4.7x | 59% | $4.91 | -2.4% | **GATE 1 FAIL** (need 30 trades, 14 days) |
-| BollingerRSI | 12 | 2 | 1.9x | 75% | $12.64 | -6.2% | **GATE 1 FAIL** (need 30 trades, 14 days) |
-| MasterTraderV1 | 20 | 3 | 0.9x | 60% | $22.99 | -9.9% | **GATE 2 FAIL** (PF < 2.0, MaxDD > 15%) |
-| IchimokuTrendV1 | 2 | 0 | 0.2x | 50% | $20.01 | -10.1% | **GATE 1 FAIL** (way too early) |
-| EMACrossoverV1 | 0 | 0 | -- | -- | -- | -- | **GATE 1 FAIL** (zero trades) |
-| FuturesSniperV1 | 1 | 0 | 0.0x | 0% | $19.66 | -7.9% | **GATE 1 FAIL** (way too early) |
+| SupertrendStrategy | 43 | 13 | 1.82x | 63% | 5.3% | -5.2% | **GATE 2 NEAR** — PF needs 2.0x, day 14 tomorrow |
+| MasterTraderV1 | 25 | 13 | 0.81x | 60% | 2.5% | -5.2% | **GATE 2 FAIL** (PF < 2.0) |
+| AlligatorTrendV1 | 0 | 7 | -- | -- | -- | -- | **GATE 1 FAIL** (zero trades, daily TF — expected) |
+| GaussianChannelV1 | 0 | 7 | -- | -- | -- | -- | **GATE 1 FAIL** (zero trades, daily TF — expected) |
+| BearCrashShortV1 | 0 | 1 | -- | -- | -- | -- | **GATE 1 FAIL** (no bear regime detected yet) |
+| ~~BollingerRSIMeanReversion~~ | 24 | -- | 0.50x | 63% | 6.3% | -5.3% | **KILLED** 2026-03-20 |
+| ~~FuturesSniperV1~~ | 9 | -- | 0.10x | 22% | 7.9% | -7.9% | **KILLED** 2026-03-20 |
 
 **No bot is currently ready for live trading.**
 
-Closest: SupertrendStrategy needs 3 more trades and 12 more days of dry-run.
-After that, if its metrics hold, it will be the first to graduate.
+SupertrendStrategy is closest: passes Gate 1 (43 trades, 13 days) and most Gate 2 metrics,
+but PF 1.82x is still below the 2.0x threshold. One contaminated 4h-config trade (DOT/USDT
+-$1.64, opened under 4h config on 2026-03-18) was removed from the database on 2026-03-24.
+The remaining 5 stoploss hits from Mar 16-17 were legitimate 1h trades during a market dip.
 
 ---
 

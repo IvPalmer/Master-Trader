@@ -44,10 +44,8 @@ def _load_bots_config() -> dict:
         }
     except (FileNotFoundError, _json.JSONDecodeError, KeyError):
         return {
-            "SupertrendStrategy":     {"port": 8084, "timeframe": "4h", "type": "trend-follower"},
+            "SupertrendStrategy":     {"port": 8084, "timeframe": "1h", "type": "trend-follower"},
             "MasterTraderV1":         {"port": 8086, "timeframe": "1h", "type": "hybrid"},
-            "BollingerRSIMeanReversion": {"port": 8089, "timeframe": "15m", "type": "mean-reversion"},
-            "FuturesSniperV1":        {"port": 8090, "timeframe": "1h", "type": "trend-follower"},
             "AlligatorTrendV1":       {"port": 8091, "timeframe": "1d", "type": "trend-follower"},
             "GaussianChannelV1":      {"port": 8092, "timeframe": "1d", "type": "trend-follower"},
         }
