@@ -5,11 +5,11 @@ BearCrashShortV1 - Bear Regime Short-Only Strategy
 SHORT-ONLY. Zero long entries. Activates exclusively during confirmed bear regimes.
 
 Entry pattern: "Failed Rally Short" - trend-following shorts on dead cat bounces
-- BTC must be in confirmed bear regime (below SMA200, ADX>25, RSI<50) for 3+ candles
-- Pair: -DI > +DI, ADX > 30, RSI 45-65 (bear "overbought"), MACD bearish
-- Anti-squeeze: skip if RSI < 25, skip if Fear & Greed < 10
+- BTC must be in confirmed bear regime (below SMA200, ADX>25, RSI<45) for 4-of-6 candles
+- Pair: -DI > +DI, ADX > 25, RSI 40-70 (bear "overbought"), below SMA200
+- Anti-squeeze: RSI > 40 (entry signal), BTC RSI > 20, F&G > 10 (confirm_trade_entry)
 
-Exit: RSI < 25, +DI crosses -DI, BTC flips bullish, volatility spike, or time-based
+Exit: RSI < 25, 2-candle +DI > -DI confirmation, BTC flips bullish, volatility spike, or time-based
 Risk: -5% stoploss on exchange, 2% trail at 3%, 48h hard exit, $22 stake, 2x leverage
 """
 
@@ -27,7 +27,7 @@ from market_intelligence import FearGreedIndex, PositionTracker, MAX_BOTS_PER_PA
 logger = logging.getLogger(__name__)
 
 KILL_SWITCH_FILE = Path("/freqtrade/user_data/kill_switch_BearCrashShortV1.json")
-DAILY_LOSS_LIMIT = 0.03  # 3% of wallet
+DAILY_LOSS_LIMIT = 0.10  # 10% of wallet (with 2x leverage, a -5% SL = ~10% of stake)
 CONSECUTIVE_LOSS_LIMIT = 3
 
 
@@ -103,26 +103,22 @@ class BearCrashShortV1(IStrategy):
         dataframe["atr_14"] = ta.ATR(dataframe, timeperiod=14)
         dataframe["atr_sma_50"] = dataframe["atr_14"].rolling(50).mean()
 
-        # -- BTC Bear Regime Detection (3-candle persistence) --
+        # -- BTC Bear Regime Detection (4-of-6 rolling window) --
         btc_bear_single = (
             (dataframe["btc_usdt_close_1h"] < dataframe["btc_usdt_sma200_1h"])
             & (dataframe["btc_usdt_adx_1h"] > 25)
             & (dataframe["btc_usdt_rsi_1h"] < 45)
         ).astype(int)
 
-        # BTC must also be declining (not just below SMA200)
+        # BTC must also be declining (not just sitting below SMA200)
         btc_declining = (
             dataframe["btc_usdt_close_1h"] < dataframe["btc_usdt_close_1h"].shift(6)
         )
 
-        # Require 6 consecutive bear candles AND BTC actively declining
+        # Require 4 out of 6 candles bearish AND BTC actively declining
+        # (tolerates 1-2 candle flicker without losing regime signal)
         dataframe["btc_bear_confirmed"] = (
-            (btc_bear_single == 1)
-            & (btc_bear_single.shift(1) == 1)
-            & (btc_bear_single.shift(2) == 1)
-            & (btc_bear_single.shift(3) == 1)
-            & (btc_bear_single.shift(4) == 1)
-            & (btc_bear_single.shift(5) == 1)
+            (btc_bear_single.rolling(6).sum() >= 4)
             & btc_declining
         ).astype(int)
 
@@ -204,10 +200,10 @@ class BearCrashShortV1(IStrategy):
                 logger.info("BLOCKED %s: %d other bots already hold this pair", pair, other_bots)
                 return False
 
-            # Anti-squeeze: don't short during extreme fear (crowded short side)
-            if FearGreedIndex.is_extreme_fear():
-                logger.info("BLOCKED %s: Fear & Greed extreme fear (%d) - squeeze risk",
-                            pair, FearGreedIndex.get()["value"])
+            # Anti-squeeze: block during deep capitulation (F&G <= 10)
+            fg = FearGreedIndex.get()["value"]
+            if fg <= 10:
+                logger.info("BLOCKED %s: F&G capitulation (%d) - squeeze risk", pair, fg)
                 return False
 
             PositionTracker.register(bot_name, pair, amount * rate)
@@ -243,7 +239,6 @@ class BearCrashShortV1(IStrategy):
                 & (dataframe["close"] < dataframe["sma200"])      # Below SMA200
 
                 # -- ANTI-SQUEEZE FILTERS --
-                & (dataframe["rsi"] > 25)                         # Not oversold
                 & (dataframe["btc_usdt_rsi_1h"] > 20)            # BTC not at floor
 
                 # -- VOLUME --
@@ -261,8 +256,11 @@ class BearCrashShortV1(IStrategy):
             (
                 # Bear regime ending
                 (dataframe["btc_usdt_close_1h"] > dataframe["btc_usdt_sma200_1h"])
-                # OR bulls taking over pair
-                | (dataframe["plus_di"] > dataframe["minus_di"])
+                # OR bulls taking over pair (2-candle confirmation to avoid DI flicker)
+                | (
+                    (dataframe["plus_di"] > dataframe["minus_di"])
+                    & (dataframe["plus_di"].shift(1) > dataframe["minus_di"].shift(1))
+                )
                 # OR extremely oversold (bounce imminent)
                 | (dataframe["rsi"] < 25)
                 # OR volatility spike

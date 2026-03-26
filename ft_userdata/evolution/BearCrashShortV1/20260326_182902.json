@@ -1,0 +1,28 @@
+{
+  "id": "20260326_182902",
+  "timestamp": "2026-03-26T18:29:02Z",
+  "note": "test snapshot",
+  "parameters": {
+    "stoploss": -0.05,
+    "trailing_stop": "True",
+    "trailing_stop_positive": 0.02,
+    "trailing_stop_positive_offset": 0.03,
+    "timeframe": "1h",
+    "can_short": "True",
+    "minimal_roi": "\"0\": 0.08,     # 8% - grab big moves immediately\n        \"720\": 0.05,   # 5% after 12h\n        \"1440\": 0.03,  # 3% after 24h\n        \"2160\": 0.01,  # 1% after 36h\n        \"2880\": 0.0,   # Break-even at 48h - hard exit",
+    "_file_hash": "2d3539abc5b9"
+  },
+  "config": {
+    "dry_run": true,
+    "dry_run_wallet": 22,
+    "max_open_trades": 2,
+    "stake_amount": "unlimited",
+    "stoploss_on_exchange": true,
+    "trading_mode": "futures"
+  },
+  "metrics": {
+    "total_trades": 0,
+    "open_trades": 0,
+    "open_stake": 0
+  }
+}

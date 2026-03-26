@@ -63,7 +63,8 @@
             "XUSD/USDT:USDT",
             "U/USDT:USDT",
             "EUR/USDT:USDT",
-            ".*_PERP"
+            ".*_PERP",
+            "BTC/USDT:USDT"
         ]
     },
     "pairlists": [

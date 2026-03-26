@@ -85,15 +85,16 @@ class TestStrategyFile:
         assert "return 2.0" in source
 
     def test_anti_squeeze_filters(self, source):
-        assert "is_extreme_fear" in source, "Missing Fear & Greed anti-squeeze filter"
+        assert "FearGreedIndex" in source, "Missing Fear & Greed anti-squeeze filter"
+        assert "fg <= 10" in source or "fg<=10" in source, "F&G capitulation guard should block at <= 10"
 
     def test_time_exit_48h(self, source):
         assert "time_exit_48h" in source, "Missing 48h time exit"
 
     def test_bear_regime_persistence(self, source):
-        """Must require 3+ candle bear confirmation, not single-candle."""
+        """Must require multi-candle bear confirmation, not single-candle."""
         assert "btc_bear_confirmed" in source
-        assert "shift(1)" in source and "shift(2)" in source
+        assert "rolling(6)" in source, "Regime detection should use 4-of-6 rolling window"
 
 
 class TestLiveConfig:

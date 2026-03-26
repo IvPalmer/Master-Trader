@@ -176,7 +176,7 @@ Exit:   Quick profit taking (2-4 hours), very tight timeframe
    - This is because unlimited loss potential requires wider safety margins
 
 6. **Circuit breaker specific to shorts**
-   - Kill switch: 3% portfolio loss from short trades in 24h = stop all shorts
+   - Kill switch: **10%** portfolio loss from short trades in 24h = stop all shorts (was 3%, but with 2x leverage a -5% SL = ~10% of stake, which exceeded the 3% limit on the first loss)
    - Don't wait for the general 10% circuit breaker
    - Separate tracking from long portfolio performance
 
