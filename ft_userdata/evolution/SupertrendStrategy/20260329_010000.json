@@ -1,0 +1,50 @@
+{
+  "id": "20260329_010000",
+  "timestamp": "2026-03-29T01:00:00Z",
+  "note": "daily auto-snapshot",
+  "parameters": {
+    "stoploss": -0.05,
+    "trailing_stop": "True",
+    "trailing_stop_positive": 0.02,
+    "trailing_stop_positive_offset": 0.03,
+    "timeframe": "1h",
+    "minimal_roi": "\"0\": 0.05, \"360\": 0.03, \"720\": 0.02, \"1440\": 0.01",
+    "_file_hash": "5f3ce97380d7"
+  },
+  "config": {
+    "dry_run": true,
+    "dry_run_wallet": 88,
+    "max_open_trades": 3,
+    "stake_amount": "unlimited",
+    "stoploss_on_exchange": true,
+    "trading_mode": "spot"
+  },
+  "metrics": {
+    "total_trades": 49,
+    "open_trades": 0,
+    "open_stake": 0,
+    "winners": 30,
+    "losers": 19,
+    "win_rate": 61.2,
+    "profit_factor": 1.13,
+    "risk_reward": 0.71,
+    "avg_win": 0.46,
+    "avg_loss": 0.64,
+    "total_pnl": 1.54,
+    "worst_loss_abs": -2.26,
+    "worst_loss_pct": -7.5,
+    "max_drawdown": 8.96,
+    "max_consec_losses": 5,
+    "unique_pairs": 25,
+    "days_running": 15,
+    "exit_reasons": {
+      "exit_signal": 14,
+      "roi": 20,
+      "trailing_stop_loss": 4,
+      "stoploss_on_exchange": 10,
+      "emergency_exit": 1
+    },
+    "force_exits": 1,
+    "trades_per_day": 3.3
+  }
+}

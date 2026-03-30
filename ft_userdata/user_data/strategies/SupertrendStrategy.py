@@ -38,7 +38,8 @@ class SupertrendStrategy(IStrategy):
     timeframe = '1h'
     process_only_new_candles = True
     use_exit_signal = True
-    exit_profit_only = False
+    exit_profit_only = True  # Only honor exit signals when trade is profitable
+    exit_profit_offset = 0.01  # Minimum +1% profit before exit signal is honored
     ignore_roi_if_entry_signal = False
     startup_candle_count = 200  # BTC SMA200 needs 200 candles
 
@@ -70,6 +71,7 @@ class SupertrendStrategy(IStrategy):
     def populate_indicators_btc_1h(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
         dataframe['sma200'] = ta.SMA(dataframe['close'], timeperiod=200)
+        dataframe['sma50'] = ta.SMA(dataframe['close'], timeperiod=50)
         dataframe['adx'] = ta.ADX(dataframe, timeperiod=14)
         return dataframe
 
@@ -117,8 +119,11 @@ class SupertrendStrategy(IStrategy):
         dataframe['regime_trending'] = (dataframe['regime_adx_14'] > 25).astype(int)
 
         # --- BTC Market Guard composite ---
+        # SMA50 added as fast regime gate: catches BTC rollovers before SMA200 lags
+        # (Mar 16-17: SMA200 lag let 5 trades in that all hit stoploss = -$5.04)
         dataframe['btc_bullish'] = (
             (dataframe['btc_usdt_close_1h'] > dataframe['btc_usdt_sma200_1h'])
+            & (dataframe['btc_usdt_close_1h'] > dataframe['btc_usdt_sma50_1h'])
             & (dataframe['btc_usdt_rsi_1h'] > 35)
         ).astype(int)
 

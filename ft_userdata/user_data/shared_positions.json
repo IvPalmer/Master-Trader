@@ -20,13 +20,17 @@
       "stake_amount": 31.494356600097603,
       "timestamp": "2026-03-18T12:00:14.847052"
     },
-    "LINK/USDT": {
-      "stake_amount": 30.303037394097597,
-      "timestamp": "2026-03-23T14:00:03.752227"
+    "RENDER/USDT": {
+      "stake_amount": 30.9539515700976,
+      "timestamp": "2026-03-25T05:00:05.017733"
     },
-    "BTC/USDT": {
-      "stake_amount": 30.303037394097593,
-      "timestamp": "2026-03-23T14:00:05.043491"
+    "FET/USDT": {
+      "stake_amount": 31.0758610181976,
+      "timestamp": "2026-03-25T08:58:40.154206"
+    },
+    "PENGU/USDT": {
+      "stake_amount": 31.358100903597602,
+      "timestamp": "2026-03-25T12:17:00.259304"
     }
   },
   "FuturesSniperV1": {
