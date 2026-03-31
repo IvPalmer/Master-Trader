@@ -42,6 +42,8 @@ def _load_active_bots() -> list[str]:
             "FuturesSniperV1",
             "AlligatorTrendV1",
             "GaussianChannelV1",
+            "BearCrashShortV1",
+            "BollingerBounceV1",
         ]
 
 ACTIVE_BOTS = _load_active_bots()

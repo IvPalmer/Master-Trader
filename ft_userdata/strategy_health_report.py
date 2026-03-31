@@ -52,6 +52,8 @@ def _load_bots_config() -> dict:
             "MasterTraderV1":         {"port": 8086, "timeframe": "1h", "type": "hybrid"},
             "AlligatorTrendV1":       {"port": 8091, "timeframe": "1d", "type": "trend-follower"},
             "GaussianChannelV1":      {"port": 8092, "timeframe": "1d", "type": "trend-follower"},
+            "BearCrashShortV1":       {"port": 8093, "timeframe": "1h", "type": "bear-short"},
+            "BollingerBounceV1":      {"port": 8094, "timeframe": "1h", "type": "mean-reversion"},
         }
 
 BOTS = _load_bots_config()

@@ -69,6 +69,8 @@ def _load_bots_config() -> dict:
             "MasterTraderV1":     {"port": 8086, "container": "ft-mastertraderv1", "timeframe": "1h"},
             "AlligatorTrendV1":   {"port": 8091, "container": "ft-alligator-trend", "timeframe": "1d"},
             "GaussianChannelV1":  {"port": 8092, "container": "ft-gaussian-channel", "timeframe": "1d"},
+            "BearCrashShortV1":   {"port": 8093, "container": "ft-bear-crash-short", "timeframe": "1h"},
+            "BollingerBounceV1":  {"port": 8094, "container": "ft-bollinger-bounce", "timeframe": "1h"},
         }
 
 BOTS = _load_bots_config()

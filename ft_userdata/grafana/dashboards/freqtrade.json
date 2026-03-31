@@ -75,7 +75,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "Portfolio P/L",
           "refId": "A"
         }
@@ -136,7 +136,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "((sum(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4) / 528) * 100",
+          "expr": "((sum(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4) / 528) * 100",
           "legendFormat": "Return %",
           "refId": "A"
         }
@@ -197,7 +197,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "Closed P&L",
           "refId": "A"
         }
@@ -262,7 +262,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(max by (strategy)(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "Unrealized P&L",
           "refId": "A"
         }
@@ -327,7 +327,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(max by (strategy)(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "Open Positions",
           "refId": "A"
         }
@@ -449,7 +449,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(max by (strategy)(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "Closed Trades",
           "refId": "A"
         }
@@ -559,12 +559,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})",
+          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
         {
-          "expr": "sum(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_true_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "PORTFOLIO",
           "refId": "B"
         }
@@ -674,12 +674,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})",
+          "expr": "max by (strategy)(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
         {
-          "expr": "sum(max by (strategy)(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_unrealized_pnl{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "PORTFOLIO",
           "refId": "B"
         }
@@ -824,12 +824,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "Total Profit",
           "refId": "A"
         },
         {
-          "expr": "sum(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "Total Balance",
           "refId": "B"
         }
@@ -923,7 +923,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})",
+          "expr": "max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1020,7 +1020,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"}) - 88",
+          "expr": "max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"}) - 88",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1094,7 +1094,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_win_rate{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})",
+          "expr": "max by (strategy)(freqtrade_win_rate{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1166,7 +1166,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})",
+          "expr": "max by (strategy)(freqtrade_profit_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1240,7 +1240,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_drawdown{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"}) * 100",
+          "expr": "max by (strategy)(freqtrade_drawdown{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"}) * 100",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         }
@@ -1356,7 +1356,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "clamp_min((max_over_time(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})[6h:5m]) - max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) / max_over_time(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})[6h:5m]) * 100, 0)",
+          "expr": "clamp_min((max_over_time(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})[6h:5m]) - max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) / max_over_time(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})[6h:5m]) * 100, 0)",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
@@ -1485,12 +1485,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})",
+          "expr": "max by (strategy)(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
         {
-          "expr": "sum(max by (strategy)(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_trades_open{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "TOTAL",
           "refId": "B"
         }
@@ -1604,12 +1604,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})",
+          "expr": "max by (strategy)(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})",
           "legendFormat": "{{strategy}}",
           "refId": "A"
         },
         {
-          "expr": "sum(max by (strategy)(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_trades_total{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "TOTAL",
           "refId": "B"
         }
@@ -1914,7 +1914,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=\"BearCrashShortV1\"})",
+          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=\"BearCrashShortV1|BollingerBounceV1\"})",
           "legendFormat": "BearCrashShort",
           "refId": "A"
         }
@@ -1979,7 +1979,7 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "sum(max by (strategy)(freqtrade_bot_up{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"}))",
+          "expr": "sum(max by (strategy)(freqtrade_bot_up{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"}))",
           "legendFormat": "Bots Online",
           "refId": "A"
         }
@@ -2042,7 +2042,7 @@
       },
       "targets": [
         {
-          "expr": "sum(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) and count(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1\"})) >= 4",
+          "expr": "sum(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) and count(max by (strategy)(freqtrade_balance{strategy=~\"SupertrendStrategy|MasterTraderV1|BollingerRSIMeanReversion|FuturesSniperV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1\"})) >= 4",
           "legendFormat": "Total Balance",
           "refId": "A"
         }
