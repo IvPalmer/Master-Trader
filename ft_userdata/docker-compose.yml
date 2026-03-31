@@ -257,6 +257,22 @@ services:
           memory: 768M
     entrypoint: ["/bin/sh", "-c", "sleep 45 && exec freqtrade trade --logfile /freqtrade/user_data/logs/BearCrashShortV1.log --config /freqtrade/user_data/configs/BearCrashShortV1.json --strategy BearCrashShortV1"]
 
+  bollingerbouncev1:
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-bollinger-bounce
+    extra_hosts: *binance-hosts
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8094:8080"
+    healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    entrypoint: ["/bin/sh", "-c", "sleep 55 && exec freqtrade trade --logfile /freqtrade/user_data/logs/BollingerBounceV1.log --config /freqtrade/user_data/configs/BollingerBounceV1.json --strategy BollingerBounceV1"]
+
   # ── Grafana Bridge (candle data proxy for dashboards) ──────────────
 
   grafana-bridge:
