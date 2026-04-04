@@ -1,0 +1,103 @@
+{
+  "id": "20260402_010000",
+  "timestamp": "2026-04-02T01:00:00Z",
+  "note": "daily auto-snapshot",
+  "bots": {
+    "SupertrendStrategy": {
+      "total_trades": 43,
+      "open_trades": 3,
+      "open_stake": 95.15,
+      "winners": 35,
+      "losers": 8,
+      "win_rate": 81.4,
+      "profit_factor": 2.15,
+      "risk_reward": 0.49,
+      "avg_win": 0.48,
+      "avg_loss": 0.98,
+      "total_pnl": 9.02,
+      "worst_loss_abs": -1.63,
+      "worst_loss_pct": -5.4,
+      "max_drawdown": 5.45,
+      "max_consec_losses": 5,
+      "unique_pairs": 22,
+      "days_running": 21,
+      "exit_reasons": {
+        "stoploss_on_exchange": 10,
+        "exit_signal": 1,
+        "roi": 20,
+        "force_exit": 1,
+        "trailing_stop_loss": 11
+      },
+      "force_exits": 1,
+      "trades_per_day": 2.0
+    },
+    "MasterTraderV1": {
+      "total_trades": 22,
+      "open_trades": 0,
+      "open_stake": 0,
+      "winners": 14,
+      "losers": 8,
+      "win_rate": 63.6,
+      "profit_factor": 2.83,
+      "risk_reward": 1.62,
+      "avg_win": 0.19,
+      "avg_loss": 0.12,
+      "total_pnl": 1.73,
+      "worst_loss_abs": -0.29,
+      "worst_loss_pct": -1.6,
+      "max_drawdown": 0.54,
+      "max_consec_losses": 2,
+      "unique_pairs": 20,
+      "days_running": 5,
+      "exit_reasons": {
+        "exit_signal": 7,
+        "trailing_stop_loss": 1,
+        "roi": 13,
+        "time_exit_48h": 1
+      },
+      "force_exits": 0,
+      "trades_per_day": 4.4
+    },
+    "AlligatorTrendV1": {
+      "total_trades": 0,
+      "open_trades": 0,
+      "open_stake": 0
+    },
+    "GaussianChannelV1": {
+      "total_trades": 0,
+      "open_trades": 0,
+      "open_stake": 0
+    },
+    "BearCrashShortV1": {
+      "total_trades": 6,
+      "open_trades": 0,
+      "open_stake": 0,
+      "winners": 2,
+      "losers": 4,
+      "win_rate": 33.3,
+      "profit_factor": 1.36,
+      "risk_reward": 2.71,
+      "avg_win": 0.44,
+      "avg_loss": 0.16,
+      "total_pnl": 0.23,
+      "worst_loss_abs": -0.28,
+      "worst_loss_pct": -2.6,
+      "max_drawdown": 0.54,
+      "max_consec_losses": 3,
+      "unique_pairs": 5,
+      "days_running": 3,
+      "exit_reasons": {
+        "exit_signal": 4,
+        "stoploss_on_exchange": 1,
+        "time_exit_48h": 1
+      },
+      "force_exits": 0,
+      "trades_per_day": 2.0
+    },
+    "BollingerBounceV1": {
+      "total_trades": 0,
+      "open_trades": 0,
+      "open_stake": 0
+    }
+  }
+}

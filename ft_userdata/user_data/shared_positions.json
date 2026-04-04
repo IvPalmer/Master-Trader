@@ -1,9 +1,5 @@
 {
   "Supertrend": {
-    "ETH/USDT": {
-      "stake_amount": 30.303037394097597,
-      "timestamp": "2026-03-23T14:00:04.413861"
-    },
     "PUMP/USDT": {
       "stake_amount": 221.22026153172,
       "timestamp": "2026-03-16T22:14:14.134977"
@@ -21,8 +17,8 @@
       "timestamp": "2026-03-18T12:00:14.847052"
     },
     "RENDER/USDT": {
-      "stake_amount": 30.9539515700976,
-      "timestamp": "2026-03-25T05:00:05.017733"
+      "stake_amount": 30.675939978946868,
+      "timestamp": "2026-04-04T11:00:07.255741"
     },
     "FET/USDT": {
       "stake_amount": 31.0758610181976,
@@ -31,6 +27,30 @@
     "PENGU/USDT": {
       "stake_amount": 31.358100903597602,
       "timestamp": "2026-03-25T12:17:00.259304"
+    },
+    "BTC/USDT": {
+      "stake_amount": 31.46730942127344,
+      "timestamp": "2026-04-04T16:45:51.778729"
+    },
+    "TRUMP/USDT": {
+      "stake_amount": 31.773366588073443,
+      "timestamp": "2026-04-01T05:00:06.326576"
+    },
+    "SUI/USDT": {
+      "stake_amount": 32.01683659507344,
+      "timestamp": "2026-04-01T17:03:15.913850"
+    },
+    "XPL/USDT": {
+      "stake_amount": 31.214972660220326,
+      "timestamp": "2026-04-02T01:30:46.927478"
+    },
+    "NEAR/USDT": {
+      "stake_amount": 31.46730942127344,
+      "timestamp": "2026-04-04T16:35:46.779044"
+    },
+    "ZEC/USDT": {
+      "stake_amount": 31.467309421273445,
+      "timestamp": "2026-04-04T16:35:47.385720"
     }
   },
   "FuturesSniperV1": {

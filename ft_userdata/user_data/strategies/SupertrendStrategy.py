@@ -24,9 +24,10 @@ class SupertrendStrategy(IStrategy):
         "sell_p1": 16, "sell_p2": 18, "sell_p3": 18,
     }
 
-    # ROI reverted to 1h-proven values — bot had PF 7.44 on 1h, collapsed to 1.46 on 4h
+    # ROI widened: old 5/3/2/1% was capping winners (avg win $0.48 vs avg loss $1.12)
+    # Let trailing stop (2% @ 3% offset) handle profit-taking instead of early ROI exits
     minimal_roi = {
-        "0": 0.05, "360": 0.03, "720": 0.02, "1440": 0.01
+        "0": 0.08, "360": 0.05, "720": 0.03, "1440": 0.02
     }
 
     stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%

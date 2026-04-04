@@ -152,7 +152,7 @@ EXIT_PROFILES = {
         "stoploss": -0.05,
         "trailing_stop_positive": 0.02,
         "trailing_stop_positive_offset": 0.03,
-        "minimal_roi": {"0": 0.05, "360": 0.03, "720": 0.02, "1440": 0.01},
+        "minimal_roi": {"0": 0.08, "360": 0.05, "720": 0.03, "1440": 0.02},
         "exit_profit_only": True,
         "exit_profit_offset": 0.01,
     },

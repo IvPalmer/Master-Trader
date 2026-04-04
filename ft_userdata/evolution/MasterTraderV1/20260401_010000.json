@@ -1,6 +1,6 @@
 {
-  "id": "20260331_010000",
-  "timestamp": "2026-03-31T01:00:00Z",
+  "id": "20260401_010000",
+  "timestamp": "2026-04-01T01:00:00Z",
   "note": "daily auto-snapshot",
   "parameters": {
     "stoploss": -0.05,
@@ -45,6 +45,5 @@
     },
     "force_exits": 0,
     "trades_per_day": 4.4
-  },
-  "_peak_reason": "New peak PF: 2.83x"
+  }
 }

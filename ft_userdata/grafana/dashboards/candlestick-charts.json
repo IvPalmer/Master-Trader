@@ -75,7 +75,7 @@
     },
     {
       "id": 2,
-      "title": "\u25cf LINK/USDT",
+      "title": "\u25cf NEAR/USDT",
       "type": "candlestick",
       "gridPos": {
         "h": 10,
@@ -195,7 +195,7 @@
           },
           "type": "json",
           "source": "url",
-          "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=LINK/USDT&timeframe=1h&limit=2000&markers=true",
+          "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=NEAR/USDT&timeframe=1h&limit=2000&markers=true",
           "url_options": {
             "method": "GET"
           },
@@ -248,7 +248,7 @@
     },
     {
       "id": 3,
-      "title": "\u25cf ETH/USDT",
+      "title": "\u25cf ZEC/USDT",
       "type": "candlestick",
       "gridPos": {
         "h": 10,
@@ -368,7 +368,7 @@
           },
           "type": "json",
           "source": "url",
-          "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=ETH/USDT&timeframe=1h&limit=2000&markers=true",
+          "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=ZEC/USDT&timeframe=1h&limit=2000&markers=true",
           "url_options": {
             "method": "GET"
           },
@@ -594,7 +594,7 @@
     },
     {
       "type": "row",
-      "title": "SupertrendStrategy  \u2014  12 closed  [1h]",
+      "title": "SupertrendStrategy  \u2014  11 closed  [1h]",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -602,7 +602,7 @@
         "y": 21
       },
       "collapsed": true,
-      "id": 17,
+      "id": 16,
       "panels": [
         {
           "id": 5,
@@ -1125,7 +1125,7 @@
         },
         {
           "id": 8,
-          "title": "FET/USDT  (closed)",
+          "title": "ETH/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
@@ -1245,7 +1245,7 @@
               },
               "type": "json",
               "source": "url",
-              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=FET/USDT&timeframe=1h&limit=2000&markers=true",
+              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=ETH/USDT&timeframe=1h&limit=2000&markers=true",
               "url_options": {
                 "method": "GET"
               },
@@ -1298,7 +1298,7 @@
         },
         {
           "id": 9,
-          "title": "NEAR/USDT  (closed)",
+          "title": "FET/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
@@ -1418,7 +1418,7 @@
               },
               "type": "json",
               "source": "url",
-              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=NEAR/USDT&timeframe=1h&limit=2000&markers=true",
+              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=FET/USDT&timeframe=1h&limit=2000&markers=true",
               "url_options": {
                 "method": "GET"
               },
@@ -1644,7 +1644,7 @@
         },
         {
           "id": 11,
-          "title": "SOL/USDT  (closed)",
+          "title": "RENDER/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
@@ -1764,7 +1764,7 @@
               },
               "type": "json",
               "source": "url",
-              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=SOL/USDT&timeframe=1h&limit=2000&markers=true",
+              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=RENDER/USDT&timeframe=1h&limit=2000&markers=true",
               "url_options": {
                 "method": "GET"
               },
@@ -1817,7 +1817,7 @@
         },
         {
           "id": 12,
-          "title": "SUI/USDT  (closed)",
+          "title": "SOL/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
@@ -1937,7 +1937,7 @@
               },
               "type": "json",
               "source": "url",
-              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=SUI/USDT&timeframe=1h&limit=2000&markers=true",
+              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=SOL/USDT&timeframe=1h&limit=2000&markers=true",
               "url_options": {
                 "method": "GET"
               },
@@ -2336,185 +2336,12 @@
         },
         {
           "id": 15,
-          "title": "XPL/USDT  (closed)",
-          "type": "candlestick",
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 40
-          },
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "infinity"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "BUY"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#FADE2A"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "WIN"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#73BF69"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "LOSS"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#F2495C"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "mode": "candles",
-            "candleStyle": "candles",
-            "colorStrategy": "open-close",
-            "colors": {
-              "up": "rgba(0, 200, 83, 0.8)",
-              "down": "rgba(255, 82, 82, 0.8)",
-              "flat": "rgba(158, 158, 158, 0.8)"
-            },
-            "includeAllFields": true
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "yesoreyeram-infinity-datasource",
-                "uid": "infinity"
-              },
-              "type": "json",
-              "source": "url",
-              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=XPL/USDT&timeframe=1h&limit=2000&markers=true",
-              "url_options": {
-                "method": "GET"
-              },
-              "format": "table",
-              "root_selector": "",
-              "columns": [
-                {
-                  "selector": "time",
-                  "text": "time",
-                  "type": "timestamp_epoch_s"
-                },
-                {
-                  "selector": "open",
-                  "text": "open",
-                  "type": "number"
-                },
-                {
-                  "selector": "high",
-                  "text": "high",
-                  "type": "number"
-                },
-                {
-                  "selector": "low",
-                  "text": "low",
-                  "type": "number"
-                },
-                {
-                  "selector": "close",
-                  "text": "close",
-                  "type": "number"
-                },
-                {
-                  "selector": "BUY",
-                  "text": "BUY",
-                  "type": "number"
-                },
-                {
-                  "selector": "WIN",
-                  "text": "WIN",
-                  "type": "number"
-                },
-                {
-                  "selector": "LOSS",
-                  "text": "LOSS",
-                  "type": "number"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "id": 16,
           "title": "XRP/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
+            "x": 0,
             "y": 40
           },
           "datasource": {
@@ -2684,7 +2511,7 @@
     },
     {
       "type": "row",
-      "title": "MasterTraderV1  \u2014  16 closed  [1h]",
+      "title": "MasterTraderV1  \u2014  14 closed  [1h]",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2692,10 +2519,10 @@
         "y": 23
       },
       "collapsed": true,
-      "id": 34,
+      "id": 31,
       "panels": [
         {
-          "id": 18,
+          "id": 17,
           "title": "ADA/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -2868,187 +2695,14 @@
           ]
         },
         {
-          "id": 19,
-          "title": "APT/USDT  (closed)",
+          "id": 18,
+          "title": "AVAX/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 12,
             "y": 0
-          },
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "infinity"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "BUY"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#FADE2A"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "WIN"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#73BF69"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "LOSS"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#F2495C"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "mode": "candles",
-            "candleStyle": "candles",
-            "colorStrategy": "open-close",
-            "colors": {
-              "up": "rgba(0, 200, 83, 0.8)",
-              "down": "rgba(255, 82, 82, 0.8)",
-              "flat": "rgba(158, 158, 158, 0.8)"
-            },
-            "includeAllFields": true
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "yesoreyeram-infinity-datasource",
-                "uid": "infinity"
-              },
-              "type": "json",
-              "source": "url",
-              "url": "http://grafana-bridge:5555/candles/MasterTraderV1?pair=APT/USDT&timeframe=1h&limit=2000&markers=true",
-              "url_options": {
-                "method": "GET"
-              },
-              "format": "table",
-              "root_selector": "",
-              "columns": [
-                {
-                  "selector": "time",
-                  "text": "time",
-                  "type": "timestamp_epoch_s"
-                },
-                {
-                  "selector": "open",
-                  "text": "open",
-                  "type": "number"
-                },
-                {
-                  "selector": "high",
-                  "text": "high",
-                  "type": "number"
-                },
-                {
-                  "selector": "low",
-                  "text": "low",
-                  "type": "number"
-                },
-                {
-                  "selector": "close",
-                  "text": "close",
-                  "type": "number"
-                },
-                {
-                  "selector": "BUY",
-                  "text": "BUY",
-                  "type": "number"
-                },
-                {
-                  "selector": "WIN",
-                  "text": "WIN",
-                  "type": "number"
-                },
-                {
-                  "selector": "LOSS",
-                  "text": "LOSS",
-                  "type": "number"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "id": 20,
-          "title": "AVAX/USDT  (closed)",
-          "type": "candlestick",
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 8
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -3214,13 +2868,13 @@
           ]
         },
         {
-          "id": 21,
+          "id": 19,
           "title": "BNB/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
+            "x": 0,
             "y": 8
           },
           "datasource": {
@@ -3387,14 +3041,14 @@
           ]
         },
         {
-          "id": 22,
+          "id": 20,
           "title": "BTC/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 0,
-            "y": 16
+            "x": 12,
+            "y": 8
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -3560,13 +3214,13 @@
           ]
         },
         {
-          "id": 23,
+          "id": 21,
           "title": "DOGE/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
+            "x": 0,
             "y": 16
           },
           "datasource": {
@@ -3733,14 +3387,14 @@
           ]
         },
         {
-          "id": 24,
+          "id": 22,
           "title": "ENA/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 0,
-            "y": 24
+            "x": 12,
+            "y": 16
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -3906,13 +3560,13 @@
           ]
         },
         {
-          "id": 25,
+          "id": 23,
           "title": "ETH/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
+            "x": 0,
             "y": 24
           },
           "datasource": {
@@ -4079,14 +3733,14 @@
           ]
         },
         {
-          "id": 26,
+          "id": 24,
           "title": "HBAR/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 0,
-            "y": 32
+            "x": 12,
+            "y": 24
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -4252,13 +3906,13 @@
           ]
         },
         {
-          "id": 27,
+          "id": 25,
           "title": "LINK/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
+            "x": 0,
             "y": 32
           },
           "datasource": {
@@ -4425,14 +4079,14 @@
           ]
         },
         {
-          "id": 28,
+          "id": 26,
           "title": "LTC/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 0,
-            "y": 40
+            "x": 12,
+            "y": 32
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -4598,13 +4252,13 @@
           ]
         },
         {
-          "id": 29,
+          "id": 27,
           "title": "NEAR/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
+            "x": 0,
             "y": 40
           },
           "datasource": {
@@ -4771,187 +4425,14 @@
           ]
         },
         {
-          "id": 30,
-          "title": "PUMP/USDT  (closed)",
-          "type": "candlestick",
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 48
-          },
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "infinity"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "BUY"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#FADE2A"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "WIN"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#73BF69"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "LOSS"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#F2495C"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "mode": "candles",
-            "candleStyle": "candles",
-            "colorStrategy": "open-close",
-            "colors": {
-              "up": "rgba(0, 200, 83, 0.8)",
-              "down": "rgba(255, 82, 82, 0.8)",
-              "flat": "rgba(158, 158, 158, 0.8)"
-            },
-            "includeAllFields": true
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "yesoreyeram-infinity-datasource",
-                "uid": "infinity"
-              },
-              "type": "json",
-              "source": "url",
-              "url": "http://grafana-bridge:5555/candles/MasterTraderV1?pair=PUMP/USDT&timeframe=1h&limit=2000&markers=true",
-              "url_options": {
-                "method": "GET"
-              },
-              "format": "table",
-              "root_selector": "",
-              "columns": [
-                {
-                  "selector": "time",
-                  "text": "time",
-                  "type": "timestamp_epoch_s"
-                },
-                {
-                  "selector": "open",
-                  "text": "open",
-                  "type": "number"
-                },
-                {
-                  "selector": "high",
-                  "text": "high",
-                  "type": "number"
-                },
-                {
-                  "selector": "low",
-                  "text": "low",
-                  "type": "number"
-                },
-                {
-                  "selector": "close",
-                  "text": "close",
-                  "type": "number"
-                },
-                {
-                  "selector": "BUY",
-                  "text": "BUY",
-                  "type": "number"
-                },
-                {
-                  "selector": "WIN",
-                  "text": "WIN",
-                  "type": "number"
-                },
-                {
-                  "selector": "LOSS",
-                  "text": "LOSS",
-                  "type": "number"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "id": 31,
+          "id": 28,
           "title": "SUI/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 48
+            "y": 40
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -5117,14 +4598,14 @@
           ]
         },
         {
-          "id": 32,
+          "id": 29,
           "title": "TAO/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 56
+            "y": 48
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -5290,14 +4771,14 @@
           ]
         },
         {
-          "id": 33,
+          "id": 30,
           "title": "TRX/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 56
+            "y": 48
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -5474,12 +4955,12 @@
         "y": 25
       },
       "collapsed": false,
-      "id": 35,
+      "id": 32,
       "panels": [],
       "repeat": null
     },
     {
-      "id": 36,
+      "id": 33,
       "title": "\u25cb ADA/USDT  (no trades)",
       "type": "candlestick",
       "gridPos": {
@@ -5652,8 +5133,8 @@
       ]
     },
     {
-      "id": 37,
-      "title": "\u25cb AVAX/USDT  (no trades)",
+      "id": 34,
+      "title": "\u25cb BCH/USDT  (no trades)",
       "type": "candlestick",
       "gridPos": {
         "h": 10,
@@ -5773,7 +5254,7 @@
           },
           "type": "json",
           "source": "url",
-          "url": "http://grafana-bridge:5555/candles/AlligatorTrendV1?pair=AVAX/USDT&timeframe=1d&limit=2000&markers=true",
+          "url": "http://grafana-bridge:5555/candles/AlligatorTrendV1?pair=BCH/USDT&timeframe=1d&limit=2000&markers=true",
           "url_options": {
             "method": "GET"
           },
@@ -5825,7 +5306,7 @@
       ]
     },
     {
-      "id": 38,
+      "id": 35,
       "title": "\u25cb BNB/USDT  (no trades)",
       "type": "candlestick",
       "gridPos": {
@@ -6007,12 +5488,12 @@
         "y": 47
       },
       "collapsed": false,
-      "id": 39,
+      "id": 36,
       "panels": [],
       "repeat": null
     },
     {
-      "id": 40,
+      "id": 37,
       "title": "\u25cb ADA/USDT  (no trades)",
       "type": "candlestick",
       "gridPos": {
@@ -6185,8 +5666,8 @@
       ]
     },
     {
-      "id": 41,
-      "title": "\u25cb AVAX/USDT  (no trades)",
+      "id": 38,
+      "title": "\u25cb BCH/USDT  (no trades)",
       "type": "candlestick",
       "gridPos": {
         "h": 10,
@@ -6306,7 +5787,7 @@
           },
           "type": "json",
           "source": "url",
-          "url": "http://grafana-bridge:5555/candles/GaussianChannelV1?pair=AVAX/USDT&timeframe=1d&limit=2000&markers=true",
+          "url": "http://grafana-bridge:5555/candles/GaussianChannelV1?pair=BCH/USDT&timeframe=1d&limit=2000&markers=true",
           "url_options": {
             "method": "GET"
           },
@@ -6358,7 +5839,7 @@
       ]
     },
     {
-      "id": 42,
+      "id": 39,
       "title": "\u25cb BNB/USDT  (no trades)",
       "type": "candlestick",
       "gridPos": {
