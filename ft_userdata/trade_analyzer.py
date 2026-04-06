@@ -139,6 +139,59 @@ def analyze_trade(trade: dict, strategy_info: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Session & Day-of-Week Analysis
+# ---------------------------------------------------------------------------
+
+def classify_session(hour_utc: int) -> str:
+    """Classify a UTC hour into a trading session.
+
+    Asian: 0-7, European: 8-15, US: 16-23.
+    """
+    if hour_utc <= 7:
+        return "asian"
+    elif hour_utc <= 15:
+        return "european"
+    else:
+        return "us"
+
+
+def _session_stats(trades: list) -> dict:
+    """Calculate aggregate stats for a group of trades."""
+    if not trades:
+        return {"trades": 0, "win_rate": 0, "avg_pnl": 0, "total_pnl": 0}
+    total_pnl = sum(t.get("profit_abs", 0) for t in trades)
+    winners = sum(1 for t in trades if t.get("profit_abs", 0) > 0)
+    return {
+        "trades": len(trades),
+        "win_rate": round(winners / len(trades) * 100, 1),
+        "avg_pnl": round(total_pnl / len(trades), 2),
+        "total_pnl": round(total_pnl, 2),
+    }
+
+
+def analyze_by_session(closed_trades: list) -> dict:
+    """Group closed trades by trading session and return stats per session."""
+    buckets: dict[str, list] = {"asian": [], "european": [], "us": []}
+    for t in closed_trades:
+        dt = parse_date(t.get("open_date"))
+        if dt:
+            session = classify_session(dt.hour)
+            buckets[session].append(t)
+    return {session: _session_stats(trades) for session, trades in buckets.items()}
+
+
+def analyze_by_day_of_week(closed_trades: list) -> dict:
+    """Group closed trades by weekday name and return stats per day."""
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    buckets: dict[str, list] = {name: [] for name in day_names}
+    for t in closed_trades:
+        dt = parse_date(t.get("open_date"))
+        if dt:
+            buckets[day_names[dt.weekday()]].append(t)
+    return {day: _session_stats(trades) for day, trades in buckets.items()}
+
+
+# ---------------------------------------------------------------------------
 # Strategy-Level Analysis
 # ---------------------------------------------------------------------------
 
@@ -293,6 +346,8 @@ def analyze_strategy(strategy: str, info: dict) -> dict:
         }
 
     result["patterns"] = patterns
+    result["session_performance"] = analyze_by_session(closed)
+    result["day_of_week_performance"] = analyze_by_day_of_week(closed)
 
     # --- Issue Detection ---
     issues = result["issues"]
