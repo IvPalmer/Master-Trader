@@ -122,3 +122,27 @@ def test_never_returns_positive():
     assert re.search(r'sl_from_current\s*>=\s*0', source) or \
            re.search(r'>= 0', source), \
         "custom_stoploss should guard against returning positive values (would close trade)"
+
+
+# ── Confidence-Based Position Sizing ────────────────────────────
+
+STRATEGY_PATH = STRATEGY_FILE
+
+
+class TestConfidenceSizing:
+    """Test confidence-based position sizing."""
+
+    def test_custom_stake_amount_method_exists(self):
+        source = STRATEGY_PATH.read_text()
+        assert "custom_stake_amount" in source, "custom_stake_amount method must exist"
+
+    def test_confidence_score_logic_present(self):
+        source = STRATEGY_PATH.read_text()
+        stake_section = source.split("custom_stake_amount")[1][:1500]
+        assert "score" in stake_section.lower(), "must use a scoring system"
+
+    def test_multiplier_levels(self):
+        source = STRATEGY_PATH.read_text()
+        stake_section = source.split("custom_stake_amount")[1][:1500]
+        assert "1.25" in stake_section, "high confidence should use 1.25x"
+        assert "0.75" in stake_section, "low confidence should use 0.75x"

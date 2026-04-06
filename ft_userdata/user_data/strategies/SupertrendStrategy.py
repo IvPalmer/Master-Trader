@@ -123,6 +123,10 @@ class SupertrendStrategy(IStrategy):
         dataframe['regime_adx_14'] = ta.ADX(dataframe, timeperiod=14)
         dataframe['regime_trending'] = (dataframe['regime_adx_14'] > 25).astype(int)
 
+        # Volume ratio for confidence scoring
+        dataframe['volume_sma_20'] = dataframe['volume'].rolling(window=20).mean()
+        dataframe['volume_ratio'] = dataframe['volume'] / (dataframe['volume_sma_20'] + 1e-10)
+
         # --- BTC Market Guard composite ---
         # SMA50 added as fast regime gate: catches BTC rollovers before SMA200 lags
         # (Mar 16-17: SMA200 lag let 5 trades in that all hit stoploss = -$5.04)
@@ -200,6 +204,49 @@ class SupertrendStrategy(IStrategy):
             return -0.001
 
         return sl_from_current
+
+    def custom_stake_amount(self, current_time: datetime, current_rate: float,
+                            proposed_stake: float, min_stake: float | None,
+                            max_stake: float, entry_tag: str | None, side: str,
+                            **kwargs) -> float:
+        """
+        Confidence-based position sizing (Lance Breitstein A/B/C grading).
+        Score setup quality from confirming indicators, scale stake accordingly.
+        """
+        pair = kwargs.get('pair', '')
+        dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
+        if dataframe.empty:
+            return proposed_stake
+
+        last = dataframe.iloc[-1]
+        score = 0
+
+        # +1: Strong ADX trend (> 30 vs entry threshold of 25)
+        if last.get('regime_adx_14', 0) > 30:
+            score += 1
+
+        # +1: Volume spike (> 1.5x average)
+        if last.get('volume_ratio', 0) > 1.5:
+            score += 1
+
+        # +1: Low volatility (ATR well below danger zone)
+        if last.get('regime_volatile', 1) == 0 and last.get('regime_atr_14', 0) < 1.5 * last.get('regime_atr_sma_50', 1):
+            score += 1
+
+        # +1: BTC RSI shows strong momentum (> 55, not just above 35 threshold)
+        if last.get('btc_usdt_rsi_1h', 0) > 55:
+            score += 1
+
+        # Scale stake: score 0-1 = 0.75x, score 2 = 1.0x, score 3-4 = 1.25x
+        if score >= 3:
+            multiplier = 1.25
+        elif score >= 2:
+            multiplier = 1.0
+        else:
+            multiplier = 0.75
+
+        adjusted = proposed_stake * multiplier
+        return max(min(adjusted, max_stake), min_stake or 0)
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe.loc[
