@@ -154,3 +154,53 @@ def classify_btc_regime(btc_close, btc_sma200, btc_rsi, btc_adx) -> str:
         return "bear"
     else:
         return "neutral"
+
+
+# ── Crypto Sector / Theme Classification ──────────────────────────
+SECTOR_MAP: dict[str, list[str]] = {
+    "ai": ["FET", "RENDER", "TAO", "OCEAN", "AGIX", "NMR", "ALI", "AKT", "RNDR", "GRT", "NEAR"],
+    "l2": ["ARB", "OP", "MATIC", "MANTA", "STRK", "ZK", "METIS", "IMX"],
+    "defi": ["UNI", "AAVE", "MKR", "COMP", "CRV", "SUSHI", "SNX", "LDO", "PENDLE", "GMX", "DYDX", "1INCH"],
+    "meme": ["DOGE", "SHIB", "PEPE", "BONK", "FLOKI", "WIF", "MEME", "TURBO", "BRETT", "NEIRO"],
+    "infra": ["LINK", "DOT", "ATOM", "AVAX", "SOL", "ADA", "TIA", "SEI", "SUI", "APT", "INJ"],
+}
+
+# Reverse lookup: token symbol → sector
+_TOKEN_TO_SECTOR: dict[str, str] = {
+    token: sector for sector, tokens in SECTOR_MAP.items() for token in tokens
+}
+
+
+def classify_pair_sector(pair: str) -> str:
+    """
+    Classify a trading pair into a crypto sector.
+
+    Args:
+        pair: Trading pair string, e.g. "FET/USDT" or "FET/USDT:USDT"
+
+    Returns:
+        Sector name ("ai", "l2", "defi", "meme", "infra") or "other"
+    """
+    base = pair.split("/")[0].upper()
+    return _TOKEN_TO_SECTOR.get(base, "other")
+
+
+def score_sector_momentum(pair_volumes: dict[str, float]) -> dict:
+    """
+    Group pair volumes by sector and compute momentum stats.
+
+    Args:
+        pair_volumes: dict mapping pair names to their 24h volume,
+                      e.g. {"FET/USDT": 1000000, "ARB/USDT": 500000}
+
+    Returns:
+        dict keyed by sector with {"pairs": int, "total_volume": float}
+    """
+    sectors: dict[str, dict] = {}
+    for pair, volume in pair_volumes.items():
+        sector = classify_pair_sector(pair)
+        if sector not in sectors:
+            sectors[sector] = {"pairs": 0, "total_volume": 0.0}
+        sectors[sector]["pairs"] += 1
+        sectors[sector]["total_volume"] += volume
+    return sectors
