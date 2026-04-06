@@ -46,6 +46,9 @@ class BollingerBounceV1(IStrategy):
         dataframe['bb_lower'] = bb_sma - 2 * bb_std
         dataframe['adx'] = _adx(dataframe, 14)
         dataframe['btc_gate'] = ((dataframe['btc_usdt_close_1h'] > dataframe['btc_usdt_sma200_1h'])).astype(int)
+        # Volume capitulation filter: spike = exhaustion, higher probability mean reversion
+        dataframe['volume_sma'] = dataframe['volume'].rolling(20).mean()
+        dataframe['volume_ratio'] = dataframe['volume'] / (dataframe['volume_sma'] + 1e-10)
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -57,7 +60,7 @@ class BollingerBounceV1(IStrategy):
                 (dataframe['rsi'] <= 70) &
                 (dataframe['adx'] > 25) &
                 (dataframe['btc_gate'] == 1) &
-
+                (dataframe['volume_ratio'] >= 1.5) &
                 (dataframe['volume'] > 0)
             ),
             'enter_long'] = 1
