@@ -123,6 +123,70 @@
 
 ---
 
+## Phase 4b: TAO / Bittensor Yield Staking (Months 8-12+)
+
+**Goal:** Diversify into passive yield via Bittensor staking. Separate from algo trading — this is a conviction bet on decentralized AI, not a systematic strategy.
+
+### Why
+- TAO = "S&P 500 for AI" — index fund effect (benefits from ANY subnet succeeding)
+- Bitcoin-like tokenomics: 21M hard cap, first halving Dec 2025
+- Root staking yields 5-7% APY, top subnets (Templar) yield ~40% APY
+- $3-4B market cap vs. $4T AI industry — asymmetric upside if thesis plays out
+- Completely uncorrelated to Freqtrade bot performance
+- On-chain via `btcli` — no exchange counterparty risk for staked position
+
+### Risk Profile
+- **NOT backtestable** — pure conviction bet, treat as speculative allocation
+- **Max allocation: 10% of total trading portfolio** (e.g., R$500 on R$5K portfolio)
+- **Only funded from PROFITS** — never contribute fresh salary capital to TAO until algo bots are profitable for 3+ months
+- **No leverage, no subnet tokens initially** — root staking only until you understand the ecosystem
+- **Accept 50%+ drawdown possibility** — TAO crashed 62% in 90 days (Q1 2026)
+
+### Implementation Plan
+
+**Step 1: Learn (Month 8) — R$0**
+- [ ] Install `btcli` (Bittensor CLI)
+- [ ] Create a Bittensor wallet (`btcli wallet create`)
+- [ ] Read Bittensor docs: staking mechanics, emission schedule, subnet structure
+- [ ] Monitor TAO price via CoinGecko API (already have integration)
+- [ ] Add TAO/USDT price tracking to Grafana dashboard
+
+**Step 2: Seed Position (Month 9) — R$200-500 from bot profits ONLY**
+- [ ] Buy TAO on Binance (already available as TAO/USDT)
+- [ ] Transfer to Bittensor wallet
+- [ ] Root stake 100% of initial position (safe, yield-generating)
+- [ ] Set up Telegram alerts for staking rewards (reuse existing bot)
+- [ ] Document: staking APY, gas costs, UX friction
+
+**Step 3: Automate & Monitor (Month 10-12)**
+- [ ] Python script: daily TAO price check via CoinGecko (free API, stay under rate limits)
+- [ ] Auto-compound staking rewards (restake emissions)
+- [ ] Add TAO position value to portfolio Grafana dashboard
+- [ ] Monthly review: compare TAO yield vs. algo bot returns
+- [ ] Decision gate: if TAO position is profitable after 3 months, consider 50/50 split (root staking + top 2-3 subnet tokens)
+
+**Step 4: Subnet Exploration (Month 12+ — ONLY if Step 3 profitable)**
+- [ ] Research top 3-5 subnets by emission share + real utility (Templar, Targon, Chutes)
+- [ ] Allocate max 50% of TAO position to subnet tokens (other 50% stays root staked)
+- [ ] Set exit rules BEFORE entering: take 10% off at +100%, keep 10% moonbag
+- [ ] Monitor subnet health via `btcli` commands
+- [ ] DCA entry: only buy subnets when TAO drops 3%+ in a day
+
+### Success Criteria
+- TAO root staking running for 3+ months
+- Yield covers gas/tx costs (break-even at minimum)
+- Position funded entirely from bot profits (zero salary capital)
+- Clear understanding of btcli, staking mechanics, subnet dynamics
+- Portfolio diversification: algo bots (systematic) + TAO staking (conviction)
+
+### Kill Criteria
+- TAO drops 60%+ from entry AND fundamentals deteriorate (not just price)
+- Staking yield drops below 3% APY (no longer worth the complexity)
+- Bittensor network has critical security incident
+- You find yourself spending more time on TAO than on algo bot optimization
+
+---
+
 ## Phase 5: Passive Income Machine (Year 2+)
 
 **Goal:** Self-sustaining system that compounds.
@@ -134,6 +198,7 @@
 - [ ] Consider FreqAI integration for adaptive strategies
 - [ ] Build strategy factory: systematic pipeline to develop, test, graduate, deploy new strategies
 - [ ] Consider VPS migration for 99.9% uptime (no more PC crash risk)
+- [ ] Scale TAO staking position if yield thesis holds (move from 10% to max 20% of portfolio)
 
 ### Success criteria
 - Monthly passive income R$500-1,500 (1-3% monthly on R$50K)
