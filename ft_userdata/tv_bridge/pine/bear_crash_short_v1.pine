@@ -1,0 +1,74 @@
+//@version=6
+indicator("BearCrashShort V1 — Master Trader", overlay=true, max_labels_count=500)
+
+// === Pair Indicators ===
+[di_plus, di_minus, adx_val] = ta.dmi(14, 14)
+rsi_val = ta.rsi(close, 14)
+[macd_line, signal_line, macd_hist] = ta.macd(close, 12, 26, 9)
+sma200 = ta.sma(close, 200)
+atr_val = ta.atr(14)
+
+// === BTC Regime Detection (4-of-6 rolling window) ===
+btc_close = request.security("BINANCE:BTCUSDT", timeframe.period, close)
+btc_sma200 = request.security("BINANCE:BTCUSDT", timeframe.period, ta.sma(close, 200))
+btc_rsi = request.security("BINANCE:BTCUSDT", timeframe.period, ta.rsi(close, 14))
+// Extract BTC ADX — must destructure ta.dmi before passing to request.security
+get_adx() =>
+    [_dp, _dm, _adx] = ta.dmi(14, 14)
+    _adx
+btc_adx = request.security("BINANCE:BTCUSDT", timeframe.period, get_adx())
+
+btc_bear_candle = btc_close < btc_sma200 and btc_adx > 25 and btc_rsi < 45
+
+// 4-of-6 rolling window
+bear_count = 0
+for i = 0 to 5
+    if btc_bear_candle[i]
+        bear_count += 1
+
+bear_regime = bear_count >= 4
+
+// BTC must also be declining
+btc_declining = btc_close < btc_close[3]
+full_bear_regime = bear_regime and btc_declining
+
+// === Short Entry Conditions ===
+// Pair: -DI > +DI, ADX > 25, RSI 40-70, below SMA200
+pair_bearish = di_minus > di_plus and adx_val > 25
+rsi_entry_ok = rsi_val >= 40 and rsi_val <= 70
+below_sma200 = close < sma200
+
+entry_short = full_bear_regime and pair_bearish and rsi_entry_ok and below_sma200
+
+// === Exit Conditions ===
+// RSI < 25 (oversold)
+rsi_oversold = rsi_val < 25
+
+// 2-candle confirmed +DI > -DI (bearish trend breaking)
+di_flip = di_plus > di_minus and di_plus[1] > di_minus[1]
+
+// BTC flips bullish
+btc_bullish = btc_close > btc_sma200
+
+exit_short = rsi_oversold or di_flip or btc_bullish
+
+// === Plot ===
+plot(sma200, "SMA200", color=color.white, linewidth=1)
+
+// Short entry: inverted red triangle above bar
+plotshape(entry_short, "Short Entry", shape.triangledown, location.abovebar, color.fuchsia, size=size.small)
+plotshape(exit_short and not exit_short[1], "Cover Signal", shape.triangleup, location.belowbar, color.aqua, size=size.small)
+
+// === Regime Background ===
+bgcolor(full_bear_regime ? color.new(color.red, 90) : color.new(color.gray, 96), title="Bear Regime")
+
+// === Info Table ===
+var tbl = table.new(position.top_right, 2, 7, bgcolor=color.new(color.black, 80))
+if barstate.islast
+    table.cell(tbl, 0, 0, "BearCrashShort V1", text_color=color.fuchsia, text_size=size.small)
+    table.cell(tbl, 0, 1, "Bear Regime: " + (full_bear_regime ? "ACTIVE (" + str.tostring(bear_count) + "/6)" : "OFF (" + str.tostring(bear_count) + "/6)"), text_color=full_bear_regime ? color.red : color.green, text_size=size.small)
+    table.cell(tbl, 0, 2, "RSI: " + str.tostring(rsi_val, "#.0"), text_color=rsi_val < 25 ? color.green : rsi_val > 70 ? color.red : color.white, text_size=size.small)
+    table.cell(tbl, 0, 3, "ADX: " + str.tostring(adx_val, "#.0") + " +DI:" + str.tostring(di_plus, "#.0") + " -DI:" + str.tostring(di_minus, "#.0"), text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 4, "MACD: " + str.tostring(macd_hist, "#.##"), text_color=macd_hist > 0 ? color.green : color.red, text_size=size.small)
+    table.cell(tbl, 0, 5, "BTC Declining: " + (btc_declining ? "YES" : "NO"), text_color=btc_declining ? color.red : color.green, text_size=size.small)
+    table.cell(tbl, 0, 6, "BTC RSI: " + str.tostring(btc_rsi, "#.0"), text_color=color.white, text_size=size.small)

@@ -1,0 +1,51 @@
+//@version=6
+indicator("MasterTrader V1 — Master Trader", overlay=true, max_labels_count=500)
+
+// === EMAs ===
+ema_fast_len = input.int(9, "Fast EMA")
+ema_slow_len = input.int(21, "Slow EMA")
+ema_fast = ta.ema(close, ema_fast_len)
+ema_slow = ta.ema(close, ema_slow_len)
+
+plot(ema_fast, "EMA Fast", color=color.orange, linewidth=2)
+plot(ema_slow, "EMA Slow", color=color.purple, linewidth=2)
+
+// === RSI (14) ===
+rsi_len = input.int(14, "RSI Length")
+rsi_val = ta.rsi(close, rsi_len)
+
+// === Volume Filter ===
+vol_sma = ta.sma(volume, 20)
+vol_ok = volume > vol_sma
+
+// === BTC Guard (SMA200 + RSI > 35) ===
+btc_close = request.security("BINANCE:BTCUSDT", timeframe.period, close)
+btc_sma200 = request.security("BINANCE:BTCUSDT", timeframe.period, ta.sma(close, 200))
+btc_rsi = request.security("BINANCE:BTCUSDT", timeframe.period, ta.rsi(close, 14))
+btc_gate = btc_close > btc_sma200 and btc_rsi > 35
+
+// === Entry: EMA crossover + RSI not overbought ===
+ema_cross_up = ta.crossover(ema_fast, ema_slow)
+rsi_entry_ok = rsi_val < 70 and rsi_val > 30
+entry_long = ema_cross_up and rsi_entry_ok and btc_gate and vol_ok
+
+// === Exit: EMA crossunder OR RSI overbought ===
+ema_cross_down = ta.crossunder(ema_fast, ema_slow)
+rsi_exit = rsi_val > 75
+exit_long = ema_cross_down or rsi_exit
+
+// === Plot Signals ===
+plotshape(entry_long, "Long Entry", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(exit_long, "Exit Signal", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// === BTC Gate Background ===
+bgcolor(btc_gate ? color.new(color.green, 95) : color.new(color.red, 95), title="BTC Guard")
+
+// === Info Table ===
+var tbl = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black, 80))
+if barstate.islast
+    table.cell(tbl, 0, 0, "MasterTrader V1", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 1, "EMA9: " + str.tostring(ema_fast, "#.##"), text_color=ema_fast > ema_slow ? color.green : color.red, text_size=size.small)
+    table.cell(tbl, 0, 2, "EMA21: " + str.tostring(ema_slow, "#.##"), text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 3, "RSI: " + str.tostring(rsi_val, "#.0"), text_color=rsi_val > 70 ? color.red : rsi_val < 30 ? color.green : color.white, text_size=size.small)
+    table.cell(tbl, 0, 4, "BTC Gate: " + (btc_gate ? "PASS" : "BLOCKED"), text_color=btc_gate ? color.green : color.red, text_size=size.small)

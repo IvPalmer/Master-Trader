@@ -1,0 +1,76 @@
+//@version=6
+indicator("SupertrendStrategy — Master Trader", overlay=true, max_labels_count=500)
+
+// === 3-Layer Supertrend (Buy) ===
+// Layer 1: Factor=4, Period=8
+[st1_val, st1_dir] = ta.supertrend(4.0, 8)
+// Layer 2: Factor=7, Period=9
+[st2_val, st2_dir] = ta.supertrend(7.0, 9)
+// Layer 3: Factor=1, Period=8
+[st3_val, st3_dir] = ta.supertrend(1.0, 8)
+
+// Buy supertrends: all 3 must be bullish (dir < 0 means bullish in Pine)
+buy_st1_up = st1_dir < 0
+buy_st2_up = st2_dir < 0
+buy_st3_up = st3_dir < 0
+all_buy_up = buy_st1_up and buy_st2_up and buy_st3_up
+
+// === 3-Layer Supertrend (Sell) ===
+// Sell Layer 1: Factor=1, Period=16
+[ss1_val, ss1_dir] = ta.supertrend(1.0, 16)
+// Sell Layer 2: Factor=3, Period=18
+[ss2_val, ss2_dir] = ta.supertrend(3.0, 18)
+// Sell Layer 3: Factor=6, Period=18
+[ss3_val, ss3_dir] = ta.supertrend(6.0, 18)
+
+all_sell_down = ss1_dir > 0 and ss2_dir > 0 and ss3_dir > 0
+
+// === Supporting Indicators ===
+rsi_val = ta.rsi(close, 14)
+sma200 = ta.sma(close, 200)
+sma50 = ta.sma(close, 50)
+[di_plus, di_minus, adx_val] = ta.dmi(14, 14)
+
+// === BTC SMA50 Fast Gate ===
+btc_close = request.security("BINANCE:BTCUSDT", timeframe.period, close)
+btc_sma50 = request.security("BINANCE:BTCUSDT", timeframe.period, ta.sma(close, 50))
+btc_sma200 = request.security("BINANCE:BTCUSDT", timeframe.period, ta.sma(close, 200))
+btc_fast_gate = btc_close > btc_sma50
+btc_guard = btc_close > btc_sma200
+
+// === Entry: All 3 buy supertrends up + BTC fast gate ===
+entry_long = all_buy_up and not all_buy_up[1] and btc_fast_gate
+
+// === Exit: All 3 sell supertrends down ===
+exit_long = all_sell_down and not all_sell_down[1]
+
+// === Plot Supertrend Lines ===
+plot(buy_st1_up ? st1_val : na, "ST Buy 1 (4,8)", color=color.new(color.green, 40), linewidth=1)
+plot(buy_st2_up ? st2_val : na, "ST Buy 2 (7,9)", color=color.new(color.green, 60), linewidth=1)
+plot(buy_st3_up ? st3_val : na, "ST Buy 3 (1,8)", color=color.new(color.green, 80), linewidth=1)
+plot(not buy_st1_up ? st1_val : na, "ST Sell 1", color=color.new(color.red, 40), linewidth=1)
+plot(not buy_st2_up ? st2_val : na, "ST Sell 2", color=color.new(color.red, 60), linewidth=1)
+plot(not buy_st3_up ? st3_val : na, "ST Sell 3", color=color.new(color.red, 80), linewidth=1)
+
+// === SMA Lines ===
+plot(sma200, "SMA200", color=color.new(color.white, 40), linewidth=1)
+plot(sma50, "SMA50", color=color.new(color.yellow, 40), linewidth=1)
+
+// === Signals ===
+plotshape(entry_long, "Long Entry", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(exit_long, "Exit Signal", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// === Background: Regime ===
+regime_color = all_buy_up and btc_fast_gate ? color.new(color.green, 93) : all_sell_down ? color.new(color.red, 93) : color.new(color.gray, 96)
+bgcolor(regime_color, title="Regime")
+
+// === Info Table ===
+var tbl = table.new(position.top_right, 2, 7, bgcolor=color.new(color.black, 80))
+if barstate.islast
+    table.cell(tbl, 0, 0, "SupertrendStrategy", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 1, "Buy ST: " + (all_buy_up ? "ALL UP ✓" : "NOT ALL UP"), text_color=all_buy_up ? color.green : color.red, text_size=size.small)
+    table.cell(tbl, 0, 2, "Sell ST: " + (all_sell_down ? "ALL DOWN" : "HOLDING"), text_color=all_sell_down ? color.red : color.green, text_size=size.small)
+    table.cell(tbl, 0, 3, "RSI: " + str.tostring(rsi_val, "#.0"), text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 4, "ADX: " + str.tostring(adx_val, "#.0"), text_color=adx_val > 25 ? color.green : color.orange, text_size=size.small)
+    table.cell(tbl, 0, 5, "BTC Fast Gate: " + (btc_fast_gate ? "PASS" : "BLOCKED"), text_color=btc_fast_gate ? color.green : color.red, text_size=size.small)
+    table.cell(tbl, 0, 6, "BTC SMA200: " + (btc_guard ? "ABOVE" : "BELOW"), text_color=btc_guard ? color.green : color.red, text_size=size.small)

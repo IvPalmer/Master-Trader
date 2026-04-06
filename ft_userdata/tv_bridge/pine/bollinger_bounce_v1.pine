@@ -1,0 +1,47 @@
+//@version=6
+indicator("BollingerBounce V1 — Master Trader", overlay=true, max_labels_count=500)
+
+// === Bollinger Bands (20, 2σ) ===
+bb_len = 20
+bb_mult = 2.0
+bb_basis = ta.sma(close, bb_len)
+bb_dev = bb_mult * ta.stdev(close, bb_len)
+bb_upper = bb_basis + bb_dev
+bb_lower = bb_basis - bb_dev
+
+plot(bb_basis, "BB Mid", color=color.gray)
+p_upper = plot(bb_upper, "BB Upper", color=color.blue)
+p_lower = plot(bb_lower, "BB Lower", color=color.blue)
+fill(p_upper, p_lower, color=color.new(color.blue, 92))
+
+// === RSI (14) ===
+rsi_val = ta.rsi(close, 14)
+
+// === ADX (14) ===
+[di_plus, di_minus, adx_val] = ta.dmi(14, 14)
+
+// === BTC SMA200 Gate ===
+btc_close = request.security("BINANCE:BTCUSDT", timeframe.period, close)
+btc_sma200 = request.security("BINANCE:BTCUSDT", timeframe.period, ta.sma(close, 200))
+btc_gate = btc_close > btc_sma200
+
+// === Entry Signal ===
+bb_bounce = close > bb_lower and close[1] <= bb_lower[1]
+rsi_ok = rsi_val >= 30 and rsi_val <= 70
+adx_ok = adx_val > 25
+entry = bb_bounce and rsi_ok and adx_ok and btc_gate
+
+// === Plot Signals ===
+plotshape(entry, "Long Entry", shape.triangleup, location.belowbar, color.green, size=size.small)
+
+// === BTC Gate Background ===
+bgcolor(btc_gate ? color.new(color.green, 95) : color.new(color.red, 95), title="BTC Guard")
+
+// === Info Table ===
+var tbl = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black, 80))
+if barstate.islast
+    table.cell(tbl, 0, 0, "BollingerBounce V1", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 1, "RSI: " + str.tostring(rsi_val, "#.0"), text_color=rsi_val > 70 ? color.red : rsi_val < 30 ? color.green : color.white, text_size=size.small)
+    table.cell(tbl, 0, 2, "ADX: " + str.tostring(adx_val, "#.0"), text_color=adx_val > 25 ? color.green : color.orange, text_size=size.small)
+    table.cell(tbl, 0, 3, "BTC Gate: " + (btc_gate ? "PASS" : "BLOCKED"), text_color=btc_gate ? color.green : color.red, text_size=size.small)
+    table.cell(tbl, 0, 4, "BB Lower: " + str.tostring(bb_lower, "#.##"), text_color=color.white, text_size=size.small)

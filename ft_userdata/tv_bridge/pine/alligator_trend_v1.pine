@@ -1,0 +1,59 @@
+//@version=6
+indicator("AlligatorTrend V1 — Master Trader", overlay=true, max_labels_count=500)
+
+// === Williams Alligator (SMMA on HL2) ===
+// SMMA = RMA in Pine (Wilder's smoothing)
+hl2_val = hl2
+jaw_len = 13
+teeth_len = 8
+lips_len = 5
+
+jaw = ta.rma(hl2_val, jaw_len)
+teeth = ta.rma(hl2_val, teeth_len)
+lips = ta.rma(hl2_val, lips_len)
+
+// Offset lines for visual (standard Alligator offsets)
+plot(jaw, "Jaw (13)", color=color.blue, linewidth=2, offset=8)
+plot(teeth, "Teeth (8)", color=color.red, linewidth=1, offset=5)
+plot(lips, "Lips (5)", color=color.green, linewidth=1, offset=3)
+
+// Non-offset for signal calculation
+jaw_now = jaw
+lips_now = lips
+
+// === ATR Dynamic Stoploss ===
+atr_val = ta.atr(14)
+
+// === BTC SMA200 Gate (1D) ===
+btc_close = request.security("BINANCE:BTCUSDT", "1D", close)
+btc_sma200 = request.security("BINANCE:BTCUSDT", "1D", ta.sma(close, 200))
+btc_gate = btc_close > btc_sma200
+
+// === Entry: Lips crosses above Jaw ===
+lips_above_jaw = lips_now > jaw_now
+lips_cross_up = lips_above_jaw and not lips_above_jaw[1]
+entry_long = lips_cross_up and btc_gate
+
+// === Exit: Lips crosses below Jaw ===
+lips_cross_down = not lips_above_jaw and lips_above_jaw[1]
+
+// === ATR Stoploss Bands ===
+atr_mult = 2.0
+atr_stop_long = close - atr_val * atr_mult
+plot(atr_stop_long, "ATR Stop", color=color.new(color.red, 60), style=plot.style_stepline)
+
+// === Plot Signals ===
+plotshape(entry_long, "Long Entry", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(lips_cross_down, "Exit Signal", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// === BTC Gate Background ===
+bgcolor(btc_gate ? color.new(color.green, 95) : color.new(color.red, 95), title="BTC Guard")
+
+// === Info Table ===
+var tbl = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black, 80))
+if barstate.islast
+    table.cell(tbl, 0, 0, "AlligatorTrend V1", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 1, "Jaw: " + str.tostring(jaw_now, "#.##"), text_color=color.blue, text_size=size.small)
+    table.cell(tbl, 0, 2, "Lips: " + str.tostring(lips_now, "#.##"), text_color=color.green, text_size=size.small)
+    table.cell(tbl, 0, 3, "ATR: " + str.tostring(atr_val, "#.##"), text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 4, "BTC Gate: " + (btc_gate ? "PASS" : "BLOCKED"), text_color=btc_gate ? color.green : color.red, text_size=size.small)

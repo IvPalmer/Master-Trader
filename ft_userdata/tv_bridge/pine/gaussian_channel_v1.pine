@@ -1,0 +1,88 @@
+//@version=6
+indicator("GaussianChannel V1 — Master Trader", overlay=true, max_labels_count=500)
+
+// === Gaussian Filter (4-pole IIR, sampling_period=144) ===
+// Replicates: ft_userdata/user_data/strategies/GaussianChannelV1.py gaussian_filter()
+poles = 4
+sampling_period = 144
+mult = 1.0
+
+// Compute filter coefficients
+pi_val = 2.0 * math.pi / sampling_period
+beta = (1.0 - math.cos(pi_val)) / (math.pow(2.0, 1.0 / poles) - 1.0)
+alpha = -beta + math.sqrt(beta * beta + 2.0 * beta)
+
+// 4-pole Gaussian filter on close
+var float f1 = na
+var float f2 = na
+var float f3 = na
+var float f4 = na
+
+if bar_index == 0
+    f1 := close
+    f2 := close
+    f3 := close
+    f4 := close
+else
+    f1 := alpha * close + (1.0 - alpha) * nz(f1[1], close)
+    f2 := alpha * f1 + (1.0 - alpha) * nz(f2[1], close)
+    f3 := alpha * f2 + (1.0 - alpha) * nz(f3[1], close)
+    f4 := alpha * f3 + (1.0 - alpha) * nz(f4[1], close)
+
+gaussian_mid = f4
+
+// 4-pole Gaussian filter on True Range (for channel width)
+tr_val = ta.tr(true)
+var float tf1 = na
+var float tf2 = na
+var float tf3 = na
+var float tf4 = na
+
+if bar_index == 0
+    tf1 := tr_val
+    tf2 := tr_val
+    tf3 := tr_val
+    tf4 := tr_val
+else
+    tf1 := alpha * tr_val + (1.0 - alpha) * nz(tf1[1], tr_val)
+    tf2 := alpha * tf1 + (1.0 - alpha) * nz(tf2[1], tr_val)
+    tf3 := alpha * tf2 + (1.0 - alpha) * nz(tf3[1], tr_val)
+    tf4 := alpha * tf3 + (1.0 - alpha) * nz(tf4[1], tr_val)
+
+tr_filtered = tf4
+gaussian_upper = gaussian_mid + tr_filtered * mult
+gaussian_lower = gaussian_mid - tr_filtered * mult
+
+// === Plot Channel ===
+p_mid = plot(gaussian_mid, "Gaussian Mid", color=color.yellow, linewidth=2)
+p_upper = plot(gaussian_upper, "Gaussian Upper", color=color.green, linewidth=1)
+p_lower = plot(gaussian_lower, "Gaussian Lower", color=color.red, linewidth=1)
+fill(p_upper, p_lower, color=color.new(color.yellow, 90))
+
+// === BTC SMA200 Gate (1D) ===
+btc_close = request.security("BINANCE:BTCUSDT", "1D", close)
+btc_sma200 = request.security("BINANCE:BTCUSDT", "1D", ta.sma(close, 200))
+btc_gate = btc_close > btc_sma200
+
+// === Entry: Close crosses above upper band ===
+cross_above_upper = ta.crossover(close, gaussian_upper)
+entry_long = cross_above_upper and btc_gate
+
+// === Exit: Close crosses below upper band ===
+cross_below_upper = ta.crossunder(close, gaussian_upper)
+
+// === Signals ===
+plotshape(entry_long, "Long Entry", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(cross_below_upper, "Exit Signal", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// === BTC Gate Background ===
+bgcolor(btc_gate ? color.new(color.green, 95) : color.new(color.red, 95), title="BTC Guard")
+
+// === Info Table ===
+var tbl = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black, 80))
+if barstate.islast
+    table.cell(tbl, 0, 0, "GaussianChannel V1", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 0, 1, "Mid: " + str.tostring(gaussian_mid, "#.##"), text_color=color.yellow, text_size=size.small)
+    table.cell(tbl, 0, 2, "Upper: " + str.tostring(gaussian_upper, "#.##"), text_color=color.green, text_size=size.small)
+    table.cell(tbl, 0, 3, "Lower: " + str.tostring(gaussian_lower, "#.##"), text_color=color.red, text_size=size.small)
+    table.cell(tbl, 0, 4, "BTC Gate: " + (btc_gate ? "PASS" : "BLOCKED"), text_color=btc_gate ? color.green : color.red, text_size=size.small)

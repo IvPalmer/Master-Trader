@@ -1,0 +1,81 @@
+//@version=6
+indicator("BTC Guard Dashboard — Master Trader", overlay=true, max_labels_count=500)
+
+// === Core BTC Indicators ===
+sma200 = ta.sma(close, 200)
+sma50 = ta.sma(close, 50)
+rsi_val = ta.rsi(close, 14)
+[di_plus, di_minus, adx_val] = ta.dmi(14, 14)
+atr_val = ta.atr(14)
+
+// === Plot Key Levels ===
+plot(sma200, "SMA200", color=color.white, linewidth=2)
+plot(sma50, "SMA50", color=color.yellow, linewidth=2)
+
+// === Guard States ===
+above_sma200 = close > sma200
+above_sma50 = close > sma50
+trending = adx_val > 25
+rsi_healthy = rsi_val > 35 and rsi_val < 65
+
+// === Bear Regime (BearCrashShortV1 logic) ===
+bear_candle = close < sma200 and adx_val > 25 and rsi_val < 45
+bear_count = 0
+for i = 0 to 5
+    if bear_candle[i]
+        bear_count += 1
+bear_regime = bear_count >= 4
+btc_declining = close < close[3]
+full_bear = bear_regime and btc_declining
+
+// === Background Regime Coloring ===
+bg_color = full_bear ? color.new(color.red, 88) : above_sma50 ? color.new(color.green, 93) : above_sma200 ? color.new(color.yellow, 93) : color.new(color.red, 93)
+bgcolor(bg_color, title="Market Regime")
+
+// === Strategy Gate Status Table ===
+var tbl = table.new(position.top_right, 3, 8, bgcolor=color.new(color.black, 75), border_width=1)
+
+if barstate.islast
+    // Header
+    table.cell(tbl, 0, 0, "Strategy", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 1, 0, "Gate", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 2, 0, "Status", text_color=color.white, text_size=size.small)
+
+    // SupertrendStrategy — needs BTC > SMA50
+    st_gate = above_sma50
+    table.cell(tbl, 0, 1, "Supertrend", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 1, 1, "SMA50", text_color=color.yellow, text_size=size.small)
+    table.cell(tbl, 2, 1, st_gate ? "OPEN" : "BLOCKED", text_color=st_gate ? color.green : color.red, text_size=size.small)
+
+    // MasterTraderV1 — needs BTC > SMA200 + RSI > 35
+    mt_gate = above_sma200 and rsi_val > 35
+    table.cell(tbl, 0, 2, "MasterTrader", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 1, 2, "SMA200+RSI", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 2, 2, mt_gate ? "OPEN" : "BLOCKED", text_color=mt_gate ? color.green : color.red, text_size=size.small)
+
+    // AlligatorTrendV1 — needs BTC > SMA200 (1D)
+    table.cell(tbl, 0, 3, "Alligator", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 1, 3, "SMA200", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 2, 3, above_sma200 ? "OPEN" : "BLOCKED", text_color=above_sma200 ? color.green : color.red, text_size=size.small)
+
+    // GaussianChannelV1 — needs BTC > SMA200 (1D)
+    table.cell(tbl, 0, 4, "Gaussian", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 1, 4, "SMA200", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 2, 4, above_sma200 ? "OPEN" : "BLOCKED", text_color=above_sma200 ? color.green : color.red, text_size=size.small)
+
+    // BollingerBounceV1 — needs BTC > SMA200
+    table.cell(tbl, 0, 5, "BBounce", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 1, 5, "SMA200", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 2, 5, above_sma200 ? "OPEN" : "BLOCKED", text_color=above_sma200 ? color.green : color.red, text_size=size.small)
+
+    // BearCrashShortV1 — needs bear regime (inverted: OPEN when bear)
+    table.cell(tbl, 0, 6, "BearCrash", text_color=color.fuchsia, text_size=size.small)
+    table.cell(tbl, 1, 6, "Bear " + str.tostring(bear_count) + "/6", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 2, 6, full_bear ? "SHORTING" : "IDLE", text_color=full_bear ? color.fuchsia : color.gray, text_size=size.small)
+
+    // Summary Row
+    table.cell(tbl, 0, 7, "BTC", text_color=color.white, text_size=size.small)
+    table.cell(tbl, 1, 7, "RSI:" + str.tostring(rsi_val, "#.0") + " ADX:" + str.tostring(adx_val, "#.0"), text_color=color.white, text_size=size.small)
+    regime_str = full_bear ? "BEAR" : above_sma50 ? "BULL" : above_sma200 ? "CAUTIOUS" : "DANGER"
+    regime_clr = full_bear ? color.red : above_sma50 ? color.green : above_sma200 ? color.yellow : color.red
+    table.cell(tbl, 2, 7, regime_str, text_color=regime_clr, text_size=size.small)
