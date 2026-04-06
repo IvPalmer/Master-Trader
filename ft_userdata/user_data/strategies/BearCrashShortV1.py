@@ -1,13 +1,18 @@
 """
-BearCrashShortV1 - Bear Regime Short-Only Strategy
-====================================================
+BearCrashShortV1 - Bear Regime Short-Only Strategy + Bounce-Long Mode
+======================================================================
 
-SHORT-ONLY. Zero long entries. Activates exclusively during confirmed bear regimes.
+PRIMARY: Short-only during confirmed bear regimes.
+SECONDARY: Rare bounce-long on bear-to-bull regime transitions (SMB Capital 5/5 track record).
 
-Entry pattern: "Failed Rally Short" - trend-following shorts on dead cat bounces
+Entry pattern (short): "Failed Rally Short" - trend-following shorts on dead cat bounces
 - BTC must be in confirmed bear regime (below SMA200, ADX>25, RSI<45) for 4-of-6 candles
 - Pair: -DI > +DI, ADX > 25, RSI 40-70 (bear "overbought"), below SMA200
 - Anti-squeeze: RSI > 40 (entry signal), BTC RSI > 20, F&G > 10 (confirm_trade_entry)
+
+Entry pattern (bounce-long): Post-bear recovery bet
+- BTC was in confirmed bear regime on previous candle, now flipped bullish
+- Pair: +DI > -DI, RSI 40-70, volume >= 1.5x 20-period average
 
 Exit: RSI < 25, 2-candle +DI > -DI confirmation, BTC flips bullish, volatility spike, or time-based
 Risk: -5% stoploss on exchange, 2% trail at 3%, 48h hard exit, $22 stake, 2x leverage
@@ -121,6 +126,22 @@ class BearCrashShortV1(IStrategy):
             (btc_bear_single.rolling(6).sum() >= 4)
             & btc_declining
         ).astype(int)
+
+        # -- Regime Flip Detection (bear → bull transition) --
+        # Previous candle was confirmed bear, current candle shows bullish flip
+        dataframe["btc_was_bear"] = dataframe["btc_bear_confirmed"].shift(1).fillna(0)
+        dataframe["btc_now_bull"] = (
+            (dataframe["btc_usdt_close_1h"] > dataframe["btc_usdt_sma200_1h"])
+            & (dataframe["btc_usdt_rsi_1h"] > 45)
+        ).astype(int)
+        dataframe["bear_to_bull"] = (
+            (dataframe["btc_was_bear"] == 1)
+            & (dataframe["btc_now_bull"] == 1)
+        ).astype(int)
+
+        # Volume ratio for bounce confirmation
+        dataframe["volume_sma_20"] = dataframe["volume"].rolling(window=20).mean()
+        dataframe["volume_ratio"] = dataframe["volume"] / (dataframe["volume_sma_20"] + 1e-10)
 
         return dataframe
 
@@ -245,6 +266,19 @@ class BearCrashShortV1(IStrategy):
                 & (dataframe["volume"] > 0)
             ),
             "enter_short",
+        ] = 1
+
+        # === BOUNCE LONG: Post-bear recovery (SMB Capital 5/5 track record) ===
+        # Rare signal: only fires on the candle where bear regime flips to bullish
+        dataframe.loc[
+            (
+                (dataframe["bear_to_bull"] == 1)
+                & (dataframe["rsi"] > 40) & (dataframe["rsi"] < 70)
+                & (dataframe["plus_di"] > dataframe["minus_di"])
+                & (dataframe["volume_ratio"] >= 1.5)
+                & (dataframe["volume"] > 0)
+            ),
+            "enter_long",
         ] = 1
 
         return dataframe

@@ -64,9 +64,10 @@ class TestStrategyFile:
         missing = required - methods
         assert not missing, f"Missing methods: {missing}"
 
-    def test_no_enter_long_signal(self, source):
-        """Short-only strategy must NEVER set enter_long."""
-        assert "enter_long" not in source, "Short-only strategy must not have enter_long signals"
+    def test_enter_long_only_for_bounce_mode(self, source):
+        """enter_long must only appear in bounce-long mode (bear-to-bull regime flip)."""
+        assert "enter_long" in source, "Bounce-long mode requires enter_long signal"
+        assert "bear_to_bull" in source, "enter_long must be gated by bear_to_bull regime flip"
 
     def test_stoploss_not_worse_than_minus_5_pct(self, source):
         match = re.search(r'stoploss\s*=\s*(-[\d.]+)', source)
