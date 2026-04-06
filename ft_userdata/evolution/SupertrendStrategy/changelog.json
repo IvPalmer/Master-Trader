@@ -264,5 +264,33 @@
       "_file_hash": "5f3ce97380d7"
     },
     "file_hash": "5f3ce97380d7"
+  },
+  {
+    "timestamp": "2026-04-06T13:32:16Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "False",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.03,
+      "timeframe": "1h",
+      "minimal_roi": "\"0\": 0.08, \"360\": 0.05, \"720\": 0.03, \"1440\": 0.02",
+      "_file_hash": "0f83d7439ffa"
+    },
+    "file_hash": "0f83d7439ffa"
+  },
+  {
+    "timestamp": "2026-04-06T13:33:46Z",
+    "description": "test change entry",
+    "params_after": {
+      "stoploss": -0.05,
+      "trailing_stop": "False",
+      "trailing_stop_positive": 0.02,
+      "trailing_stop_positive_offset": 0.03,
+      "timeframe": "1h",
+      "minimal_roi": "\"0\": 0.08, \"360\": 0.05, \"720\": 0.03, \"1440\": 0.02",
+      "_file_hash": "54450d1cb20b"
+    },
+    "file_hash": "54450d1cb20b"
   }
 ]

@@ -1,0 +1,392 @@
+[
+  {
+    "rank": 1,
+    "combo": "bb(20,3)+adx(30)|btc_sma200|tight",
+    "screen_score": 5.6100278360793165,
+    "screen_pf": 2.302818458754156,
+    "screen_pnl_pct": 9.727711158697696,
+    "validation": {
+      "bull": {
+        "window": "bull",
+        "desc": "Bull (Sep-Oct 2025)",
+        "pf": 5.9,
+        "dd": 0.63,
+        "trades": 14,
+        "pnl_pct": 3.18,
+        "wr": 92.9
+      },
+      "bear": {
+        "window": "bear",
+        "desc": "Bear (Nov 2025-Jan 2026)",
+        "pf": 1.07,
+        "dd": 1.91,
+        "trades": 16,
+        "pnl_pct": 0.22,
+        "wr": 68.8
+      },
+      "recent": {
+        "window": "recent",
+        "desc": "Recent (Feb-Mar 2026)",
+        "pf": 1.3,
+        "dd": 1.89,
+        "trades": 11,
+        "pnl_pct": 0.57,
+        "wr": 72.7
+      }
+    },
+    "profitable_windows": 3,
+    "robust": true,
+    "strategy_file": "LabStrategy_001.py"
+  },
+  {
+    "rank": 2,
+    "combo": "bb(20,3)+rsi(30,70)+vol(1.5)|btc_sma50|wide",
+    "screen_score": 4.925396921962913,
+    "screen_pf": 2.6220178370775695,
+    "screen_pnl_pct": 18.10177690706683,
+    "validation": {
+      "bull": {
+        "window": "bull",
+        "desc": "Bull (Sep-Oct 2025)",
+        "pf": 0.0,
+        "dd": 0.0,
+        "trades": 5,
+        "pnl_pct": 2.39,
+        "wr": 100.0
+      },
+      "bear": {
+        "window": "bear",
+        "desc": "Bear (Nov 2025-Jan 2026)",
+        "pf": 1.08,
+        "dd": 1.58,
+        "trades": 13,
+        "pnl_pct": 0.44,
+        "wr": 69.2
+      },
+      "recent": {
+        "window": "recent",
+        "desc": "Recent (Feb-Mar 2026)",
+        "pf": 1.86,
+        "dd": 1.42,
+        "trades": 4,
+        "pnl_pct": 1.23,
+        "wr": 75.0
+      }
+    },
+    "profitable_windows": 2,
+    "robust": true,
+    "strategy_file": "LabStrategy_002.py"
+  },
+  {
+    "rank": 3,
+    "combo": "bb(20,3)+rsi(30,70)+vol(1.5)|btc_sma50+nc24|wide",
+    "screen_score": 4.925396921962913,
+    "screen_pf": 2.6220178370775695,
+    "screen_pnl_pct": 18.10177690706683,
+    "validation": {
+      "bull": {
+        "window": "bull",
+        "desc": "Bull (Sep-Oct 2025)",
+        "pf": 0.0,
+        "dd": 0.0,
+        "trades": 5,
+        "pnl_pct": 2.39,
+        "wr": 100.0
+      },
+      "bear": {
+        "window": "bear",
+        "desc": "Bear (Nov 2025-Jan 2026)",
+        "pf": 1.08,
+        "dd": 1.58,
+        "trades": 13,
+        "pnl_pct": 0.44,
+        "wr": 69.2
+      },
+      "recent": {
+        "window": "recent",
+        "desc": "Recent (Feb-Mar 2026)",
+        "pf": 1.86,
+        "dd": 1.42,
+        "trades": 4,
+        "pnl_pct": 1.23,
+        "wr": 75.0
+      }
+    },
+    "profitable_windows": 2,
+    "robust": true,
+    "strategy_file": "LabStrategy_003.py"
+  },
+  {
+    "rank": 4,
+    "combo": "bb(20,3)+rsi(30,70)+vol(1.5)|btc_sma50+rsi35|wide",
+    "screen_score": 4.925396921962913,
+    "screen_pf": 2.6220178370775695,
+    "screen_pnl_pct": 18.10177690706683,
+    "validation": {
+      "bull": {
+        "window": "bull",
+        "desc": "Bull (Sep-Oct 2025)",
+        "pf": 0.0,
+        "dd": 0.0,
+        "trades": 5,
+        "pnl_pct": 2.39,
+        "wr": 100.0
+      },
+      "bear": {
+        "window": "bear",
+        "desc": "Bear (Nov 2025-Jan 2026)",
+        "pf": 1.08,
+        "dd": 1.58,
+        "trades": 13,
+        "pnl_pct": 0.44,
+        "wr": 69.2
+      },
+      "recent": {
+        "window": "recent",
+        "desc": "Recent (Feb-Mar 2026)",
+        "pf": 1.86,
+        "dd": 1.42,
+        "trades": 4,
+        "pnl_pct": 1.23,
+        "wr": 75.0
+      }
+    },
+    "profitable_windows": 2,
+    "robust": true,
+    "strategy_file": "LabStrategy_004.py"
+  },
+  {
+    "rank": 5,
+    "combo": "bb(20,3)+rsi(30,70)+adx(25)|btc_sma200|balanced",
+    "screen_score": 4.586877271759249,
+    "screen_pf": 2.144256969738609,
+    "screen_pnl_pct": 13.296434928208534,
+    "validation": {
+      "bull": {
+        "window": "bull",
+        "desc": "Bull (Sep-Oct 2025)",
+        "pf": 3.06,
+        "dd": 1.03,
+        "trades": 16,
+        "pnl_pct": 3.08,
+        "wr": 87.5
+      },
+      "bear": {
+        "window": "bear",
+        "desc": "Bear (Nov 2025-Jan 2026)",
+        "pf": 1.57,
+        "dd": 2.04,
+        "trades": 21,
+        "pnl_pct": 2.35,
+        "wr": 81.0
+      },
+      "recent": {
+        "window": "recent",
+        "desc": "Recent (Feb-Mar 2026)",
+        "pf": 3.52,
+        "dd": 1.03,
+        "trades": 10,
+        "pnl_pct": 2.69,
+        "wr": 90.0
+      }
+    },
+    "profitable_windows": 3,
+    "robust": true,
+    "strategy_file": "LabStrategy_005.py"
+  },
+  {
+    "rank": 6,
+    "combo": "bb(20,3)+adx(30)|btc_sma200|balanced",
+    "screen_score": 4.57575854573717,
+    "screen_pf": 2.074940589197136,
+    "screen_pnl_pct": 11.17938212765024,
+    "validation": {
+      "bull": {
+        "window": "bull",
+        "desc": "Bull (Sep-Oct 2025)",
+        "pf": 3.97,
+        "dd": 1.03,
+        "trades": 14,
+        "pnl_pct": 3.13,
+        "wr": 92.9
+      },
+      "bear": {
+        "window": "bear",
+        "desc": "Bear (Nov 2025-Jan 2026)",
+        "pf": 1.15,
+        "dd": 2.09,
+        "trades": 15,
+        "pnl_pct": 0.62,
+        "wr": 73.3
+      },
+      "recent": {
+        "window": "recent",
+        "desc": "Recent (Feb-Mar 2026)",
+        "pf": 1.58,
+        "dd": 2.05,
+        "trades": 11,
+        "pnl_pct": 1.23,
+        "wr": 81.8
+      }
+    },
+    "profitable_windows": 3,
+    "robust": true,
+    "strategy_file": "LabStrategy_006.py"
+  },
+  {
+    "rank": 7,
+    "combo": "bb(20,3)+vol(2.0)|btc_sma50|wide",
+    "screen_score": 3.1514647858412177,
+    "screen_pf": 2.2100070349036267,
+    "screen_pnl_pct": 16.407738545221314,
+    "validation": {
+      "bull": {
+        "window": "bull",
+        "desc": "Bull (Sep-Oct 2025)",
+        "pf": 0.78,
+        "dd": 1.42,
+        "trades": 6,
+        "pnl_pct": -0.63,
+        "wr": 66.7
+      },
+      "bear": {
+        "window": "bear",
+        "desc": "Bear (Nov 2025-Jan 2026)",
+        "pf": 1.07,
+        "dd": 2.05,
+        "trades": 12,
+        "pnl_pct": 0.34,
+        "wr": 66.7
+      },
+      "recent": {
+        "window": "recent",
+        "desc": "Recent (Feb-Mar 2026)",
+        "pf": 0.0,
+        "dd": 0.0,
+        "trades": 4,
+        "pnl_pct": 3.4,
+        "wr": 100.0
+      }
+    },
+    "profitable_windows": 1,
+    "robust": false,
+    "strategy_file": "LabStrategy_007.py"
+  },
+  {
+    "rank": 8,
+    "combo": "bb(20,3)+vol(2.0)|btc_sma50+nc24|wide",
+    "screen_score": 3.1514647858412177,
+    "screen_pf": 2.2100070349036267,
+    "screen_pnl_pct": 16.407738545221314,
+    "validation": {
+      "bull": {
+        "window": "bull",
+        "desc": "Bull (Sep-Oct 2025)",
+        "pf": 0.78,
+        "dd": 1.42,
+        "trades": 6,
+        "pnl_pct": -0.63,
+        "wr": 66.7
+      },
+      "bear": {
+        "window": "bear",
+        "desc": "Bear (Nov 2025-Jan 2026)",
+        "pf": 1.07,
+        "dd": 2.05,
+        "trades": 12,
+        "pnl_pct": 0.34,
+        "wr": 66.7
+      },
+      "recent": {
+        "window": "recent",
+        "desc": "Recent (Feb-Mar 2026)",
+        "pf": 0.0,
+        "dd": 0.0,
+        "trades": 4,
+        "pnl_pct": 3.4,
+        "wr": 100.0
+      }
+    },
+    "profitable_windows": 1,
+    "robust": false,
+    "strategy_file": "LabStrategy_008.py"
+  },
+  {
+    "rank": 9,
+    "combo": "bb(20,3)+vol(2.0)|btc_sma50+rsi35|wide",
+    "screen_score": 3.1514647858412177,
+    "screen_pf": 2.2100070349036267,
+    "screen_pnl_pct": 16.407738545221314,
+    "validation": {
+      "bull": {
+        "window": "bull",
+        "desc": "Bull (Sep-Oct 2025)",
+        "pf": 0.78,
+        "dd": 1.42,
+        "trades": 6,
+        "pnl_pct": -0.63,
+        "wr": 66.7
+      },
+      "bear": {
+        "window": "bear",
+        "desc": "Bear (Nov 2025-Jan 2026)",
+        "pf": 1.07,
+        "dd": 2.05,
+        "trades": 12,
+        "pnl_pct": 0.34,
+        "wr": 66.7
+      },
+      "recent": {
+        "window": "recent",
+        "desc": "Recent (Feb-Mar 2026)",
+        "pf": 0.0,
+        "dd": 0.0,
+        "trades": 4,
+        "pnl_pct": 3.4,
+        "wr": 100.0
+      }
+    },
+    "profitable_windows": 1,
+    "robust": false,
+    "strategy_file": "LabStrategy_009.py"
+  },
+  {
+    "rank": 10,
+    "combo": "bb(20,3)+stoch(20)|btc_sma50|wide",
+    "screen_score": 3.076499029920973,
+    "screen_pf": 1.814695947759537,
+    "screen_pnl_pct": 16.306766555407798,
+    "validation": {
+      "bull": {
+        "window": "bull",
+        "desc": "Bull (Sep-Oct 2025)",
+        "pf": 0.67,
+        "dd": 4.24,
+        "trades": 11,
+        "pnl_pct": -1.57,
+        "wr": 63.6
+      },
+      "bear": {
+        "window": "bear",
+        "desc": "Bear (Nov 2025-Jan 2026)",
+        "pf": 1.75,
+        "dd": 2.82,
+        "trades": 16,
+        "pnl_pct": 3.23,
+        "wr": 81.2
+      },
+      "recent": {
+        "window": "recent",
+        "desc": "Recent (Feb-Mar 2026)",
+        "pf": 1.1,
+        "dd": 2.81,
+        "trades": 11,
+        "pnl_pct": 0.44,
+        "wr": 72.7
+      }
+    },
+    "profitable_windows": 2,
+    "robust": true,
+    "strategy_file": "LabStrategy_010.py"
+  }
+]

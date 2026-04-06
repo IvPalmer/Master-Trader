@@ -1,0 +1,91 @@
+Label                | Window     | Trades |   WR% |    PF |    P&L% |   DD% |   Score
+-------------------------------------------------------------------------------------
+current              | 7m_all     |    129 |  41.1 |  0.33 |  -25.10 |  25.1 |   -0.33
+current              | bull       |     55 |  34.5 |  0.31 |  -12.24 |  12.2 |   -0.31
+current              | bear       |     57 |  45.6 |  0.33 |  -12.05 |  12.2 |   -0.33
+current              | recent     |     17 |  47.1 |  0.44 |   -2.97 |   3.4 |   -0.13
+current              | AVG        |        |       |       |         |       |   -0.27
+
+epo_on               | 7m_all     |    128 |  56.2 |  0.38 |  -27.25 |  28.0 |   -0.37
+epo_on               | bull       |     54 |  55.6 |  0.41 |  -12.33 |  12.3 |   -0.41
+epo_on               | bear       |     57 |  54.4 |  0.31 |  -15.34 |  15.4 |   -0.31
+epo_on               | recent     |     17 |  64.7 |  0.61 |   -1.97 |   3.2 |   -0.13
+epo_on               | AVG        |        |       |       |         |       |   -0.30
+
+tight_sl+epo         | 7m_all     |    129 |  51.9 |  0.48 |  -17.93 |  18.7 |   -0.46
+tight_sl+epo         | bull       |     55 |  52.7 |  0.55 |   -6.92 |   7.6 |   -0.50
+tight_sl+epo         | bear       |     57 |  50.9 |  0.41 |   -9.60 |   9.7 |   -0.41
+tight_sl+epo         | recent     |     17 |  52.9 |  0.51 |   -2.47 |   2.7 |   -0.16
+tight_sl+epo         | AVG        |        |       |       |         |       |   -0.38
+
+wide_roi+epo         | 7m_all     |    124 |  46.8 |  0.41 |  -29.25 |  30.0 |   -0.40
+wide_roi+epo         | bull       |     52 |  48.1 |  0.40 |  -13.79 |  14.3 |   -0.39
+wide_roi+epo         | bear       |     55 |  43.6 |  0.38 |  -15.95 |  17.5 |   -0.35
+wide_roi+epo         | recent     |     17 |  52.9 |  0.62 |   -2.35 |   3.5 |   -0.14
+wide_roi+epo         | AVG        |        |       |       |         |       |   -0.32
+
+wider+epo            | 7m_all     |    124 |  46.8 |  0.40 |  -29.45 |  30.0 |   -0.39
+wider+epo            | bull       |     52 |  48.1 |  0.39 |  -13.99 |  14.0 |   -0.39
+wider+epo            | bear       |     55 |  43.6 |  0.39 |  -15.57 |  17.5 |   -0.35
+wider+epo            | recent     |     17 |  52.9 |  0.54 |   -2.85 |   3.6 |   -0.14
+wider+epo            | AVG        |        |       |       |         |       |   -0.32
+
+balanced+epo         | 7m_all     |    127 |  50.4 |  0.47 |  -22.59 |  22.9 |   -0.46
+balanced+epo         | bull       |     54 |  53.7 |  0.52 |   -8.47 |   9.4 |   -0.47
+balanced+epo         | bear       |     56 |  46.4 |  0.41 |  -13.14 |  14.4 |   -0.37
+balanced+epo         | recent     |     17 |  52.9 |  0.55 |   -2.63 |   3.0 |   -0.17
+balanced+epo         | AVG        |        |       |       |         |       |   -0.37
+
+tight_all            | 7m_all     |    130 |  56.9 |  0.43 |  -17.69 |  17.9 |   -0.43
+tight_all            | bull       |     56 |  53.6 |  0.35 |   -9.68 |   9.7 |   -0.35
+tight_all            | bear       |     57 |  61.4 |  0.54 |   -5.90 |   5.9 |   -0.54
+tight_all            | recent     |     17 |  52.9 |  0.36 |   -3.16 |   3.4 |   -0.11
+tight_all            | AVG        |        |       |       |         |       |   -0.36
+
+wide_all             | 7m_all     |    120 |  45.0 |  0.40 |  -34.33 |  35.8 |   -0.38
+wide_all             | bull       |     49 |  46.9 |  0.43 |  -15.14 |  16.3 |   -0.39
+wide_all             | bear       |     54 |  40.7 |  0.35 |  -20.67 |  22.4 |   -0.32
+wide_all             | recent     |     17 |  52.9 |  0.61 |   -2.46 |   3.6 |   -0.14
+wide_all             | AVG        |        |       |       |         |       |   -0.31
+
+asymmetric           | 7m_all     |    129 |  51.9 |  0.49 |  -17.57 |  18.7 |   -0.46
+asymmetric           | bull       |     55 |  52.7 |  0.57 |   -6.53 |   7.6 |   -0.49
+asymmetric           | bear       |     57 |  50.9 |  0.40 |   -9.67 |   9.8 |   -0.40
+asymmetric           | recent     |     17 |  52.9 |  0.52 |   -2.37 |   2.6 |   -0.16
+asymmetric           | AVG        |        |       |       |         |       |   -0.38
+
+tight_trail          | 7m_all     |    130 |  63.8 |  0.36 |  -21.29 |  21.4 |   -0.36
+tight_trail          | bull       |     56 |  66.1 |  0.41 |   -8.23 |   8.9 |   -0.38
+tight_trail          | bear       |     57 |  63.2 |  0.31 |  -10.89 |  10.9 |   -0.31
+tight_trail          | recent     |     17 |  58.8 |  0.34 |   -3.76 |   3.8 |   -0.12
+tight_trail          | AVG        |        |       |       |         |       |   -0.29
+
+
+=====================================================================================
+ FINAL RANKING — MasterTraderV1Hyperopt
+=====================================================================================
+#1 current              SL:-0.05 trail:0.01@0.02 ROI_max:0.07 EPO:0.0 → score:-0.27
+    7m_all    : PF: 0.33 P&L:-25.10% DD: 25.1% trades:129
+    bull      : PF: 0.31 P&L:-12.24% DD: 12.2% trades:55
+    bear      : PF: 0.33 P&L:-12.05% DD: 12.2% trades:57
+    recent    : PF: 0.44 P&L: -2.97% DD:  3.4% trades:17
+#2 tight_trail          SL:-0.04 trail:0.008@0.012 ROI_max:0.07 EPO:0.01 → score:-0.29
+    7m_all    : PF: 0.36 P&L:-21.29% DD: 21.4% trades:130
+    bull      : PF: 0.41 P&L: -8.23% DD:  8.9% trades:56
+    bear      : PF: 0.31 P&L:-10.89% DD: 10.9% trades:57
+    recent    : PF: 0.34 P&L: -3.76% DD:  3.8% trades:17
+#3 epo_on               SL:-0.05 trail:0.01@0.02 ROI_max:0.07 EPO:0.01 → score:-0.30
+    7m_all    : PF: 0.38 P&L:-27.25% DD: 28.0% trades:128
+    bull      : PF: 0.41 P&L:-12.33% DD: 12.3% trades:54
+    bear      : PF: 0.31 P&L:-15.34% DD: 15.4% trades:57
+    recent    : PF: 0.61 P&L: -1.97% DD:  3.2% trades:17
+#4 wide_all             SL:-0.07 trail:0.02@0.04 ROI_max:0.12 EPO:0.01 → score:-0.31
+    7m_all    : PF: 0.40 P&L:-34.33% DD: 35.8% trades:120
+    bull      : PF: 0.43 P&L:-15.14% DD: 16.3% trades:49
+    bear      : PF: 0.35 P&L:-20.67% DD: 22.4% trades:54
+    recent    : PF: 0.61 P&L: -2.46% DD:  3.6% trades:17
+#5 wide_roi+epo         SL:-0.05 trail:0.015@0.03 ROI_max:0.1 EPO:0.01 → score:-0.32
+    7m_all    : PF: 0.41 P&L:-29.25% DD: 30.0% trades:124
+    bull      : PF: 0.40 P&L:-13.79% DD: 14.3% trades:52
+    bear      : PF: 0.38 P&L:-15.95% DD: 17.5% trades:55
+    recent    : PF: 0.62 P&L: -2.35% DD:  3.5% trades:17

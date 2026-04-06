@@ -40,3 +40,4 @@ Thumbs.db
 logs/
 backtest_results/
 *.log
+*.sqlite.bak*

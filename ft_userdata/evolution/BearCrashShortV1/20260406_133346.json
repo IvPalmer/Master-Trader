@@ -1,0 +1,49 @@
+{
+  "id": "20260406_133346",
+  "timestamp": "2026-04-06T13:33:46Z",
+  "note": "test snapshot",
+  "parameters": {
+    "stoploss": -0.05,
+    "trailing_stop": "True",
+    "trailing_stop_positive": 0.02,
+    "trailing_stop_positive_offset": 0.03,
+    "timeframe": "1h",
+    "can_short": "True",
+    "minimal_roi": "\"0\": 0.08,     # 8% - grab big moves immediately\n        \"720\": 0.05,   # 5% after 12h\n        \"1440\": 0.03,  # 3% after 24h\n        \"2160\": 0.01,  # 1% after 36h\n        \"2880\": 0.0,   # Break-even at 48h - hard exit",
+    "_file_hash": "bd73a4006cdc"
+  },
+  "config": {
+    "dry_run": true,
+    "dry_run_wallet": 22,
+    "max_open_trades": 2,
+    "stake_amount": "unlimited",
+    "stoploss_on_exchange": true,
+    "trading_mode": "futures"
+  },
+  "metrics": {
+    "total_trades": 7,
+    "open_trades": 1,
+    "open_stake": 10.98,
+    "winners": 2,
+    "losers": 5,
+    "win_rate": 28.6,
+    "profit_factor": 1.27,
+    "risk_reward": 3.18,
+    "avg_win": 0.44,
+    "avg_loss": 0.14,
+    "total_pnl": 0.19,
+    "worst_loss_abs": -0.28,
+    "worst_loss_pct": -2.6,
+    "max_drawdown": 0.58,
+    "max_consec_losses": 4,
+    "unique_pairs": 5,
+    "days_running": 9,
+    "exit_reasons": {
+      "exit_signal": 5,
+      "stoploss_on_exchange": 1,
+      "time_exit_48h": 1
+    },
+    "force_exits": 0,
+    "trades_per_day": 0.8
+  }
+}

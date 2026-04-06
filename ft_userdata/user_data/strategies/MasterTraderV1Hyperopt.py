@@ -1,0 +1,166 @@
+"""
+MasterTrader V1 - EMA Crossover + RSI Filter + Market Intelligence
+Simple trend-following strategy for dry-run validation.
+
+Entry: Fast EMA crosses above slow EMA, RSI confirms (not overbought)
+       + BTC must be healthy (above 200 SMA, RSI > 35)
+       + Fear & Greed not in extreme greed
+       + Cross-bot position limit not exceeded
+Exit: Fast EMA crosses below slow EMA, or RSI overbought, or stoploss/ROI
+"""
+
+import logging
+from datetime import datetime
+
+from freqtrade.strategy import IStrategy, DecimalParameter, IntParameter, informative
+from pandas import DataFrame
+import talib.abstract as ta
+
+
+logger = logging.getLogger(__name__)
+
+
+class MasterTraderV1Hyperopt(IStrategy):
+
+    INTERFACE_VERSION = 3
+
+    # Keeping 1h: EMA 9/21 crossover generates only 8 trades/6mo on 4h (too restrictive)
+    # 4H migration would need longer EMAs (21/55) — revisit after current evaluation period
+    timeframe = "1h"
+
+    # ROI table - matched to actual MFE distribution (most trades peak 1-2.4%)
+    minimal_roi = {
+        "0": 0.07,      # 7% immediate (rare big move)
+        "360": 0.04,    # 4% after 6h
+        "720": 0.025,   # 2.5% after 12h
+        "1440": 0.015,  # 1.5% after 24h
+    }
+
+    # Stoploss
+    stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%
+
+    # Trailing stop - offset at 2% where trades actually reach
+    trailing_stop = True
+    trailing_stop_positive = 0.01       # Trail by 1% once offset is reached
+    trailing_stop_positive_offset = 0.02  # Start trailing at 2% profit
+    trailing_only_offset_is_reached = True
+
+    # Run on new candles only
+    process_only_new_candles = True
+
+    # Use exit signal
+    use_exit_signal = True
+    exit_profit_only = False
+    ignore_roi_if_entry_signal = False
+
+    # Number of candles needed before producing valid signals
+    startup_candle_count: int = 200  # BTC SMA200 needs 200 candles
+
+    @property
+    def protections(self):
+        return [
+            {"method": "CooldownPeriod", "stop_duration_candles": 2},
+            {"method": "StoplossGuard", "lookback_period_candles": 48, "trade_limit": 2, "stop_duration_candles": 24, "only_per_pair": True},
+            {"method": "LowProfitPairs", "lookback_period_candles": 288, "trade_limit": 4, "stop_duration_candles": 48, "required_profit": -0.05},
+            {"method": "MaxDrawdown", "lookback_period_candles": 48, "max_allowed_drawdown": 0.20, "stop_duration_candles": 12, "trade_limit": 1},
+        ]
+
+    # Hyperoptable parameters
+    ema_fast = IntParameter(5, 25, default=9, space="buy", optimize=False)
+    ema_slow = IntParameter(20, 60, default=21, space="buy", optimize=False)
+    rsi_period = IntParameter(10, 25, default=14, space="buy", optimize=False)
+    rsi_buy_limit = IntParameter(20, 45, default=35, space="buy", optimize=False)
+    rsi_sell_limit = IntParameter(65, 85, default=75, space="sell", optimize=False)
+
+    # ── BTC Market Guard (informative pair) ───────────────────────
+
+    @informative('1h', 'BTC/{stake}')
+    def populate_indicators_btc_1h(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
+        dataframe['sma200'] = ta.SMA(dataframe['close'], timeperiod=200)
+        dataframe['adx'] = ta.ADX(dataframe, timeperiod=14)
+        return dataframe
+
+    def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        # EMAs
+        for val in range(5, 61):
+            dataframe[f"ema_{val}"] = ta.EMA(dataframe, timeperiod=val)
+
+        # RSI
+        for val in range(10, 26):
+            dataframe[f"rsi_{val}"] = ta.RSI(dataframe, timeperiod=val)
+
+        # Volume SMA for volume filter
+        dataframe["volume_sma_20"] = ta.SMA(dataframe["volume"], timeperiod=20)
+
+        # --- Regime Detection ---
+        dataframe['regime_atr_14'] = ta.ATR(dataframe, timeperiod=14)
+        dataframe['regime_atr_sma_50'] = dataframe['regime_atr_14'].rolling(50).mean()
+        dataframe['regime_volatile'] = (dataframe['regime_atr_14'] > 2.0 * dataframe['regime_atr_sma_50']).astype(int)
+
+        dataframe['regime_adx_14'] = ta.ADX(dataframe, timeperiod=14)
+        dataframe['regime_trending'] = (dataframe['regime_adx_14'] > 25).astype(int)
+
+        # --- BTC Market Guard composite ---
+        dataframe['btc_bullish'] = (
+            (dataframe['btc_usdt_close_1h'] > dataframe['btc_usdt_sma200_1h'])
+            & (dataframe['btc_usdt_rsi_1h'] > 35)
+        ).astype(int)
+
+        return dataframe
+
+    def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        ema_f = f"ema_{self.ema_fast.value}"
+        ema_s = f"ema_{self.ema_slow.value}"
+        rsi_col = f"rsi_{self.rsi_period.value}"
+
+        dataframe.loc[
+            (
+                # EMA crossover (fast crosses above slow)
+                (dataframe[ema_f] > dataframe[ema_s])
+                & (dataframe[ema_f].shift(1) <= dataframe[ema_s].shift(1))
+                # RSI not overbought and above minimum
+                & (dataframe[rsi_col] > self.rsi_buy_limit.value)
+                & (dataframe[rsi_col] < 70)
+                # Volume above average
+                & (dataframe["volume"] > dataframe["volume_sma_20"])
+                # Non-zero volume
+                & (dataframe["volume"] > 0)
+                # Regime filters
+                & (dataframe['regime_volatile'] == 0)  # Don't enter during high volatility
+                & (dataframe['regime_trending'] == 1)  # Trend following: only enter in trending markets
+                # BTC market guard
+                & (dataframe['btc_bullish'] == 1)
+            ),
+            "enter_long",
+        ] = 1
+
+        return dataframe
+
+    def custom_exit(self, pair: str, trade, current_time, current_rate, current_profit, **kwargs):
+        # Force close after 48h - edge decays for 1h EMA crossover
+        if (current_time - trade.open_date_utc).total_seconds() > 48 * 3600:
+            return 'time_exit_48h'
+        return None
+
+    def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        ema_f = f"ema_{self.ema_fast.value}"
+        ema_s = f"ema_{self.ema_slow.value}"
+        rsi_col = f"rsi_{self.rsi_period.value}"
+
+        dataframe.loc[
+            (
+                # EMA crossunder (fast crosses below slow)
+                (
+                    (dataframe[ema_f] < dataframe[ema_s])
+                    & (dataframe[ema_f].shift(1) >= dataframe[ema_s].shift(1))
+                )
+                # OR RSI overbought
+                | (dataframe[rsi_col] > self.rsi_sell_limit.value)
+            )
+            & (dataframe["volume"] > 0)
+            | ((dataframe['regime_atr_14'] > 2.5 * dataframe['regime_atr_sma_50']) & (dataframe["volume"] > 0)),  # Exit on volatility spike
+            "exit_long",
+        ] = 1
+
+        return dataframe
