@@ -70,13 +70,25 @@ def test_strategy_file_exists(bot):
 
 
 @pytest.mark.parametrize("bot", ACTIVE_BOTS)
-def test_stoploss_on_exchange_enabled(bot):
-    """All bots must have stoploss_on_exchange for crash protection."""
+def test_stoploss_on_exchange_matches_mode(bot):
+    """
+    Dry-run: stoploss_on_exchange must be False (simulated SL orders are in-memory
+    only and lost on container restart — found 2026-04-07 when BearCrashShortV1
+    trade 8 lost $1.10 to emergency_exit after restart).
+    Live: stoploss_on_exchange must be True (real exchange order for crash protection).
+    """
     config = load_config(bot)
     order_types = config.get("order_types", {})
-    assert order_types.get("stoploss_on_exchange") is True, (
-        f"{bot}: stoploss_on_exchange must be True (crash protection)"
-    )
+    sl_on_exchange = order_types.get("stoploss_on_exchange")
+    if config.get("dry_run", True):
+        assert sl_on_exchange is False, (
+            f"{bot}: stoploss_on_exchange must be False in dry-run "
+            f"(simulated SL orders are lost on container restart)"
+        )
+    else:
+        assert sl_on_exchange is True, (
+            f"{bot}: stoploss_on_exchange must be True in live mode (crash protection)"
+        )
 
 
 @pytest.mark.parametrize("bot", ACTIVE_BOTS)

@@ -39,7 +39,7 @@
         "force_exit": "market",
         "force_entry": "market",
         "stoploss": "market",
-        "stoploss_on_exchange": true,
+        "stoploss_on_exchange": false,
         "stoploss_on_exchange_interval": 60
     },
     "exchange": {
@@ -94,14 +94,14 @@
             "method": "VolatilityFilter",
             "lookback_days": 14,
             "min_volatility": 0.02,
-            "max_volatility": 0.50,
+            "max_volatility": 0.5,
             "refresh_period": 86400
         },
         {
             "method": "RangeStabilityFilter",
             "lookback_days": 10,
             "min_rate_of_change": 0.02,
-            "max_rate_of_change": 0.40,
+            "max_rate_of_change": 0.4,
             "refresh_period": 86400
         },
         {

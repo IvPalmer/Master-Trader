@@ -61,557 +61,197 @@
   "panels": [
     {
       "type": "row",
-      "title": "SupertrendStrategy  \u2014  3 open  [1h]",
+      "title": "SupertrendStrategy  \u2014  15 closed  [1h]",
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
         "y": 0
       },
-      "collapsed": false,
-      "id": 1,
-      "panels": [],
-      "repeat": null
-    },
-    {
-      "id": 2,
-      "title": "\u25cf LTC/USDT",
-      "type": "candlestick",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 1
-      },
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "infinity"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "BUY"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#FADE2A"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "WIN"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#73BF69"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "LOSS"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#F2495C"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "mode": "candles",
-        "candleStyle": "candles",
-        "colorStrategy": "open-close",
-        "colors": {
-          "up": "rgba(0, 200, 83, 0.8)",
-          "down": "rgba(255, 82, 82, 0.8)",
-          "flat": "rgba(158, 158, 158, 0.8)"
-        },
-        "includeAllFields": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "infinity"
-          },
-          "type": "json",
-          "source": "url",
-          "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=LTC/USDT&timeframe=1h&limit=2000&markers=true",
-          "url_options": {
-            "method": "GET"
-          },
-          "format": "table",
-          "root_selector": "",
-          "columns": [
-            {
-              "selector": "time",
-              "text": "time",
-              "type": "timestamp_epoch_s"
-            },
-            {
-              "selector": "open",
-              "text": "open",
-              "type": "number"
-            },
-            {
-              "selector": "high",
-              "text": "high",
-              "type": "number"
-            },
-            {
-              "selector": "low",
-              "text": "low",
-              "type": "number"
-            },
-            {
-              "selector": "close",
-              "text": "close",
-              "type": "number"
-            },
-            {
-              "selector": "BUY",
-              "text": "BUY",
-              "type": "number"
-            },
-            {
-              "selector": "WIN",
-              "text": "WIN",
-              "type": "number"
-            },
-            {
-              "selector": "LOSS",
-              "text": "LOSS",
-              "type": "number"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "title": "\u25cf ADA/USDT",
-      "type": "candlestick",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 1
-      },
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "infinity"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "BUY"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#FADE2A"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "WIN"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#73BF69"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "LOSS"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#F2495C"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "mode": "candles",
-        "candleStyle": "candles",
-        "colorStrategy": "open-close",
-        "colors": {
-          "up": "rgba(0, 200, 83, 0.8)",
-          "down": "rgba(255, 82, 82, 0.8)",
-          "flat": "rgba(158, 158, 158, 0.8)"
-        },
-        "includeAllFields": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "infinity"
-          },
-          "type": "json",
-          "source": "url",
-          "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=ADA/USDT&timeframe=1h&limit=2000&markers=true",
-          "url_options": {
-            "method": "GET"
-          },
-          "format": "table",
-          "root_selector": "",
-          "columns": [
-            {
-              "selector": "time",
-              "text": "time",
-              "type": "timestamp_epoch_s"
-            },
-            {
-              "selector": "open",
-              "text": "open",
-              "type": "number"
-            },
-            {
-              "selector": "high",
-              "text": "high",
-              "type": "number"
-            },
-            {
-              "selector": "low",
-              "text": "low",
-              "type": "number"
-            },
-            {
-              "selector": "close",
-              "text": "close",
-              "type": "number"
-            },
-            {
-              "selector": "BUY",
-              "text": "BUY",
-              "type": "number"
-            },
-            {
-              "selector": "WIN",
-              "text": "WIN",
-              "type": "number"
-            },
-            {
-              "selector": "LOSS",
-              "text": "LOSS",
-              "type": "number"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 4,
-      "title": "\u25cf ZEC/USDT",
-      "type": "candlestick",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 11
-      },
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "infinity"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "BUY"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#FADE2A"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "WIN"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#73BF69"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "LOSS"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#F2495C"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "mode": "candles",
-        "candleStyle": "candles",
-        "colorStrategy": "open-close",
-        "colors": {
-          "up": "rgba(0, 200, 83, 0.8)",
-          "down": "rgba(255, 82, 82, 0.8)",
-          "flat": "rgba(158, 158, 158, 0.8)"
-        },
-        "includeAllFields": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "infinity"
-          },
-          "type": "json",
-          "source": "url",
-          "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=ZEC/USDT&timeframe=1h&limit=2000&markers=true",
-          "url_options": {
-            "method": "GET"
-          },
-          "format": "table",
-          "root_selector": "",
-          "columns": [
-            {
-              "selector": "time",
-              "text": "time",
-              "type": "timestamp_epoch_s"
-            },
-            {
-              "selector": "open",
-              "text": "open",
-              "type": "number"
-            },
-            {
-              "selector": "high",
-              "text": "high",
-              "type": "number"
-            },
-            {
-              "selector": "low",
-              "text": "low",
-              "type": "number"
-            },
-            {
-              "selector": "close",
-              "text": "close",
-              "type": "number"
-            },
-            {
-              "selector": "BUY",
-              "text": "BUY",
-              "type": "number"
-            },
-            {
-              "selector": "WIN",
-              "text": "WIN",
-              "type": "number"
-            },
-            {
-              "selector": "LOSS",
-              "text": "LOSS",
-              "type": "number"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "type": "row",
-      "title": "SupertrendStrategy  \u2014  13 closed  [1h]",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 21
-      },
       "collapsed": true,
-      "id": 18,
+      "id": 16,
       "panels": [
         {
-          "id": 5,
-          "title": "AVAX/USDT  (closed)",
+          "id": 1,
+          "title": "ADA/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 0,
+            "y": 0
+          },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "BUY"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#FADE2A"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "WIN"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#73BF69"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "LOSS"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#F2495C"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "mode": "candles",
+            "candleStyle": "candles",
+            "colorStrategy": "open-close",
+            "colors": {
+              "up": "rgba(0, 200, 83, 0.8)",
+              "down": "rgba(255, 82, 82, 0.8)",
+              "flat": "rgba(158, 158, 158, 0.8)"
+            },
+            "includeAllFields": true
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "yesoreyeram-infinity-datasource",
+                "uid": "infinity"
+              },
+              "type": "json",
+              "source": "url",
+              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=ADA/USDT&timeframe=1h&limit=2000&markers=true",
+              "url_options": {
+                "method": "GET"
+              },
+              "format": "table",
+              "root_selector": "",
+              "columns": [
+                {
+                  "selector": "time",
+                  "text": "time",
+                  "type": "timestamp_epoch_s"
+                },
+                {
+                  "selector": "open",
+                  "text": "open",
+                  "type": "number"
+                },
+                {
+                  "selector": "high",
+                  "text": "high",
+                  "type": "number"
+                },
+                {
+                  "selector": "low",
+                  "text": "low",
+                  "type": "number"
+                },
+                {
+                  "selector": "close",
+                  "text": "close",
+                  "type": "number"
+                },
+                {
+                  "selector": "BUY",
+                  "text": "BUY",
+                  "type": "number"
+                },
+                {
+                  "selector": "WIN",
+                  "text": "WIN",
+                  "type": "number"
+                },
+                {
+                  "selector": "LOSS",
+                  "text": "LOSS",
+                  "type": "number"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "AVAX/USDT  (closed)",
+          "type": "candlestick",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
             "y": 0
           },
           "datasource": {
@@ -778,14 +418,14 @@
           ]
         },
         {
-          "id": 6,
+          "id": 3,
           "title": "BNB/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
-            "y": 0
+            "x": 0,
+            "y": 8
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -951,13 +591,13 @@
           ]
         },
         {
-          "id": 7,
+          "id": 4,
           "title": "BTC/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 0,
+            "x": 12,
             "y": 8
           },
           "datasource": {
@@ -1124,14 +764,14 @@
           ]
         },
         {
-          "id": 8,
+          "id": 5,
           "title": "DOGE/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
-            "y": 8
+            "x": 0,
+            "y": 16
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -1297,13 +937,13 @@
           ]
         },
         {
-          "id": 9,
+          "id": 6,
           "title": "ETH/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 0,
+            "x": 12,
             "y": 16
           },
           "datasource": {
@@ -1470,14 +1110,14 @@
           ]
         },
         {
-          "id": 10,
+          "id": 7,
           "title": "FET/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
-            "y": 16
+            "x": 0,
+            "y": 24
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -1643,14 +1283,187 @@
           ]
         },
         {
-          "id": 11,
+          "id": 8,
+          "title": "LTC/USDT  (closed)",
+          "type": "candlestick",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 24
+          },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "BUY"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#FADE2A"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "WIN"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#73BF69"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "LOSS"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#F2495C"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "mode": "candles",
+            "candleStyle": "candles",
+            "colorStrategy": "open-close",
+            "colors": {
+              "up": "rgba(0, 200, 83, 0.8)",
+              "down": "rgba(255, 82, 82, 0.8)",
+              "flat": "rgba(158, 158, 158, 0.8)"
+            },
+            "includeAllFields": true
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "yesoreyeram-infinity-datasource",
+                "uid": "infinity"
+              },
+              "type": "json",
+              "source": "url",
+              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=LTC/USDT&timeframe=1h&limit=2000&markers=true",
+              "url_options": {
+                "method": "GET"
+              },
+              "format": "table",
+              "root_selector": "",
+              "columns": [
+                {
+                  "selector": "time",
+                  "text": "time",
+                  "type": "timestamp_epoch_s"
+                },
+                {
+                  "selector": "open",
+                  "text": "open",
+                  "type": "number"
+                },
+                {
+                  "selector": "high",
+                  "text": "high",
+                  "type": "number"
+                },
+                {
+                  "selector": "low",
+                  "text": "low",
+                  "type": "number"
+                },
+                {
+                  "selector": "close",
+                  "text": "close",
+                  "type": "number"
+                },
+                {
+                  "selector": "BUY",
+                  "text": "BUY",
+                  "type": "number"
+                },
+                {
+                  "selector": "WIN",
+                  "text": "WIN",
+                  "type": "number"
+                },
+                {
+                  "selector": "LOSS",
+                  "text": "LOSS",
+                  "type": "number"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": 9,
           "title": "NEAR/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 24
+            "y": 32
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -1816,14 +1629,14 @@
           ]
         },
         {
-          "id": 12,
+          "id": 10,
           "title": "PAXG/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 24
+            "y": 32
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -1989,187 +1802,14 @@
           ]
         },
         {
-          "id": 13,
-          "title": "RENDER/USDT  (closed)",
-          "type": "candlestick",
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 32
-          },
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "infinity"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "custom": {}
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "BUY"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#FADE2A"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "WIN"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#73BF69"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "LOSS"
-                },
-                "properties": [
-                  {
-                    "id": "custom.drawStyle",
-                    "value": "points"
-                  },
-                  {
-                    "id": "custom.pointSize",
-                    "value": 14
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed",
-                      "fixedColor": "#F2495C"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "always"
-                  }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "mode": "candles",
-            "candleStyle": "candles",
-            "colorStrategy": "open-close",
-            "colors": {
-              "up": "rgba(0, 200, 83, 0.8)",
-              "down": "rgba(255, 82, 82, 0.8)",
-              "flat": "rgba(158, 158, 158, 0.8)"
-            },
-            "includeAllFields": true
-          },
-          "targets": [
-            {
-              "refId": "A",
-              "datasource": {
-                "type": "yesoreyeram-infinity-datasource",
-                "uid": "infinity"
-              },
-              "type": "json",
-              "source": "url",
-              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=RENDER/USDT&timeframe=1h&limit=2000&markers=true",
-              "url_options": {
-                "method": "GET"
-              },
-              "format": "table",
-              "root_selector": "",
-              "columns": [
-                {
-                  "selector": "time",
-                  "text": "time",
-                  "type": "timestamp_epoch_s"
-                },
-                {
-                  "selector": "open",
-                  "text": "open",
-                  "type": "number"
-                },
-                {
-                  "selector": "high",
-                  "text": "high",
-                  "type": "number"
-                },
-                {
-                  "selector": "low",
-                  "text": "low",
-                  "type": "number"
-                },
-                {
-                  "selector": "close",
-                  "text": "close",
-                  "type": "number"
-                },
-                {
-                  "selector": "BUY",
-                  "text": "BUY",
-                  "type": "number"
-                },
-                {
-                  "selector": "WIN",
-                  "text": "WIN",
-                  "type": "number"
-                },
-                {
-                  "selector": "LOSS",
-                  "text": "LOSS",
-                  "type": "number"
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "id": 14,
+          "id": 11,
           "title": "SOL/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
-            "y": 32
+            "x": 0,
+            "y": 40
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -2335,13 +1975,13 @@
           ]
         },
         {
-          "id": 15,
+          "id": 12,
           "title": "TAO/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 0,
+            "x": 12,
             "y": 40
           },
           "datasource": {
@@ -2508,14 +2148,14 @@
           ]
         },
         {
-          "id": 16,
+          "id": 13,
           "title": "TRX/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 12,
-            "y": 40
+            "x": 0,
+            "y": 48
           },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
@@ -2681,13 +2321,13 @@
           ]
         },
         {
-          "id": 17,
+          "id": 14,
           "title": "XRP/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
             "h": 8,
             "w": 12,
-            "x": 0,
+            "x": 12,
             "y": 48
           },
           "datasource": {
@@ -2852,191 +2492,177 @@
               ]
             }
           ]
-        }
-      ]
-    },
-    {
-      "type": "row",
-      "title": "MasterTraderV1  \u2014  1 open  [1h]",
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 23
-      },
-      "collapsed": false,
-      "id": 19,
-      "panels": [],
-      "repeat": null
-    },
-    {
-      "id": 20,
-      "title": "\u25cf UNI/USDT",
-      "type": "candlestick",
-      "gridPos": {
-        "h": 12,
-        "w": 24,
-        "x": 0,
-        "y": 24
-      },
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "infinity"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "BUY"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#FADE2A"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "WIN"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#73BF69"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "LOSS"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#F2495C"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "mode": "candles",
-        "candleStyle": "candles",
-        "colorStrategy": "open-close",
-        "colors": {
-          "up": "rgba(0, 200, 83, 0.8)",
-          "down": "rgba(255, 82, 82, 0.8)",
-          "flat": "rgba(158, 158, 158, 0.8)"
-        },
-        "includeAllFields": true
-      },
-      "targets": [
         {
-          "refId": "A",
+          "id": 15,
+          "title": "ZEC/USDT  (closed)",
+          "type": "candlestick",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 56
+          },
           "datasource": {
             "type": "yesoreyeram-infinity-datasource",
             "uid": "infinity"
           },
-          "type": "json",
-          "source": "url",
-          "url": "http://grafana-bridge:5555/candles/MasterTraderV1?pair=UNI/USDT&timeframe=1h&limit=2000&markers=true",
-          "url_options": {
-            "method": "GET"
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "BUY"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#FADE2A"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "WIN"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#73BF69"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "LOSS"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#F2495C"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              }
+            ]
           },
-          "format": "table",
-          "root_selector": "",
-          "columns": [
-            {
-              "selector": "time",
-              "text": "time",
-              "type": "timestamp_epoch_s"
+          "options": {
+            "mode": "candles",
+            "candleStyle": "candles",
+            "colorStrategy": "open-close",
+            "colors": {
+              "up": "rgba(0, 200, 83, 0.8)",
+              "down": "rgba(255, 82, 82, 0.8)",
+              "flat": "rgba(158, 158, 158, 0.8)"
             },
+            "includeAllFields": true
+          },
+          "targets": [
             {
-              "selector": "open",
-              "text": "open",
-              "type": "number"
-            },
-            {
-              "selector": "high",
-              "text": "high",
-              "type": "number"
-            },
-            {
-              "selector": "low",
-              "text": "low",
-              "type": "number"
-            },
-            {
-              "selector": "close",
-              "text": "close",
-              "type": "number"
-            },
-            {
-              "selector": "BUY",
-              "text": "BUY",
-              "type": "number"
-            },
-            {
-              "selector": "WIN",
-              "text": "WIN",
-              "type": "number"
-            },
-            {
-              "selector": "LOSS",
-              "text": "LOSS",
-              "type": "number"
+              "refId": "A",
+              "datasource": {
+                "type": "yesoreyeram-infinity-datasource",
+                "uid": "infinity"
+              },
+              "type": "json",
+              "source": "url",
+              "url": "http://grafana-bridge:5555/candles/SupertrendStrategy?pair=ZEC/USDT&timeframe=1h&limit=2000&markers=true",
+              "url_options": {
+                "method": "GET"
+              },
+              "format": "table",
+              "root_selector": "",
+              "columns": [
+                {
+                  "selector": "time",
+                  "text": "time",
+                  "type": "timestamp_epoch_s"
+                },
+                {
+                  "selector": "open",
+                  "text": "open",
+                  "type": "number"
+                },
+                {
+                  "selector": "high",
+                  "text": "high",
+                  "type": "number"
+                },
+                {
+                  "selector": "low",
+                  "text": "low",
+                  "type": "number"
+                },
+                {
+                  "selector": "close",
+                  "text": "close",
+                  "type": "number"
+                },
+                {
+                  "selector": "BUY",
+                  "text": "BUY",
+                  "type": "number"
+                },
+                {
+                  "selector": "WIN",
+                  "text": "WIN",
+                  "type": "number"
+                },
+                {
+                  "selector": "LOSS",
+                  "text": "LOSS",
+                  "type": "number"
+                }
+              ]
             }
           ]
         }
@@ -3044,18 +2670,18 @@
     },
     {
       "type": "row",
-      "title": "MasterTraderV1  \u2014  13 closed  [1h]",
+      "title": "MasterTraderV1  \u2014  14 closed  [1h]",
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 2
       },
       "collapsed": true,
-      "id": 34,
+      "id": 31,
       "panels": [
         {
-          "id": 21,
+          "id": 17,
           "title": "ADA/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -3228,7 +2854,7 @@
           ]
         },
         {
-          "id": 22,
+          "id": 18,
           "title": "AVAX/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -3401,7 +3027,7 @@
           ]
         },
         {
-          "id": 23,
+          "id": 19,
           "title": "BNB/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -3574,7 +3200,7 @@
           ]
         },
         {
-          "id": 24,
+          "id": 20,
           "title": "BTC/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -3747,7 +3373,7 @@
           ]
         },
         {
-          "id": 25,
+          "id": 21,
           "title": "DOGE/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -3920,7 +3546,7 @@
           ]
         },
         {
-          "id": 26,
+          "id": 22,
           "title": "ENA/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -4093,7 +3719,7 @@
           ]
         },
         {
-          "id": 27,
+          "id": 23,
           "title": "ETH/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -4266,7 +3892,7 @@
           ]
         },
         {
-          "id": 28,
+          "id": 24,
           "title": "LINK/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -4439,7 +4065,7 @@
           ]
         },
         {
-          "id": 29,
+          "id": 25,
           "title": "LTC/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -4612,7 +4238,7 @@
           ]
         },
         {
-          "id": 30,
+          "id": 26,
           "title": "NEAR/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -4785,7 +4411,7 @@
           ]
         },
         {
-          "id": 31,
+          "id": 27,
           "title": "SUI/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -4958,7 +4584,7 @@
           ]
         },
         {
-          "id": 32,
+          "id": 28,
           "title": "TAO/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -5131,7 +4757,7 @@
           ]
         },
         {
-          "id": 33,
+          "id": 29,
           "title": "TRX/USDT  (closed)",
           "type": "candlestick",
           "gridPos": {
@@ -5302,6 +4928,179 @@
               ]
             }
           ]
+        },
+        {
+          "id": 30,
+          "title": "UNI/USDT  (closed)",
+          "type": "candlestick",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 48
+          },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "BUY"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#FADE2A"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "WIN"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#73BF69"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "LOSS"
+                },
+                "properties": [
+                  {
+                    "id": "custom.drawStyle",
+                    "value": "points"
+                  },
+                  {
+                    "id": "custom.pointSize",
+                    "value": 14
+                  },
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "#F2495C"
+                    }
+                  },
+                  {
+                    "id": "custom.showPoints",
+                    "value": "always"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "mode": "candles",
+            "candleStyle": "candles",
+            "colorStrategy": "open-close",
+            "colors": {
+              "up": "rgba(0, 200, 83, 0.8)",
+              "down": "rgba(255, 82, 82, 0.8)",
+              "flat": "rgba(158, 158, 158, 0.8)"
+            },
+            "includeAllFields": true
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "yesoreyeram-infinity-datasource",
+                "uid": "infinity"
+              },
+              "type": "json",
+              "source": "url",
+              "url": "http://grafana-bridge:5555/candles/MasterTraderV1?pair=UNI/USDT&timeframe=1h&limit=2000&markers=true",
+              "url_options": {
+                "method": "GET"
+              },
+              "format": "table",
+              "root_selector": "",
+              "columns": [
+                {
+                  "selector": "time",
+                  "text": "time",
+                  "type": "timestamp_epoch_s"
+                },
+                {
+                  "selector": "open",
+                  "text": "open",
+                  "type": "number"
+                },
+                {
+                  "selector": "high",
+                  "text": "high",
+                  "type": "number"
+                },
+                {
+                  "selector": "low",
+                  "text": "low",
+                  "type": "number"
+                },
+                {
+                  "selector": "close",
+                  "text": "close",
+                  "type": "number"
+                },
+                {
+                  "selector": "BUY",
+                  "text": "BUY",
+                  "type": "number"
+                },
+                {
+                  "selector": "WIN",
+                  "text": "WIN",
+                  "type": "number"
+                },
+                {
+                  "selector": "LOSS",
+                  "text": "LOSS",
+                  "type": "number"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -5312,22 +5111,22 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 4
       },
       "collapsed": false,
-      "id": 35,
+      "id": 32,
       "panels": [],
       "repeat": null
     },
     {
-      "id": 36,
+      "id": 33,
       "title": "\u25cb ADA/USDT  (no trades)",
       "type": "candlestick",
       "gridPos": {
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 39
+        "y": 5
       },
       "datasource": {
         "type": "yesoreyeram-infinity-datasource",
@@ -5493,14 +5292,187 @@
       ]
     },
     {
-      "id": 37,
-      "title": "\u25cb BNB/USDT  (no trades)",
+      "id": 34,
+      "title": "\u25cb AVAX/USDT  (no trades)",
       "type": "candlestick",
       "gridPos": {
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 39
+        "y": 5
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "BUY"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 14
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FADE2A"
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "WIN"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 14
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "LOSS"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 14
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "mode": "candles",
+        "candleStyle": "candles",
+        "colorStrategy": "open-close",
+        "colors": {
+          "up": "rgba(0, 200, 83, 0.8)",
+          "down": "rgba(255, 82, 82, 0.8)",
+          "flat": "rgba(158, 158, 158, 0.8)"
+        },
+        "includeAllFields": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
+          "type": "json",
+          "source": "url",
+          "url": "http://grafana-bridge:5555/candles/AlligatorTrendV1?pair=AVAX/USDT&timeframe=1d&limit=2000&markers=true",
+          "url_options": {
+            "method": "GET"
+          },
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "time",
+              "text": "time",
+              "type": "timestamp_epoch_s"
+            },
+            {
+              "selector": "open",
+              "text": "open",
+              "type": "number"
+            },
+            {
+              "selector": "high",
+              "text": "high",
+              "type": "number"
+            },
+            {
+              "selector": "low",
+              "text": "low",
+              "type": "number"
+            },
+            {
+              "selector": "close",
+              "text": "close",
+              "type": "number"
+            },
+            {
+              "selector": "BUY",
+              "text": "BUY",
+              "type": "number"
+            },
+            {
+              "selector": "WIN",
+              "text": "WIN",
+              "type": "number"
+            },
+            {
+              "selector": "LOSS",
+              "text": "LOSS",
+              "type": "number"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 35,
+      "title": "\u25cb BNB/USDT  (no trades)",
+      "type": "candlestick",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 15
       },
       "datasource": {
         "type": "yesoreyeram-infinity-datasource",
@@ -5666,201 +5638,28 @@
       ]
     },
     {
-      "id": 38,
-      "title": "\u25cb BTC/USDT  (no trades)",
-      "type": "candlestick",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 49
-      },
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "infinity"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "BUY"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#FADE2A"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "WIN"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#73BF69"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "LOSS"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#F2495C"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "mode": "candles",
-        "candleStyle": "candles",
-        "colorStrategy": "open-close",
-        "colors": {
-          "up": "rgba(0, 200, 83, 0.8)",
-          "down": "rgba(255, 82, 82, 0.8)",
-          "flat": "rgba(158, 158, 158, 0.8)"
-        },
-        "includeAllFields": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "infinity"
-          },
-          "type": "json",
-          "source": "url",
-          "url": "http://grafana-bridge:5555/candles/AlligatorTrendV1?pair=BTC/USDT&timeframe=1d&limit=2000&markers=true",
-          "url_options": {
-            "method": "GET"
-          },
-          "format": "table",
-          "root_selector": "",
-          "columns": [
-            {
-              "selector": "time",
-              "text": "time",
-              "type": "timestamp_epoch_s"
-            },
-            {
-              "selector": "open",
-              "text": "open",
-              "type": "number"
-            },
-            {
-              "selector": "high",
-              "text": "high",
-              "type": "number"
-            },
-            {
-              "selector": "low",
-              "text": "low",
-              "type": "number"
-            },
-            {
-              "selector": "close",
-              "text": "close",
-              "type": "number"
-            },
-            {
-              "selector": "BUY",
-              "text": "BUY",
-              "type": "number"
-            },
-            {
-              "selector": "WIN",
-              "text": "WIN",
-              "type": "number"
-            },
-            {
-              "selector": "LOSS",
-              "text": "LOSS",
-              "type": "number"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "type": "row",
       "title": "GaussianChannelV1  \u2014  watching 3 pairs  [1d]",
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 26
       },
       "collapsed": false,
-      "id": 39,
+      "id": 36,
       "panels": [],
       "repeat": null
     },
     {
-      "id": 40,
+      "id": 37,
       "title": "\u25cb ADA/USDT  (no trades)",
       "type": "candlestick",
       "gridPos": {
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 61
+        "y": 27
       },
       "datasource": {
         "type": "yesoreyeram-infinity-datasource",
@@ -6026,14 +5825,187 @@
       ]
     },
     {
-      "id": 41,
-      "title": "\u25cb BNB/USDT  (no trades)",
+      "id": 38,
+      "title": "\u25cb AVAX/USDT  (no trades)",
       "type": "candlestick",
       "gridPos": {
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 61
+        "y": 27
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "BUY"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 14
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FADE2A"
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "WIN"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 14
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "LOSS"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              },
+              {
+                "id": "custom.pointSize",
+                "value": 14
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "mode": "candles",
+        "candleStyle": "candles",
+        "colorStrategy": "open-close",
+        "colors": {
+          "up": "rgba(0, 200, 83, 0.8)",
+          "down": "rgba(255, 82, 82, 0.8)",
+          "flat": "rgba(158, 158, 158, 0.8)"
+        },
+        "includeAllFields": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
+          "type": "json",
+          "source": "url",
+          "url": "http://grafana-bridge:5555/candles/GaussianChannelV1?pair=AVAX/USDT&timeframe=1d&limit=2000&markers=true",
+          "url_options": {
+            "method": "GET"
+          },
+          "format": "table",
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "time",
+              "text": "time",
+              "type": "timestamp_epoch_s"
+            },
+            {
+              "selector": "open",
+              "text": "open",
+              "type": "number"
+            },
+            {
+              "selector": "high",
+              "text": "high",
+              "type": "number"
+            },
+            {
+              "selector": "low",
+              "text": "low",
+              "type": "number"
+            },
+            {
+              "selector": "close",
+              "text": "close",
+              "type": "number"
+            },
+            {
+              "selector": "BUY",
+              "text": "BUY",
+              "type": "number"
+            },
+            {
+              "selector": "WIN",
+              "text": "WIN",
+              "type": "number"
+            },
+            {
+              "selector": "LOSS",
+              "text": "LOSS",
+              "type": "number"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 39,
+      "title": "\u25cb BNB/USDT  (no trades)",
+      "type": "candlestick",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 37
       },
       "datasource": {
         "type": "yesoreyeram-infinity-datasource",
@@ -6148,179 +6120,6 @@
           "type": "json",
           "source": "url",
           "url": "http://grafana-bridge:5555/candles/GaussianChannelV1?pair=BNB/USDT&timeframe=1d&limit=2000&markers=true",
-          "url_options": {
-            "method": "GET"
-          },
-          "format": "table",
-          "root_selector": "",
-          "columns": [
-            {
-              "selector": "time",
-              "text": "time",
-              "type": "timestamp_epoch_s"
-            },
-            {
-              "selector": "open",
-              "text": "open",
-              "type": "number"
-            },
-            {
-              "selector": "high",
-              "text": "high",
-              "type": "number"
-            },
-            {
-              "selector": "low",
-              "text": "low",
-              "type": "number"
-            },
-            {
-              "selector": "close",
-              "text": "close",
-              "type": "number"
-            },
-            {
-              "selector": "BUY",
-              "text": "BUY",
-              "type": "number"
-            },
-            {
-              "selector": "WIN",
-              "text": "WIN",
-              "type": "number"
-            },
-            {
-              "selector": "LOSS",
-              "text": "LOSS",
-              "type": "number"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": 42,
-      "title": "\u25cb BTC/USDT  (no trades)",
-      "type": "candlestick",
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 0,
-        "y": 71
-      },
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "infinity"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {}
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "BUY"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#FADE2A"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "WIN"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#73BF69"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "LOSS"
-            },
-            "properties": [
-              {
-                "id": "custom.drawStyle",
-                "value": "points"
-              },
-              {
-                "id": "custom.pointSize",
-                "value": 14
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#F2495C"
-                }
-              },
-              {
-                "id": "custom.showPoints",
-                "value": "always"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "mode": "candles",
-        "candleStyle": "candles",
-        "colorStrategy": "open-close",
-        "colors": {
-          "up": "rgba(0, 200, 83, 0.8)",
-          "down": "rgba(255, 82, 82, 0.8)",
-          "flat": "rgba(158, 158, 158, 0.8)"
-        },
-        "includeAllFields": true
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "infinity"
-          },
-          "type": "json",
-          "source": "url",
-          "url": "http://grafana-bridge:5555/candles/GaussianChannelV1?pair=BTC/USDT&timeframe=1d&limit=2000&markers=true",
           "url_options": {
             "method": "GET"
           },

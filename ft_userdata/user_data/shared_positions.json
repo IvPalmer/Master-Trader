@@ -9,8 +9,8 @@
       "timestamp": "2026-03-16T22:06:54.465828"
     },
     "DOGE/USDT": {
-      "stake_amount": 221.63697387612,
-      "timestamp": "2026-03-17T01:35:33.647848"
+      "stake_amount": 23.56619159435508,
+      "timestamp": "2026-04-07T09:00:07.598133"
     },
     "DOT/USDT": {
       "stake_amount": 31.494356600097603,
@@ -48,9 +48,17 @@
       "stake_amount": 31.903655762473438,
       "timestamp": "2026-04-06T02:36:22.110470"
     },
-    "ZEC/USDT": {
-      "stake_amount": 32.11906223947344,
-      "timestamp": "2026-04-06T12:16:37.585300"
+    "ENA/USDT": {
+      "stake_amount": 32.18031194022033,
+      "timestamp": "2026-04-06T16:18:24.017500"
+    },
+    "BNB/USDT": {
+      "stake_amount": 31.593725809020327,
+      "timestamp": "2026-04-06T17:01:33.962716"
+    },
+    "ETH/USDT": {
+      "stake_amount": 31.884273938520323,
+      "timestamp": "2026-04-06T21:00:31.739089"
     }
   },
   "MasterTraderV1": {
@@ -61,10 +69,6 @@
     "LTC/USDT": {
       "stake_amount": 29.610917467032,
       "timestamp": "2026-04-05T19:00:06.624344"
-    },
-    "UNI/USDT": {
-      "stake_amount": 29.610917467031996,
-      "timestamp": "2026-04-06T00:00:08.359254"
     }
   }
 }

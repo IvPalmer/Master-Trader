@@ -123,8 +123,9 @@ class TestLiveConfig:
     def test_max_open_trades(self, config):
         assert config["max_open_trades"] == 2
 
-    def test_stoploss_on_exchange(self, config):
-        assert config["order_types"]["stoploss_on_exchange"] is True
+    def test_stoploss_on_exchange_disabled_dryrun(self, config):
+        """Dry-run must use internal SL (simulated exchange SL lost on restart)."""
+        assert config["order_types"]["stoploss_on_exchange"] is False
 
     def test_bot_name_set(self, config):
         assert config["bot_name"] == "BearCrashShort"

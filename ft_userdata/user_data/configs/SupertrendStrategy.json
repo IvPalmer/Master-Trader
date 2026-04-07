@@ -23,7 +23,7 @@
         "force_exit": "market",
         "force_entry": "market",
         "stoploss": "market",
-        "stoploss_on_exchange": true,
+        "stoploss_on_exchange": false,
         "stoploss_on_exchange_interval": 60
     },
     "entry_pricing": {
@@ -99,7 +99,7 @@
             "method": "RangeStabilityFilter",
             "lookback_days": 10,
             "min_rate_of_change": 0.03,
-            "max_rate_of_change": 0.50,
+            "max_rate_of_change": 0.5,
             "refresh_period": 14400
         },
         {
