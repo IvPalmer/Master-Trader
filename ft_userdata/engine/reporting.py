@@ -105,23 +105,32 @@ def classify_recommendation(results: dict) -> str:
     Determine recommendation from combined stage results.
 
     Decision tree:
-        KILL:           viability=DEAD OR mc_score<40
-        INVESTIGATE:    calibration<50 (engine broken, NOT strategy fault)
-        MONITOR:        viability=MARGINAL OR calibration 50-69 OR mc_score 40-59
-        OPTIMIZE:       viability=VIABLE AND calibration>=70 AND mc_score>=60
-        KEEP:           All checks pass, no param changes needed
+        REGIME_DEPENDENT: viability=DEAD BUT calibration>=70 (works live, backtests poorly)
+        KILL:             viability=DEAD AND calibration<70 (or no calibration)
+        INVESTIGATE:      calibration<50 (engine broken, NOT strategy fault)
+        MONITOR:          viability=MARGINAL OR calibration 50-69 OR mc_score 40-59
+        OPTIMIZE:         viability=VIABLE AND calibration>=70 AND mc_score>=60
+        KEEP:             All checks pass, no param changes needed
 
     NOTE: Low calibration means the backtest engine doesn't reproduce live results.
     This is an ENGINE problem, not a strategy problem. Don't kill strategies
     based on calibration — investigate why backtests diverge from live.
 
-    Returns: 'KILL', 'INVESTIGATE', 'OPTIMIZE', 'MONITOR', or 'KEEP'
+    Returns: 'KILL', 'REGIME_DEPENDENT', 'INVESTIGATE', 'OPTIMIZE', 'MONITOR', or 'KEEP'
     """
     viability = _safe_get(results, "viability", "classification", default="UNKNOWN")
     calibration = _safe_get(results, "calibration", "score")
     mc_score = _safe_get(results, "robustness", "monte_carlo", "mc_score")
     wf_profitable = _safe_get(results, "walk_forward", "consensus", "windows_profitable", default=0)
     wf_total = _safe_get(results, "walk_forward", "consensus", "windows_total", default=0)
+
+    # ── REGIME_DEPENDENT: backtests poorly but live performance is good ───
+    # High calibration = recent live trades match backtest signals.
+    # Dead viability = full-year backtest loses money.
+    # This means the strategy works NOW but not across all market regimes.
+    # Don't kill — monitor closely, may stop working when regime shifts.
+    if viability == "DEAD" and calibration is not None and calibration >= OPTIMIZE_CALIBRATION:
+        return "REGIME_DEPENDENT"
 
     # ── KILL conditions (viability or MC only — NOT calibration) ──────────
     if viability == "DEAD":
@@ -256,6 +265,8 @@ def build_report_card(strategy_name: str, results: dict) -> str:
         rec_display = "KEEP + APPLY CONSENSUS"
     elif recommendation == "KILL":
         rec_display = "FLAG -- RECOMMEND REMOVAL (manual action required)"
+    elif recommendation == "REGIME_DEPENDENT":
+        rec_display = "REGIME-DEPENDENT -- works live, backtests poorly"
     elif recommendation == "INVESTIGATE":
         rec_display = "INVESTIGATE -- ENGINE DIVERGES FROM LIVE"
     elif recommendation == "MONITOR":
@@ -281,12 +292,16 @@ def build_report_card(strategy_name: str, results: dict) -> str:
     lines.append(_box_line(f"RECOMMENDATION: {rec_display}"))
 
     if top_pairs:
-        pairs_str = ", ".join(p.split("/")[0] for p in top_pairs[:5])
+        def _pair_name(p):
+            if isinstance(p, dict):
+                return p.get("pair", "?").split("/")[0]
+            return str(p).split("/")[0]
+        pairs_str = ", ".join(_pair_name(p) for p in top_pairs[:5])
         lines.append(_box_line(""))
         lines.append(_box_line(f"Top pairs: {pairs_str}"))
 
     if worst_pairs:
-        pairs_str = ", ".join(p.split("/")[0] for p in worst_pairs[:5])
+        pairs_str = ", ".join(_pair_name(p) for p in worst_pairs[:5])
         lines.append(_box_line(f"Drop pairs: {pairs_str} (negative expectancy)"))
 
     # Extra details
@@ -338,6 +353,8 @@ def build_telegram_message(all_results: dict) -> str:
         # Emoji-free status indicators
         if rec == "KILL":
             indicator = "[X]"
+        elif rec == "REGIME_DEPENDENT":
+            indicator = "[R]"
         elif rec == "MONITOR":
             indicator = "[?]"
         elif rec == "OPTIMIZE":
