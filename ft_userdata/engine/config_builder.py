@@ -78,6 +78,7 @@ def build_backtest_config(
         config["margin_mode"] = strat.get("margin_mode", "isolated")
     config["max_open_trades"] = max_open_trades or strat["max_open_trades"]
     config["stake_amount"] = stake_amount or strat["stake_amount"]
+    config["dry_run_wallet"] = strat.get("dry_run_wallet", 1000)
     config["bot_name"] = f"Backtest-{strategy_name}"
 
     # Pairs
@@ -169,6 +170,7 @@ def build_calibration_config(
         config["margin_mode"] = strat.get("margin_mode", "isolated")
     config["max_open_trades"] = max_open_trades
     config["stake_amount"] = stake_amount
+    config["dry_run_wallet"] = strat.get("dry_run_wallet", 1000)
     config["bot_name"] = f"Calibrate-{strategy_name}"
     config["exchange"]["pair_whitelist"] = pairs
 
