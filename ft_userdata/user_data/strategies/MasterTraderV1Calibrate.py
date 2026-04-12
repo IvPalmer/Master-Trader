@@ -1,55 +1,21 @@
 """
-Calibration wrapper — replays ALL runtime filters in backtest.
+Calibration wrapper — bypasses runtime-only checks for live-vs-backtest comparison.
 
-Replicated: BTC guard, F&G gate, dynamic pairlist (Vol+Volatility+Range)
-Bypassed:   PositionTracker (no cross-bot state in backtest)
+Calibration asks: does the backtest reproduce the same trades as live?
+Since live trades already passed all filters, the backtest should too.
+Only PositionTracker needs bypassing (no cross-bot state in backtest).
+
+BTC guard: already in populate_entry_trend, works natively.
+F&G gate: 0 extreme greed days since Apr 2025, not a factor.
+Pairlist filter: NOT applied here — belongs in viability wrapper.
 """
-import json
-import logging
-from datetime import datetime
-from pathlib import Path
-
 from MasterTraderV1 import MasterTraderV1
-from dynamic_pairlist_mixin import DynamicPairlistMixin
-
-logger = logging.getLogger(__name__)
-FNG_CACHE_FILE = Path("/freqtrade/user_data/fear_greed_history.json")
 
 
-class MasterTraderV1Calibrate(DynamicPairlistMixin, MasterTraderV1):
-
-    # Match live pairlist config
-    PAIRLIST_VOLUME_MIN = 5_000_000
-    PAIRLIST_VOLUME_TOP_N = 40
-    PAIRLIST_VOLATILITY_MIN = 0.02
-    PAIRLIST_VOLATILITY_MAX = 0.60
-    PAIRLIST_RANGE_MIN = 0.02
-    PAIRLIST_RANGE_MAX = 0.45
-
-    _fng_data: dict = {}
-
-    def bot_start(self, **kwargs):
-        super().bot_start(**kwargs)
-        if FNG_CACHE_FILE.exists():
-            try:
-                with open(FNG_CACHE_FILE) as f:
-                    self._fng_data = json.load(f)
-                logger.info("F&G: %d days loaded", len(self._fng_data))
-            except Exception:
-                pass
+class MasterTraderV1Calibrate(MasterTraderV1):
 
     def confirm_trade_entry(self, pair, order_type, amount, rate, time_in_force,
                             current_time, entry_tag, side, **kwargs):
-        # F&G gate
-        if self._fng_data:
-            fng = self._fng_data.get(current_time.strftime("%Y-%m-%d"), 50)
-            if fng >= 80:
-                return False
-
-        # Dynamic pairlist gate
-        if not self.passes_dynamic_pairlist(pair, current_time):
-            return False
-
         return True
 
     def confirm_trade_exit(self, pair, trade, order_type, amount, rate,

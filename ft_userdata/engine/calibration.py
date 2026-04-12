@@ -946,9 +946,11 @@ def _run_per_pair_calibration(
         bt_trades = filter_boundary_exits(bt_trades, timerange, timeframe)
         all_bt_trades.extend(bt_trades)
 
+        # 8h tolerance: same supertrend flip, slightly delayed entry
+        # 4h was too tight (30% match), 24h too loose (70% match)
         matches = match_trades(
             pair_trades, bt_trades,
-            candle_tolerance=4, timeframe=timeframe,
+            candle_tolerance=8, timeframe=timeframe,
         )
 
         matched = sum(1 for m in matches if m["matched"])

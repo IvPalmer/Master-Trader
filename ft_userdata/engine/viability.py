@@ -208,6 +208,22 @@ def run_recursive_analysis(
 
 # ── Stage 3c: Full-Period Backtest ───────────────────────────────────────
 
+def _viability_strategy_name(strategy_name: str) -> str:
+    """
+    Use viability wrapper if it exists, otherwise base strategy.
+
+    Viability wrappers apply runtime filters (dynamic pairlist, F&G)
+    that the base strategy checks in confirm_trade_entry at runtime.
+    """
+    from pathlib import Path
+    wrapper = f"{strategy_name}Viability"
+    wrapper_file = FT_DIR / "user_data" / "strategies" / f"{wrapper}.py"
+    if wrapper_file.exists():
+        log.info("Using viability wrapper: %s", wrapper)
+        return wrapper
+    return strategy_name
+
+
 def run_full_backtest(
     strategy_name: str,
     timerange: str,
@@ -229,11 +245,14 @@ def run_full_backtest(
     strat = get_strategy(strategy_name)
     image = strat["image"]
 
+    # Use viability wrapper if available (applies runtime filters)
+    bt_strategy = _viability_strategy_name(strategy_name)
+
     start_ts = _time.time()
 
     args = [
         "backtesting",
-        "--strategy", strategy_name,
+        "--strategy", bt_strategy,
         "--config", config_path,
         "--timerange", timerange,
         "--export", "trades",
@@ -243,7 +262,10 @@ def run_full_backtest(
         result = _run_docker(image, args, timeout=_BACKTEST_TIMEOUT)
         combined = (result.stdout or "") + "\n" + (result.stderr or "")
 
-        metrics = parse_backtest_output(combined, strategy_name)
+        # Try both wrapper name and base name for parsing
+        metrics = parse_backtest_output(combined, bt_strategy)
+        if metrics is None:
+            metrics = parse_backtest_output(combined, strategy_name)
         if metrics is None:
             log.warning("Could not parse backtest output for %s", strategy_name)
             return {"error": "unparseable output", "raw": combined[-1000:]}
