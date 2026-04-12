@@ -392,35 +392,79 @@ def run_pipeline(
     spot_pairs = data_result.get("spot_pairs", [])
     futures_pairs = data_result.get("futures_pairs", [])
 
-    # If we skipped data or it failed, build a default timerange
+    # If we skipped data or it failed, build a timerange from available data
     if not timerange:
-        from engine.data import _build_timerange
-        timerange = _build_timerange(400)
-        log.info("Using default timerange: %s", timerange)
+        # Detect actual data start from BTC candle file (most reliable reference)
+        data_start = None
+        btc_feather = FT_DIR / "user_data" / "data" / "binance" / "BTC_USDT-1h.feather"
+        if btc_feather.exists():
+            try:
+                import pandas as pd
+                df = pd.read_feather(btc_feather)
+                data_start = df["date"].min().strftime("%Y%m%d")
+                log.info("Data starts at %s (from BTC/USDT 1h)", data_start)
+            except Exception:
+                pass
 
-    # If pairs are empty (data stage skipped/failed), fetch them now
+        if data_start:
+            end = datetime.now().strftime("%Y%m%d")
+            timerange = f"{data_start}-{end}"
+        else:
+            # Conservative fallback: 365 days (not 400)
+            from engine.data import _build_timerange
+            timerange = _build_timerange(365)
+
+        log.info("Using timerange: %s", timerange)
+
+    # Build per-strategy pair lists from LIVE TRADE HISTORY.
+    # Using API pairs is wrong — the live bot trades different pairs than
+    # a generic top-50 list. Trade history is the source of truth.
+    from engine.calibration import find_trade_db, read_live_trades
+    strategy_pairs: dict[str, list[str]] = {}
+
+    for strat_name in strat_names:
+        db = find_trade_db(strat_name)
+        if db:
+            trades = read_live_trades(db)
+            pairs = sorted(set(t["pair"] for t in trades))
+            if pairs:
+                strategy_pairs[strat_name] = pairs
+                log.info("Pairs for %s: %d from trade history", strat_name, len(pairs))
+                continue
+
+        # Fallback: read from the bot's backtest config
+        strat_cfg = get_strategy(strat_name)
+        config_name = strat_cfg.get("backtest_config")
+        if config_name:
+            config_path = FT_DIR / "user_data" / "configs" / config_name
+            if config_path.exists():
+                try:
+                    with open(config_path) as f:
+                        cfg = json.load(f)
+                    pairs = cfg.get("exchange", {}).get("pair_whitelist", [])
+                    if pairs:
+                        strategy_pairs[strat_name] = pairs
+                        log.info("Pairs for %s: %d from backtest config", strat_name, len(pairs))
+                        continue
+                except Exception:
+                    pass
+
+        log.warning("No pairs found for %s — will use API fallback", strat_name)
+
+    # API fallback only for strategies with no trade history AND no config
     if not spot_pairs:
-        log.info("No spot pairs from data stage — fetching from Binance API...")
         try:
             from engine.data import fetch_top_pairs_spot
             spot_pairs = fetch_top_pairs_spot(limit=50)
-            log.info("Fetched %d spot pairs", len(spot_pairs))
+            log.info("API fallback: fetched %d spot pairs", len(spot_pairs))
         except Exception as e:
-            log.error("Failed to fetch spot pairs: %s", e)
-            # Fallback to pairs from backtest_base.json
-            try:
-                with open(FT_DIR / "user_data" / "configs" / "backtest_base.json") as f:
-                    base_cfg = json.load(f)
-                spot_pairs = base_cfg.get("exchange", {}).get("pair_whitelist", [])
-                log.info("Using %d pairs from backtest_base.json", len(spot_pairs))
-            except Exception:
-                log.error("No pairs available — downstream stages will fail")
+            log.warning("Failed to fetch spot pairs: %s", e)
 
     if not futures_pairs:
         try:
             from engine.data import fetch_top_pairs_futures
             futures_pairs = fetch_top_pairs_futures(limit=20)
-            log.info("Fetched %d futures pairs", len(futures_pairs))
+            log.info("API fallback: fetched %d futures pairs", len(futures_pairs))
         except Exception as e:
             log.warning("Failed to fetch futures pairs: %s", e)
 
@@ -496,7 +540,12 @@ def run_pipeline(
 
                 try:
                     strat_cfg = get_strategy(strat_name)
-                    pairs = futures_pairs if strat_cfg["trading_mode"] == "futures" else spot_pairs
+                    # Use per-strategy pairs from trade history (preferred)
+                    # Fall back to API pairs only if no history exists
+                    if strat_name in strategy_pairs:
+                        pairs = strategy_pairs[strat_name]
+                    else:
+                        pairs = futures_pairs if strat_cfg["trading_mode"] == "futures" else spot_pairs
                     via_result = run_viability_stage(
                         strategy_name=strat_name,
                         pairs=pairs,
@@ -549,7 +598,10 @@ def run_pipeline(
 
                 try:
                     strat_cfg = get_strategy(strat_name)
-                    pairs = futures_pairs if strat_cfg["trading_mode"] == "futures" else spot_pairs
+                    if strat_name in strategy_pairs:
+                        pairs = strategy_pairs[strat_name]
+                    else:
+                        pairs = futures_pairs if strat_cfg["trading_mode"] == "futures" else spot_pairs
                     wf_result = run_walk_forward_stage(
                         strategy_name=strat_name,
                         pairs=pairs,
@@ -592,7 +644,10 @@ def run_pipeline(
 
                 try:
                     strat_cfg = get_strategy(strat_name)
-                    pairs = futures_pairs if strat_cfg["trading_mode"] == "futures" else spot_pairs
+                    if strat_name in strategy_pairs:
+                        pairs = strategy_pairs[strat_name]
+                    else:
+                        pairs = futures_pairs if strat_cfg["trading_mode"] == "futures" else spot_pairs
                     # Get consensus params from walk-forward results
                     wf_data = results["strategies"][strat_name].get("walk_forward", {})
                     consensus = wf_data.get("consensus", {})

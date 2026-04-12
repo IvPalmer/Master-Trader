@@ -948,7 +948,7 @@ def _run_per_pair_calibration(
 
         matches = match_trades(
             pair_trades, bt_trades,
-            candle_tolerance=24, timeframe=timeframe,
+            candle_tolerance=4, timeframe=timeframe,
         )
 
         matched = sum(1 for m in matches if m["matched"])
