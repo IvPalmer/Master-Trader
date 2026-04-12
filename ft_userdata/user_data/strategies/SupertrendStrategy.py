@@ -1,8 +1,6 @@
 import logging
 from datetime import datetime
-from numpy.lib import math
 from freqtrade.strategy import IStrategy, IntParameter, informative
-from freqtrade.persistence import Trade
 from pandas import DataFrame
 import talib.abstract as ta
 import numpy as np
@@ -25,20 +23,19 @@ class SupertrendStrategy(IStrategy):
         "sell_p1": 16, "sell_p2": 18, "sell_p3": 18,
     }
 
-    # ROI widened: old 5/3/2/1% was capping winners (avg win $0.48 vs avg loss $1.12)
-    # Let trailing stop (2% @ 3% offset) handle profit-taking instead of early ROI exits
+    # Full-year backtest (Apr 2025-Apr 2026): Config E is the only profitable config.
+    # Tight ROI captures more total profit than wide ROI by freeing trade slots faster.
     minimal_roi = {
-        "0": 0.08, "360": 0.05, "720": 0.03, "1440": 0.02
+        "0": 0.05, "360": 0.03, "720": 0.02, "1440": 0.01
     }
 
     stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%
-    # Built-in trailing disabled — replaced by N-bar structure-based trailing in custom_stoploss
-    trailing_stop = False
-    # trailing_stop_positive = 0.02
-    # trailing_stop_positive_offset = 0.03
-    # trailing_only_offset_is_reached = True
-    use_custom_stoploss = True
-    n_bar_lookback = 3
+    # Built-in trailing: 2% trail activates at +3% profit. Full-year backtest: 102 trades, 100% WR, +$42.
+    trailing_stop = True
+    trailing_stop_positive = 0.02
+    trailing_stop_positive_offset = 0.03
+    trailing_only_offset_is_reached = True
+    use_custom_stoploss = False
     # Reverted to 1h — the 4h migration killed PF (3.34→1.46). Live 1h performance > 4h backtest.
     timeframe = '1h'
     process_only_new_candles = True
@@ -171,82 +168,6 @@ class SupertrendStrategy(IStrategy):
         bot_name = self.config.get('bot_name', 'Supertrend')
         PositionTracker.unregister(bot_name, pair)
         return True
-
-    def custom_stoploss(self, pair: str, trade: Trade, current_time: datetime,
-                        current_rate: float, current_profit: float, **kwargs) -> float:
-        """
-        N-bar trailing stop: trail using lowest low of last N candles.
-        Adapts to volatility — wide candles = wide stop, tight candles = tight stop.
-        Inspired by Lance Breitstein's 2-bar trailing methodology (SMB Capital).
-        """
-        dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
-        if dataframe.empty:
-            return self.stoploss  # -0.05
-
-        trade_candles = len(dataframe.loc[dataframe['date'] >= trade.open_date_utc])
-
-        # Not enough candles yet — use default stoploss
-        if trade_candles < self.n_bar_lookback:
-            return self.stoploss
-
-        # Lowest low of last N candles
-        n_bar_low = dataframe['low'].tail(self.n_bar_lookback).min()
-
-        # Calculate stoploss relative to current rate
-        sl_from_current = (n_bar_low / current_rate) - 1.0
-
-        # Never wider than default stoploss (-5%)
-        if sl_from_current < self.stoploss:
-            return self.stoploss
-
-        # Never return positive (that would close the trade)
-        if sl_from_current >= 0:
-            return -0.001
-
-        return sl_from_current
-
-    def custom_stake_amount(self, current_time: datetime, current_rate: float,
-                            proposed_stake: float, min_stake: float | None,
-                            max_stake: float, entry_tag: str | None, side: str,
-                            **kwargs) -> float:
-        """
-        Confidence-based position sizing (Lance Breitstein A/B/C grading).
-        Score setup quality from confirming indicators, scale stake accordingly.
-        """
-        pair = kwargs.get('pair', '')
-        dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
-        if dataframe.empty:
-            return proposed_stake
-
-        last = dataframe.iloc[-1]
-        score = 0
-
-        # +1: Strong ADX trend (> 30 vs entry threshold of 25)
-        if last.get('regime_adx_14', 0) > 30:
-            score += 1
-
-        # +1: Volume spike (> 1.5x average)
-        if last.get('volume_ratio', 0) > 1.5:
-            score += 1
-
-        # +1: Low volatility (ATR well below danger zone)
-        if last.get('regime_volatile', 1) == 0 and last.get('regime_atr_14', 0) < 1.5 * last.get('regime_atr_sma_50', 1):
-            score += 1
-
-        # +1: BTC RSI shows strong momentum (> 55, not just above 35 threshold)
-        if last.get('btc_usdt_rsi_1h', 0) > 55:
-            score += 1
-
-        # Scale stake: score 0-1 = 0.75x, score 2 = 1.0x, score 3-4 = 1.25x
-        if score >= 3:
-            multiplier = 1.25
-        elif score >= 2:
-            multiplier = 1.0
-        else:
-            multiplier = 0.75
-
-        adjusted = proposed_stake * multiplier
-        return max(min(adjusted, max_stake), min_stake or 0)
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe.loc[

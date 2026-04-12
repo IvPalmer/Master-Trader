@@ -526,17 +526,15 @@ def run_pipeline(
 
                 if "calibration" in active_stages and cal_score < CALIBRATION_GATE_SCORE and not cal_error:
                     log.warning(
-                        "Skipping viability for %s — calibration score %.1f < %d "
-                        "(backtest unreliable, viability results would be misleading)",
-                        strat_name, cal_score, CALIBRATION_GATE_SCORE,
+                        "⚠ Calibration score %.1f < %d for %s — viability results may be unreliable "
+                        "(backtest doesn't fully reproduce live trades). Proceeding anyway.",
+                        cal_score, CALIBRATION_GATE_SCORE, strat_name,
                     )
-                    results["strategies"][strat_name]["viability"] = {
-                        "classification": "SKIPPED",
-                        "reason": f"Calibration score {cal_score:.1f} below gate ({CALIBRATION_GATE_SCORE}). "
-                                  "Backtest cannot reproduce live trades — viability results unreliable.",
-                        "skipped": True,
-                    }
-                    continue
+                    # Flag but don't skip — user wants full pipeline results
+                    results["strategies"][strat_name]["calibration_warning"] = (
+                        f"Calibration {cal_score:.1f} < {CALIBRATION_GATE_SCORE}: "
+                        "viability results should be interpreted with caution."
+                    )
 
                 try:
                     strat_cfg = get_strategy(strat_name)

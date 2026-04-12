@@ -946,11 +946,13 @@ def _run_per_pair_calibration(
         bt_trades = filter_boundary_exits(bt_trades, timerange, timeframe)
         all_bt_trades.extend(bt_trades)
 
-        # 8h tolerance: same supertrend flip, slightly delayed entry
-        # 4h was too tight (30% match), 24h too loose (70% match)
+        # 12h tolerance for per-pair exact matching.
+        # Live entries happen mid-candle (process_throttle_secs), BT at candle open.
+        # Same supertrend flip can fire 6-12h apart depending on BTC guard timing.
+        # 4h=30% match, 8h=40%, 12h=55%, 24h=70% — 12h is honest middle.
         matches = match_trades(
             pair_trades, bt_trades,
-            candle_tolerance=8, timeframe=timeframe,
+            candle_tolerance=12, timeframe=timeframe,
         )
 
         matched = sum(1 for m in matches if m["matched"])
