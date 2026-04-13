@@ -29,12 +29,12 @@ BASE_CONFIG = {
     "max_open_trades": 5,
     "amount_reserve_percent": 0.05,
     "entry_pricing": {
-        "price_side": "other",
+        "price_side": "same",
         "use_order_book": True,
         "order_book_top": 1,
     },
     "exit_pricing": {
-        "price_side": "other",
+        "price_side": "same",
         "use_order_book": True,
         "order_book_top": 1,
     },

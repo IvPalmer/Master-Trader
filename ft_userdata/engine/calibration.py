@@ -343,6 +343,13 @@ def _run_calibration_backtest(
     import time as _time
     start_ts = _time.time()
 
+    # Use --timeframe-detail 5m for sub-candle entry/exit precision.
+    # This makes trailing stop triggers match live more closely (5m vs 1h granularity).
+    # Only enable if 5m data exists for the pairs being tested.
+    tf_detail = None
+    if strat["timeframe"] in ("1h", "2h", "4h"):
+        tf_detail = "5m"
+
     cmd = [
         "docker", "run", "--rm",
         "-v", f"{FT_DIR / 'user_data'}:/freqtrade/user_data",
@@ -353,6 +360,8 @@ def _run_calibration_backtest(
         "--timerange", timerange,
         "--export", "trades",
     ]
+    if tf_detail:
+        cmd.extend(["--timeframe-detail", tf_detail])
 
     log.info("Running calibration backtest: %s (range: %s)", bt_strategy, timerange)
     log.debug("Command: %s", " ".join(cmd))
