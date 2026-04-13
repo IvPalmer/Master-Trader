@@ -343,13 +343,6 @@ def _run_calibration_backtest(
     import time as _time
     start_ts = _time.time()
 
-    # Use --timeframe-detail 5m for sub-candle entry/exit precision.
-    # This makes trailing stop triggers match live more closely (5m vs 1h granularity).
-    # Only enable if 5m data exists for the pairs being tested.
-    tf_detail = None
-    if strat["timeframe"] in ("1h", "2h", "4h"):
-        tf_detail = "5m"
-
     cmd = [
         "docker", "run", "--rm",
         "-v", f"{FT_DIR / 'user_data'}:/freqtrade/user_data",
@@ -360,8 +353,6 @@ def _run_calibration_backtest(
         "--timerange", timerange,
         "--export", "trades",
     ]
-    if tf_detail:
-        cmd.extend(["--timeframe-detail", tf_detail])
 
     log.info("Running calibration backtest: %s (range: %s)", bt_strategy, timerange)
     log.debug("Command: %s", " ".join(cmd))
@@ -1090,11 +1081,25 @@ def run_calibration_stage(strategy_name: str) -> dict:
         log.info("Filtered %d pairs with no data: %s", len(skipped_pairs),
                  ", ".join(skipped_pairs[:10]))
 
-    # Also filter live_trades to only include valid pairs
+    # Filter live_trades to only include valid pairs
     live_trades_filtered = [t for t in live_trades if t["pair"] in valid_pairs]
+
+    # Filter out stoploss_on_exchange exits — these trigger at tick-level prices
+    # via exchange-side orders. Backtest cannot reproduce this mechanism accurately.
+    sl_exchange = [t for t in live_trades_filtered
+                   if "stoploss_on_exchange" in t.get("exit_reason", "")]
+    if sl_exchange:
+        live_trades_filtered = [t for t in live_trades_filtered
+                                if "stoploss_on_exchange" not in t.get("exit_reason", "")]
+        log.info("Excluded %d stoploss_on_exchange trades (tick-level exits, "
+                 "not reproducible in backtest)", len(sl_exchange))
+
     excluded_trades = len(live_trades) - len(live_trades_filtered)
     if excluded_trades:
-        log.info("Excluded %d live trades on pairs without data", excluded_trades)
+        log.info("Excluded %d live trades total (%d no data, %d stoploss_on_exchange)",
+                 excluded_trades,
+                 excluded_trades - len(sl_exchange),
+                 len(sl_exchange))
 
     pairlist = valid_pairs
     result["timerange"] = timerange

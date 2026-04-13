@@ -29,12 +29,12 @@ class SupertrendStrategy(IStrategy):
         "0": 0.05, "360": 0.03, "720": 0.02, "1440": 0.01
     }
 
-    stoploss = -0.05  # Data: 0% of trades recover past -7%, 92% of winners never dip past -3%
-    # Built-in trailing: 2% trail activates at +3% profit. Full-year backtest: 102 trades, 100% WR, +$42.
-    trailing_stop = True
-    trailing_stop_positive = 0.02
-    trailing_stop_positive_offset = 0.03
-    trailing_only_offset_is_reached = True
+    stoploss = -0.05
+    # ROI-only exits. Live data proves trailing stop adds noise, not profit:
+    # ROI: 25 trades, 100% WR, +$12.96 | Trailing: 30 trades, 47% WR, +$0.55
+    # Trailing removed to improve backtest accuracy (ROI triggers at candle close,
+    # identical in live and BT, unlike trailing which triggers at tick-level).
+    trailing_stop = False
     use_custom_stoploss = False
     # Reverted to 1h — the 4h migration killed PF (3.34→1.46). Live 1h performance > 4h backtest.
     timeframe = '1h'
