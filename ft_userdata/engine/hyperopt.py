@@ -64,13 +64,14 @@ def run_hyperopt(
         "--strategy", strategy_name,
         "--config", config_path,
         "--hyperopt-loss", loss_function,
-        "--spaces", "roi", "stoploss", "trailing",
+        "--spaces", "roi", "stoploss",
         "--epochs", str(epochs),
         "--timerange", timerange,
         "--print-json",
         "--disable-param-export",
         "-j", "1",
         "--min-trades", str(min_trades),
+        "--timeframe-detail", "1m",
     ]
 
     log.info(

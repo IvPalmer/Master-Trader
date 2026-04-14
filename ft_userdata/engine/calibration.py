@@ -352,6 +352,7 @@ def _run_calibration_backtest(
         "--config", config_path,
         "--timerange", timerange,
         "--export", "trades",
+        "--timeframe-detail", "1m",
     ]
 
     log.info("Running calibration backtest: %s (range: %s)", bt_strategy, timerange)

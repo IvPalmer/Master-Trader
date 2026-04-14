@@ -163,6 +163,7 @@ def run_oos_backtest(
         "--strategy", strategy_name,
         "--config", oos_config_path,
         "--timerange", timerange,
+        "--timeframe-detail", "1m",
     ]
 
     log.info(

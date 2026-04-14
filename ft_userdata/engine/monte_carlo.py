@@ -336,6 +336,7 @@ def _run_docker_backtest(
         "--strategy", strategy_name,
         "--config", config_path,
         "--timerange", timerange,
+        "--timeframe-detail", "1m",
     ]
 
     log.debug("Running backtest: %s", " ".join(cmd))

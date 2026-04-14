@@ -256,6 +256,7 @@ def run_full_backtest(
         "--config", config_path,
         "--timerange", timerange,
         "--export", "trades",
+        "--timeframe-detail", "1m",
     ]
 
     try:
