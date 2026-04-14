@@ -133,6 +133,7 @@ def build_hyperopt_config(
         config["margin_mode"] = strat.get("margin_mode", "isolated")
     config["max_open_trades"] = strat["max_open_trades"]
     config["stake_amount"] = strat["stake_amount"]
+    config["dry_run_wallet"] = strat.get("dry_run_wallet", 1000)
     config["bot_name"] = f"Hyperopt-{strategy_name}"
     config["exchange"]["pair_whitelist"] = pairs
     if strat.get("pair_blacklist"):
