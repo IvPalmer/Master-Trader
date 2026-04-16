@@ -1,0 +1,17 @@
+{
+  "strategy": "BearCrashShortV1",
+  "score": 0,
+  "grade": "Broken",
+  "metrics": {},
+  "component_scores": {},
+  "divergent_trades": [],
+  "live_trade_count": 0,
+  "bt_trade_count": 0,
+  "timerange": "",
+  "pairlist": [],
+  "needs_investigation": true,
+  "code_change_date": "2026-04-06T10:32:29-03:00",
+  "trades_excluded_old_code": 8,
+  "total_trades_in_db": 8,
+  "error": "No closed trades found after last code change (2026-04-06) in tradesv3.dryrun.BearCrashShortV1.sqlite. 8 older trades excluded."
+}

@@ -1,0 +1,357 @@
+{
+  "meta": {
+    "mode": "fast",
+    "mode_config": {
+      "epochs": 300,
+      "wf_windows": 3,
+      "train_days": 90,
+      "test_days": 30,
+      "mc_iterations": 0,
+      "perturb_pcts": [],
+      "description": "Weekly validation \u2014 skip Monte Carlo"
+    },
+    "strategies": [
+      "SupertrendStrategy"
+    ],
+    "stages_requested": [
+      "calibration",
+      "viability",
+      "reporting"
+    ],
+    "stages_completed": [
+      "calibration",
+      "viability",
+      "reporting"
+    ],
+    "run_dir": "/Users/palmer/ft_userdata/engine_results/20260412_122255_fast",
+    "started_at": "2026-04-12T12:22:55.750302",
+    "status": "success",
+    "total_duration": "2m 59s",
+    "finished_at": "2026-04-12T12:25:54.896605"
+  },
+  "strategies": {
+    "SupertrendStrategy": {
+      "calibration": {
+        "strategy": "SupertrendStrategy",
+        "score": 66.3,
+        "grade": "Moderate",
+        "metrics": {
+          "trade_match_rate": 0.5,
+          "matched_count": 10,
+          "total_live_trades": 20,
+          "profit_correlation": 0.4029,
+          "aggregate_pnl_delta": 1.4012,
+          "live_total_pnl": -3.2528,
+          "bt_total_pnl": 1.305,
+          "exit_reason_concordance": 0.0,
+          "signal_match_rate": 0.75,
+          "direction_agreement": 0.5333
+        },
+        "component_scores": {
+          "signal_match": 45.0,
+          "direction_agreement": 21.3
+        },
+        "divergent_trades": [
+          {
+            "type": "unmatched",
+            "pair": "AVAX/USDT",
+            "open_date": "2026-04-08 10:48:42.634349",
+            "live_profit": -0.5376734,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BCH/USDT",
+            "open_date": "2026-04-08 11:33:05.370986",
+            "live_profit": -0.2101704,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BTC/USDT",
+            "open_date": "2026-04-08 19:00:12.930408",
+            "live_profit": -0.06641451,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BTC/USDT",
+            "open_date": "2026-04-09 09:00:08.598930",
+            "live_profit": -0.11267781,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ENA/USDT",
+            "open_date": "2026-04-10 17:50:11.173452",
+            "live_profit": 0.31814426,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ETH/USDT",
+            "open_date": "2026-04-10 17:50:09.905500",
+            "live_profit": 0.66807576,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "GIGGLE/USDT",
+            "open_date": "2026-04-09 00:39:36.281545",
+            "live_profit": -0.7296997,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "LINK/USDT",
+            "open_date": "2026-04-08 11:21:24.433014",
+            "live_profit": -0.4096352,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "SOL/USDT",
+            "open_date": "2026-04-08 18:55:05.657742",
+            "live_profit": -0.07320265,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "XRP/USDT",
+            "open_date": "2026-04-08 07:33:57.926443",
+            "live_profit": -0.095646,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "ADA/USDT",
+            "open_date": "2026-04-08 00:39:22.758018",
+            "live_profit": -0.29047464,
+            "bt_profit": -1.58447172,
+            "delta": -1.29399708,
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "stop_loss",
+            "reason": "Profit delta: $1.29"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "ARB/USDT",
+            "open_date": "2026-04-09 00:39:35.536897",
+            "live_profit": -0.1213836,
+            "bt_profit": 0.61245504,
+            "delta": 0.73383864,
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "roi",
+            "reason": "Profit delta: $0.73"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "BARD/USDT",
+            "open_date": "2026-04-08 18:50:30.551019",
+            "live_profit": -0.34771919,
+            "bt_profit": 0.91808797,
+            "delta": 1.26580716,
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "roi",
+            "reason": "Profit delta: $1.27"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "BARD/USDT",
+            "open_date": "2026-04-09 01:00:06.316490",
+            "live_profit": 0.24443008,
+            "bt_profit": 0.91864533,
+            "delta": 0.67421525,
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "roi",
+            "reason": "Profit delta: $0.67"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "NEAR/USDT",
+            "open_date": "2026-04-08 14:09:18.323958",
+            "live_profit": -0.7841081,
+            "bt_profit": 0.30603873,
+            "delta": 1.09014683,
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "roi",
+            "reason": "Profit delta: $1.09"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "NEAR/USDT",
+            "open_date": "2026-04-09 20:00:06.144693",
+            "live_profit": -0.161269,
+            "bt_profit": 0.61078618,
+            "delta": 0.77205518,
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "roi",
+            "reason": "Profit delta: $0.77"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "SUI/USDT",
+            "open_date": "2026-04-08 06:30:55.851000",
+            "live_profit": -0.46370898,
+            "bt_profit": -1.58274006,
+            "delta": -1.1190310799999998,
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "stop_loss",
+            "reason": "Profit delta: $1.12"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "AVAX/USDT",
+            "open_date": "2026-04-08 00:39:22.063273",
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "roi",
+            "reason": "Exit: live=trailing_stop_loss vs bt=roi"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "ENA/USDT",
+            "open_date": "2026-04-08 00:39:23.400819",
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "roi",
+            "reason": "Exit: live=trailing_stop_loss vs bt=roi"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "TRX/USDT",
+            "open_date": "2026-04-09 20:41:00.769789",
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "force_exit",
+            "reason": "Exit: live=trailing_stop_loss vs bt=force_exit"
+          }
+        ],
+        "live_trade_count": 20,
+        "bt_trade_count": 13,
+        "timerange": "20260407-20260412",
+        "pairlist": [
+          "ADA/USDT",
+          "ARB/USDT",
+          "AVAX/USDT",
+          "BARD/USDT",
+          "BCH/USDT",
+          "BTC/USDT",
+          "ENA/USDT",
+          "ETH/USDT",
+          "GIGGLE/USDT",
+          "LINK/USDT",
+          "NEAR/USDT",
+          "SOL/USDT",
+          "SUI/USDT",
+          "TRX/USDT",
+          "XRP/USDT"
+        ],
+        "needs_investigation": true,
+        "code_change_date": "2026-04-06T10:33:16-03:00",
+        "trades_excluded_old_code": 52,
+        "total_trades_in_db": 72,
+        "skipped_pairs": [],
+        "per_pair": {
+          "score": 27.1,
+          "grade": "Broken",
+          "metrics": {
+            "trade_match_rate": 0.5,
+            "matched_count": 10,
+            "total_live_trades": 20,
+            "profit_correlation": 0.4029,
+            "aggregate_pnl_delta": 1.4012,
+            "live_total_pnl": -3.2528,
+            "bt_total_pnl": 1.305,
+            "exit_reason_concordance": 0.0
+          },
+          "signal": {
+            "signal_score": 66.3,
+            "signal_match_rate": 0.75,
+            "signal_matched_count": 15,
+            "direction_agreement": 0.5333
+          }
+        },
+        "calibration_mode": "per_pair_signal",
+        "signal": {
+          "signal_score": 43.9,
+          "signal_match_rate": 0.35,
+          "signal_matched_count": 7,
+          "direction_agreement": 0.5714
+        }
+      },
+      "viability": {
+        "strategy": "SupertrendStrategy",
+        "classification": "MARGINAL",
+        "reasons": [
+          "MARGINAL: Max drawdown 47.0% in warning range (35.0-50.0%)",
+          "MARGINAL: Recursive analysis warning \u2014 indicators may depend on dataset length",
+          "MARGINAL: Sharpe ratio -0.81 in warning range (-1.0-0.5)"
+        ],
+        "lookahead": {
+          "passed": true,
+          "flagged_indicators": [
+            "filename"
+          ],
+          "raw": "2026-04-12 15:24:47,540 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:47,603 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:47,607 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-10 16:00:00 (9 days).\n2026-04-12 15:24:47,608 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 15:24:47,614 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-10 16:00:00\n2026-04-12 15:24:47,621 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:47,695 - freqtrade.data.history.datahandlers.idatahandler - WARNING - DOGE/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:47,702 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-10 08:00:00 (9 days).\n2026-04-12 15:24:47,702 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 15:24:47,708 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-10 08:00:00\n2026-04-12 15:24:47,716 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:47,775 - freqtrade.data.history.datahandlers.idatahandler - WARNING - DOGE/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:47,780 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-10 16:00:00 (9 days).\n2026-04-12 15:24:47,781 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 15:24:47,787 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-10 16:00:00\n2026-04-12 15:24:47,796 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:47,874 - freqtrade.data.history.datahandlers.idatahandler - WARNING - RENDER/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:47,882 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-10 14:00:00 (9 days).\n2026-04-12 15:24:47,882 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 15:24:47,886 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-10 14:00:00\n2026-04-12 15:24:47,895 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:47,988 - freqtrade.data.history.datahandlers.idatahandler - WARNING - RENDER/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:47,993 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-11 01:00:00 (10 days).\n2026-04-12 15:24:47,994 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 15:24:48,000 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-11 01:00:00\n2026-04-12 15:24:48,008 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:48,083 - freqtrade.data.history.datahandlers.idatahandler - WARNING - RENDER/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:48,087 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-11 08:00:00 (10 days).\n2026-04-12 15:24:48,088 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 15:24:48,094 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-11 08:00:00\n2026-04-12 15:24:48,101 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:48,164 - freqtrade.data.history.datahandlers.idatahandler - WARNING - RENDER/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:48,170 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-11 10:00:00 (10 days).\n2026-04-12 15:24:48,170 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 15:24:48,175 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-11 10:00:00\n2026-04-12 15:24:48,183 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 15:24:48,232 - freqtrade.optimize.analysis.lookahead - INFO - Found targeted trade amount = 20 signals.\n2026-04-12 15:24:48,232 - freqtrade.loggers.set_log_levels - INFO - Restoring log verbosity.\n2026-04-12 15:24:48,232 - freqtrade.optimize.analysis.lookahead - INFO - SupertrendStrategy: no bias detected\n2026-04-12 15:24:48,233 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Checking look ahead bias via backtests of SupertrendStrategy.py took 22 seconds."
+        },
+        "recursive": {
+          "warning": true,
+          "flagged_indicators": [],
+          "raw": "/freqtrade/user_data/strategies/SupertrendStrategy.py:227: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`\n  result.fillna(0, inplace=True)\n2026-04-12 15:24:53,804 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 199.\n2026-04-12 15:24:53,915 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:53,921 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-04-03 16:00:00 up to 2026-04-11 11:00:00 (7 days).\n2026-04-12 15:24:53,928 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-04-03 16:00:00 to 2026-04-12 00:00:00\n2026-04-12 15:24:53,935 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:53,951 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 200.\n2026-04-12 15:24:54,053 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:54,060 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-04-03 15:00:00 up to 2026-04-11 11:00:00 (7 days).\n2026-04-12 15:24:54,064 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-04-03 15:00:00 to 2026-04-12 00:00:00\n2026-04-12 15:24:54,073 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:54,089 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 399.\n2026-04-12 15:24:54,190 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:54,196 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-26 08:00:00 up to 2026-04-11 11:00:00 (16 days).\n2026-04-12 15:24:54,201 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-26 08:00:00 to 2026-04-12 00:00:00\n2026-04-12 15:24:54,209 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:54,224 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 499.\n2026-04-12 15:24:54,328 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:54,335 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-22 04:00:00 up to 2026-04-11 11:00:00 (20 days).\n2026-04-12 15:24:54,341 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-22 04:00:00 to 2026-04-12 00:00:00\n2026-04-12 15:24:54,350 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:54,369 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 999.\n2026-04-12 15:24:54,488 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:54,495 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-01 08:00:00 up to 2026-04-11 11:00:00 (41 days).\n2026-04-12 15:24:54,506 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-01 08:00:00 to 2026-04-12 00:00:00\n2026-04-12 15:24:54,514 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:54,538 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 1999.\n2026-04-12 15:24:54,635 - freqtrade.exchange.exchange - WARNING - Using 2 calls to get OHLCV. This can result in slower operations for the bot. Please check if you really need 1999 candles for your \nstrategy.\n2026-04-12 15:24:54,644 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:54,650 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-01-18 16:00:00 up to 2026-04-11 11:00:00 (82 days).\n2026-04-12 15:24:54,668 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-01-18 16:00:00 to 2026-04-12 00:00:00\n2026-04-12 15:24:54,678 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 15:24:54,713 - freqtrade.loggers.set_log_levels - INFO - Restoring log verbosity.\n2026-04-12 15:24:54,713 - freqtrade.optimize.analysis.recursive - INFO - Start checking for recursive bias\n2026-04-12 15:24:54,721 - freqtrade.optimize.analysis.recursive - INFO - Start checking for lookahead bias on indicators only\n2026-04-12 15:24:54,721 - freqtrade.optimize.analysis.recursive - INFO - Check indicators at 2025-04-01T10:00:00\n2026-04-12 15:24:54,722 - freqtrade.optimize.analysis.recursive - INFO - No lookahead bias on indicators found.\n2026-04-12 15:24:54,722 - freqtrade.optimize.analysis.recursive_helpers - INFO - Checking recursive and indicator-only lookahead bias of indicators of SupertrendStrategy.py took 3 seconds."
+        },
+        "metrics": {
+          "strategy": "SupertrendStrategyViability",
+          "total_trades": 675,
+          "avg_profit_pct": -0.05,
+          "total_profit": -15.78,
+          "total_profit_pct": -17.93,
+          "wins": 479,
+          "draws": 0,
+          "losses": 196,
+          "win_rate": 71.0,
+          "max_drawdown_pct": 47.05,
+          "sortino": -3.44,
+          "sharpe": -0.81,
+          "calmar": -1.98,
+          "profit_factor": 0.95,
+          "avg_stake": 28.953,
+          "total_volume": 39149.461,
+          "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-12_15-25-53.zip"
+        },
+        "pair_analysis": {
+          "pairs": [],
+          "top_5": [],
+          "bottom_5": [],
+          "concentration_risk": false,
+          "concentration_details": "",
+          "total_pairs_traded": 0,
+          "error": "no trades in export"
+        }
+      }
+    }
+  },
+  "stage_durations": {
+    "calibration": 86.30965995788574,
+    "viability": 91.16114211082458,
+    "reporting": 0.006001710891723633
+  },
+  "reporting": {
+    "stage": "reporting",
+    "status": "success",
+    "recommendations": {
+      "SupertrendStrategy": "MONITOR"
+    },
+    "report_dir": "/Users/palmer/ft_userdata/engine_results/20260412_fast",
+    "report_cards": "+--------------------------------------------------+\n| SUPERTRENDSTRATEGY -- REPORT CARD                |\n+--------------------------------------------------+\n| Calibration:    66.3/100 (Fair)                  |\n| Viability:      MARGINAL (PF 0.95, 675 trades)   |\n| Lookahead:      PASS                             |\n| Walk-Forward:   SKIPPED                          |\n| Consensus:      SKIPPED                          |\n| Monte Carlo:    SKIPPED                          |\n| Perturbation:   SKIPPED                          |\n|                                                  |\n| RECOMMENDATION: MONITOR -- REVIEW NEXT CYCLE     |\n|                                                  |\n| Max Drawdown:   47.0%                            |\n+--------------------------------------------------+",
+    "telegram_message": "Engine v2 Report -- 2026-04-12 12:25\n\n[?] SupertrendStrategy\n  MONITOR\n  MARGINAL | PF 0.95 | 675T | Cal 66.3\n\n---\nKILL: 0 | INVESTIGATE: 0 | MONITOR: 1 | OPTIMIZE: 0 | KEEP: 0",
+    "telegram_sent": null
+  }
+}

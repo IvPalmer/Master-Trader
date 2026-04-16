@@ -1,0 +1,179 @@
+{
+  "strategy": "BearCrashShortV1",
+  "classification": "MARGINAL",
+  "reasons": [
+    "MARGINAL: Max drawdown 35.0% in warning range (35.0-50.0%)",
+    "MARGINAL: Sharpe ratio -0.13 in warning range (-1.0-0.5)",
+    "MARGINAL: Pair concentration risk \u2014 96% of profit from top 2 pairs: DOGE/USDT:USDT, TAO/USDT:USDT"
+  ],
+  "lookahead": {
+    "passed": true,
+    "flagged_indicators": [
+      "filename"
+    ],
+    "raw": "2026-04-12 16:07:20,197 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2025-07-01 00:00:00\n2026-04-12 16:07:20,279 - freqtrade.data.history.datahandlers.idatahandler - WARNING - SOL/USDT:USDT, futures, 1h, data starts at 2025-07-01 00:00:00\n2026-04-12 16:07:20,289 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-07-01 00:00:00 up to 2025-08-16 22:00:00 (46 days).\n2026-04-12 16:07:20,290 - freqtrade.configuration.timerange... (truncated)"
+  },
+  "recursive": {
+    "warning": false,
+    "flagged_indicators": [],
+    "raw": "2026-04-12 16:07:26,956 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-12 16:07:26,956 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-12 16:07:26,957 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.02\n2026-04-12 16:07:26,957 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.03\n2026-04-12 16:07:26,957 - freqtrade.resolvers.s... (truncated)"
+  },
+  "metrics": {
+    "strategy": "BearCrashShortV1",
+    "total_trades": 177,
+    "avg_profit_pct": -0.01,
+    "total_profit": -0.774,
+    "total_profit_pct": -3.52,
+    "wins": 97,
+    "draws": 0,
+    "losses": 80,
+    "win_rate": 54.8,
+    "max_drawdown_pct": 35.05,
+    "sortino": -0.27,
+    "sharpe": -0.13,
+    "calmar": -0.69,
+    "profit_factor": 0.98,
+    "avg_stake": 10.528,
+    "total_volume": 7454.481,
+    "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-12_16-07-34.zip"
+  },
+  "pair_analysis": {
+    "pairs": [
+      {
+        "pair": "DOGE/USDT:USDT",
+        "trades": 53,
+        "total_profit": 4.26485207,
+        "wins": 33,
+        "losses": 20,
+        "win_rate": 62.3
+      },
+      {
+        "pair": "TAO/USDT:USDT",
+        "trades": 1,
+        "total_profit": 0.18023432,
+        "wins": 1,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "PAXG/USDT:USDT",
+        "trades": 2,
+        "total_profit": 0.17456813,
+        "wins": 2,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "XRP/USDT:USDT",
+        "trades": 44,
+        "total_profit": -0.006576939999999587,
+        "wins": 24,
+        "losses": 20,
+        "win_rate": 54.5
+      },
+      {
+        "pair": "BNB/USDT:USDT",
+        "trades": 47,
+        "total_profit": -1.57889789,
+        "wins": 24,
+        "losses": 23,
+        "win_rate": 51.1
+      },
+      {
+        "pair": "SOL/USDT:USDT",
+        "trades": 30,
+        "total_profit": -3.80833867,
+        "wins": 13,
+        "losses": 17,
+        "win_rate": 43.3
+      }
+    ],
+    "top_5": [
+      {
+        "pair": "DOGE/USDT:USDT",
+        "trades": 53,
+        "total_profit": 4.26485207,
+        "wins": 33,
+        "losses": 20,
+        "win_rate": 62.3
+      },
+      {
+        "pair": "TAO/USDT:USDT",
+        "trades": 1,
+        "total_profit": 0.18023432,
+        "wins": 1,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "PAXG/USDT:USDT",
+        "trades": 2,
+        "total_profit": 0.17456813,
+        "wins": 2,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "XRP/USDT:USDT",
+        "trades": 44,
+        "total_profit": -0.006576939999999587,
+        "wins": 24,
+        "losses": 20,
+        "win_rate": 54.5
+      },
+      {
+        "pair": "BNB/USDT:USDT",
+        "trades": 47,
+        "total_profit": -1.57889789,
+        "wins": 24,
+        "losses": 23,
+        "win_rate": 51.1
+      }
+    ],
+    "bottom_5": [
+      {
+        "pair": "TAO/USDT:USDT",
+        "trades": 1,
+        "total_profit": 0.18023432,
+        "wins": 1,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "PAXG/USDT:USDT",
+        "trades": 2,
+        "total_profit": 0.17456813,
+        "wins": 2,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "XRP/USDT:USDT",
+        "trades": 44,
+        "total_profit": -0.006576939999999587,
+        "wins": 24,
+        "losses": 20,
+        "win_rate": 54.5
+      },
+      {
+        "pair": "BNB/USDT:USDT",
+        "trades": 47,
+        "total_profit": -1.57889789,
+        "wins": 24,
+        "losses": 23,
+        "win_rate": 51.1
+      },
+      {
+        "pair": "SOL/USDT:USDT",
+        "trades": 30,
+        "total_profit": -3.80833867,
+        "wins": 13,
+        "losses": 17,
+        "win_rate": 43.3
+      }
+    ],
+    "concentration_risk": true,
+    "concentration_details": "96% of profit from top 2 pairs: DOGE/USDT:USDT, TAO/USDT:USDT",
+    "total_pairs_traded": 6
+  }
+}

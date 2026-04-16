@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "mode": "fast",
+    "mode_config": {
+      "epochs": 300,
+      "wf_windows": 3,
+      "train_days": 90,
+      "test_days": 30,
+      "mc_iterations": 0,
+      "perturb_pcts": [],
+      "description": "Weekly validation \u2014 skip Monte Carlo"
+    },
+    "strategies": [
+      "MasterTraderV1"
+    ],
+    "stages_requested": [
+      "calibration",
+      "reporting"
+    ],
+    "stages_completed": [
+      "calibration",
+      "reporting"
+    ],
+    "run_dir": "/Users/palmer/ft_userdata/engine_results/20260410_203033_fast",
+    "started_at": "2026-04-10T20:30:33.287208",
+    "status": "success",
+    "total_duration": "0.0s",
+    "finished_at": "2026-04-10T20:30:33.288542"
+  },
+  "strategies": {
+    "MasterTraderV1": {
+      "calibration": {
+        "error": "run_calibration_stage() got an unexpected keyword argument 'pairs'"
+      }
+    }
+  },
+  "stage_durations": {
+    "calibration": 0.0005710124969482422,
+    "reporting": 0.0004620552062988281
+  }
+}

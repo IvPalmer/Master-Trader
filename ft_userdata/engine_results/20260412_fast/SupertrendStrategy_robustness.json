@@ -1,0 +1,7 @@
+{
+  "strategy": "SupertrendStrategy",
+  "monte_carlo": null,
+  "perturbation": null,
+  "combined_score": 0,
+  "combined_verdict": "SKIP"
+}

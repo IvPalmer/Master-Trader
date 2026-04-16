@@ -1,0 +1,15 @@
++--------------------------------------------------+
+| SUPERTRENDSTRATEGY -- REPORT CARD                |
++--------------------------------------------------+
+| Calibration:    SKIPPED                          |
+| Viability:      DEAD (PF 0.89, 582 trades)       |
+| Lookahead:      PASS                             |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: FLAG -- RECOMMEND REMOVAL (manual action required)|
+|                                                  |
+| Max Drawdown:   50.1%                            |
++--------------------------------------------------+

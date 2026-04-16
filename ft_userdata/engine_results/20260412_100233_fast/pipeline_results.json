@@ -1,0 +1,216 @@
+{
+  "meta": {
+    "mode": "fast",
+    "mode_config": {
+      "epochs": 300,
+      "wf_windows": 3,
+      "train_days": 90,
+      "test_days": 30,
+      "mc_iterations": 0,
+      "perturb_pcts": [],
+      "description": "Weekly validation \u2014 skip Monte Carlo"
+    },
+    "strategies": [
+      "MasterTraderV1"
+    ],
+    "stages_requested": [
+      "calibration",
+      "viability",
+      "walk_forward",
+      "robustness",
+      "reporting"
+    ],
+    "stages_completed": [
+      "calibration",
+      "viability",
+      "walk_forward",
+      "robustness",
+      "reporting"
+    ],
+    "run_dir": "/Users/palmer/ft_userdata/engine_results/20260412_100233_fast",
+    "started_at": "2026-04-12T10:02:33.403708",
+    "status": "killed",
+    "total_duration": "1m 26s",
+    "finished_at": "2026-04-12T10:03:59.424288",
+    "killed_strategies": [
+      "MasterTraderV1"
+    ]
+  },
+  "strategies": {
+    "MasterTraderV1": {
+      "calibration": {
+        "strategy": "MasterTraderV1",
+        "score": 88.6,
+        "grade": "Good",
+        "metrics": {
+          "trade_match_rate": 1.0,
+          "matched_count": 7,
+          "total_live_trades": 7,
+          "profit_correlation": 0.8792,
+          "aggregate_pnl_delta": 0.2598,
+          "live_total_pnl": 1.9401,
+          "bt_total_pnl": 1.4361,
+          "exit_reason_concordance": 0.4286,
+          "signal_match_rate": 1.0,
+          "direction_agreement": 0.7143
+        },
+        "component_scores": {
+          "signal_match": 60.0,
+          "direction_agreement": 28.6
+        },
+        "divergent_trades": [
+          {
+            "type": "profit_divergence",
+            "pair": "UNI/USDT",
+            "open_date": "2026-04-07 22:20:18.813549",
+            "live_profit": 0.81766096,
+            "bt_profit": 0.23680211,
+            "delta": -0.58085885,
+            "live_exit": "exit_signal",
+            "bt_exit": "trailing_stop_loss",
+            "reason": "Profit delta: $0.58"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "LTC/USDT",
+            "open_date": "2026-04-05 19:00:06.927682",
+            "live_exit": "stoploss_on_exchange",
+            "bt_exit": "trailing_stop_loss",
+            "reason": "Exit: live=stoploss_on_exchange vs bt=trailing_stop_loss"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "LTC/USDT",
+            "open_date": "2026-04-09 17:00:08.058018",
+            "live_exit": "time_exit_48h",
+            "bt_exit": "exit_signal",
+            "reason": "Exit: live=time_exit_48h vs bt=exit_signal"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "TAO/USDT",
+            "open_date": "2026-04-06 00:10:12.670344",
+            "live_exit": "exit_signal",
+            "bt_exit": "trailing_stop_loss",
+            "reason": "Exit: live=exit_signal vs bt=trailing_stop_loss"
+          }
+        ],
+        "live_trade_count": 7,
+        "bt_trade_count": 7,
+        "timerange": "20260404-20260412",
+        "pairlist": [
+          "LTC/USDT",
+          "SOL/USDT",
+          "TAO/USDT",
+          "TRX/USDT",
+          "UNI/USDT"
+        ],
+        "needs_investigation": false,
+        "code_change_date": "2026-03-18T19:11:17-03:00",
+        "trades_excluded_old_code": 22,
+        "total_trades_in_db": 29,
+        "skipped_pairs": [],
+        "per_pair": {
+          "score": 79.8,
+          "grade": "Good",
+          "metrics": {
+            "trade_match_rate": 1.0,
+            "matched_count": 7,
+            "total_live_trades": 7,
+            "profit_correlation": 0.8792,
+            "aggregate_pnl_delta": 0.2598,
+            "live_total_pnl": 1.9401,
+            "bt_total_pnl": 1.4361,
+            "exit_reason_concordance": 0.4286
+          },
+          "signal": {
+            "signal_score": 88.6,
+            "signal_match_rate": 1.0,
+            "signal_matched_count": 7,
+            "direction_agreement": 0.7143
+          }
+        },
+        "calibration_mode": "per_pair_signal",
+        "signal": {
+          "signal_score": 88.6,
+          "signal_match_rate": 1.0,
+          "signal_matched_count": 7,
+          "direction_agreement": 0.7143
+        }
+      },
+      "viability": {
+        "strategy": "MasterTraderV1",
+        "classification": "DEAD",
+        "reasons": [
+          "KILL: Profit factor 0.45 < 0.5"
+        ],
+        "lookahead": {
+          "passed": true,
+          "flagged_indicators": [
+            "filename"
+          ],
+          "raw": "2026-04-12 13:03:32,778 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:32,924 - freqtrade.data.history.datahandlers.idatahandler - WARNING - AVAX/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:32,934 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-05-26 09:00:00 (55 days).\n2026-04-12 13:03:32,936 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:03:32,953 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-05-26 09:00:00\n2026-04-12 13:03:32,965 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:33,116 - freqtrade.data.history.datahandlers.idatahandler - WARNING - SUI/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:33,127 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-05-26 02:00:00 (55 days).\n2026-04-12 13:03:33,127 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:03:33,142 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-05-26 02:00:00\n2026-04-12 13:03:33,157 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:33,289 - freqtrade.data.history.datahandlers.idatahandler - WARNING - SUI/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:33,300 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-05-26 15:00:00 (55 days).\n2026-04-12 13:03:33,301 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:03:33,318 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-05-26 15:00:00\n2026-04-12 13:03:33,341 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:33,530 - freqtrade.data.history.datahandlers.idatahandler - WARNING - DOGE/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:33,538 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-05-26 02:00:00 (55 days).\n2026-04-12 13:03:33,541 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:03:33,559 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-05-26 02:00:00\n2026-04-12 13:03:33,579 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:33,703 - freqtrade.data.history.datahandlers.idatahandler - WARNING - DOGE/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:33,711 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-05-26 20:00:00 (55 days).\n2026-04-12 13:03:33,712 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:03:33,727 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-05-26 20:00:00\n2026-04-12 13:03:33,767 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:33,910 - freqtrade.data.history.datahandlers.idatahandler - WARNING - LTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:33,920 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-05-26 02:00:00 (55 days).\n2026-04-12 13:03:33,920 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:03:33,936 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-05-26 02:00:00\n2026-04-12 13:03:33,949 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:34,093 - freqtrade.data.history.datahandlers.idatahandler - WARNING - LTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:34,103 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-05-26 20:00:00 (55 days).\n2026-04-12 13:03:34,103 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:03:34,122 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-05-26 20:00:00\n2026-04-12 13:03:34,132 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:34,219 - freqtrade.optimize.analysis.lookahead - INFO - Found targeted trade amount = 20 signals.\n2026-04-12 13:03:34,219 - freqtrade.loggers.set_log_levels - INFO - Restoring log verbosity.\n2026-04-12 13:03:34,219 - freqtrade.optimize.analysis.lookahead - INFO - MasterTraderV1: no bias detected\n2026-04-12 13:03:34,220 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Checking look ahead bias via backtests of MasterTraderV1.py took 15 seconds."
+        },
+        "recursive": {
+          "warning": true,
+          "flagged_indicators": [],
+          "raw": "2026-04-12 13:03:42,334 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-01 10:00:00\n2026-04-12 13:03:42,346 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:03:42,367 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 199.\n2026-04-12 13:03:42,454 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:42,462 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-04-03 16:00:00 up to 2026-04-11 11:00:00 (7 days).\n2026-04-12 13:03:42,466 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-04-03 16:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:03:42,476 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:42,496 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 200.\n2026-04-12 13:03:42,584 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:42,592 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-04-03 15:00:00 up to 2026-04-11 11:00:00 (7 days).\n2026-04-12 13:03:42,598 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-04-03 15:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:03:42,608 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:42,631 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 399.\n2026-04-12 13:03:42,720 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:42,728 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-26 08:00:00 up to 2026-04-11 11:00:00 (16 days).\n2026-04-12 13:03:42,733 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-26 08:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:03:42,744 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:42,770 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 499.\n2026-04-12 13:03:42,869 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:42,878 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-22 04:00:00 up to 2026-04-11 11:00:00 (20 days).\n2026-04-12 13:03:42,889 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-22 04:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:03:42,903 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:42,929 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 999.\n2026-04-12 13:03:43,029 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:43,037 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-01 08:00:00 up to 2026-04-11 11:00:00 (41 days).\n2026-04-12 13:03:43,048 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-01 08:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:03:43,059 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:43,085 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 1999.\n2026-04-12 13:03:43,167 - freqtrade.exchange.exchange - WARNING - Using 2 calls to get OHLCV. This can result in slower operations for the bot. Please check if you really need 1999 candles for your \nstrategy.\n2026-04-12 13:03:43,178 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:43,187 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-01-18 16:00:00 up to 2026-04-11 11:00:00 (82 days).\n2026-04-12 13:03:43,210 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-01-18 16:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:03:43,221 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:03:43,245 - freqtrade.loggers.set_log_levels - INFO - Restoring log verbosity.\n2026-04-12 13:03:43,248 - freqtrade.optimize.analysis.recursive - INFO - Start checking for recursive bias\n2026-04-12 13:03:43,260 - freqtrade.optimize.analysis.recursive - INFO - Start checking for lookahead bias on indicators only\n2026-04-12 13:03:43,262 - freqtrade.optimize.analysis.recursive - INFO - Check indicators at 2025-04-01T10:00:00\n2026-04-12 13:03:43,263 - freqtrade.optimize.analysis.recursive - INFO - No lookahead bias on indicators found.\n2026-04-12 13:03:43,263 - freqtrade.optimize.analysis.recursive_helpers - INFO - Checking recursive and indicator-only lookahead bias of indicators of MasterTraderV1.py took 3 seconds."
+        },
+        "metrics": {
+          "strategy": "MasterTraderV1",
+          "total_trades": 110,
+          "avg_profit_pct": -0.72,
+          "total_profit": -70.007,
+          "total_profit_pct": -7.0,
+          "wins": 46,
+          "draws": 0,
+          "losses": 64,
+          "win_rate": 41.8,
+          "max_drawdown_pct": 7.72,
+          "sortino": -2.41,
+          "sharpe": -1.82,
+          "calmar": -4.72,
+          "profit_factor": 0.45,
+          "avg_stake": 87.873,
+          "total_volume": 19300.551,
+          "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-12_13-03-59.zip"
+        },
+        "pair_analysis": {
+          "pairs": [],
+          "top_5": [],
+          "bottom_5": [],
+          "concentration_risk": false,
+          "concentration_details": "",
+          "total_pairs_traded": 0,
+          "error": "no trades in export"
+        }
+      },
+      "walk_forward": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      },
+      "robustness": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      }
+    }
+  },
+  "stage_durations": {
+    "calibration": 41.23205518722534,
+    "viability": 43.37570118904114,
+    "walk_forward": 0.0005497932434082031,
+    "robustness": 0.0008687973022460938,
+    "reporting": 0.0055348873138427734
+  },
+  "reporting": {
+    "stage": "reporting",
+    "status": "success",
+    "recommendations": {
+      "MasterTraderV1": "REGIME_DEPENDENT"
+    },
+    "report_dir": "/Users/palmer/ft_userdata/engine_results/20260412_fast",
+    "report_cards": "+--------------------------------------------------+\n| MASTERTRADERV1 -- REPORT CARD                    |\n+--------------------------------------------------+\n| Calibration:    88.6/100 (Excellent)             |\n| Viability:      DEAD (PF 0.45, 110 trades)       |\n| Lookahead:      PASS                             |\n| Walk-Forward:   SKIPPED                          |\n| Consensus:      SKIPPED                          |\n| Monte Carlo:    SKIPPED                          |\n| Perturbation:   SKIPPED                          |\n|                                                  |\n| RECOMMENDATION: REGIME-DEPENDENT -- works live, backtests poorly|\n|                                                  |\n| Max Drawdown:   7.7%                             |\n+--------------------------------------------------+",
+    "telegram_message": "Engine v2 Report -- 2026-04-12 10:03\n\n[R] MasterTraderV1\n  REGIME_DEPENDENT\n  DEAD | PF 0.45 | 110T | Cal 88.6\n\n---\nKILL: 0 | INVESTIGATE: 0 | MONITOR: 0 | OPTIMIZE: 0 | KEEP: 0",
+    "telegram_sent": null
+  }
+}

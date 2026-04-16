@@ -10,12 +10,12 @@
   "max_open_trades": 3,
   "amount_reserve_percent": 0.05,
   "entry_pricing": {
-    "price_side": "same",
+    "price_side": "other",
     "use_order_book": true,
     "order_book_top": 1
   },
   "exit_pricing": {
-    "price_side": "same",
+    "price_side": "other",
     "use_order_book": true,
     "order_book_top": 1
   },
@@ -24,28 +24,10 @@
     "key": "",
     "secret": "",
     "pair_whitelist": [
-      "ADA/USDT",
-      "AVAX/USDT",
-      "BNB/USDT",
-      "BTC/USDT",
-      "DOGE/USDT",
-      "ENA/USDT",
-      "ETH/USDT",
-      "EUR/USDT",
-      "HBAR/USDT",
-      "LINK/USDT",
-      "LTC/USDT",
-      "NEAR/USDT",
-      "PUMP/USDT",
-      "SHIB/USDT",
-      "SOL/USDT",
-      "SUI/USDT",
-      "TAO/USDT",
-      "TRX/USDT",
-      "U/USDT",
-      "UNI/USDT",
-      "USD1/USDT",
-      "XUSD/USDT"
+      "ASTER/USDT",
+      "PAXG/USDT",
+      "RENDER/USDT",
+      "SEI/USDT"
     ],
     "pair_blacklist": []
   },
@@ -54,5 +36,5 @@
       "method": "StaticPairList"
     }
   ],
-  "bot_name": "Backtest-MasterTraderV1"
+  "bot_name": "Backtest-BollingerBounceV1"
 }

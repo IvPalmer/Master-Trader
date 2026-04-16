@@ -1,0 +1,8 @@
+Engine v2 Report -- 2026-04-14 00:19
+
+[X] SupertrendStrategy
+  KILL
+  DEAD | PF 0.89 | 582T
+
+---
+KILL: 1 | INVESTIGATE: 0 | MONITOR: 0 | OPTIMIZE: 0 | KEEP: 0

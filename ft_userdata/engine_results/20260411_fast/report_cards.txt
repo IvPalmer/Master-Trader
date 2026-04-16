@@ -1,0 +1,70 @@
++--------------------------------------------------+
+| BEARCRASHSHORTV1 -- REPORT CARD                  |
++--------------------------------------------------+
+| Calibration:    0/100 (Poor)                     |
+| Viability:      DEAD                             |
+| Lookahead:      PASS                             |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: FLAG -- RECOMMEND REMOVAL (manual action required)|
++--------------------------------------------------+
+
++--------------------------------------------------+
+| BOLLINGERBOUNCEV1 -- REPORT CARD                 |
++--------------------------------------------------+
+| Calibration:    0/100 (Poor)                     |
+| Viability:      MARGINAL (PF 0.73, 55 trades)    |
+| Lookahead:      PASS                             |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: INVESTIGATE -- ENGINE DIVERGES FROM LIVE|
+|                                                  |
+| Top pairs: TRX, SOL, USD1, DOGE, DASH            |
+| Drop pairs: FF, XRP, ADA, ETH, ZEC (negative expectancy)|
+|                                                  |
+| Max Drawdown:   4.1%                             |
++--------------------------------------------------+
+
++--------------------------------------------------+
+| MASTERTRADERV1 -- REPORT CARD                    |
++--------------------------------------------------+
+| Calibration:    88.6/100 (Excellent)             |
+| Viability:      MARGINAL (PF 0.54, 63 trades)    |
+| Lookahead:      PASS                             |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: MONITOR -- REVIEW NEXT CYCLE     |
+|                                                  |
+| Top pairs: DASH, TAO, NOM, USD1, TRX             |
+| Drop pairs: TRX, FF, BNB, ADA, DOGE (negative expectancy)|
+|                                                  |
+| Max Drawdown:   3.5%                             |
++--------------------------------------------------+
+
++--------------------------------------------------+
+| SUPERTRENDSTRATEGY -- REPORT CARD                |
++--------------------------------------------------+
+| Calibration:    76.9/100 (Good)                  |
+| Viability:      DEAD (PF 0.90, 536 trades)       |
+| Lookahead:      PASS                             |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: REGIME-DEPENDENT -- works live, backtests poorly|
+|                                                  |
+| Top pairs: TAO, ETH, TRX, ADA, DOGE              |
+| Drop pairs: FF, PEPE, BNB, DASH, ZEC (negative expectancy)|
+|                                                  |
+| Max Drawdown:   13.5%                            |
++--------------------------------------------------+

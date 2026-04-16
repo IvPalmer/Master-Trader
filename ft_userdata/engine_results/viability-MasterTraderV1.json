@@ -1,0 +1,45 @@
+{
+  "strategy": "MasterTraderV1",
+  "classification": "DEAD",
+  "reasons": [
+    "KILL: Sharpe ratio -1.89 < -1.0"
+  ],
+  "lookahead": {
+    "passed": true,
+    "flagged_indicators": [],
+    "raw": "2026-04-14 03:14:47,237 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Forced max_open_trades to -1 (same amount as there are pairs)\n2026-04-14 03:14:47,238 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Dry run wallet was not set to 1 billion, pushing it up there just to avoid false positives\n2026-04-14 03:14:47,238 - freqtrade.optimize.analysis.lookahead_helpers - INFO - fixing stake_amount to 10k\n2026-04-14 03:14:47,371 - freqtrade.optimize.analysis.lookahead_helpers - INF... (truncated)"
+  },
+  "recursive": {
+    "warning": true,
+    "flagged_indicators": [],
+    "raw": "2026-04-14 03:14:56,205 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-01 10:00:00\n2026-04-14 03:14:56,214 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-14 03:14:56,238 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 199.\n2026-04-14 03:14:56,335 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/US... (truncated)"
+  },
+  "metrics": {
+    "strategy": "MasterTraderV1Viability",
+    "total_trades": 122,
+    "avg_profit_pct": -0.75,
+    "total_profit": -23.404,
+    "total_profit_pct": -26.6,
+    "wins": 53,
+    "draws": 0,
+    "losses": 69,
+    "win_rate": 43.4,
+    "max_drawdown_pct": 31.21,
+    "sortino": -2.93,
+    "sharpe": -1.89,
+    "calmar": -4.44,
+    "profit_factor": 0.5,
+    "avg_stake": 25.424,
+    "total_volume": 6192.349,
+    "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-14_03-15-53.zip"
+  },
+  "pair_analysis": {
+    "pairs": [],
+    "top_5": [],
+    "bottom_5": [],
+    "concentration_risk": false,
+    "concentration_details": "",
+    "total_pairs_traded": 0,
+    "error": "no trades in export"
+  }
+}

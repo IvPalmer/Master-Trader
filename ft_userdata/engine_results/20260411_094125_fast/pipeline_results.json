@@ -1,0 +1,470 @@
+{
+  "meta": {
+    "mode": "fast",
+    "mode_config": {
+      "epochs": 300,
+      "wf_windows": 3,
+      "train_days": 90,
+      "test_days": 30,
+      "mc_iterations": 0,
+      "perturb_pcts": [],
+      "description": "Weekly validation \u2014 skip Monte Carlo"
+    },
+    "strategies": [
+      "SupertrendStrategy",
+      "MasterTraderV1",
+      "BearCrashShortV1",
+      "BollingerBounceV1"
+    ],
+    "stages_requested": [
+      "calibration",
+      "reporting"
+    ],
+    "stages_completed": [
+      "calibration",
+      "reporting"
+    ],
+    "run_dir": "/Users/palmer/ft_userdata/engine_results/20260411_094125_fast",
+    "started_at": "2026-04-11T09:41:25.619977",
+    "status": "success",
+    "total_duration": "24.6s",
+    "finished_at": "2026-04-11T09:41:50.254229"
+  },
+  "strategies": {
+    "SupertrendStrategy": {
+      "calibration": {
+        "strategy": "SupertrendStrategy",
+        "score": 0,
+        "grade": "Broken",
+        "metrics": {},
+        "component_scores": {},
+        "divergent_trades": [],
+        "live_trade_count": 70,
+        "bt_trade_count": 0,
+        "timerange": "20260310-20260411",
+        "pairlist": [
+          "ADA/USDT",
+          "ARB/USDT",
+          "AVAX/USDT",
+          "BARD/USDT",
+          "BCH/USDT",
+          "BNB/USDT",
+          "BTC/USDT",
+          "DOGE/USDT",
+          "ENA/USDT",
+          "ENSO/USDT",
+          "ETH/USDT",
+          "EUR/USDT",
+          "FET/USDT",
+          "GIGGLE/USDT",
+          "HUMA/USDT",
+          "ICP/USDT",
+          "LINK/USDT",
+          "LTC/USDT",
+          "NEAR/USDT",
+          "PAXG/USDT",
+          "PENGU/USDT",
+          "PIXEL/USDT",
+          "PUMP/USDT",
+          "RENDER/USDT",
+          "SHIB/USDT",
+          "SOL/USDT",
+          "SUI/USDT",
+          "TAO/USDT",
+          "TRUMP/USDT",
+          "TRX/USDT",
+          "XPL/USDT",
+          "XRP/USDT",
+          "ZEC/USDT"
+        ],
+        "needs_investigation": true,
+        "skipped_pairs": [],
+        "error": "Calibration backtest failed to produce results"
+      }
+    },
+    "MasterTraderV1": {
+      "calibration": {
+        "strategy": "MasterTraderV1",
+        "score": 46.7,
+        "grade": "Broken",
+        "metrics": {
+          "trade_match_rate": 35.7,
+          "matched_count": 10,
+          "total_live_trades": 28,
+          "profit_correlation": 0.768,
+          "aggregate_pnl_delta": 0.8507,
+          "live_total_pnl": 3.581,
+          "bt_total_pnl": 0.5348,
+          "exit_reason_concordance": 50.0
+        },
+        "component_scores": {
+          "match_rate": 35.7,
+          "profit_correlation": 76.8,
+          "pnl_accuracy": 14.9,
+          "exit_concordance": 50.0
+        },
+        "divergent_trades": [
+          {
+            "type": "unmatched",
+            "pair": "SHIB/USDT",
+            "open_date": "2026-03-11 13:00:04.371490",
+            "live_profit": -0.004575693759999999,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "NEAR/USDT",
+            "open_date": "2026-03-11 13:10:09.121420",
+            "live_profit": 0.192027,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BNB/USDT",
+            "open_date": "2026-03-11 14:00:03.586452",
+            "live_profit": 0.17499645504,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "SUI/USDT",
+            "open_date": "2026-03-11 14:00:04.198528",
+            "live_profit": 0.17816286752000002,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "LTC/USDT",
+            "open_date": "2026-03-11 14:10:10.318161",
+            "live_profit": -0.23204462687999997,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TAO/USDT",
+            "open_date": "2026-03-11 17:10:03.606822",
+            "live_profit": 0.18319465823999997,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "PUMP/USDT",
+            "open_date": "2026-03-12 09:00:02.805698",
+            "live_profit": 0.35278644280000004,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BNB/USDT",
+            "open_date": "2026-03-12 10:00:03.099094",
+            "live_profit": 0.19445328144,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ETH/USDT",
+            "open_date": "2026-03-12 11:00:04.110100",
+            "live_profit": 0.21327295615999997,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "DOGE/USDT",
+            "open_date": "2026-03-12 11:00:05.801067",
+            "live_profit": 0.19266984,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "LINK/USDT",
+            "open_date": "2026-03-12 11:00:06.420733",
+            "live_profit": 0.17847429599999998,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BTC/USDT",
+            "open_date": "2026-03-12 12:00:06.917947",
+            "live_profit": -0.24979077376,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ADA/USDT",
+            "open_date": "2026-03-12 13:36:30.601308",
+            "live_profit": -0.2895428448,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ENA/USDT",
+            "open_date": "2026-03-12 16:00:04.988424",
+            "live_profit": 0.18084899272,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "U/USDT",
+            "open_date": "2026-03-12 16:30:20.258355",
+            "live_profit": -0.0350134928,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "AVAX/USDT",
+            "open_date": "2026-03-12 17:30:43.273930",
+            "live_profit": -0.053319552,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "LTC/USDT",
+            "open_date": "2026-04-05 19:00:06.927682",
+            "live_profit": 0.28394716,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "SOL/USDT",
+            "open_date": "2026-04-07 21:00:08.163367",
+            "live_profit": 0.6820261,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "TRX/USDT",
+            "open_date": "2026-03-13 01:30:22.325260",
+            "live_profit": 0.17764362615999998,
+            "bt_profit": -0.1193337,
+            "delta": -0.29697732616,
+            "live_exit": "roi",
+            "bt_exit": "exit_signal",
+            "reason": "Profit delta: $0.30"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "UNI/USDT",
+            "open_date": "2026-04-07 22:20:18.813549",
+            "live_profit": 0.81766096,
+            "bt_profit": 0.13975621,
+            "delta": -0.67790475,
+            "live_exit": "exit_signal",
+            "bt_exit": "trailing_stop_loss",
+            "reason": "Profit delta: $0.68"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "SHIB/USDT",
+            "open_date": "2026-03-12 08:20:14.284337",
+            "live_exit": "roi",
+            "bt_exit": "trailing_stop_loss",
+            "reason": "Exit: live=roi vs bt=trailing_stop_loss"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "USD1/USDT",
+            "open_date": "2026-03-15 14:30:18.866873",
+            "live_exit": "time_exit_48h",
+            "bt_exit": "exit_signal",
+            "reason": "Exit: live=time_exit_48h vs bt=exit_signal"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "TAO/USDT",
+            "open_date": "2026-04-06 00:10:12.670344",
+            "live_exit": "exit_signal",
+            "bt_exit": "trailing_stop_loss",
+            "reason": "Exit: live=exit_signal vs bt=trailing_stop_loss"
+          }
+        ],
+        "live_trade_count": 28,
+        "bt_trade_count": 18,
+        "timerange": "20260310-20260410",
+        "pairlist": [
+          "ADA/USDT",
+          "AVAX/USDT",
+          "BNB/USDT",
+          "BTC/USDT",
+          "DOGE/USDT",
+          "ENA/USDT",
+          "ETH/USDT",
+          "EUR/USDT",
+          "HBAR/USDT",
+          "LINK/USDT",
+          "LTC/USDT",
+          "NEAR/USDT",
+          "PUMP/USDT",
+          "SHIB/USDT",
+          "SOL/USDT",
+          "SUI/USDT",
+          "TAO/USDT",
+          "TRX/USDT",
+          "U/USDT",
+          "UNI/USDT",
+          "USD1/USDT",
+          "XUSD/USDT"
+        ],
+        "needs_investigation": true,
+        "skipped_pairs": []
+      }
+    },
+    "BearCrashShortV1": {
+      "calibration": {
+        "strategy": "BearCrashShortV1",
+        "score": 74.3,
+        "grade": "Good",
+        "metrics": {
+          "trade_match_rate": 50.0,
+          "matched_count": 4,
+          "total_live_trades": 8,
+          "profit_correlation": 0.9998,
+          "aggregate_pnl_delta": 0.5332,
+          "live_total_pnl": 0.3673,
+          "bt_total_pnl": -0.166,
+          "exit_reason_concordance": 100.0
+        },
+        "component_scores": {
+          "match_rate": 50.0,
+          "profit_correlation": 100.0,
+          "pnl_accuracy": 46.7,
+          "exit_concordance": 100.0
+        },
+        "divergent_trades": [
+          {
+            "type": "unmatched",
+            "pair": "PAXG/USDT:USDT",
+            "open_date": "2026-03-27 03:00:14.226426",
+            "live_profit": -0.10650828,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "XRP/USDT:USDT",
+            "open_date": "2026-03-27 04:10:13.701552",
+            "live_profit": 0.28417184,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BNB/USDT:USDT",
+            "open_date": "2026-03-27 07:01:43.153344",
+            "live_profit": 0.58921452,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "SOL/USDT:USDT",
+            "open_date": "2026-03-28 11:00:08.733802",
+            "live_profit": -0.28089758,
+            "live_exit": "time_exit_48h",
+            "reason": "No matching backtest trade found"
+          }
+        ],
+        "live_trade_count": 8,
+        "bt_trade_count": 11,
+        "timerange": "20260326-20260406",
+        "pairlist": [
+          "BNB/USDT:USDT",
+          "DOGE/USDT:USDT",
+          "PAXG/USDT:USDT",
+          "SOL/USDT:USDT",
+          "TAO/USDT:USDT",
+          "XRP/USDT:USDT"
+        ],
+        "needs_investigation": false,
+        "skipped_pairs": []
+      }
+    },
+    "BollingerBounceV1": {
+      "calibration": {
+        "strategy": "BollingerBounceV1",
+        "score": 53.7,
+        "grade": "Moderate",
+        "metrics": {
+          "trade_match_rate": 50.0,
+          "matched_count": 2,
+          "total_live_trades": 4,
+          "profit_correlation": null,
+          "aggregate_pnl_delta": 0.5172,
+          "live_total_pnl": 1.2038,
+          "bt_total_pnl": 0.5812,
+          "exit_reason_concordance": 100.0
+        },
+        "component_scores": {
+          "match_rate": 50.0,
+          "profit_correlation": 30.0,
+          "pnl_accuracy": 48.3,
+          "exit_concordance": 100.0
+        },
+        "divergent_trades": [
+          {
+            "type": "unmatched",
+            "pair": "ASTER/USDT",
+            "open_date": "2026-04-05 21:00:05.577943",
+            "live_profit": 0.293568,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "PAXG/USDT",
+            "open_date": "2026-04-06 01:00:06.164452",
+            "live_profit": 0.29206838,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          }
+        ],
+        "live_trade_count": 4,
+        "bt_trade_count": 2,
+        "timerange": "20260403-20260408",
+        "pairlist": [
+          "ASTER/USDT",
+          "PAXG/USDT",
+          "RENDER/USDT",
+          "SEI/USDT"
+        ],
+        "needs_investigation": true,
+        "skipped_pairs": []
+      }
+    }
+  },
+  "stage_durations": {
+    "calibration": 23.07785701751709,
+    "reporting": 0.0031023025512695312
+  },
+  "reporting": {
+    "stage": "reporting",
+    "status": "success",
+    "recommendations": {
+      "BearCrashShortV1": "MONITOR",
+      "BollingerBounceV1": "MONITOR",
+      "MasterTraderV1": "INVESTIGATE",
+      "SupertrendStrategy": "INVESTIGATE"
+    },
+    "report_dir": "/Users/palmer/ft_userdata/engine_results/20260411_fast",
+    "report_cards": "+--------------------------------------------------+\n| BEARCRASHSHORTV1 -- REPORT CARD                  |\n+--------------------------------------------------+\n| Calibration:    74.3/100 (Good)                  |\n| Viability:      SKIPPED                          |\n| Lookahead:      SKIPPED                          |\n| Walk-Forward:   SKIPPED                          |\n| Consensus:      SKIPPED                          |\n| Monte Carlo:    SKIPPED                          |\n| Perturbation:   SKIPPED                          |\n|                                                  |\n| RECOMMENDATION: MONITOR -- REVIEW NEXT CYCLE     |\n+--------------------------------------------------+\n\n+--------------------------------------------------+\n| BOLLINGERBOUNCEV1 -- REPORT CARD                 |\n+--------------------------------------------------+\n| Calibration:    53.7/100 (Fair)                  |\n| Viability:      SKIPPED                          |\n| Lookahead:      SKIPPED                          |\n| Walk-Forward:   SKIPPED                          |\n| Consensus:      SKIPPED                          |\n| Monte Carlo:    SKIPPED                          |\n| Perturbation:   SKIPPED                          |\n|                                                  |\n| RECOMMENDATION: MONITOR -- REVIEW NEXT CYCLE     |\n+--------------------------------------------------+\n\n+--------------------------------------------------+\n| MASTERTRADERV1 -- REPORT CARD                    |\n+--------------------------------------------------+\n| Calibration:    46.7/100 (Poor)                  |\n| Viability:      SKIPPED                          |\n| Lookahead:      SKIPPED                          |\n| Walk-Forward:   SKIPPED                          |\n| Consensus:      SKIPPED                          |\n| Monte Carlo:    SKIPPED                          |\n| Perturbation:   SKIPPED                          |\n|                                                  |\n| RECOMMENDATION: INVESTIGATE -- ENGINE DIVERGES FROM LIVE|\n+--------------------------------------------------+\n\n+--------------------------------------------------+\n| SUPERTRENDSTRATEGY -- REPORT CARD                |\n+--------------------------------------------------+\n| Calibration:    0/100 (Poor)                     |\n| Viability:      SKIPPED                          |\n| Lookahead:      SKIPPED                          |\n| Walk-Forward:   SKIPPED                          |\n| Consensus:      SKIPPED                          |\n| Monte Carlo:    SKIPPED                          |\n| Perturbation:   SKIPPED                          |\n|                                                  |\n| RECOMMENDATION: INVESTIGATE -- ENGINE DIVERGES FROM LIVE|\n+--------------------------------------------------+",
+    "telegram_message": "Engine v2 Report -- 2026-04-11 09:41\n\n[?] BearCrashShortV1\n  MONITOR\n  Cal 74.3\n\n[?] BollingerBounceV1\n  MONITOR\n  Cal 53.7\n\n[+] MasterTraderV1\n  INVESTIGATE\n  Cal 46.7\n\n[+] SupertrendStrategy\n  INVESTIGATE\n  Cal 0\n\n---\nKILL: 0 | INVESTIGATE: 2 | MONITOR: 2 | OPTIMIZE: 0 | KEEP: 0",
+    "telegram_sent": null
+  }
+}

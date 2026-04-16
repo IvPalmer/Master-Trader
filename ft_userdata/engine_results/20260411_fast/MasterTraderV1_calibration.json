@@ -1,0 +1,100 @@
+{
+  "strategy": "MasterTraderV1",
+  "score": 88.6,
+  "grade": "Good",
+  "metrics": {
+    "trade_match_rate": 1.0,
+    "matched_count": 7,
+    "total_live_trades": 7,
+    "profit_correlation": 0.8792,
+    "aggregate_pnl_delta": 0.2598,
+    "live_total_pnl": 1.9401,
+    "bt_total_pnl": 1.4361,
+    "exit_reason_concordance": 0.4286,
+    "signal_match_rate": 1.0,
+    "direction_agreement": 0.7143
+  },
+  "component_scores": {
+    "signal_match": 60.0,
+    "direction_agreement": 28.6
+  },
+  "divergent_trades": [
+    {
+      "type": "profit_divergence",
+      "pair": "UNI/USDT",
+      "open_date": "2026-04-07 22:20:18.813549",
+      "live_profit": 0.81766096,
+      "bt_profit": 0.23680211,
+      "delta": -0.58085885,
+      "live_exit": "exit_signal",
+      "bt_exit": "trailing_stop_loss",
+      "reason": "Profit delta: $0.58"
+    },
+    {
+      "type": "exit_mismatch",
+      "pair": "LTC/USDT",
+      "open_date": "2026-04-05 19:00:06.927682",
+      "live_exit": "stoploss_on_exchange",
+      "bt_exit": "trailing_stop_loss",
+      "reason": "Exit: live=stoploss_on_exchange vs bt=trailing_stop_loss"
+    },
+    {
+      "type": "exit_mismatch",
+      "pair": "LTC/USDT",
+      "open_date": "2026-04-09 17:00:08.058018",
+      "live_exit": "time_exit_48h",
+      "bt_exit": "exit_signal",
+      "reason": "Exit: live=time_exit_48h vs bt=exit_signal"
+    },
+    {
+      "type": "exit_mismatch",
+      "pair": "TAO/USDT",
+      "open_date": "2026-04-06 00:10:12.670344",
+      "live_exit": "exit_signal",
+      "bt_exit": "trailing_stop_loss",
+      "reason": "Exit: live=exit_signal vs bt=trailing_stop_loss"
+    }
+  ],
+  "live_trade_count": 7,
+  "bt_trade_count": 7,
+  "timerange": "20260404-20260412",
+  "pairlist": [
+    "LTC/USDT",
+    "SOL/USDT",
+    "TAO/USDT",
+    "TRX/USDT",
+    "UNI/USDT"
+  ],
+  "needs_investigation": false,
+  "code_change_date": "2026-03-18T19:11:17-03:00",
+  "trades_excluded_old_code": 22,
+  "total_trades_in_db": 29,
+  "skipped_pairs": [],
+  "per_pair": {
+    "score": 79.8,
+    "grade": "Good",
+    "metrics": {
+      "trade_match_rate": 1.0,
+      "matched_count": 7,
+      "total_live_trades": 7,
+      "profit_correlation": 0.8792,
+      "aggregate_pnl_delta": 0.2598,
+      "live_total_pnl": 1.9401,
+      "bt_total_pnl": 1.4361,
+      "exit_reason_concordance": 0.4286
+    },
+    "signal": {
+      "signal_score": 88.6,
+      "signal_match_rate": 1.0,
+      "signal_matched_count": 7,
+      "direction_agreement": 0.7143
+    }
+  },
+  "calibration_mode": "per_pair_signal",
+  "signal": {
+    "signal_score": 88.6,
+    "signal_match_rate": 1.0,
+    "signal_matched_count": 7,
+    "direction_agreement": 0.7143
+  }
+}

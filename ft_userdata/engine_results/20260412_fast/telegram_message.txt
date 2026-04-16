@@ -1,0 +1,20 @@
+Engine v2 Report -- 2026-04-12 13:08
+
+[+] BearCrashShortV1
+  INVESTIGATE
+  MARGINAL | PF 0.98 | 177T | Cal 0
+
+[+] BollingerBounceV1
+  INVESTIGATE
+  MARGINAL | PF 0.73 | 18T | Cal 0
+
+[R] MasterTraderV1
+  REGIME_DEPENDENT
+  DEAD | PF 0.43 | 123T | Cal 88.6
+
+[?] SupertrendStrategy
+  MONITOR
+  MARGINAL | PF 0.95 | 675T | Cal 66.3
+
+---
+KILL: 0 | INVESTIGATE: 2 | MONITOR: 1 | OPTIMIZE: 0 | KEEP: 0

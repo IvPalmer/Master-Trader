@@ -1,0 +1,1227 @@
+{
+  "meta": {
+    "mode": "rigorous",
+    "mode_config": {
+      "epochs": 1000,
+      "wf_windows": 6,
+      "train_days": 120,
+      "test_days": 30,
+      "mc_iterations": 1000,
+      "perturb_pcts": [
+        10,
+        20
+      ],
+      "description": "Initial / quarterly full analysis"
+    },
+    "strategies": [
+      "SupertrendStrategy",
+      "MasterTraderV1",
+      "BearCrashShortV1",
+      "BollingerBounceV1"
+    ],
+    "stages_requested": [
+      "data",
+      "calibration",
+      "viability",
+      "walk_forward",
+      "robustness",
+      "reporting"
+    ],
+    "stages_completed": [
+      "data",
+      "calibration",
+      "viability",
+      "walk_forward",
+      "robustness",
+      "reporting"
+    ],
+    "run_dir": "/Users/palmer/ft_userdata/engine_results/20260410_205805_rigorous",
+    "started_at": "2026-04-10T20:58:05.331620",
+    "status": "killed",
+    "total_duration": "3m 33s",
+    "finished_at": "2026-04-10T21:01:38.498514",
+    "killed_strategies": [
+      "BearCrashShortV1",
+      "BollingerBounceV1",
+      "MasterTraderV1",
+      "SupertrendStrategy"
+    ]
+  },
+  "strategies": {
+    "SupertrendStrategy": {
+      "calibration": {
+        "strategy": "SupertrendStrategy",
+        "score": 23.4,
+        "grade": "Broken",
+        "metrics": {
+          "trade_match_rate": 7.1,
+          "matched_count": 5,
+          "total_live_trades": 70,
+          "profit_correlation": 0.5763,
+          "aggregate_pnl_delta": 1.068,
+          "live_total_pnl": 3.6999,
+          "bt_total_pnl": -0.2518,
+          "exit_reason_concordance": 20.0
+        },
+        "component_scores": {
+          "match_rate": 7.1,
+          "profit_correlation": 57.6,
+          "pnl_accuracy": 0,
+          "exit_concordance": 20.0
+        },
+        "divergent_trades": [
+          {
+            "type": "unmatched",
+            "pair": "PAXG/USDT",
+            "open_date": "2026-03-11 03:14:07.195916",
+            "live_profit": -0.9043077288960009,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "PIXEL/USDT",
+            "open_date": "2026-03-11 03:14:07.790757",
+            "live_profit": 0.21883518975999997,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "HUMA/USDT",
+            "open_date": "2026-03-11 03:14:08.954908",
+            "live_profit": 1.0217685192,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "EUR/USDT",
+            "open_date": "2026-03-11 03:24:12.877969",
+            "live_profit": -0.2656279454400019,
+            "live_exit": "force_exit",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "AVAX/USDT",
+            "open_date": "2026-03-11 05:00:06.517642",
+            "live_profit": 0.31438028160000003,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "SHIB/USDT",
+            "open_date": "2026-03-11 05:00:07.126510",
+            "live_profit": 0.51611361032,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "FET/USDT",
+            "open_date": "2026-03-11 10:23:59.071994",
+            "live_profit": 0.51311691552,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TAO/USDT",
+            "open_date": "2026-03-12 13:36:44.309986",
+            "live_profit": 0.2987107199999999,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TRX/USDT",
+            "open_date": "2026-03-12 18:14:52.309134",
+            "live_profit": 0.1798566484,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "PUMP/USDT",
+            "open_date": "2026-03-12 18:15:21.668435",
+            "live_profit": 0.30809307390400187,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ICP/USDT",
+            "open_date": "2026-03-12 18:16:01.711151",
+            "live_profit": 0.29408959008000296,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "XPL/USDT",
+            "open_date": "2026-03-12 18:16:06.082735",
+            "live_profit": 0.319654368,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ENSO/USDT",
+            "open_date": "2026-03-12 18:17:51.470402",
+            "live_profit": 0.20190187775999752,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TAO/USDT",
+            "open_date": "2026-03-12 20:00:03.028351",
+            "live_profit": 0.4138316160000019,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "PUMP/USDT",
+            "open_date": "2026-03-12 20:00:03.778109",
+            "live_profit": 0.2890575802400001,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "XPL/USDT",
+            "open_date": "2026-03-12 20:00:04.492148",
+            "live_profit": 0.36283760128,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ENSO/USDT",
+            "open_date": "2026-03-12 20:00:05.531689",
+            "live_profit": 1.755231913600002,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TAO/USDT",
+            "open_date": "2026-03-12 22:24:07.869358",
+            "live_profit": 0.91032347648,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "NEAR/USDT",
+            "open_date": "2026-03-12 22:24:08.464194",
+            "live_profit": 0.2502681984,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "PUMP/USDT",
+            "open_date": "2026-03-12 22:24:09.069363",
+            "live_profit": 0.19590661376,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ICP/USDT",
+            "open_date": "2026-03-13 00:47:30.027979",
+            "live_profit": 0.1821243028,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ETH/USDT",
+            "open_date": "2026-03-13 02:03:06.696397",
+            "live_profit": 0.56047857096,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "FET/USDT",
+            "open_date": "2026-03-13 02:49:14.222824",
+            "live_profit": 0.46909808,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "DOGE/USDT",
+            "open_date": "2026-03-13 06:03:51.650203",
+            "live_profit": 0.55689879168,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "XRP/USDT",
+            "open_date": "2026-03-13 08:37:03.131699",
+            "live_profit": 0.185258304,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BTC/USDT",
+            "open_date": "2026-03-13 12:14:48.707969",
+            "live_profit": 0.44299947207999996,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BNB/USDT",
+            "open_date": "2026-03-13 13:19:52.024126",
+            "live_profit": 0.1852054864,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TAO/USDT",
+            "open_date": "2026-03-15 02:00:06.366096",
+            "live_profit": 0.44215150055999997,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ETH/USDT",
+            "open_date": "2026-03-15 22:41:06.434933",
+            "live_profit": 1.09414477744,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "SOL/USDT",
+            "open_date": "2026-03-16 14:07:31.426600",
+            "live_profit": 0.5815729427199999,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "XRP/USDT",
+            "open_date": "2026-03-16 14:07:32.629374",
+            "live_profit": 0.57247974784,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "NEAR/USDT",
+            "open_date": "2026-03-16 14:09:03.930186",
+            "live_profit": 0.5736908672,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BTC/USDT",
+            "open_date": "2026-03-16 21:16:55.850685",
+            "live_profit": -0.97292167,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ETH/USDT",
+            "open_date": "2026-03-16 21:36:13.301822",
+            "live_profit": -0.99975133,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "AVAX/USDT",
+            "open_date": "2026-03-16 22:06:54.756677",
+            "live_profit": -1.0422324,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "PUMP/USDT",
+            "open_date": "2026-03-16 22:14:14.427156",
+            "live_profit": -1.01352067,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "DOGE/USDT",
+            "open_date": "2026-03-17 01:35:33.935369",
+            "live_profit": -1.01212441,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "RENDER/USDT",
+            "open_date": "2026-03-25 05:00:05.308156",
+            "live_profit": 0.36942257,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "FET/USDT",
+            "open_date": "2026-03-25 08:58:40.447429",
+            "live_profit": 0.85527238,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "PENGU/USDT",
+            "open_date": "2026-03-25 12:17:00.544245",
+            "live_profit": -1.63379962,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TRUMP/USDT",
+            "open_date": "2026-04-01 05:00:06.616271",
+            "live_profit": -1.66523386,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "NEAR/USDT",
+            "open_date": "2026-04-04 16:35:47.069176",
+            "live_profit": 0.6527469,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ZEC/USDT",
+            "open_date": "2026-04-04 16:35:47.674414",
+            "live_profit": 0.65847726,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BTC/USDT",
+            "open_date": "2026-04-04 16:45:52.070688",
+            "live_profit": 0.66378438,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "LTC/USDT",
+            "open_date": "2026-04-05 23:32:09.319491",
+            "live_profit": -0.08677488,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ADA/USDT",
+            "open_date": "2026-04-06 02:36:22.400794",
+            "live_profit": -0.60754018,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ZEC/USDT",
+            "open_date": "2026-04-06 12:16:37.875196",
+            "live_profit": -0.1886675,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ENA/USDT",
+            "open_date": "2026-04-06 16:18:24.323050",
+            "live_profit": -0.44570795,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BNB/USDT",
+            "open_date": "2026-04-06 17:01:34.263314",
+            "live_profit": -0.06289608,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "AVAX/USDT",
+            "open_date": "2026-04-08 00:39:22.063273",
+            "live_profit": 0.0471941,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ENA/USDT",
+            "open_date": "2026-04-08 00:39:23.400819",
+            "live_profit": 0.0376994,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "SUI/USDT",
+            "open_date": "2026-04-08 06:30:55.851000",
+            "live_profit": -0.46370898,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "XRP/USDT",
+            "open_date": "2026-04-08 07:33:57.926443",
+            "live_profit": -0.095646,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "AVAX/USDT",
+            "open_date": "2026-04-08 10:48:42.634349",
+            "live_profit": -0.5376734,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "LINK/USDT",
+            "open_date": "2026-04-08 11:21:24.433014",
+            "live_profit": -0.4096352,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BCH/USDT",
+            "open_date": "2026-04-08 11:33:05.370986",
+            "live_profit": -0.2101704,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "NEAR/USDT",
+            "open_date": "2026-04-08 14:09:18.323958",
+            "live_profit": -0.7841081,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BARD/USDT",
+            "open_date": "2026-04-08 18:50:30.551019",
+            "live_profit": -0.34771919,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "SOL/USDT",
+            "open_date": "2026-04-08 18:55:05.657742",
+            "live_profit": -0.07320265,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BTC/USDT",
+            "open_date": "2026-04-08 19:00:12.930408",
+            "live_profit": -0.06641451,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "GIGGLE/USDT",
+            "open_date": "2026-04-09 00:39:36.281545",
+            "live_profit": -0.7296997,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BARD/USDT",
+            "open_date": "2026-04-09 01:00:06.316490",
+            "live_profit": 0.24443008,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BTC/USDT",
+            "open_date": "2026-04-09 09:00:08.598930",
+            "live_profit": -0.11267781,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "NEAR/USDT",
+            "open_date": "2026-04-09 20:00:06.144693",
+            "live_profit": -0.161269,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TRX/USDT",
+            "open_date": "2026-04-09 20:41:00.769789",
+            "live_profit": -0.1645567,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "ENSO/USDT",
+            "open_date": "2026-03-13 00:53:20.586904",
+            "live_profit": 0.5032365448,
+            "bt_profit": 0.95307813,
+            "delta": 0.44984158519999995,
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "roi",
+            "reason": "Profit delta: $0.45"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "RENDER/USDT",
+            "open_date": "2026-03-15 04:08:23.047125",
+            "live_profit": 0.18920269632,
+            "bt_profit": -0.97953056,
+            "delta": -1.1687332563200001,
+            "live_exit": "roi",
+            "bt_exit": "stop_loss",
+            "reason": "Profit delta: $1.17"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "ADA/USDT",
+            "open_date": "2026-04-08 00:39:22.758018",
+            "live_profit": -0.29047464,
+            "bt_profit": -0.98689175,
+            "delta": -0.69641711,
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "stop_loss",
+            "reason": "Profit delta: $0.70"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "ARB/USDT",
+            "open_date": "2026-04-09 00:39:35.536897",
+            "live_profit": -0.1213836,
+            "bt_profit": 0.38117439,
+            "delta": 0.50255799,
+            "live_exit": "trailing_stop_loss",
+            "bt_exit": "roi",
+            "reason": "Profit delta: $0.50"
+          }
+        ],
+        "live_trade_count": 70,
+        "bt_trade_count": 55,
+        "timerange": "20260310-20260411",
+        "pairlist": [
+          "ADA/USDT",
+          "ARB/USDT",
+          "AVAX/USDT",
+          "BARD/USDT",
+          "BCH/USDT",
+          "BNB/USDT",
+          "BTC/USDT",
+          "DOGE/USDT",
+          "ENA/USDT",
+          "ENSO/USDT",
+          "ETH/USDT",
+          "EUR/USDT",
+          "FET/USDT",
+          "GIGGLE/USDT",
+          "HUMA/USDT",
+          "ICP/USDT",
+          "LINK/USDT",
+          "LTC/USDT",
+          "NEAR/USDT",
+          "PAXG/USDT",
+          "PENGU/USDT",
+          "PIXEL/USDT",
+          "PUMP/USDT",
+          "RENDER/USDT",
+          "SHIB/USDT",
+          "SOL/USDT",
+          "SUI/USDT",
+          "TAO/USDT",
+          "TRUMP/USDT",
+          "TRX/USDT",
+          "XPL/USDT",
+          "XRP/USDT",
+          "ZEC/USDT"
+        ],
+        "needs_investigation": true
+      },
+      "viability": {
+        "strategy": "SupertrendStrategy",
+        "classification": "DEAD",
+        "reasons": [
+          "KILL: Backtest failed \u2014 unparseable output"
+        ],
+        "lookahead": {
+          "passed": true,
+          "flagged_indicators": [],
+          "raw": "2026-04-10 23:59:16,634 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Forced max_open_trades to -1 (same amount as there are pairs)\n2026-04-10 23:59:16,635 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Dry run wallet was not set to 1 billion, pushing it up there just to avoid false positives\n2026-04-10 23:59:16,635 - freqtrade.optimize.analysis.lookahead_helpers - INFO - fixing stake_amount to 10k\n2026-04-10 23:59:16,963 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Bias test of SupertrendStrategy.py started.\n2026-04-10 23:59:16,991 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled\n2026-04-10 23:59:16,992 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39\n2026-04-10 23:59:17,018 - freqtrade.exchange.exchange - INFO - Using Exchange \"Binance\"\n2026-04-10 23:59:18,891 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...\n2026-04-10 23:59:18,912 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy SupertrendStrategy from '/freqtrade/user_data/strategies/SupertrendStrategy.py'...\n2026-04-10 23:59:18,913 - freqtrade.strategy.hyper - INFO - Found no parameter file.\n2026-04-10 23:59:18,914 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'order_types' with value from the configuration: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', \n'stoploss_on_exchange': False}.\n2026-04-10 23:59:18,914 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.\n2026-04-10 23:59:18,915 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 10000.\n2026-04-10 23:59:18,915 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: -1.\n2026-04-10 23:59:18,915 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.05, '360': 0.03, '720': 0.02, '1440': 0.01}\n2026-04-10 23:59:18,915 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-10 23:59:18,916 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-10 23:59:18,916 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-10 23:59:18,916 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.02\n2026-04-10 23:59:18,917 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.03\n2026-04-10 23:59:18,917 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: True\n2026-04-10 23:59:18,917 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False\n2026-04-10 23:59:18,917 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True\n2026-04-10 23:59:18,918 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', 'stoploss_on_exchange': False}\n2026-04-10 23:59:18,918 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-10 23:59:18,919 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-10 23:59:18,919 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 10000\n2026-04-10 23:59:18,920 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-10 23:59:18,920 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: True\n2026-04-10 23:59:18,920 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: True\n2026-04-10 23:59:18,921 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-10 23:59:18,921 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.01\n2026-04-10 23:59:18,922 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-10 23:59:18,922 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-10 23:59:18,923 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-10 23:59:18,923 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-10 23:59:18,923 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: -1\n2026-04-10 23:59:18,924 - freqtrade - ERROR - Configuration error: Market entry orders require entry_pricing.price_side = \"other\".\nPlease make sure to review the documentation at https://www.freqtrade.io/en/stable."
+        },
+        "recursive": {
+          "warning": false,
+          "flagged_indicators": [],
+          "raw": "2026-04-10 23:59:23,585 - freqtrade.exchange.check_exchange - INFO - Exchange \"binance\" is officially supported by the Freqtrade development team.\n2026-04-10 23:59:23,586 - freqtrade.configuration.configuration - INFO - Using pairlist from configuration.\n2026-04-10 23:59:23,586 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-10 23:59:23,700 - freqtrade.optimize.analysis.recursive_helpers - INFO - Recursive test of SupertrendStrategy.py started.\n2026-04-10 23:59:23,702 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled\n2026-04-10 23:59:23,702 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39\n2026-04-10 23:59:23,715 - freqtrade.exchange.exchange - INFO - Using Exchange \"Binance\"\n2026-04-10 23:59:25,292 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...\n2026-04-10 23:59:25,305 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy SupertrendStrategy from '/freqtrade/user_data/strategies/SupertrendStrategy.py'...\n2026-04-10 23:59:25,305 - freqtrade.strategy.hyper - INFO - Found no parameter file.\n2026-04-10 23:59:25,306 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.\n2026-04-10 23:59:25,306 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 88.\n2026-04-10 23:59:25,306 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: 3.\n2026-04-10 23:59:25,307 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.05, '360': 0.03, '720': 0.02, '1440': 0.01}\n2026-04-10 23:59:25,307 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-10 23:59:25,307 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-10 23:59:25,307 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-10 23:59:25,307 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.02\n2026-04-10 23:59:25,308 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.03\n2026-04-10 23:59:25,308 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: True\n2026-04-10 23:59:25,308 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False\n2026-04-10 23:59:25,308 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True\n2026-04-10 23:59:25,308 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'limit', 'exit': 'limit', 'stoploss': 'limit', 'stoploss_on_exchange': False, \n'stoploss_on_exchange_interval': 60}\n2026-04-10 23:59:25,308 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-10 23:59:25,309 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-10 23:59:25,309 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 88\n2026-04-10 23:59:25,309 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-10 23:59:25,309 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: True\n2026-04-10 23:59:25,309 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: True\n2026-04-10 23:59:25,309 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-10 23:59:25,310 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.01\n2026-04-10 23:59:25,310 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-10 23:59:25,310 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-10 23:59:25,310 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-10 23:59:25,310 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-10 23:59:25,311 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: 3\n2026-04-10 23:59:25,311 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-10 23:59:25,317 - freqtrade.resolvers.iresolver - INFO - Using resolved pairlist StaticPairList from '/freqtrade/freqtrade/plugins/pairlist/StaticPairList.py'...\n2026-04-10 23:59:25,320 - freqtrade - ERROR - No pair in whitelist."
+        },
+        "metrics": {
+          "error": "unparseable output",
+          "raw": ",050 - freqtrade.configuration.configuration - INFO - Using data directory: /freqtrade/user_data/data/binance ...\n2026-04-10 23:59:38,050 - freqtrade.configuration.configuration - INFO - Parameter --export detected: trades ...\n2026-04-10 23:59:38,051 - freqtrade.configuration.configuration - INFO - Parameter --cache=day detected ...\n2026-04-10 23:59:38,056 - freqtrade.configuration.configuration - INFO - Filter trades by timerange: 20250306-20260410\n2026-04-10 23:59:38,060 - freqtrade.exchange.check_exchange - INFO - Checking exchange...\n2026-04-10 23:59:38,074 - freqtrade.exchange.check_exchange - INFO - Exchange \"binance\" is officially supported by the Freqtrade development team.\n2026-04-10 23:59:38,074 - freqtrade.configuration.configuration - INFO - Using pairlist from configuration.\n2026-04-10 23:59:38,075 - freqtrade - ERROR - Configuration error: StaticPairList requires pair_whitelist to be set.\nPlease make sure to review the documentation at https://www.freqtrade.io/en/stable.\n"
+        },
+        "pair_analysis": {
+          "pairs": [],
+          "top_5": [],
+          "bottom_5": [],
+          "concentration_risk": false,
+          "concentration_details": "",
+          "total_pairs_traded": 0,
+          "error": "no trades in export"
+        }
+      },
+      "walk_forward": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      },
+      "robustness": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      }
+    },
+    "MasterTraderV1": {
+      "calibration": {
+        "strategy": "MasterTraderV1",
+        "score": 45.8,
+        "grade": "Broken",
+        "metrics": {
+          "trade_match_rate": 28.0,
+          "matched_count": 7,
+          "total_live_trades": 25,
+          "profit_correlation": 0.7354,
+          "aggregate_pnl_delta": 0.6627,
+          "live_total_pnl": 2.1036,
+          "bt_total_pnl": 0.7096,
+          "exit_reason_concordance": 42.9
+        },
+        "component_scores": {
+          "match_rate": 28.0,
+          "profit_correlation": 73.5,
+          "pnl_accuracy": 33.7,
+          "exit_concordance": 42.9
+        },
+        "divergent_trades": [
+          {
+            "type": "unmatched",
+            "pair": "SHIB/USDT",
+            "open_date": "2026-03-11 13:00:04.371490",
+            "live_profit": -0.004575693759999999,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "NEAR/USDT",
+            "open_date": "2026-03-11 13:10:09.121420",
+            "live_profit": 0.192027,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BNB/USDT",
+            "open_date": "2026-03-11 14:00:03.586452",
+            "live_profit": 0.17499645504,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "SUI/USDT",
+            "open_date": "2026-03-11 14:00:04.198528",
+            "live_profit": 0.17816286752000002,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "LTC/USDT",
+            "open_date": "2026-03-11 14:10:10.318161",
+            "live_profit": -0.23204462687999997,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TAO/USDT",
+            "open_date": "2026-03-11 17:10:03.606822",
+            "live_profit": 0.18319465823999997,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "PUMP/USDT",
+            "open_date": "2026-03-12 09:00:02.805698",
+            "live_profit": 0.35278644280000004,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BNB/USDT",
+            "open_date": "2026-03-12 10:00:03.099094",
+            "live_profit": 0.19445328144,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ETH/USDT",
+            "open_date": "2026-03-12 11:00:04.110100",
+            "live_profit": 0.21327295615999997,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "DOGE/USDT",
+            "open_date": "2026-03-12 11:00:05.801067",
+            "live_profit": 0.19266984,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "LINK/USDT",
+            "open_date": "2026-03-12 11:00:06.420733",
+            "live_profit": 0.17847429599999998,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BTC/USDT",
+            "open_date": "2026-03-12 12:00:06.917947",
+            "live_profit": -0.24979077376,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ADA/USDT",
+            "open_date": "2026-03-12 13:36:30.601308",
+            "live_profit": -0.2895428448,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ENA/USDT",
+            "open_date": "2026-03-12 16:00:04.988424",
+            "live_profit": 0.18084899272,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "U/USDT",
+            "open_date": "2026-03-12 16:30:20.258355",
+            "live_profit": -0.0350134928,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "AVAX/USDT",
+            "open_date": "2026-03-12 17:30:43.273930",
+            "live_profit": -0.053319552,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "LTC/USDT",
+            "open_date": "2026-04-05 19:00:06.927682",
+            "live_profit": 0.28394716,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "UNI/USDT",
+            "open_date": "2026-04-06 00:00:08.642581",
+            "live_profit": -0.60328872,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "profit_divergence",
+            "pair": "TRX/USDT",
+            "open_date": "2026-03-13 01:30:22.325260",
+            "live_profit": 0.17764362615999998,
+            "bt_profit": -0.1193337,
+            "delta": -0.29697732616,
+            "live_exit": "roi",
+            "bt_exit": "exit_signal",
+            "reason": "Profit delta: $0.30"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "SHIB/USDT",
+            "open_date": "2026-03-12 08:20:14.284337",
+            "live_exit": "roi",
+            "bt_exit": "trailing_stop_loss",
+            "reason": "Exit: live=roi vs bt=trailing_stop_loss"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "USD1/USDT",
+            "open_date": "2026-03-15 14:30:18.866873",
+            "live_exit": "time_exit_48h",
+            "bt_exit": "exit_signal",
+            "reason": "Exit: live=time_exit_48h vs bt=exit_signal"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "TAO/USDT",
+            "open_date": "2026-04-06 00:10:12.670344",
+            "live_exit": "exit_signal",
+            "bt_exit": "trailing_stop_loss",
+            "reason": "Exit: live=exit_signal vs bt=trailing_stop_loss"
+          }
+        ],
+        "live_trade_count": 25,
+        "bt_trade_count": 22,
+        "timerange": "20260310-20260407",
+        "pairlist": [
+          "ADA/USDT",
+          "AVAX/USDT",
+          "BNB/USDT",
+          "BTC/USDT",
+          "DOGE/USDT",
+          "ENA/USDT",
+          "ETH/USDT",
+          "EUR/USDT",
+          "HBAR/USDT",
+          "LINK/USDT",
+          "LTC/USDT",
+          "NEAR/USDT",
+          "PUMP/USDT",
+          "SHIB/USDT",
+          "SUI/USDT",
+          "TAO/USDT",
+          "TRX/USDT",
+          "U/USDT",
+          "UNI/USDT",
+          "USD1/USDT",
+          "XUSD/USDT"
+        ],
+        "needs_investigation": true
+      },
+      "viability": {
+        "strategy": "MasterTraderV1",
+        "classification": "DEAD",
+        "reasons": [
+          "KILL: Backtest failed \u2014 unparseable output"
+        ],
+        "lookahead": {
+          "passed": true,
+          "flagged_indicators": [],
+          "raw": "2026-04-10 23:59:45,618 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Forced max_open_trades to -1 (same amount as there are pairs)\n2026-04-10 23:59:45,618 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Dry run wallet was not set to 1 billion, pushing it up there just to avoid false positives\n2026-04-10 23:59:45,619 - freqtrade.optimize.analysis.lookahead_helpers - INFO - fixing stake_amount to 10k\n2026-04-10 23:59:45,854 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Bias test of MasterTraderV1.py started.\n2026-04-10 23:59:45,859 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled\n2026-04-10 23:59:45,860 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39\n2026-04-10 23:59:45,888 - freqtrade.exchange.exchange - INFO - Using Exchange \"Binance\"\n2026-04-10 23:59:47,958 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...\n2026-04-10 23:59:47,983 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy MasterTraderV1 from '/freqtrade/user_data/strategies/MasterTraderV1.py'...\n2026-04-10 23:59:47,984 - freqtrade.strategy.hyper - INFO - Found no parameter file.\n2026-04-10 23:59:47,985 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'order_types' with value from the configuration: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', \n'stoploss_on_exchange': False}.\n2026-04-10 23:59:47,986 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.\n2026-04-10 23:59:47,986 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 10000.\n2026-04-10 23:59:47,987 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: -1.\n2026-04-10 23:59:47,987 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.07, '360': 0.04, '720': 0.025, '1440': 0.015}\n2026-04-10 23:59:47,988 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-10 23:59:47,988 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-10 23:59:47,988 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-10 23:59:47,989 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.01\n2026-04-10 23:59:47,989 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.02\n2026-04-10 23:59:47,989 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: True\n2026-04-10 23:59:47,989 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False\n2026-04-10 23:59:47,989 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True\n2026-04-10 23:59:47,990 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', 'stoploss_on_exchange': False}\n2026-04-10 23:59:47,990 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-10 23:59:47,990 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-10 23:59:47,990 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 10000\n2026-04-10 23:59:47,991 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-10 23:59:47,991 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: True\n2026-04-10 23:59:47,992 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: False\n2026-04-10 23:59:47,992 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-10 23:59:47,992 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.0\n2026-04-10 23:59:47,992 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-10 23:59:47,993 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-10 23:59:47,994 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-10 23:59:47,994 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-10 23:59:47,994 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: -1\n2026-04-10 23:59:47,995 - freqtrade - ERROR - Configuration error: Market entry orders require entry_pricing.price_side = \"other\".\nPlease make sure to review the documentation at https://www.freqtrade.io/en/stable."
+        },
+        "recursive": {
+          "warning": false,
+          "flagged_indicators": [],
+          "raw": "2026-04-10 23:59:55,116 - freqtrade.exchange.check_exchange - INFO - Exchange \"binance\" is officially supported by the Freqtrade development team.\n2026-04-10 23:59:55,117 - freqtrade.configuration.configuration - INFO - Using pairlist from configuration.\n2026-04-10 23:59:55,118 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-10 23:59:55,250 - freqtrade.optimize.analysis.recursive_helpers - INFO - Recursive test of MasterTraderV1.py started.\n2026-04-10 23:59:55,251 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled\n2026-04-10 23:59:55,251 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39\n2026-04-10 23:59:55,267 - freqtrade.exchange.exchange - INFO - Using Exchange \"Binance\"\n2026-04-10 23:59:57,039 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...\n2026-04-10 23:59:57,049 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy MasterTraderV1 from '/freqtrade/user_data/strategies/MasterTraderV1.py'...\n2026-04-10 23:59:57,050 - freqtrade.strategy.hyper - INFO - Found no parameter file.\n2026-04-10 23:59:57,050 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.\n2026-04-10 23:59:57,051 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 88.\n2026-04-10 23:59:57,051 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: 3.\n2026-04-10 23:59:57,051 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.07, '360': 0.04, '720': 0.025, '1440': 0.015}\n2026-04-10 23:59:57,051 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-10 23:59:57,052 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-10 23:59:57,052 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-10 23:59:57,052 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.01\n2026-04-10 23:59:57,052 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.02\n2026-04-10 23:59:57,052 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: True\n2026-04-10 23:59:57,052 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False\n2026-04-10 23:59:57,052 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True\n2026-04-10 23:59:57,053 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'limit', 'exit': 'limit', 'stoploss': 'limit', 'stoploss_on_exchange': False, \n'stoploss_on_exchange_interval': 60}\n2026-04-10 23:59:57,053 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-10 23:59:57,053 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-10 23:59:57,053 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 88\n2026-04-10 23:59:57,053 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-10 23:59:57,053 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: True\n2026-04-10 23:59:57,054 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: False\n2026-04-10 23:59:57,054 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-10 23:59:57,054 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.0\n2026-04-10 23:59:57,054 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-10 23:59:57,054 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-10 23:59:57,054 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-10 23:59:57,054 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-10 23:59:57,055 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: 3\n2026-04-10 23:59:57,055 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-10 23:59:57,062 - freqtrade.resolvers.iresolver - INFO - Using resolved pairlist StaticPairList from '/freqtrade/freqtrade/plugins/pairlist/StaticPairList.py'...\n2026-04-10 23:59:57,066 - freqtrade - ERROR - No pair in whitelist."
+        },
+        "metrics": {
+          "error": "unparseable output",
+          "raw": ",395 - freqtrade.configuration.configuration - INFO - Using data directory: /freqtrade/user_data/data/binance ...\n2026-04-11 00:00:09,395 - freqtrade.configuration.configuration - INFO - Parameter --export detected: trades ...\n2026-04-11 00:00:09,396 - freqtrade.configuration.configuration - INFO - Parameter --cache=day detected ...\n2026-04-11 00:00:09,397 - freqtrade.configuration.configuration - INFO - Filter trades by timerange: 20250306-20260410\n2026-04-11 00:00:09,410 - freqtrade.exchange.check_exchange - INFO - Checking exchange...\n2026-04-11 00:00:09,502 - freqtrade.exchange.check_exchange - INFO - Exchange \"binance\" is officially supported by the Freqtrade development team.\n2026-04-11 00:00:09,503 - freqtrade.configuration.configuration - INFO - Using pairlist from configuration.\n2026-04-11 00:00:09,522 - freqtrade - ERROR - Configuration error: StaticPairList requires pair_whitelist to be set.\nPlease make sure to review the documentation at https://www.freqtrade.io/en/stable.\n"
+        },
+        "pair_analysis": {
+          "pairs": [],
+          "top_5": [],
+          "bottom_5": [],
+          "concentration_risk": false,
+          "concentration_details": "",
+          "total_pairs_traded": 0,
+          "error": "no trades in export"
+        }
+      },
+      "walk_forward": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      },
+      "robustness": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      }
+    },
+    "BearCrashShortV1": {
+      "calibration": {
+        "strategy": "BearCrashShortV1",
+        "score": 69.1,
+        "grade": "Moderate",
+        "metrics": {
+          "trade_match_rate": 62.5,
+          "matched_count": 5,
+          "total_live_trades": 8,
+          "profit_correlation": 0.9393,
+          "aggregate_pnl_delta": 0.6937,
+          "live_total_pnl": 0.3673,
+          "bt_total_pnl": -0.3265,
+          "exit_reason_concordance": 80.0
+        },
+        "component_scores": {
+          "match_rate": 62.5,
+          "profit_correlation": 93.9,
+          "pnl_accuracy": 30.6,
+          "exit_concordance": 80.0
+        },
+        "divergent_trades": [
+          {
+            "type": "unmatched",
+            "pair": "PAXG/USDT:USDT",
+            "open_date": "2026-03-27 03:00:14.226426",
+            "live_profit": -0.10650828,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "XRP/USDT:USDT",
+            "open_date": "2026-03-27 04:10:13.701552",
+            "live_profit": 0.28417184,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "BNB/USDT:USDT",
+            "open_date": "2026-03-27 07:01:43.153344",
+            "live_profit": 0.58921452,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "exit_mismatch",
+            "pair": "SOL/USDT:USDT",
+            "open_date": "2026-03-28 11:00:08.733802",
+            "live_exit": "time_exit_48h",
+            "bt_exit": "exit_signal",
+            "reason": "Exit: live=time_exit_48h vs bt=exit_signal"
+          }
+        ],
+        "live_trade_count": 8,
+        "bt_trade_count": 8,
+        "timerange": "20260326-20260406",
+        "pairlist": [
+          "BNB/USDT:USDT",
+          "DOGE/USDT:USDT",
+          "PAXG/USDT:USDT",
+          "SOL/USDT:USDT",
+          "TAO/USDT:USDT",
+          "XRP/USDT:USDT"
+        ],
+        "needs_investigation": true
+      },
+      "viability": {
+        "strategy": "BearCrashShortV1",
+        "classification": "DEAD",
+        "reasons": [
+          "KILL: Backtest failed \u2014 unparseable output"
+        ],
+        "lookahead": {
+          "passed": true,
+          "flagged_indicators": [],
+          "raw": "2026-04-11 00:00:18,143 - freqtrade.optimize.analysis.lookahead_helpers - INFO - fixing stake_amount to 10k\n2026-04-11 00:00:18,468 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Bias test of BearCrashShortV1.py started.\n2026-04-11 00:00:18,479 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled\n2026-04-11 00:00:18,480 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39\n2026-04-11 00:00:18,481 - freqtrade.exchange.exchange - INFO - Applying additional ccxt config: {'options': {'defaultType': 'swap'}}\n2026-04-11 00:00:18,506 - freqtrade.exchange.exchange - INFO - Applying additional ccxt config: {'options': {'defaultType': 'swap'}}\n2026-04-11 00:00:18,517 - freqtrade.exchange.exchange - INFO - Using Exchange \"Binance\"\n2026-04-11 00:00:20,654 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...\n2026-04-11 00:00:20,668 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy BearCrashShortV1 from '/freqtrade/user_data/strategies/BearCrashShortV1.py'...\n2026-04-11 00:00:20,670 - freqtrade.strategy.hyper - INFO - Found no parameter file.\n2026-04-11 00:00:20,674 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'order_types' with value from the configuration: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', \n'stoploss_on_exchange': False}.\n2026-04-11 00:00:20,674 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.\n2026-04-11 00:00:20,674 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 10000.\n2026-04-11 00:00:20,675 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: -1.\n2026-04-11 00:00:20,675 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.08, '720': 0.05, '1440': 0.03, '2160': 0.01, '2880': 0.0}\n2026-04-11 00:00:20,675 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-11 00:00:20,675 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-11 00:00:20,676 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-11 00:00:20,676 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.02\n2026-04-11 00:00:20,676 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.03\n2026-04-11 00:00:20,676 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: True\n2026-04-11 00:00:20,676 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False\n2026-04-11 00:00:20,677 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True\n2026-04-11 00:00:20,677 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', 'stoploss_on_exchange': False}\n2026-04-11 00:00:20,677 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-11 00:00:20,677 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-11 00:00:20,678 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 10000\n2026-04-11 00:00:20,678 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-11 00:00:20,678 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: True\n2026-04-11 00:00:20,679 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: False\n2026-04-11 00:00:20,679 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-11 00:00:20,679 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.0\n2026-04-11 00:00:20,679 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-11 00:00:20,679 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-11 00:00:20,679 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-11 00:00:20,680 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-11 00:00:20,680 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: -1\n2026-04-11 00:00:20,680 - freqtrade - ERROR - Configuration error: Market entry orders require entry_pricing.price_side = \"other\".\nPlease make sure to review the documentation at https://www.freqtrade.io/en/stable."
+        },
+        "recursive": {
+          "warning": false,
+          "flagged_indicators": [],
+          "raw": "2026-04-11 00:00:29,907 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-11 00:00:30,055 - freqtrade.optimize.analysis.recursive_helpers - INFO - Recursive test of BearCrashShortV1.py started.\n2026-04-11 00:00:30,058 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled\n2026-04-11 00:00:30,058 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39\n2026-04-11 00:00:30,059 - freqtrade.exchange.exchange - INFO - Applying additional ccxt config: {'options': {'defaultType': 'swap'}}\n2026-04-11 00:00:30,080 - freqtrade.exchange.exchange - INFO - Applying additional ccxt config: {'options': {'defaultType': 'swap'}}\n2026-04-11 00:00:30,095 - freqtrade.exchange.exchange - INFO - Using Exchange \"Binance\"\n2026-04-11 00:00:32,395 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...\n2026-04-11 00:00:32,430 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy BearCrashShortV1 from '/freqtrade/user_data/strategies/BearCrashShortV1.py'...\n2026-04-11 00:00:32,431 - freqtrade.strategy.hyper - INFO - Found no parameter file.\n2026-04-11 00:00:32,432 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.\n2026-04-11 00:00:32,432 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 22.\n2026-04-11 00:00:32,432 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: 2.\n2026-04-11 00:00:32,433 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.08, '720': 0.05, '1440': 0.03, '2160': 0.01, '2880': 0.0}\n2026-04-11 00:00:32,433 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-11 00:00:32,433 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-11 00:00:32,434 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-11 00:00:32,434 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.02\n2026-04-11 00:00:32,435 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.03\n2026-04-11 00:00:32,435 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: True\n2026-04-11 00:00:32,435 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False\n2026-04-11 00:00:32,436 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True\n2026-04-11 00:00:32,436 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'limit', 'exit': 'limit', 'stoploss': 'limit', 'stoploss_on_exchange': False, \n'stoploss_on_exchange_interval': 60}\n2026-04-11 00:00:32,439 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-11 00:00:32,440 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-11 00:00:32,440 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 22\n2026-04-11 00:00:32,440 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-11 00:00:32,441 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: True\n2026-04-11 00:00:32,442 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: False\n2026-04-11 00:00:32,442 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-11 00:00:32,442 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.0\n2026-04-11 00:00:32,443 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-11 00:00:32,443 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-11 00:00:32,443 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-11 00:00:32,444 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-11 00:00:32,444 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: 2\n2026-04-11 00:00:32,444 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-11 00:00:32,471 - freqtrade.resolvers.iresolver - INFO - Using resolved pairlist StaticPairList from '/freqtrade/freqtrade/plugins/pairlist/StaticPairList.py'...\n2026-04-11 00:00:32,484 - freqtrade - ERROR - No pair in whitelist."
+        },
+        "metrics": {
+          "error": "unparseable output",
+          "raw": ",245 - freqtrade.configuration.configuration - INFO - Using data directory: /freqtrade/user_data/data/binance ...\n2026-04-11 00:00:51,246 - freqtrade.configuration.configuration - INFO - Parameter --export detected: trades ...\n2026-04-11 00:00:51,247 - freqtrade.configuration.configuration - INFO - Parameter --cache=day detected ...\n2026-04-11 00:00:51,247 - freqtrade.configuration.configuration - INFO - Filter trades by timerange: 20250306-20260410\n2026-04-11 00:00:51,260 - freqtrade.exchange.check_exchange - INFO - Checking exchange...\n2026-04-11 00:00:51,355 - freqtrade.exchange.check_exchange - INFO - Exchange \"binance\" is officially supported by the Freqtrade development team.\n2026-04-11 00:00:51,356 - freqtrade.configuration.configuration - INFO - Using pairlist from configuration.\n2026-04-11 00:00:51,361 - freqtrade - ERROR - Configuration error: StaticPairList requires pair_whitelist to be set.\nPlease make sure to review the documentation at https://www.freqtrade.io/en/stable.\n"
+        },
+        "pair_analysis": {
+          "pairs": [],
+          "top_5": [],
+          "bottom_5": [],
+          "concentration_risk": false,
+          "concentration_details": "",
+          "total_pairs_traded": 0,
+          "error": "no trades in export"
+        }
+      },
+      "walk_forward": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      },
+      "robustness": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      }
+    },
+    "BollingerBounceV1": {
+      "calibration": {
+        "strategy": "BollingerBounceV1",
+        "score": 41.3,
+        "grade": "Broken",
+        "metrics": {
+          "trade_match_rate": 25.0,
+          "matched_count": 1,
+          "total_live_trades": 4,
+          "profit_correlation": null,
+          "aggregate_pnl_delta": 0.7587,
+          "live_total_pnl": 1.2038,
+          "bt_total_pnl": 0.2905,
+          "exit_reason_concordance": 100.0
+        },
+        "component_scores": {
+          "match_rate": 25.0,
+          "profit_correlation": 30.0,
+          "pnl_accuracy": 24.1,
+          "exit_concordance": 100.0
+        },
+        "divergent_trades": [
+          {
+            "type": "unmatched",
+            "pair": "SEI/USDT",
+            "open_date": "2026-04-04 18:10:08.774117",
+            "live_profit": 0.32150044,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "ASTER/USDT",
+            "open_date": "2026-04-05 21:00:05.577943",
+            "live_profit": 0.293568,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "PAXG/USDT",
+            "open_date": "2026-04-06 01:00:06.164452",
+            "live_profit": 0.29206838,
+            "live_exit": "roi",
+            "reason": "No matching backtest trade found"
+          }
+        ],
+        "live_trade_count": 4,
+        "bt_trade_count": 1,
+        "timerange": "20260403-20260408",
+        "pairlist": [
+          "ASTER/USDT",
+          "PAXG/USDT",
+          "RENDER/USDT",
+          "SEI/USDT"
+        ],
+        "needs_investigation": true
+      },
+      "viability": {
+        "strategy": "BollingerBounceV1",
+        "classification": "DEAD",
+        "reasons": [
+          "KILL: Backtest failed \u2014 unparseable output"
+        ],
+        "lookahead": {
+          "passed": true,
+          "flagged_indicators": [],
+          "raw": "2026-04-11 00:01:01,477 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Forced max_open_trades to -1 (same amount as there are pairs)\n2026-04-11 00:01:01,477 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Dry run wallet was not set to 1 billion, pushing it up there just to avoid false positives\n2026-04-11 00:01:01,477 - freqtrade.optimize.analysis.lookahead_helpers - INFO - fixing stake_amount to 10k\n2026-04-11 00:01:01,839 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Bias test of BollingerBounceV1.py started.\n2026-04-11 00:01:01,847 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled\n2026-04-11 00:01:01,847 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39\n2026-04-11 00:01:01,884 - freqtrade.exchange.exchange - INFO - Using Exchange \"Binance\"\n2026-04-11 00:01:03,583 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...\n2026-04-11 00:01:03,600 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy BollingerBounceV1 from '/freqtrade/user_data/strategies/BollingerBounceV1.py'...\n2026-04-11 00:01:03,604 - freqtrade.strategy.hyper - INFO - Found no parameter file.\n2026-04-11 00:01:03,609 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'order_types' with value from the configuration: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', \n'stoploss_on_exchange': False}.\n2026-04-11 00:01:03,609 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.\n2026-04-11 00:01:03,609 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 10000.\n2026-04-11 00:01:03,610 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: -1.\n2026-04-11 00:01:03,610 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.05, '360': 0.03, '720': 0.02, '1440': 0.01}\n2026-04-11 00:01:03,610 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-11 00:01:03,610 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-11 00:01:03,611 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-11 00:01:03,612 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.02\n2026-04-11 00:01:03,612 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.03\n2026-04-11 00:01:03,612 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: True\n2026-04-11 00:01:03,613 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False\n2026-04-11 00:01:03,613 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True\n2026-04-11 00:01:03,614 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', 'stoploss_on_exchange': False}\n2026-04-11 00:01:03,614 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-11 00:01:03,614 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-11 00:01:03,614 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 10000\n2026-04-11 00:01:03,615 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-11 00:01:03,615 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: False\n2026-04-11 00:01:03,616 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: True\n2026-04-11 00:01:03,616 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-11 00:01:03,617 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.01\n2026-04-11 00:01:03,617 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-11 00:01:03,617 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-11 00:01:03,617 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-11 00:01:03,618 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-11 00:01:03,618 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: -1\n2026-04-11 00:01:03,618 - freqtrade - ERROR - Configuration error: Market entry orders require entry_pricing.price_side = \"other\".\nPlease make sure to review the documentation at https://www.freqtrade.io/en/stable."
+        },
+        "recursive": {
+          "warning": false,
+          "flagged_indicators": [],
+          "raw": "2026-04-11 00:01:12,637 - freqtrade.exchange.check_exchange - INFO - Exchange \"binance\" is officially supported by the Freqtrade development team.\n2026-04-11 00:01:12,638 - freqtrade.configuration.configuration - INFO - Using pairlist from configuration.\n2026-04-11 00:01:12,641 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-11 00:01:12,815 - freqtrade.optimize.analysis.recursive_helpers - INFO - Recursive test of BollingerBounceV1.py started.\n2026-04-11 00:01:12,818 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled\n2026-04-11 00:01:12,818 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39\n2026-04-11 00:01:12,835 - freqtrade.exchange.exchange - INFO - Using Exchange \"Binance\"\n2026-04-11 00:01:14,661 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...\n2026-04-11 00:01:14,686 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy BollingerBounceV1 from '/freqtrade/user_data/strategies/BollingerBounceV1.py'...\n2026-04-11 00:01:14,687 - freqtrade.strategy.hyper - INFO - Found no parameter file.\n2026-04-11 00:01:14,688 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.\n2026-04-11 00:01:14,688 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 88.\n2026-04-11 00:01:14,688 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: 3.\n2026-04-11 00:01:14,689 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.05, '360': 0.03, '720': 0.02, '1440': 0.01}\n2026-04-11 00:01:14,689 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-11 00:01:14,691 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-11 00:01:14,691 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-11 00:01:14,692 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.02\n2026-04-11 00:01:14,692 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.03\n2026-04-11 00:01:14,693 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: True\n2026-04-11 00:01:14,694 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False\n2026-04-11 00:01:14,694 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True\n2026-04-11 00:01:14,694 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'limit', 'exit': 'limit', 'stoploss': 'limit', 'stoploss_on_exchange': False, \n'stoploss_on_exchange_interval': 60}\n2026-04-11 00:01:14,695 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-11 00:01:14,695 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-11 00:01:14,695 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 88\n2026-04-11 00:01:14,695 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-11 00:01:14,695 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: False\n2026-04-11 00:01:14,695 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: True\n2026-04-11 00:01:14,696 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-11 00:01:14,696 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.01\n2026-04-11 00:01:14,696 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-11 00:01:14,696 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-11 00:01:14,697 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-11 00:01:14,697 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-11 00:01:14,697 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: 3\n2026-04-11 00:01:14,697 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-11 00:01:14,705 - freqtrade.resolvers.iresolver - INFO - Using resolved pairlist StaticPairList from '/freqtrade/freqtrade/plugins/pairlist/StaticPairList.py'...\n2026-04-11 00:01:14,713 - freqtrade - ERROR - No pair in whitelist."
+        },
+        "metrics": {
+          "error": "unparseable output",
+          "raw": ",986 - freqtrade.configuration.configuration - INFO - Using data directory: /freqtrade/user_data/data/binance ...\n2026-04-11 00:01:35,989 - freqtrade.configuration.configuration - INFO - Parameter --export detected: trades ...\n2026-04-11 00:01:35,990 - freqtrade.configuration.configuration - INFO - Parameter --cache=day detected ...\n2026-04-11 00:01:35,990 - freqtrade.configuration.configuration - INFO - Filter trades by timerange: 20250306-20260410\n2026-04-11 00:01:36,004 - freqtrade.exchange.check_exchange - INFO - Checking exchange...\n2026-04-11 00:01:36,119 - freqtrade.exchange.check_exchange - INFO - Exchange \"binance\" is officially supported by the Freqtrade development team.\n2026-04-11 00:01:36,121 - freqtrade.configuration.configuration - INFO - Using pairlist from configuration.\n2026-04-11 00:01:36,124 - freqtrade - ERROR - Configuration error: StaticPairList requires pair_whitelist to be set.\nPlease make sure to review the documentation at https://www.freqtrade.io/en/stable.\n"
+        },
+        "pair_analysis": {
+          "pairs": [
+            {
+              "pair": "RENDER/USDT",
+              "trades": 1,
+              "total_profit": 0.29052854,
+              "wins": 1,
+              "losses": 0,
+              "win_rate": 100.0
+            }
+          ],
+          "top_5": [
+            {
+              "pair": "RENDER/USDT",
+              "trades": 1,
+              "total_profit": 0.29052854,
+              "wins": 1,
+              "losses": 0,
+              "win_rate": 100.0
+            }
+          ],
+          "bottom_5": [
+            {
+              "pair": "RENDER/USDT",
+              "trades": 1,
+              "total_profit": 0.29052854,
+              "wins": 1,
+              "losses": 0,
+              "win_rate": 100.0
+            }
+          ],
+          "concentration_risk": false,
+          "concentration_details": "",
+          "total_pairs_traded": 1
+        }
+      },
+      "walk_forward": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      },
+      "robustness": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      }
+    }
+  },
+  "stage_durations": {
+    "calibration": 62.10809087753296,
+    "viability": 151.02287983894348,
+    "walk_forward": 0.0009379386901855469,
+    "robustness": 0.0006110668182373047,
+    "reporting": 0.030715227127075195
+  },
+  "data": {
+    "status": "skipped"
+  }
+}

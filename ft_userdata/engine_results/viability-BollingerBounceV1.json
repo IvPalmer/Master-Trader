@@ -1,0 +1,124 @@
+{
+  "strategy": "BollingerBounceV1",
+  "classification": "MARGINAL",
+  "reasons": [
+    "MARGINAL: Profit factor 0.73 in warning range (0.5-0.8)",
+    "MARGINAL: Only 18 trades with non-positive P&L ($-2.06)",
+    "MARGINAL: Sharpe ratio -0.12 in warning range (-1.0-0.5)",
+    "MARGINAL: Pair concentration risk \u2014 100% of profit from top 2 pairs: PAXG/USDT, SEI/USDT"
+  ],
+  "lookahead": {
+    "passed": true,
+    "flagged_indicators": [
+      "filename"
+    ],
+    "raw": "2026-04-12 16:07:45,584 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2026-03-03 17:00:00\n2026-04-12 16:07:45,594 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 16:07:45,719 - freqtrade.data.history.datahandlers.idatahandler - WARNING - PAXG/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 16:07:45,726 - freqtrade.optimize.backtesting - INFO - Loading d... (truncated)"
+  },
+  "recursive": {
+    "warning": false,
+    "flagged_indicators": [],
+    "raw": "2026-04-12 16:07:53,029 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.05, '360': 0.03, '720': 0.02, '1440': 0.01}\n2026-04-12 16:07:53,029 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-12 16:07:53,029 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-12 16:07:53,030 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-12 16:07:53,030 - freqtra... (truncated)"
+  },
+  "metrics": {
+    "strategy": "BollingerBounceV1",
+    "total_trades": 18,
+    "avg_profit_pct": -0.38,
+    "total_profit": -2.056,
+    "total_profit_pct": -2.34,
+    "wins": 13,
+    "draws": 0,
+    "losses": 5,
+    "win_rate": 72.2,
+    "max_drawdown_pct": 4.56,
+    "sortino": -5.42,
+    "sharpe": -0.12,
+    "calmar": -2.67,
+    "profit_factor": 0.73,
+    "avg_stake": 28.548,
+    "total_volume": 1027.72,
+    "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-12_16-07-59.zip"
+  },
+  "pair_analysis": {
+    "pairs": [
+      {
+        "pair": "PAXG/USDT",
+        "trades": 8,
+        "total_profit": 0.7935314100000002,
+        "wins": 7,
+        "losses": 1,
+        "win_rate": 87.5
+      },
+      {
+        "pair": "SEI/USDT",
+        "trades": 1,
+        "total_profit": 0.28202014,
+        "wins": 1,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "RENDER/USDT",
+        "trades": 9,
+        "total_profit": -3.1316489999999995,
+        "wins": 5,
+        "losses": 4,
+        "win_rate": 55.6
+      }
+    ],
+    "top_5": [
+      {
+        "pair": "PAXG/USDT",
+        "trades": 8,
+        "total_profit": 0.7935314100000002,
+        "wins": 7,
+        "losses": 1,
+        "win_rate": 87.5
+      },
+      {
+        "pair": "SEI/USDT",
+        "trades": 1,
+        "total_profit": 0.28202014,
+        "wins": 1,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "RENDER/USDT",
+        "trades": 9,
+        "total_profit": -3.1316489999999995,
+        "wins": 5,
+        "losses": 4,
+        "win_rate": 55.6
+      }
+    ],
+    "bottom_5": [
+      {
+        "pair": "PAXG/USDT",
+        "trades": 8,
+        "total_profit": 0.7935314100000002,
+        "wins": 7,
+        "losses": 1,
+        "win_rate": 87.5
+      },
+      {
+        "pair": "SEI/USDT",
+        "trades": 1,
+        "total_profit": 0.28202014,
+        "wins": 1,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "RENDER/USDT",
+        "trades": 9,
+        "total_profit": -3.1316489999999995,
+        "wins": 5,
+        "losses": 4,
+        "win_rate": 55.6
+      }
+    ],
+    "concentration_risk": true,
+    "concentration_details": "100% of profit from top 2 pairs: PAXG/USDT, SEI/USDT",
+    "total_pairs_traded": 3
+  }
+}

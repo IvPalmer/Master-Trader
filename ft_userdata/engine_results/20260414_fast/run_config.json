@@ -1,0 +1,10 @@
+{
+  "date": "2026-04-14T00:19:30.283937",
+  "mode": "fast",
+  "strategies": [
+    "SupertrendStrategy"
+  ],
+  "recommendations": {
+    "SupertrendStrategy": "KILL"
+  }
+}

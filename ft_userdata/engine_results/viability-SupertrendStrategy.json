@@ -1,0 +1,45 @@
+{
+  "strategy": "SupertrendStrategy",
+  "classification": "DEAD",
+  "reasons": [
+    "KILL: Max drawdown 50.1% > 50.0%"
+  ],
+  "lookahead": {
+    "passed": true,
+    "flagged_indicators": [],
+    "raw": "2026-04-14 03:14:41,563 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Forced order_types to market orders.\n2026-04-14 03:14:41,563 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Forced max_open_trades to -1 (same amount as there are pairs)\n2026-04-14 03:14:41,563 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Dry run wallet was not set to 1 billion, pushing it up there just to avoid false positives\n2026-04-14 03:14:41,563 - freqtrade.optimize.analysis.lookahead_hel... (truncated)"
+  },
+  "recursive": {
+    "warning": false,
+    "flagged_indicators": [],
+    "raw": "2026-04-14 03:14:50,605 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-14 03:14:50,609 - freqtrade.resolvers.iresolver - INFO - Using resolved pairlist StaticPairList from '/freqtrade/freqtrade/plugins/pairlist/StaticPairList.py'...\n2026-04-14 03:14:50,712 - freqtrade.optimize.backtesting - INFO - Using fee 0.1000% - worst case fee from exchange (lowest tier).\n2026-04-14 03:14:50,713 - freqtrade.optimize.analysis.recursive - INFO - Using pair AAVE/USDT ... (truncated)"
+  },
+  "metrics": {
+    "strategy": "SupertrendStrategyViability",
+    "total_trades": 582,
+    "avg_profit_pct": -0.17,
+    "total_profit": -30.082,
+    "total_profit_pct": -34.18,
+    "wins": 382,
+    "draws": 0,
+    "losses": 200,
+    "win_rate": 65.6,
+    "max_drawdown_pct": 50.12,
+    "sortino": -6.29,
+    "sharpe": -1.57,
+    "calmar": -3.55,
+    "profit_factor": 0.89,
+    "avg_stake": 26.211,
+    "total_volume": 30540.859,
+    "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-14_03-19-28.zip"
+  },
+  "pair_analysis": {
+    "pairs": [],
+    "top_5": [],
+    "bottom_5": [],
+    "concentration_risk": false,
+    "concentration_details": "",
+    "total_pairs_traded": 0,
+    "error": "no trades in export"
+  }
+}

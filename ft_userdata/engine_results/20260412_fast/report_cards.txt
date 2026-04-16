@@ -1,0 +1,69 @@
++--------------------------------------------------+
+| BEARCRASHSHORTV1 -- REPORT CARD                  |
++--------------------------------------------------+
+| Calibration:    0/100 (Poor)                     |
+| Viability:      MARGINAL (PF 0.98, 177 trades)   |
+| Lookahead:      PASS                             |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: INVESTIGATE -- ENGINE DIVERGES FROM LIVE|
+|                                                  |
+| Top pairs: DOGE, TAO, PAXG, XRP, BNB             |
+| Drop pairs: TAO, PAXG, XRP, BNB, SOL (negative expectancy)|
+|                                                  |
+| Max Drawdown:   35.0%                            |
++--------------------------------------------------+
+
++--------------------------------------------------+
+| BOLLINGERBOUNCEV1 -- REPORT CARD                 |
++--------------------------------------------------+
+| Calibration:    0/100 (Poor)                     |
+| Viability:      MARGINAL (PF 0.73, 18 trades)    |
+| Lookahead:      PASS                             |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: INVESTIGATE -- ENGINE DIVERGES FROM LIVE|
+|                                                  |
+| Top pairs: PAXG, SEI, RENDER                     |
+| Drop pairs: PAXG, SEI, RENDER (negative expectancy)|
+|                                                  |
+| Max Drawdown:   4.6%                             |
++--------------------------------------------------+
+
++--------------------------------------------------+
+| MASTERTRADERV1 -- REPORT CARD                    |
++--------------------------------------------------+
+| Calibration:    88.6/100 (Excellent)             |
+| Viability:      DEAD (PF 0.43, 123 trades)       |
+| Lookahead:      PASS                             |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: REGIME-DEPENDENT -- works live, backtests poorly|
+|                                                  |
+| Max Drawdown:   31.9%                            |
++--------------------------------------------------+
+
++--------------------------------------------------+
+| SUPERTRENDSTRATEGY -- REPORT CARD                |
++--------------------------------------------------+
+| Calibration:    66.3/100 (Fair)                  |
+| Viability:      MARGINAL (PF 0.95, 675 trades)   |
+| Lookahead:      PASS                             |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: MONITOR -- REVIEW NEXT CYCLE     |
+|                                                  |
+| Max Drawdown:   47.0%                            |
++--------------------------------------------------+

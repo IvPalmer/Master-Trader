@@ -1,0 +1,69 @@
+{
+  "strategy": "SupertrendStrategy",
+  "score": 76.9,
+  "grade": "Good",
+  "metrics": {
+    "trade_match_rate": 0.85,
+    "matched_count": 17,
+    "total_live_trades": 20,
+    "signal_match_rate": 0.85,
+    "direction_agreement": 0.6471
+  },
+  "component_scores": {
+    "signal_match": 51.0,
+    "direction_agreement": 25.9
+  },
+  "divergent_trades": [],
+  "live_trade_count": 20,
+  "bt_trade_count": 41,
+  "timerange": "20260407-20260412",
+  "pairlist": [
+    "ADA/USDT",
+    "ARB/USDT",
+    "AVAX/USDT",
+    "BARD/USDT",
+    "BCH/USDT",
+    "BTC/USDT",
+    "ENA/USDT",
+    "ETH/USDT",
+    "GIGGLE/USDT",
+    "LINK/USDT",
+    "NEAR/USDT",
+    "SOL/USDT",
+    "SUI/USDT",
+    "TRX/USDT",
+    "XRP/USDT"
+  ],
+  "needs_investigation": false,
+  "code_change_date": "2026-04-06T10:33:16-03:00",
+  "trades_excluded_old_code": 52,
+  "total_trades_in_db": 72,
+  "skipped_pairs": [],
+  "per_pair": {
+    "score": 46.5,
+    "grade": "Broken",
+    "metrics": {
+      "trade_match_rate": 0.75,
+      "matched_count": 15,
+      "total_live_trades": 20,
+      "profit_correlation": 0.3945,
+      "aggregate_pnl_delta": 0.4571,
+      "live_total_pnl": -3.2528,
+      "bt_total_pnl": -1.7661,
+      "exit_reason_concordance": 0.0667
+    },
+    "signal": {
+      "signal_score": 66.3,
+      "signal_match_rate": 0.75,
+      "signal_matched_count": 15,
+      "direction_agreement": 0.5333
+    }
+  },
+  "calibration_mode": "unlimited_signal",
+  "signal": {
+    "signal_score": 76.9,
+    "signal_match_rate": 0.85,
+    "signal_matched_count": 17,
+    "direction_agreement": 0.6471
+  }
+}

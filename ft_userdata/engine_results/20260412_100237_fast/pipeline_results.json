@@ -1,0 +1,1331 @@
+{
+  "meta": {
+    "mode": "fast",
+    "mode_config": {
+      "epochs": 300,
+      "wf_windows": 3,
+      "train_days": 90,
+      "test_days": 30,
+      "mc_iterations": 0,
+      "perturb_pcts": [],
+      "description": "Weekly validation \u2014 skip Monte Carlo"
+    },
+    "strategies": [
+      "SupertrendStrategy"
+    ],
+    "stages_requested": [
+      "calibration",
+      "viability",
+      "walk_forward",
+      "robustness",
+      "reporting"
+    ],
+    "stages_completed": [
+      "calibration",
+      "viability",
+      "walk_forward",
+      "robustness",
+      "reporting"
+    ],
+    "run_dir": "/Users/palmer/ft_userdata/engine_results/20260412_100237_fast",
+    "started_at": "2026-04-12T10:02:37.705202",
+    "status": "success",
+    "total_duration": "56m 2s",
+    "finished_at": "2026-04-12T10:58:39.727678"
+  },
+  "strategies": {
+    "SupertrendStrategy": {
+      "calibration": {
+        "strategy": "SupertrendStrategy",
+        "score": 76.9,
+        "grade": "Good",
+        "metrics": {
+          "trade_match_rate": 0.85,
+          "matched_count": 17,
+          "total_live_trades": 20,
+          "signal_match_rate": 0.85,
+          "direction_agreement": 0.6471
+        },
+        "component_scores": {
+          "signal_match": 51.0,
+          "direction_agreement": 25.9
+        },
+        "divergent_trades": [],
+        "live_trade_count": 20,
+        "bt_trade_count": 41,
+        "timerange": "20260407-20260412",
+        "pairlist": [
+          "ADA/USDT",
+          "ARB/USDT",
+          "AVAX/USDT",
+          "BARD/USDT",
+          "BCH/USDT",
+          "BTC/USDT",
+          "ENA/USDT",
+          "ETH/USDT",
+          "GIGGLE/USDT",
+          "LINK/USDT",
+          "NEAR/USDT",
+          "SOL/USDT",
+          "SUI/USDT",
+          "TRX/USDT",
+          "XRP/USDT"
+        ],
+        "needs_investigation": false,
+        "code_change_date": "2026-04-06T10:33:16-03:00",
+        "trades_excluded_old_code": 52,
+        "total_trades_in_db": 72,
+        "skipped_pairs": [],
+        "per_pair": {
+          "score": 25.1,
+          "grade": "Broken",
+          "metrics": {
+            "trade_match_rate": 0.4,
+            "matched_count": 8,
+            "total_live_trades": 20,
+            "profit_correlation": 0.4362,
+            "aggregate_pnl_delta": 1.7937,
+            "live_total_pnl": -3.2528,
+            "bt_total_pnl": 2.5817,
+            "exit_reason_concordance": 0.0
+          },
+          "signal": {
+            "signal_score": 66.3,
+            "signal_match_rate": 0.75,
+            "signal_matched_count": 15,
+            "direction_agreement": 0.5333
+          }
+        },
+        "calibration_mode": "unlimited_signal",
+        "signal": {
+          "signal_score": 76.9,
+          "signal_match_rate": 0.85,
+          "signal_matched_count": 17,
+          "direction_agreement": 0.6471
+        }
+      },
+      "viability": {
+        "strategy": "SupertrendStrategy",
+        "classification": "MARGINAL",
+        "reasons": [
+          "MARGINAL: Recursive analysis warning \u2014 indicators may depend on dataset length"
+        ],
+        "lookahead": {
+          "passed": true,
+          "flagged_indicators": [
+            "filename"
+          ],
+          "raw": "2026-04-12 13:04:52,646 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:52,716 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:52,722 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-10 16:00:00 (9 days).\n2026-04-12 13:04:52,722 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:04:52,729 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-10 16:00:00\n2026-04-12 13:04:52,739 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:52,817 - freqtrade.data.history.datahandlers.idatahandler - WARNING - DOGE/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:52,824 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-10 08:00:00 (9 days).\n2026-04-12 13:04:52,825 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:04:52,829 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-10 08:00:00\n2026-04-12 13:04:52,839 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:52,908 - freqtrade.data.history.datahandlers.idatahandler - WARNING - DOGE/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:52,913 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-10 16:00:00 (9 days).\n2026-04-12 13:04:52,913 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:04:52,919 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-10 16:00:00\n2026-04-12 13:04:52,929 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:53,007 - freqtrade.data.history.datahandlers.idatahandler - WARNING - RENDER/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:53,014 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-10 14:00:00 (9 days).\n2026-04-12 13:04:53,014 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:04:53,019 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-10 14:00:00\n2026-04-12 13:04:53,028 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:53,131 - freqtrade.data.history.datahandlers.idatahandler - WARNING - RENDER/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:53,137 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-11 01:00:00 (10 days).\n2026-04-12 13:04:53,138 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:04:53,144 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-11 01:00:00\n2026-04-12 13:04:53,154 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:53,238 - freqtrade.data.history.datahandlers.idatahandler - WARNING - RENDER/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:53,244 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-11 08:00:00 (10 days).\n2026-04-12 13:04:53,244 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:04:53,251 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-11 08:00:00\n2026-04-12 13:04:53,261 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:53,330 - freqtrade.data.history.datahandlers.idatahandler - WARNING - RENDER/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:53,338 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-04-11 10:00:00 (10 days).\n2026-04-12 13:04:53,338 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-12 13:04:53,344 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-03-23 16:00:00 to 2025-04-11 10:00:00\n2026-04-12 13:04:53,352 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-12 13:04:53,409 - freqtrade.optimize.analysis.lookahead - INFO - Found targeted trade amount = 20 signals.\n2026-04-12 13:04:53,409 - freqtrade.loggers.set_log_levels - INFO - Restoring log verbosity.\n2026-04-12 13:04:53,409 - freqtrade.optimize.analysis.lookahead - INFO - SupertrendStrategy: no bias detected\n2026-04-12 13:04:53,411 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Checking look ahead bias via backtests of SupertrendStrategy.py took 26 seconds."
+        },
+        "recursive": {
+          "warning": true,
+          "flagged_indicators": [],
+          "raw": "/freqtrade/user_data/strategies/SupertrendStrategy.py:227: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`\n  result.fillna(0, inplace=True)\n2026-04-12 13:04:59,700 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 199.\n2026-04-12 13:04:59,813 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:04:59,820 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-04-03 16:00:00 up to 2026-04-11 11:00:00 (7 days).\n2026-04-12 13:04:59,824 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-04-03 16:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:04:59,834 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:04:59,848 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 200.\n2026-04-12 13:04:59,965 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:04:59,972 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-04-03 15:00:00 up to 2026-04-11 11:00:00 (7 days).\n2026-04-12 13:04:59,979 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-04-03 15:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:04:59,988 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:05:00,013 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 399.\n2026-04-12 13:05:00,131 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:05:00,136 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-26 08:00:00 up to 2026-04-11 11:00:00 (16 days).\n2026-04-12 13:05:00,144 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-26 08:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:05:00,153 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:05:00,172 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 499.\n2026-04-12 13:05:00,284 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:05:00,293 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-22 04:00:00 up to 2026-04-11 11:00:00 (20 days).\n2026-04-12 13:05:00,301 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-22 04:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:05:00,312 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:05:00,334 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 999.\n2026-04-12 13:05:00,448 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:05:00,454 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-01 08:00:00 up to 2026-04-11 11:00:00 (41 days).\n2026-04-12 13:05:00,466 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-01 08:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:05:00,475 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:05:00,499 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 1999.\n2026-04-12 13:05:00,605 - freqtrade.exchange.exchange - WARNING - Using 2 calls to get OHLCV. This can result in slower operations for the bot. Please check if you really need 1999 candles for your \nstrategy.\n2026-04-12 13:05:00,616 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:05:00,626 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-01-18 16:00:00 up to 2026-04-11 11:00:00 (82 days).\n2026-04-12 13:05:00,645 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-01-18 16:00:00 to 2026-04-12 00:00:00\n2026-04-12 13:05:00,655 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 11:00:00\n2026-04-12 13:05:00,691 - freqtrade.loggers.set_log_levels - INFO - Restoring log verbosity.\n2026-04-12 13:05:00,692 - freqtrade.optimize.analysis.recursive - INFO - Start checking for recursive bias\n2026-04-12 13:05:00,698 - freqtrade.optimize.analysis.recursive - INFO - Start checking for lookahead bias on indicators only\n2026-04-12 13:05:00,699 - freqtrade.optimize.analysis.recursive - INFO - Check indicators at 2025-04-01T10:00:00\n2026-04-12 13:05:00,700 - freqtrade.optimize.analysis.recursive - INFO - No lookahead bias on indicators found.\n2026-04-12 13:05:00,700 - freqtrade.optimize.analysis.recursive_helpers - INFO - Checking recursive and indicator-only lookahead bias of indicators of SupertrendStrategy.py took 3 seconds."
+        },
+        "metrics": {
+          "strategy": "SupertrendStrategy",
+          "total_trades": 584,
+          "avg_profit_pct": 0.07,
+          "total_profit": 34.784,
+          "total_profit_pct": 3.48,
+          "wins": 431,
+          "draws": 0,
+          "losses": 153,
+          "win_rate": 73.8,
+          "max_drawdown_pct": 8.1,
+          "sortino": 4.26,
+          "sharpe": 0.63,
+          "calmar": 2.28,
+          "profit_factor": 1.05,
+          "avg_stake": 87.859,
+          "total_volume": 102859.132,
+          "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-12_13-05-15.zip"
+        },
+        "pair_analysis": {
+          "pairs": [
+            {
+              "pair": "BTC/USDT",
+              "trades": 42,
+              "total_profit": 19.459368930000007,
+              "wins": 36,
+              "losses": 6,
+              "win_rate": 85.7
+            },
+            {
+              "pair": "PIXEL/USDT",
+              "trades": 5,
+              "total_profit": 18.7100876,
+              "wins": 5,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "DOGE/USDT",
+              "trades": 32,
+              "total_profit": 12.871296350000001,
+              "wins": 25,
+              "losses": 7,
+              "win_rate": 78.1
+            },
+            {
+              "pair": "AVAX/USDT",
+              "trades": 59,
+              "total_profit": 11.31188236,
+              "wins": 45,
+              "losses": 14,
+              "win_rate": 76.3
+            },
+            {
+              "pair": "PAXG/USDT",
+              "trades": 18,
+              "total_profit": 11.267899879999998,
+              "wins": 17,
+              "losses": 1,
+              "win_rate": 94.4
+            },
+            {
+              "pair": "TAO/USDT",
+              "trades": 5,
+              "total_profit": 10.65432677,
+              "wins": 5,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "PUMP/USDT",
+              "trades": 8,
+              "total_profit": 5.938945929999996,
+              "wins": 6,
+              "losses": 2,
+              "win_rate": 75.0
+            },
+            {
+              "pair": "ARB/USDT",
+              "trades": 9,
+              "total_profit": 4.940724000000001,
+              "wins": 7,
+              "losses": 2,
+              "win_rate": 77.8
+            },
+            {
+              "pair": "ENA/USDT",
+              "trades": 36,
+              "total_profit": 4.112728749999999,
+              "wins": 25,
+              "losses": 11,
+              "win_rate": 69.4
+            },
+            {
+              "pair": "SUI/USDT",
+              "trades": 5,
+              "total_profit": 3.1810250700000005,
+              "wins": 4,
+              "losses": 1,
+              "win_rate": 80.0
+            },
+            {
+              "pair": "BARD/USDT",
+              "trades": 6,
+              "total_profit": 2.7293965200000008,
+              "wins": 5,
+              "losses": 1,
+              "win_rate": 83.3
+            },
+            {
+              "pair": "PENGU/USDT",
+              "trades": 1,
+              "total_profit": 2.64261922,
+              "wins": 1,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "SHIB/USDT",
+              "trades": 1,
+              "total_profit": 2.09367291,
+              "wins": 1,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "TRX/USDT",
+              "trades": 18,
+              "total_profit": 1.6218617499999999,
+              "wins": 15,
+              "losses": 3,
+              "win_rate": 83.3
+            },
+            {
+              "pair": "EUR/USDT",
+              "trades": 1,
+              "total_profit": 0.88042755,
+              "wins": 1,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "HUMA/USDT",
+              "trades": 1,
+              "total_profit": 0.70304681,
+              "wins": 1,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "ENSO/USDT",
+              "trades": 2,
+              "total_profit": -0.12932378,
+              "wins": 1,
+              "losses": 1,
+              "win_rate": 50.0
+            },
+            {
+              "pair": "TRUMP/USDT",
+              "trades": 8,
+              "total_profit": -0.6399689300000002,
+              "wins": 6,
+              "losses": 2,
+              "win_rate": 75.0
+            },
+            {
+              "pair": "NEAR/USDT",
+              "trades": 19,
+              "total_profit": -0.7801620000000017,
+              "wins": 13,
+              "losses": 6,
+              "win_rate": 68.4
+            },
+            {
+              "pair": "ICP/USDT",
+              "trades": 3,
+              "total_profit": -1.0251557299999998,
+              "wins": 2,
+              "losses": 1,
+              "win_rate": 66.7
+            },
+            {
+              "pair": "ETH/USDT",
+              "trades": 24,
+              "total_profit": -1.2875683100000002,
+              "wins": 16,
+              "losses": 8,
+              "win_rate": 66.7
+            },
+            {
+              "pair": "RENDER/USDT",
+              "trades": 11,
+              "total_profit": -2.25373485,
+              "wins": 8,
+              "losses": 3,
+              "win_rate": 72.7
+            },
+            {
+              "pair": "SOL/USDT",
+              "trades": 14,
+              "total_profit": -3.07324968,
+              "wins": 9,
+              "losses": 5,
+              "win_rate": 64.3
+            },
+            {
+              "pair": "FET/USDT",
+              "trades": 28,
+              "total_profit": -3.208058969999998,
+              "wins": 19,
+              "losses": 9,
+              "win_rate": 67.9
+            },
+            {
+              "pair": "LINK/USDT",
+              "trades": 11,
+              "total_profit": -3.34238269,
+              "wins": 7,
+              "losses": 4,
+              "win_rate": 63.6
+            },
+            {
+              "pair": "LTC/USDT",
+              "trades": 18,
+              "total_profit": -3.4984569900000007,
+              "wins": 12,
+              "losses": 6,
+              "win_rate": 66.7
+            },
+            {
+              "pair": "ZEC/USDT",
+              "trades": 18,
+              "total_profit": -4.70964043,
+              "wins": 13,
+              "losses": 5,
+              "win_rate": 72.2
+            },
+            {
+              "pair": "BNB/USDT",
+              "trades": 46,
+              "total_profit": -8.429003519999998,
+              "wins": 35,
+              "losses": 11,
+              "win_rate": 76.1
+            },
+            {
+              "pair": "XRP/USDT",
+              "trades": 11,
+              "total_profit": -11.341606689999999,
+              "wins": 6,
+              "losses": 5,
+              "win_rate": 54.5
+            },
+            {
+              "pair": "BCH/USDT",
+              "trades": 60,
+              "total_profit": -13.791002899999995,
+              "wins": 42,
+              "losses": 18,
+              "win_rate": 70.0
+            },
+            {
+              "pair": "ADA/USDT",
+              "trades": 64,
+              "total_profit": -20.826009439999996,
+              "wins": 43,
+              "losses": 21,
+              "win_rate": 67.2
+            }
+          ],
+          "top_5": [
+            {
+              "pair": "BTC/USDT",
+              "trades": 42,
+              "total_profit": 19.459368930000007,
+              "wins": 36,
+              "losses": 6,
+              "win_rate": 85.7
+            },
+            {
+              "pair": "PIXEL/USDT",
+              "trades": 5,
+              "total_profit": 18.7100876,
+              "wins": 5,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "DOGE/USDT",
+              "trades": 32,
+              "total_profit": 12.871296350000001,
+              "wins": 25,
+              "losses": 7,
+              "win_rate": 78.1
+            },
+            {
+              "pair": "AVAX/USDT",
+              "trades": 59,
+              "total_profit": 11.31188236,
+              "wins": 45,
+              "losses": 14,
+              "win_rate": 76.3
+            },
+            {
+              "pair": "PAXG/USDT",
+              "trades": 18,
+              "total_profit": 11.267899879999998,
+              "wins": 17,
+              "losses": 1,
+              "win_rate": 94.4
+            }
+          ],
+          "bottom_5": [
+            {
+              "pair": "ZEC/USDT",
+              "trades": 18,
+              "total_profit": -4.70964043,
+              "wins": 13,
+              "losses": 5,
+              "win_rate": 72.2
+            },
+            {
+              "pair": "BNB/USDT",
+              "trades": 46,
+              "total_profit": -8.429003519999998,
+              "wins": 35,
+              "losses": 11,
+              "win_rate": 76.1
+            },
+            {
+              "pair": "XRP/USDT",
+              "trades": 11,
+              "total_profit": -11.341606689999999,
+              "wins": 6,
+              "losses": 5,
+              "win_rate": 54.5
+            },
+            {
+              "pair": "BCH/USDT",
+              "trades": 60,
+              "total_profit": -13.791002899999995,
+              "wins": 42,
+              "losses": 18,
+              "win_rate": 70.0
+            },
+            {
+              "pair": "ADA/USDT",
+              "trades": 64,
+              "total_profit": -20.826009439999996,
+              "wins": 43,
+              "losses": 21,
+              "win_rate": 67.2
+            }
+          ],
+          "concentration_risk": false,
+          "concentration_details": "",
+          "total_pairs_traded": 31
+        }
+      },
+      "walk_forward": {
+        "strategy": "SupertrendStrategy",
+        "stage": "walk_forward",
+        "mode": {
+          "windows": 3,
+          "train_days": 90,
+          "test_days": 30,
+          "epochs": 300
+        },
+        "pairs": [
+          "ADA/USDT",
+          "ARB/USDT",
+          "AVAX/USDT",
+          "BARD/USDT",
+          "BCH/USDT",
+          "BNB/USDT",
+          "BTC/USDT",
+          "DOGE/USDT",
+          "ENA/USDT",
+          "ENSO/USDT",
+          "ETH/USDT",
+          "EUR/USDT",
+          "FET/USDT",
+          "GIGGLE/USDT",
+          "HUMA/USDT",
+          "ICP/USDT",
+          "LINK/USDT",
+          "LTC/USDT",
+          "NEAR/USDT",
+          "PAXG/USDT",
+          "PENGU/USDT",
+          "PIXEL/USDT",
+          "PUMP/USDT",
+          "RENDER/USDT",
+          "SHIB/USDT",
+          "SOL/USDT",
+          "SUI/USDT",
+          "TAO/USDT",
+          "TRUMP/USDT",
+          "TRX/USDT",
+          "XPL/USDT",
+          "XRP/USDT",
+          "ZEC/USDT"
+        ],
+        "windows": [
+          {
+            "window_num": 1,
+            "train_start": "2025-10-14",
+            "train_end": "2026-01-12",
+            "test_start": "2026-01-12",
+            "test_end": "2026-02-11",
+            "train_range": "20251014-20260112",
+            "test_range": "20260112-20260211"
+          },
+          {
+            "window_num": 2,
+            "train_start": "2025-11-13",
+            "train_end": "2026-02-11",
+            "test_start": "2026-02-11",
+            "test_end": "2026-03-13",
+            "train_range": "20251113-20260211",
+            "test_range": "20260211-20260313"
+          },
+          {
+            "window_num": 3,
+            "train_start": "2025-12-13",
+            "train_end": "2026-03-13",
+            "test_start": "2026-03-13",
+            "test_end": "2026-04-12",
+            "train_range": "20251213-20260313",
+            "test_range": "20260313-20260412"
+          }
+        ],
+        "consensus": {
+          "consensus_params": {
+            "stoploss": -0.163,
+            "minimal_roi": {
+              "0": 0.338,
+              "277": 0.129,
+              "638": 0.038,
+              "1981": 0
+            },
+            "trailing_stop": true,
+            "trailing_stop_positive": 0.134,
+            "trailing_stop_positive_offset": 0.214,
+            "trailing_only_offset_is_reached": true
+          },
+          "avg_oos_sharpe": -1.403,
+          "robustness_pct": 33.3,
+          "per_window_results": [
+            {
+              "window_num": 1,
+              "window": {
+                "window_num": 1,
+                "train_start": "2025-10-14",
+                "train_end": "2026-01-12",
+                "test_start": "2026-01-12",
+                "test_end": "2026-02-11",
+                "train_range": "20251014-20260112",
+                "test_range": "20260112-20260211"
+              },
+              "hyperopt_results": {
+                "SharpeHyperOptLossDaily": {
+                  "params": {
+                    "params": {
+                      "buy_m1": 4,
+                      "buy_m2": 7,
+                      "buy_m3": 1,
+                      "buy_p1": 8,
+                      "buy_p2": 9,
+                      "buy_p3": 8,
+                      "sell_m1": 1,
+                      "sell_m2": 3,
+                      "sell_m3": 6,
+                      "sell_p1": 16,
+                      "sell_p2": 18,
+                      "sell_p3": 18
+                    },
+                    "minimal_roi": {
+                      "0": 0.521,
+                      "451": 0.08,
+                      "936": 0.045,
+                      "2214": 0
+                    },
+                    "stoploss": -0.051,
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.012,
+                    "trailing_stop_positive_offset": 0.028,
+                    "trailing_only_offset_is_reached": true,
+                    "max_open_trades": 3
+                  },
+                  "best_result_line": "Best result:",
+                  "loss_function": "SharpeHyperOptLossDaily",
+                  "timerange": "20251014-20260112",
+                  "strategy": "SupertrendStrategy",
+                  "epochs": 300
+                },
+                "SortinoHyperOptLossDaily": {
+                  "params": {
+                    "params": {
+                      "buy_m1": 4,
+                      "buy_m2": 7,
+                      "buy_m3": 1,
+                      "buy_p1": 8,
+                      "buy_p2": 9,
+                      "buy_p3": 8,
+                      "sell_m1": 1,
+                      "sell_m2": 3,
+                      "sell_m3": 6,
+                      "sell_p1": 16,
+                      "sell_p2": 18,
+                      "sell_p3": 18
+                    },
+                    "minimal_roi": {
+                      "0": 0.153,
+                      "317": 0.116,
+                      "1030": 0.089,
+                      "2323": 0
+                    },
+                    "stoploss": -0.339,
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.118,
+                    "trailing_stop_positive_offset": 0.184,
+                    "trailing_only_offset_is_reached": true,
+                    "max_open_trades": 3
+                  },
+                  "best_result_line": "Best result:",
+                  "loss_function": "SortinoHyperOptLossDaily",
+                  "timerange": "20251014-20260112",
+                  "strategy": "SupertrendStrategy",
+                  "epochs": 300
+                },
+                "CalmarHyperOptLoss": {
+                  "params": {
+                    "params": {
+                      "buy_m1": 4,
+                      "buy_m2": 7,
+                      "buy_m3": 1,
+                      "buy_p1": 8,
+                      "buy_p2": 9,
+                      "buy_p3": 8,
+                      "sell_m1": 1,
+                      "sell_m2": 3,
+                      "sell_m3": 6,
+                      "sell_p1": 16,
+                      "sell_p2": 18,
+                      "sell_p3": 18
+                    },
+                    "minimal_roi": {
+                      "0": 0.161,
+                      "360": 0.051,
+                      "681": 0.023,
+                      "1348": 0
+                    },
+                    "stoploss": -0.151,
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.249,
+                    "trailing_stop_positive_offset": 0.338,
+                    "trailing_only_offset_is_reached": false,
+                    "max_open_trades": 3
+                  },
+                  "best_result_line": "Best result:",
+                  "loss_function": "CalmarHyperOptLoss",
+                  "timerange": "20251014-20260112",
+                  "strategy": "SupertrendStrategy",
+                  "epochs": 300
+                }
+              },
+              "oos_results": {
+                "SharpeHyperOptLossDaily": {
+                  "strategy": "SupertrendStrategy",
+                  "total_trades": 24,
+                  "avg_profit_pct": -1.0,
+                  "total_profit": -20.993,
+                  "total_profit_pct": -2.1,
+                  "wins": 12,
+                  "draws": 3,
+                  "losses": 9,
+                  "win_rate": 50.0,
+                  "max_drawdown_pct": 3.15,
+                  "sortino": -1305.62,
+                  "sharpe": -4.35,
+                  "calmar": -42.39,
+                  "profit_factor": 0.5,
+                  "avg_stake": 87.807,
+                  "total_volume": 4202.15,
+                  "timerange": "20260112-20260211",
+                  "param_overrides": {
+                    "stoploss": -0.051,
+                    "minimal_roi": {
+                      "0": 0.521,
+                      "451": 0.08,
+                      "936": 0.045,
+                      "2214": 0
+                    },
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.012,
+                    "trailing_stop_positive_offset": 0.028,
+                    "trailing_only_offset_is_reached": true
+                  }
+                },
+                "SortinoHyperOptLossDaily": {
+                  "strategy": "SupertrendStrategy",
+                  "total_trades": 5,
+                  "avg_profit_pct": -20.21,
+                  "total_profit": -88.866,
+                  "total_profit_pct": -8.89,
+                  "wins": 1,
+                  "draws": 1,
+                  "losses": 3,
+                  "win_rate": 20.0,
+                  "max_drawdown_pct": 8.97,
+                  "sortino": -1247.59,
+                  "sharpe": -3.8,
+                  "calmar": -63.1,
+                  "profit_factor": 0.01,
+                  "avg_stake": 87.762,
+                  "total_volume": 790.334,
+                  "timerange": "20260112-20260211",
+                  "param_overrides": {
+                    "stoploss": -0.339,
+                    "minimal_roi": {
+                      "0": 0.153,
+                      "317": 0.116,
+                      "1030": 0.089,
+                      "2323": 0
+                    },
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.118,
+                    "trailing_stop_positive_offset": 0.184,
+                    "trailing_only_offset_is_reached": true
+                  }
+                },
+                "CalmarHyperOptLoss": {
+                  "strategy": "SupertrendStrategy",
+                  "total_trades": 11,
+                  "avg_profit_pct": -5.55,
+                  "total_profit": -53.681,
+                  "total_profit_pct": -5.37,
+                  "wins": 4,
+                  "draws": 2,
+                  "losses": 5,
+                  "win_rate": 36.4,
+                  "max_drawdown_pct": 5.79,
+                  "sortino": -51.84,
+                  "sharpe": -4.8,
+                  "calmar": -59.08,
+                  "profit_factor": 0.14,
+                  "avg_stake": 87.729,
+                  "total_volume": 1880.124,
+                  "timerange": "20260112-20260211",
+                  "param_overrides": {
+                    "stoploss": -0.151,
+                    "minimal_roi": {
+                      "0": 0.161,
+                      "360": 0.051,
+                      "681": 0.023,
+                      "1348": 0
+                    },
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.249,
+                    "trailing_stop_positive_offset": 0.338,
+                    "trailing_only_offset_is_reached": false
+                  }
+                }
+              }
+            },
+            {
+              "window_num": 2,
+              "window": {
+                "window_num": 2,
+                "train_start": "2025-11-13",
+                "train_end": "2026-02-11",
+                "test_start": "2026-02-11",
+                "test_end": "2026-03-13",
+                "train_range": "20251113-20260211",
+                "test_range": "20260211-20260313"
+              },
+              "hyperopt_results": {
+                "SharpeHyperOptLossDaily": {
+                  "params": {
+                    "params": {
+                      "buy_m1": 4,
+                      "buy_m2": 7,
+                      "buy_m3": 1,
+                      "buy_p1": 8,
+                      "buy_p2": 9,
+                      "buy_p3": 8,
+                      "sell_m1": 1,
+                      "sell_m2": 3,
+                      "sell_m3": 6,
+                      "sell_p1": 16,
+                      "sell_p2": 18,
+                      "sell_p3": 18
+                    },
+                    "minimal_roi": {
+                      "0": 0.316,
+                      "201": 0.065,
+                      "793": 0.032,
+                      "1374": 0
+                    },
+                    "stoploss": -0.137,
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.219,
+                    "trailing_stop_positive_offset": 0.232,
+                    "trailing_only_offset_is_reached": true,
+                    "max_open_trades": 3
+                  },
+                  "best_result_line": "Best result:",
+                  "loss_function": "SharpeHyperOptLossDaily",
+                  "timerange": "20251113-20260211",
+                  "strategy": "SupertrendStrategy",
+                  "epochs": 300
+                },
+                "SortinoHyperOptLossDaily": {
+                  "params": {
+                    "params": {
+                      "buy_m1": 4,
+                      "buy_m2": 7,
+                      "buy_m3": 1,
+                      "buy_p1": 8,
+                      "buy_p2": 9,
+                      "buy_p3": 8,
+                      "sell_m1": 1,
+                      "sell_m2": 3,
+                      "sell_m3": 6,
+                      "sell_p1": 16,
+                      "sell_p2": 18,
+                      "sell_p3": 18
+                    },
+                    "minimal_roi": {
+                      "0": 0.254,
+                      "142": 0.158,
+                      "368": 0.038,
+                      "1062": 0
+                    },
+                    "stoploss": -0.336,
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.012,
+                    "trailing_stop_positive_offset": 0.046,
+                    "trailing_only_offset_is_reached": true,
+                    "max_open_trades": 3
+                  },
+                  "best_result_line": "Best result:",
+                  "loss_function": "SortinoHyperOptLossDaily",
+                  "timerange": "20251113-20260211",
+                  "strategy": "SupertrendStrategy",
+                  "epochs": 300
+                },
+                "CalmarHyperOptLoss": {
+                  "params": {
+                    "params": {
+                      "buy_m1": 4,
+                      "buy_m2": 7,
+                      "buy_m3": 1,
+                      "buy_p1": 8,
+                      "buy_p2": 9,
+                      "buy_p3": 8,
+                      "sell_m1": 1,
+                      "sell_m2": 3,
+                      "sell_m3": 6,
+                      "sell_p1": 16,
+                      "sell_p2": 18,
+                      "sell_p3": 18
+                    },
+                    "minimal_roi": {
+                      "0": 0.344,
+                      "164": 0.19,
+                      "848": 0.033,
+                      "1536": 0
+                    },
+                    "stoploss": -0.318,
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.035,
+                    "trailing_stop_positive_offset": 0.063,
+                    "trailing_only_offset_is_reached": true,
+                    "max_open_trades": 3
+                  },
+                  "best_result_line": "Best result:",
+                  "loss_function": "CalmarHyperOptLoss",
+                  "timerange": "20251113-20260211",
+                  "strategy": "SupertrendStrategy",
+                  "epochs": 300
+                }
+              },
+              "oos_results": {
+                "SharpeHyperOptLossDaily": {
+                  "strategy": "SupertrendStrategy",
+                  "total_trades": 36,
+                  "avg_profit_pct": -0.35,
+                  "total_profit": -11.247,
+                  "total_profit_pct": -1.12,
+                  "wins": 12,
+                  "draws": 16,
+                  "losses": 8,
+                  "win_rate": 33.3,
+                  "max_drawdown_pct": 4.28,
+                  "sortino": -1.31,
+                  "sharpe": -1.36,
+                  "calmar": -16.75,
+                  "profit_factor": 0.82,
+                  "avg_stake": 87.928,
+                  "total_volume": 6332.227,
+                  "timerange": "20260211-20260313",
+                  "param_overrides": {
+                    "stoploss": -0.137,
+                    "minimal_roi": {
+                      "0": 0.316,
+                      "201": 0.065,
+                      "793": 0.032,
+                      "1374": 0
+                    },
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.219,
+                    "trailing_stop_positive_offset": 0.232,
+                    "trailing_only_offset_is_reached": true
+                  }
+                },
+                "SortinoHyperOptLossDaily": {
+                  "strategy": "SupertrendStrategy",
+                  "total_trades": 21,
+                  "avg_profit_pct": 0.36,
+                  "total_profit": 6.709,
+                  "total_profit_pct": 0.67,
+                  "wins": 10,
+                  "draws": 9,
+                  "losses": 2,
+                  "win_rate": 47.6,
+                  "max_drawdown_pct": 1.9,
+                  "sortino": 9.31,
+                  "sharpe": 1.17,
+                  "calmar": 22.5,
+                  "profit_factor": 1.34,
+                  "avg_stake": 87.905,
+                  "total_volume": 3706.119,
+                  "timerange": "20260211-20260313",
+                  "param_overrides": {
+                    "stoploss": -0.336,
+                    "minimal_roi": {
+                      "0": 0.254,
+                      "142": 0.158,
+                      "368": 0.038,
+                      "1062": 0
+                    },
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.012,
+                    "trailing_stop_positive_offset": 0.046,
+                    "trailing_only_offset_is_reached": true
+                  }
+                },
+                "CalmarHyperOptLoss": {
+                  "strategy": "SupertrendStrategy",
+                  "total_trades": 21,
+                  "avg_profit_pct": 0.57,
+                  "total_profit": 10.601,
+                  "total_profit_pct": 1.06,
+                  "wins": 8,
+                  "draws": 11,
+                  "losses": 2,
+                  "win_rate": 38.1,
+                  "max_drawdown_pct": 1.22,
+                  "sortino": 1.51,
+                  "sharpe": 2.23,
+                  "calmar": 55.14,
+                  "profit_factor": 1.85,
+                  "avg_stake": 87.907,
+                  "total_volume": 3710.125,
+                  "timerange": "20260211-20260313",
+                  "param_overrides": {
+                    "stoploss": -0.318,
+                    "minimal_roi": {
+                      "0": 0.344,
+                      "164": 0.19,
+                      "848": 0.033,
+                      "1536": 0
+                    },
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.035,
+                    "trailing_stop_positive_offset": 0.063,
+                    "trailing_only_offset_is_reached": true
+                  }
+                }
+              }
+            },
+            {
+              "window_num": 3,
+              "window": {
+                "window_num": 3,
+                "train_start": "2025-12-13",
+                "train_end": "2026-03-13",
+                "test_start": "2026-03-13",
+                "test_end": "2026-04-12",
+                "train_range": "20251213-20260313",
+                "test_range": "20260313-20260412"
+              },
+              "hyperopt_results": {
+                "SharpeHyperOptLossDaily": {
+                  "params": {
+                    "params": {
+                      "buy_m1": 4,
+                      "buy_m2": 7,
+                      "buy_m3": 1,
+                      "buy_p1": 8,
+                      "buy_p2": 9,
+                      "buy_p3": 8,
+                      "sell_m1": 1,
+                      "sell_m2": 3,
+                      "sell_m3": 6,
+                      "sell_p1": 16,
+                      "sell_p2": 18,
+                      "sell_p3": 18
+                    },
+                    "minimal_roi": {
+                      "0": 0.338,
+                      "277": 0.129,
+                      "638": 0.038,
+                      "1981": 0
+                    },
+                    "stoploss": -0.163,
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.134,
+                    "trailing_stop_positive_offset": 0.214,
+                    "trailing_only_offset_is_reached": true,
+                    "max_open_trades": 3
+                  },
+                  "best_result_line": "Best result:",
+                  "loss_function": "SharpeHyperOptLossDaily",
+                  "timerange": "20251213-20260313",
+                  "strategy": "SupertrendStrategy",
+                  "epochs": 300
+                },
+                "SortinoHyperOptLossDaily": {
+                  "params": {
+                    "params": {
+                      "buy_m1": 4,
+                      "buy_m2": 7,
+                      "buy_m3": 1,
+                      "buy_p1": 8,
+                      "buy_p2": 9,
+                      "buy_p3": 8,
+                      "sell_m1": 1,
+                      "sell_m2": 3,
+                      "sell_m3": 6,
+                      "sell_p1": 16,
+                      "sell_p2": 18,
+                      "sell_p3": 18
+                    },
+                    "minimal_roi": {
+                      "0": 0.159,
+                      "162": 0.132,
+                      "474": 0.076,
+                      "1160": 0
+                    },
+                    "stoploss": -0.183,
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.165,
+                    "trailing_stop_positive_offset": 0.224,
+                    "trailing_only_offset_is_reached": false,
+                    "max_open_trades": 3
+                  },
+                  "best_result_line": "Best result:",
+                  "loss_function": "SortinoHyperOptLossDaily",
+                  "timerange": "20251213-20260313",
+                  "strategy": "SupertrendStrategy",
+                  "epochs": 300
+                },
+                "CalmarHyperOptLoss": {
+                  "params": {
+                    "params": {
+                      "buy_m1": 4,
+                      "buy_m2": 7,
+                      "buy_m3": 1,
+                      "buy_p1": 8,
+                      "buy_p2": 9,
+                      "buy_p3": 8,
+                      "sell_m1": 1,
+                      "sell_m2": 3,
+                      "sell_m3": 6,
+                      "sell_p1": 16,
+                      "sell_p2": 18,
+                      "sell_p3": 18
+                    },
+                    "minimal_roi": {
+                      "0": 0.269,
+                      "214": 0.079,
+                      "914": 0.027,
+                      "2175": 0
+                    },
+                    "stoploss": -0.156,
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.333,
+                    "trailing_stop_positive_offset": 0.405,
+                    "trailing_only_offset_is_reached": true,
+                    "max_open_trades": 3
+                  },
+                  "best_result_line": "Best result:",
+                  "loss_function": "CalmarHyperOptLoss",
+                  "timerange": "20251213-20260313",
+                  "strategy": "SupertrendStrategy",
+                  "epochs": 300
+                }
+              },
+              "oos_results": {
+                "SharpeHyperOptLossDaily": {
+                  "strategy": "SupertrendStrategy",
+                  "total_trades": 26,
+                  "avg_profit_pct": 0.13,
+                  "total_profit": 3.005,
+                  "total_profit_pct": 0.3,
+                  "wins": 11,
+                  "draws": 12,
+                  "losses": 3,
+                  "win_rate": 42.3,
+                  "max_drawdown_pct": 1.43,
+                  "sortino": 0.38,
+                  "sharpe": 0.54,
+                  "calmar": 13.88,
+                  "profit_factor": 1.13,
+                  "avg_stake": 87.889,
+                  "total_volume": 4582.365,
+                  "timerange": "20260313-20260412",
+                  "param_overrides": {
+                    "stoploss": -0.163,
+                    "minimal_roi": {
+                      "0": 0.338,
+                      "277": 0.129,
+                      "638": 0.038,
+                      "1981": 0
+                    },
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.134,
+                    "trailing_stop_positive_offset": 0.214,
+                    "trailing_only_offset_is_reached": true
+                  }
+                },
+                "SortinoHyperOptLossDaily": {
+                  "strategy": "SupertrendStrategy",
+                  "total_trades": 21,
+                  "avg_profit_pct": -0.49,
+                  "total_profit": -9.029,
+                  "total_profit_pct": -0.9,
+                  "wins": 5,
+                  "draws": 12,
+                  "losses": 4,
+                  "win_rate": 23.8,
+                  "max_drawdown_pct": 2.92,
+                  "sortino": -1.11,
+                  "sharpe": -1.3,
+                  "calmar": -20.38,
+                  "profit_factor": 0.7,
+                  "avg_stake": 87.896,
+                  "total_volume": 3689.971,
+                  "timerange": "20260313-20260412",
+                  "param_overrides": {
+                    "stoploss": -0.183,
+                    "minimal_roi": {
+                      "0": 0.159,
+                      "162": 0.132,
+                      "474": 0.076,
+                      "1160": 0
+                    },
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.165,
+                    "trailing_stop_positive_offset": 0.224,
+                    "trailing_only_offset_is_reached": false
+                  }
+                },
+                "CalmarHyperOptLoss": {
+                  "strategy": "SupertrendStrategy",
+                  "total_trades": 23,
+                  "avg_profit_pct": -0.39,
+                  "total_profit": -7.965,
+                  "total_profit_pct": -0.8,
+                  "wins": 9,
+                  "draws": 9,
+                  "losses": 5,
+                  "win_rate": 39.1,
+                  "max_drawdown_pct": 2.94,
+                  "sortino": -1.12,
+                  "sharpe": -0.96,
+                  "calmar": -17.84,
+                  "profit_factor": 0.82,
+                  "avg_stake": 87.927,
+                  "total_volume": 4044.748,
+                  "timerange": "20260313-20260412",
+                  "param_overrides": {
+                    "stoploss": -0.156,
+                    "minimal_roi": {
+                      "0": 0.269,
+                      "214": 0.079,
+                      "914": 0.027,
+                      "2175": 0
+                    },
+                    "trailing_stop": true,
+                    "trailing_stop_positive": 0.333,
+                    "trailing_stop_positive_offset": 0.405,
+                    "trailing_only_offset_is_reached": true
+                  }
+                }
+              }
+            }
+          ],
+          "per_loss_results": {
+            "SharpeHyperOptLossDaily": [
+              {
+                "window_num": 1,
+                "profit_pct": -2.1,
+                "max_drawdown_pct": 3.15,
+                "sharpe": -4.35,
+                "trades": 24
+              },
+              {
+                "window_num": 2,
+                "profit_pct": -1.12,
+                "max_drawdown_pct": 4.28,
+                "sharpe": -1.36,
+                "trades": 36
+              },
+              {
+                "window_num": 3,
+                "profit_pct": 0.3,
+                "max_drawdown_pct": 1.43,
+                "sharpe": 0.54,
+                "trades": 26
+              }
+            ],
+            "SortinoHyperOptLossDaily": [
+              {
+                "window_num": 1,
+                "profit_pct": -8.89,
+                "max_drawdown_pct": 8.97,
+                "sharpe": -3.8,
+                "trades": 5
+              },
+              {
+                "window_num": 2,
+                "profit_pct": 0.67,
+                "max_drawdown_pct": 1.9,
+                "sharpe": 1.17,
+                "trades": 21
+              },
+              {
+                "window_num": 3,
+                "profit_pct": -0.9,
+                "max_drawdown_pct": 2.92,
+                "sharpe": -1.3,
+                "trades": 21
+              }
+            ],
+            "CalmarHyperOptLoss": [
+              {
+                "window_num": 1,
+                "profit_pct": -5.37,
+                "max_drawdown_pct": 5.79,
+                "sharpe": -4.8,
+                "trades": 11
+              },
+              {
+                "window_num": 2,
+                "profit_pct": 1.06,
+                "max_drawdown_pct": 1.22,
+                "sharpe": 2.23,
+                "trades": 21
+              },
+              {
+                "window_num": 3,
+                "profit_pct": -0.8,
+                "max_drawdown_pct": 2.94,
+                "sharpe": -0.96,
+                "trades": 23
+              }
+            ]
+          },
+          "passed": true,
+          "rejection_reasons": [],
+          "windows_profitable": 2,
+          "windows_total": 3,
+          "loss_functions_profitable": 3
+        }
+      },
+      "robustness": {
+        "strategy": "SupertrendStrategy",
+        "monte_carlo": null,
+        "perturbation": null,
+        "combined_score": 0,
+        "combined_verdict": "SKIP"
+      }
+    }
+  },
+  "stage_durations": {
+    "calibration": 105.23637199401855,
+    "viability": 52.52654504776001,
+    "walk_forward": 3202.8587639331818,
+    "robustness": 0.0013072490692138672,
+    "reporting": 0.004209756851196289
+  },
+  "reporting": {
+    "stage": "reporting",
+    "status": "success",
+    "recommendations": {
+      "SupertrendStrategy": "MONITOR"
+    },
+    "report_dir": "/Users/palmer/ft_userdata/engine_results/20260412_fast",
+    "report_cards": "+--------------------------------------------------+\n| SUPERTRENDSTRATEGY -- REPORT CARD                |\n+--------------------------------------------------+\n| Calibration:    76.9/100 (Good)                  |\n| Viability:      MARGINAL (PF 1.05, 584 trades)   |\n| Lookahead:      PASS                             |\n| Walk-Forward:   2/3 windows profitable           |\n| Consensus:      -1.40 (avg OOS Sharpe)           |\n| Monte Carlo:    SKIPPED                          |\n| Perturbation:   SKIPPED                          |\n|                                                  |\n| RECOMMENDATION: MONITOR -- REVIEW NEXT CYCLE     |\n|                                                  |\n| Top pairs: BTC, PIXEL, DOGE, AVAX, PAXG          |\n| Drop pairs: ZEC, BNB, XRP, BCH, ADA (negative expectancy)|\n|                                                  |\n| Max Drawdown:   8.1%                             |\n+--------------------------------------------------+",
+    "telegram_message": "Engine v2 Report -- 2026-04-12 10:58\n\n[?] SupertrendStrategy\n  MONITOR\n  MARGINAL | PF 1.05 | 584T | Cal 76.9\n\n---\nKILL: 0 | INVESTIGATE: 0 | MONITOR: 1 | OPTIMIZE: 0 | KEEP: 0",
+    "telegram_sent": null
+  }
+}

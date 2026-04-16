@@ -1,0 +1,16 @@
+{
+  "date": "2026-04-12T13:08:00.363514",
+  "mode": "fast",
+  "strategies": [
+    "SupertrendStrategy",
+    "MasterTraderV1",
+    "BearCrashShortV1",
+    "BollingerBounceV1"
+  ],
+  "recommendations": {
+    "SupertrendStrategy": "MONITOR",
+    "MasterTraderV1": "REGIME_DEPENDENT",
+    "BearCrashShortV1": "INVESTIGATE",
+    "BollingerBounceV1": "INVESTIGATE"
+  }
+}

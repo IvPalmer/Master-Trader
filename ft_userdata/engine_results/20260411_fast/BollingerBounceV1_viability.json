@@ -1,0 +1,227 @@
+{
+  "strategy": "BollingerBounceV1",
+  "classification": "MARGINAL",
+  "reasons": [
+    "MARGINAL: Profit factor 0.73 in warning range (0.5-0.8)",
+    "MARGINAL: Sharpe ratio -0.36 in warning range (-1.0-0.5)",
+    "MARGINAL: Pair concentration risk \u2014 100% of profit from top 2 pairs: TRX/USDT, SOL/USDT"
+  ],
+  "lookahead": {
+    "passed": true,
+    "flagged_indicators": [
+      "filename"
+    ],
+    "raw": "2026-04-11 20:21:35,850 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:35,898 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:35,905 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-06-09 12:00:00 (69 days).\n2026-04-11 20:21:35,905 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-11 20:21:35,919 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-02-26 16:00:00 to 2025-06-09 12:00:00\n2026-04-11 20:21:35,928 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:35,984 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ETH/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:35,991 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-06-17 02:00:00 (77 days).\n2026-04-11 20:21:35,992 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-11 20:21:36,006 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-02-26 16:00:00 to 2025-06-17 02:00:00\n2026-04-11 20:21:36,015 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,070 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ETH/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,077 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-06-17 18:00:00 (77 days).\n2026-04-11 20:21:36,078 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-11 20:21:36,092 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-02-26 16:00:00 to 2025-06-17 18:00:00\n2026-04-11 20:21:36,100 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,170 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BNB/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,176 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-06-17 02:00:00 (77 days).\n2026-04-11 20:21:36,176 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-11 20:21:36,193 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-02-26 16:00:00 to 2025-06-17 02:00:00\n2026-04-11 20:21:36,202 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,261 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BNB/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,269 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-06-22 14:00:00 (82 days).\n2026-04-11 20:21:36,269 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-11 20:21:36,287 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-02-26 16:00:00 to 2025-06-22 14:00:00\n2026-04-11 20:21:36,294 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,369 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,378 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-06-26 16:00:00 (86 days).\n2026-04-11 20:21:36,378 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-11 20:21:36,397 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-02-26 16:00:00 to 2025-06-26 16:00:00\n2026-04-11 20:21:36,406 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,459 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,464 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2025-06-30 01:00:00 (90 days).\n2026-04-11 20:21:36,464 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-11 20:21:36,483 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-02-26 16:00:00 to 2025-06-30 01:00:00\n2026-04-11 20:21:36,492 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:36,536 - freqtrade.optimize.analysis.lookahead - INFO - Found targeted trade amount = 20 signals.\n2026-04-11 20:21:36,536 - freqtrade.loggers.set_log_levels - INFO - Restoring log verbosity.\n2026-04-11 20:21:36,537 - freqtrade.optimize.analysis.lookahead - INFO - BollingerBounceV1: no bias detected\n2026-04-11 20:21:36,537 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Checking look ahead bias via backtests of BollingerBounceV1.py took 6 seconds."
+  },
+  "recursive": {
+    "warning": false,
+    "flagged_indicators": [],
+    "raw": "2026-04-11 20:21:41,454 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 88.\n2026-04-11 20:21:41,454 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: 3.\n2026-04-11 20:21:41,454 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.05, '360': 0.03, '720': 0.02, '1440': 0.01}\n2026-04-11 20:21:41,455 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-11 20:21:41,455 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.05\n2026-04-11 20:21:41,455 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-11 20:21:41,456 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.02\n2026-04-11 20:21:41,456 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.03\n2026-04-11 20:21:41,456 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: True\n2026-04-11 20:21:41,456 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False\n2026-04-11 20:21:41,457 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True\n2026-04-11 20:21:41,457 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'limit', 'exit': 'limit', 'stoploss': 'limit', 'stoploss_on_exchange': False, \n'stoploss_on_exchange_interval': 60}\n2026-04-11 20:21:41,457 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-11 20:21:41,457 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-11 20:21:41,457 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 88\n2026-04-11 20:21:41,458 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-11 20:21:41,458 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: False\n2026-04-11 20:21:41,458 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: True\n2026-04-11 20:21:41,458 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-11 20:21:41,458 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.01\n2026-04-11 20:21:41,460 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-11 20:21:41,460 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-11 20:21:41,461 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-11 20:21:41,461 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-11 20:21:41,461 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: 3\n2026-04-11 20:21:41,461 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-11 20:21:41,464 - freqtrade.resolvers.iresolver - INFO - Using resolved pairlist StaticPairList from '/freqtrade/freqtrade/plugins/pairlist/StaticPairList.py'...\n2026-04-11 20:21:41,510 - freqtrade.optimize.backtesting - INFO - Using fee 0.1000% - worst case fee from exchange (lowest tier).\n2026-04-11 20:21:41,510 - freqtrade.optimize.analysis.recursive - INFO - Using pair BTC/USDT only for recursive analysis. Replacing whitelist.\n2026-04-11 20:21:41,532 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:41,545 - freqtrade.optimize.backtesting - INFO - Loading data from 2025-04-01 00:00:00 up to 2026-04-11 00:00:00 (375 days).\n2026-04-11 20:21:41,546 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-11 20:21:41,607 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2025-02-26 16:00:00 to 2026-04-11 00:00:00\n2026-04-11 20:21:41,617 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:41,637 - freqtrade.loggers.set_log_levels - INFO - Reducing verbosity for bias tester.\n2026-04-11 20:21:41,638 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators to test lookahead on indicators.\n2026-04-11 20:21:41,701 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2025-04-01 00:00:00\n2026-04-11 20:21:41,702 - freqtrade.data.history.datahandlers.idatahandler - WARNING - No history for BTC/USDT, spot, 1h found. Use `freqtrade download-data` to download the data\n2026-04-11 20:21:41,703 - freqtrade - ERROR - No data found. Terminating."
+  },
+  "metrics": {
+    "strategy": "BollingerBounceV1",
+    "total_trades": 55,
+    "avg_profit_pct": -0.46,
+    "total_profit": -22.327,
+    "total_profit_pct": -2.23,
+    "wins": 36,
+    "draws": 0,
+    "losses": 19,
+    "win_rate": 65.5,
+    "max_drawdown_pct": 4.06,
+    "sortino": -1.11,
+    "sharpe": -0.36,
+    "calmar": -2.68,
+    "profit_factor": 0.73,
+    "avg_stake": 87.829,
+    "total_volume": 9658.172,
+    "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-11_20-21-49.zip"
+  },
+  "pair_analysis": {
+    "pairs": [
+      {
+        "pair": "TRX/USDT",
+        "trades": 4,
+        "total_profit": 7.98223801,
+        "wins": 4,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "SOL/USDT",
+        "trades": 2,
+        "total_profit": 3.5164964899999998,
+        "wins": 2,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "USD1/USDT",
+        "trades": 1,
+        "total_profit": -0.175824,
+        "wins": 0,
+        "losses": 1,
+        "win_rate": 0.0
+      },
+      {
+        "pair": "DOGE/USDT",
+        "trades": 8,
+        "total_profit": -0.5340217899999999,
+        "wins": 6,
+        "losses": 2,
+        "win_rate": 75.0
+      },
+      {
+        "pair": "DASH/USDT",
+        "trades": 4,
+        "total_profit": -0.7710245099999997,
+        "wins": 3,
+        "losses": 1,
+        "win_rate": 75.0
+      },
+      {
+        "pair": "BNB/USDT",
+        "trades": 4,
+        "total_profit": -1.0472575600000005,
+        "wins": 3,
+        "losses": 1,
+        "win_rate": 75.0
+      },
+      {
+        "pair": "BTC/USDT",
+        "trades": 4,
+        "total_profit": -1.4570963399999997,
+        "wins": 3,
+        "losses": 1,
+        "win_rate": 75.0
+      },
+      {
+        "pair": "FF/USDT",
+        "trades": 2,
+        "total_profit": -1.9282981799999996,
+        "wins": 1,
+        "losses": 1,
+        "win_rate": 50.0
+      },
+      {
+        "pair": "XRP/USDT",
+        "trades": 6,
+        "total_profit": -4.10042054,
+        "wins": 4,
+        "losses": 2,
+        "win_rate": 66.7
+      },
+      {
+        "pair": "ADA/USDT",
+        "trades": 4,
+        "total_profit": -5.60273817,
+        "wins": 2,
+        "losses": 2,
+        "win_rate": 50.0
+      },
+      {
+        "pair": "ETH/USDT",
+        "trades": 7,
+        "total_profit": -8.627647419999999,
+        "wins": 4,
+        "losses": 3,
+        "win_rate": 57.1
+      },
+      {
+        "pair": "ZEC/USDT",
+        "trades": 9,
+        "total_profit": -9.58127288,
+        "wins": 4,
+        "losses": 5,
+        "win_rate": 44.4
+      }
+    ],
+    "top_5": [
+      {
+        "pair": "TRX/USDT",
+        "trades": 4,
+        "total_profit": 7.98223801,
+        "wins": 4,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "SOL/USDT",
+        "trades": 2,
+        "total_profit": 3.5164964899999998,
+        "wins": 2,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "USD1/USDT",
+        "trades": 1,
+        "total_profit": -0.175824,
+        "wins": 0,
+        "losses": 1,
+        "win_rate": 0.0
+      },
+      {
+        "pair": "DOGE/USDT",
+        "trades": 8,
+        "total_profit": -0.5340217899999999,
+        "wins": 6,
+        "losses": 2,
+        "win_rate": 75.0
+      },
+      {
+        "pair": "DASH/USDT",
+        "trades": 4,
+        "total_profit": -0.7710245099999997,
+        "wins": 3,
+        "losses": 1,
+        "win_rate": 75.0
+      }
+    ],
+    "bottom_5": [
+      {
+        "pair": "FF/USDT",
+        "trades": 2,
+        "total_profit": -1.9282981799999996,
+        "wins": 1,
+        "losses": 1,
+        "win_rate": 50.0
+      },
+      {
+        "pair": "XRP/USDT",
+        "trades": 6,
+        "total_profit": -4.10042054,
+        "wins": 4,
+        "losses": 2,
+        "win_rate": 66.7
+      },
+      {
+        "pair": "ADA/USDT",
+        "trades": 4,
+        "total_profit": -5.60273817,
+        "wins": 2,
+        "losses": 2,
+        "win_rate": 50.0
+      },
+      {
+        "pair": "ETH/USDT",
+        "trades": 7,
+        "total_profit": -8.627647419999999,
+        "wins": 4,
+        "losses": 3,
+        "win_rate": 57.1
+      },
+      {
+        "pair": "ZEC/USDT",
+        "trades": 9,
+        "total_profit": -9.58127288,
+        "wins": 4,
+        "losses": 5,
+        "win_rate": 44.4
+      }
+    ],
+    "concentration_risk": true,
+    "concentration_details": "100% of profit from top 2 pairs: TRX/USDT, SOL/USDT",
+    "total_pairs_traded": 12
+  }
+}

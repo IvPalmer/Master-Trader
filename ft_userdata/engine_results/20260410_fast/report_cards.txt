@@ -1,0 +1,13 @@
++--------------------------------------------------+
+| MASTERTRADERV1 -- REPORT CARD                    |
++--------------------------------------------------+
+| Calibration:    0/100 (Poor)                     |
+| Viability:      SKIPPED                          |
+| Lookahead:      SKIPPED                          |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: INVESTIGATE -- ENGINE DIVERGES FROM LIVE|
++--------------------------------------------------+

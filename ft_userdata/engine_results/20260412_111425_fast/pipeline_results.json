@@ -1,0 +1,178 @@
+{
+  "meta": {
+    "mode": "fast",
+    "mode_config": {
+      "epochs": 300,
+      "wf_windows": 3,
+      "train_days": 90,
+      "test_days": 30,
+      "mc_iterations": 0,
+      "perturb_pcts": [],
+      "description": "Weekly validation \u2014 skip Monte Carlo"
+    },
+    "strategies": [
+      "MasterTraderV1"
+    ],
+    "stages_requested": [
+      "calibration",
+      "viability",
+      "reporting"
+    ],
+    "stages_completed": [
+      "calibration",
+      "viability",
+      "reporting"
+    ],
+    "run_dir": "/Users/palmer/ft_userdata/engine_results/20260412_111425_fast",
+    "started_at": "2026-04-12T11:14:25.415098",
+    "status": "success",
+    "total_duration": "36.3s",
+    "finished_at": "2026-04-12T11:15:01.695046"
+  },
+  "strategies": {
+    "MasterTraderV1": {
+      "calibration": {
+        "strategy": "MasterTraderV1",
+        "score": 0.0,
+        "grade": "Broken",
+        "metrics": {
+          "trade_match_rate": 0.0,
+          "matched_count": 0,
+          "total_live_trades": 7,
+          "profit_correlation": null,
+          "aggregate_pnl_delta": 1.0,
+          "live_total_pnl": 1.9401,
+          "bt_total_pnl": 0,
+          "exit_reason_concordance": 0.0
+        },
+        "component_scores": {
+          "match_rate": 0.0,
+          "profit_correlation": 0.0,
+          "pnl_accuracy": 0,
+          "exit_concordance": 0.0
+        },
+        "divergent_trades": [
+          {
+            "type": "unmatched",
+            "pair": "LTC/USDT",
+            "open_date": "2026-04-05 19:00:06.927682",
+            "live_profit": 0.28394716,
+            "live_exit": "stoploss_on_exchange",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "UNI/USDT",
+            "open_date": "2026-04-06 00:00:08.642581",
+            "live_profit": -0.60328872,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TAO/USDT",
+            "open_date": "2026-04-06 00:10:12.670344",
+            "live_profit": 0.69289771,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "SOL/USDT",
+            "open_date": "2026-04-07 21:00:08.163367",
+            "live_profit": 0.6820261,
+            "live_exit": "trailing_stop_loss",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "UNI/USDT",
+            "open_date": "2026-04-07 22:20:18.813549",
+            "live_profit": 0.81766096,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "TRX/USDT",
+            "open_date": "2026-04-08 05:10:11.483225",
+            "live_profit": -0.0222706,
+            "live_exit": "exit_signal",
+            "reason": "No matching backtest trade found"
+          },
+          {
+            "type": "unmatched",
+            "pair": "LTC/USDT",
+            "open_date": "2026-04-09 17:00:08.058018",
+            "live_profit": 0.08917678000000001,
+            "live_exit": "time_exit_48h",
+            "reason": "No matching backtest trade found"
+          }
+        ],
+        "live_trade_count": 7,
+        "bt_trade_count": 0,
+        "timerange": "20260404-20260412",
+        "pairlist": [
+          "LTC/USDT",
+          "SOL/USDT",
+          "TAO/USDT",
+          "TRX/USDT",
+          "UNI/USDT"
+        ],
+        "needs_investigation": true,
+        "code_change_date": "2026-03-18T19:11:17-03:00",
+        "trades_excluded_old_code": 22,
+        "total_trades_in_db": 29,
+        "skipped_pairs": [],
+        "per_pair": {
+          "score": 0.0,
+          "grade": "Broken",
+          "metrics": {
+            "trade_match_rate": 0.0,
+            "matched_count": 0,
+            "total_live_trades": 7,
+            "profit_correlation": null,
+            "aggregate_pnl_delta": 1.0,
+            "live_total_pnl": 1.9401,
+            "bt_total_pnl": 0,
+            "exit_reason_concordance": 0.0
+          },
+          "signal": {
+            "signal_score": 0.0,
+            "signal_match_rate": 0.0,
+            "signal_matched_count": 0,
+            "direction_agreement": 0.0
+          }
+        },
+        "calibration_mode": "unlimited",
+        "signal": {
+          "signal_score": 0.0,
+          "signal_match_rate": 0.0,
+          "signal_matched_count": 0,
+          "direction_agreement": 0.0
+        }
+      },
+      "viability": {
+        "classification": "SKIPPED",
+        "reason": "Calibration score 0.0 below gate (50). Backtest cannot reproduce live trades \u2014 viability results unreliable.",
+        "skipped": true
+      }
+    }
+  },
+  "stage_durations": {
+    "calibration": 34.78341770172119,
+    "viability": 9.417533874511719e-05,
+    "reporting": 0.002772092819213867
+  },
+  "reporting": {
+    "stage": "reporting",
+    "status": "success",
+    "recommendations": {
+      "MasterTraderV1": "INVESTIGATE"
+    },
+    "report_dir": "/Users/palmer/ft_userdata/engine_results/20260412_fast",
+    "report_cards": "+--------------------------------------------------+\n| MASTERTRADERV1 -- REPORT CARD                    |\n+--------------------------------------------------+\n| Calibration:    0.0/100 (Poor)                   |\n| Viability:      SKIPPED                          |\n| Lookahead:      SKIPPED                          |\n| Walk-Forward:   SKIPPED                          |\n| Consensus:      SKIPPED                          |\n| Monte Carlo:    SKIPPED                          |\n| Perturbation:   SKIPPED                          |\n|                                                  |\n| RECOMMENDATION: INVESTIGATE -- ENGINE DIVERGES FROM LIVE|\n+--------------------------------------------------+",
+    "telegram_message": "Engine v2 Report -- 2026-04-12 11:15\n\n[+] MasterTraderV1\n  INVESTIGATE\n  SKIPPED | Cal 0.0\n\n---\nKILL: 0 | INVESTIGATE: 1 | MONITOR: 0 | OPTIMIZE: 0 | KEEP: 0",
+    "telegram_sent": null
+  }
+}

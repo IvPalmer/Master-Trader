@@ -1,0 +1,259 @@
+{
+  "strategy": "SupertrendStrategy",
+  "score": 66.3,
+  "grade": "Moderate",
+  "metrics": {
+    "trade_match_rate": 0.55,
+    "matched_count": 11,
+    "total_live_trades": 20,
+    "profit_correlation": 0.5497,
+    "aggregate_pnl_delta": 0.9158,
+    "live_total_pnl": -3.2528,
+    "bt_total_pnl": -0.274,
+    "exit_reason_concordance": 0.0,
+    "signal_match_rate": 0.75,
+    "direction_agreement": 0.5333
+  },
+  "component_scores": {
+    "signal_match": 45.0,
+    "direction_agreement": 21.3
+  },
+  "divergent_trades": [
+    {
+      "type": "unmatched",
+      "pair": "AVAX/USDT",
+      "open_date": "2026-04-08 10:48:42.634349",
+      "live_profit": -0.5376734,
+      "live_exit": "trailing_stop_loss",
+      "reason": "No matching backtest trade found"
+    },
+    {
+      "type": "unmatched",
+      "pair": "BCH/USDT",
+      "open_date": "2026-04-08 11:33:05.370986",
+      "live_profit": -0.2101704,
+      "live_exit": "trailing_stop_loss",
+      "reason": "No matching backtest trade found"
+    },
+    {
+      "type": "unmatched",
+      "pair": "BTC/USDT",
+      "open_date": "2026-04-08 19:00:12.930408",
+      "live_profit": -0.06641451,
+      "live_exit": "trailing_stop_loss",
+      "reason": "No matching backtest trade found"
+    },
+    {
+      "type": "unmatched",
+      "pair": "BTC/USDT",
+      "open_date": "2026-04-09 09:00:08.598930",
+      "live_profit": -0.11267781,
+      "live_exit": "trailing_stop_loss",
+      "reason": "No matching backtest trade found"
+    },
+    {
+      "type": "unmatched",
+      "pair": "ENA/USDT",
+      "open_date": "2026-04-10 17:50:11.173452",
+      "live_profit": 0.31814426,
+      "live_exit": "roi",
+      "reason": "No matching backtest trade found"
+    },
+    {
+      "type": "unmatched",
+      "pair": "ETH/USDT",
+      "open_date": "2026-04-10 17:50:09.905500",
+      "live_profit": 0.66807576,
+      "live_exit": "roi",
+      "reason": "No matching backtest trade found"
+    },
+    {
+      "type": "unmatched",
+      "pair": "LINK/USDT",
+      "open_date": "2026-04-08 11:21:24.433014",
+      "live_profit": -0.4096352,
+      "live_exit": "trailing_stop_loss",
+      "reason": "No matching backtest trade found"
+    },
+    {
+      "type": "unmatched",
+      "pair": "SOL/USDT",
+      "open_date": "2026-04-08 18:55:05.657742",
+      "live_profit": -0.07320265,
+      "live_exit": "trailing_stop_loss",
+      "reason": "No matching backtest trade found"
+    },
+    {
+      "type": "unmatched",
+      "pair": "XRP/USDT",
+      "open_date": "2026-04-08 07:33:57.926443",
+      "live_profit": -0.095646,
+      "live_exit": "trailing_stop_loss",
+      "reason": "No matching backtest trade found"
+    },
+    {
+      "type": "profit_divergence",
+      "pair": "ADA/USDT",
+      "open_date": "2026-04-08 00:39:22.758018",
+      "live_profit": -0.29047464,
+      "bt_profit": -1.58447172,
+      "delta": -1.29399708,
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "stop_loss",
+      "reason": "Profit delta: $1.29"
+    },
+    {
+      "type": "profit_divergence",
+      "pair": "ARB/USDT",
+      "open_date": "2026-04-09 00:39:35.536897",
+      "live_profit": -0.1213836,
+      "bt_profit": 0.61245504,
+      "delta": 0.73383864,
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "roi",
+      "reason": "Profit delta: $0.73"
+    },
+    {
+      "type": "profit_divergence",
+      "pair": "BARD/USDT",
+      "open_date": "2026-04-08 18:50:30.551019",
+      "live_profit": -0.34771919,
+      "bt_profit": 0.91808797,
+      "delta": 1.26580716,
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "roi",
+      "reason": "Profit delta: $1.27"
+    },
+    {
+      "type": "profit_divergence",
+      "pair": "BARD/USDT",
+      "open_date": "2026-04-09 01:00:06.316490",
+      "live_profit": 0.24443008,
+      "bt_profit": 0.91864533,
+      "delta": 0.67421525,
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "roi",
+      "reason": "Profit delta: $0.67"
+    },
+    {
+      "type": "profit_divergence",
+      "pair": "GIGGLE/USDT",
+      "open_date": "2026-04-09 00:39:36.281545",
+      "live_profit": -0.7296997,
+      "bt_profit": -1.57896093,
+      "delta": -0.8492612300000001,
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "stop_loss",
+      "reason": "Profit delta: $0.85"
+    },
+    {
+      "type": "profit_divergence",
+      "pair": "NEAR/USDT",
+      "open_date": "2026-04-08 14:09:18.323958",
+      "live_profit": -0.7841081,
+      "bt_profit": 0.30603873,
+      "delta": 1.09014683,
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "roi",
+      "reason": "Profit delta: $1.09"
+    },
+    {
+      "type": "profit_divergence",
+      "pair": "NEAR/USDT",
+      "open_date": "2026-04-09 20:00:06.144693",
+      "live_profit": -0.161269,
+      "bt_profit": 0.61078618,
+      "delta": 0.77205518,
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "roi",
+      "reason": "Profit delta: $0.77"
+    },
+    {
+      "type": "profit_divergence",
+      "pair": "SUI/USDT",
+      "open_date": "2026-04-08 06:30:55.851000",
+      "live_profit": -0.46370898,
+      "bt_profit": -1.58274006,
+      "delta": -1.1190310799999998,
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "stop_loss",
+      "reason": "Profit delta: $1.12"
+    },
+    {
+      "type": "exit_mismatch",
+      "pair": "AVAX/USDT",
+      "open_date": "2026-04-08 00:39:22.063273",
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "roi",
+      "reason": "Exit: live=trailing_stop_loss vs bt=roi"
+    },
+    {
+      "type": "exit_mismatch",
+      "pair": "ENA/USDT",
+      "open_date": "2026-04-08 00:39:23.400819",
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "roi",
+      "reason": "Exit: live=trailing_stop_loss vs bt=roi"
+    },
+    {
+      "type": "exit_mismatch",
+      "pair": "TRX/USDT",
+      "open_date": "2026-04-09 20:41:00.769789",
+      "live_exit": "trailing_stop_loss",
+      "bt_exit": "force_exit",
+      "reason": "Exit: live=trailing_stop_loss vs bt=force_exit"
+    }
+  ],
+  "live_trade_count": 20,
+  "bt_trade_count": 13,
+  "timerange": "20260407-20260412",
+  "pairlist": [
+    "ADA/USDT",
+    "ARB/USDT",
+    "AVAX/USDT",
+    "BARD/USDT",
+    "BCH/USDT",
+    "BTC/USDT",
+    "ENA/USDT",
+    "ETH/USDT",
+    "GIGGLE/USDT",
+    "LINK/USDT",
+    "NEAR/USDT",
+    "SOL/USDT",
+    "SUI/USDT",
+    "TRX/USDT",
+    "XRP/USDT"
+  ],
+  "needs_investigation": true,
+  "code_change_date": "2026-04-06T10:33:16-03:00",
+  "trades_excluded_old_code": 52,
+  "total_trades_in_db": 72,
+  "skipped_pairs": [],
+  "per_pair": {
+    "score": 34.7,
+    "grade": "Broken",
+    "metrics": {
+      "trade_match_rate": 0.55,
+      "matched_count": 11,
+      "total_live_trades": 20,
+      "profit_correlation": 0.5497,
+      "aggregate_pnl_delta": 0.9158,
+      "live_total_pnl": -3.2528,
+      "bt_total_pnl": -0.274,
+      "exit_reason_concordance": 0.0
+    },
+    "signal": {
+      "signal_score": 66.3,
+      "signal_match_rate": 0.75,
+      "signal_matched_count": 15,
+      "direction_agreement": 0.5333
+    }
+  },
+  "calibration_mode": "per_pair_signal",
+  "signal": {
+    "signal_score": 43.9,
+    "signal_match_rate": 0.35,
+    "signal_matched_count": 7,
+    "direction_agreement": 0.5714
+  }
+}
