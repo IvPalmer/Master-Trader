@@ -1,6 +1,6 @@
 {
     "dry_run": true,
-    "dry_run_wallet": 88,
+    "dry_run_wallet": 200,
     "cancel_open_orders_on_exit": true,
     "trading_mode": "spot",
     "margin_mode": "",

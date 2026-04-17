@@ -2,8 +2,9 @@
     "dry_run": true,
     "dry_run_wallet": 200,
     "cancel_open_orders_on_exit": true,
-    "trading_mode": "spot",
-    "margin_mode": "",
+    "trading_mode": "futures",
+    "margin_mode": "isolated",
+    "liquidation_buffer": 0.05,
     "stake_currency": "USDT",
     "stake_amount": "unlimited",
     "tradable_balance_ratio": 0.99,
@@ -15,16 +16,6 @@
         "exit": 10,
         "exit_timeout_count": 0,
         "unit": "minutes"
-    },
-    "order_types": {
-        "entry": "limit",
-        "exit": "limit",
-        "emergency_exit": "market",
-        "force_exit": "market",
-        "force_entry": "market",
-        "stoploss": "market",
-        "stoploss_on_exchange": false,
-        "stoploss_on_exchange_interval": 60
     },
     "entry_pricing": {
         "price_side": "same",
@@ -41,6 +32,16 @@
         "use_order_book": true,
         "order_book_top": 1
     },
+    "order_types": {
+        "entry": "limit",
+        "exit": "limit",
+        "emergency_exit": "market",
+        "force_exit": "market",
+        "force_entry": "market",
+        "stoploss": "market",
+        "stoploss_on_exchange": false,
+        "stoploss_on_exchange_interval": 60
+    },
     "exchange": {
         "name": "binance",
         "key": "",
@@ -49,64 +50,61 @@
         "ccxt_async_config": {},
         "pair_whitelist": [],
         "pair_blacklist": [
-            ".*BULL/USDT",
-            ".*BEAR/USDT",
-            ".*UP/USDT",
-            ".*DOWN/USDT",
-            "USDC/USDT",
-            "BUSD/USDT",
-            "DAI/USDT",
-            "TUSD/USDT",
-            "FDUSD/USDT",
-            "USD1/USDT",
-            "XUSD/USDT",
-            "U/USDT",
-            "EUR/USDT",
+            ".*BULL/USDT:USDT",
+            ".*BEAR/USDT:USDT",
+            ".*UP/USDT:USDT",
+            ".*DOWN/USDT:USDT",
+            "USDC/USDT:USDT",
+            "BUSD/USDT:USDT",
+            "DAI/USDT:USDT",
+            "TUSD/USDT:USDT",
+            "FDUSD/USDT:USDT",
+            "USD1/USDT:USDT",
+            "XUSD/USDT:USDT",
+            "U/USDT:USDT",
+            "EUR/USDT:USDT",
             ".*_PERP"
         ]
     },
     "pairlists": [
         {
             "method": "VolumePairList",
-            "number_assets": 40,
+            "number_assets": 20,
             "sort_key": "quoteVolume",
-            "min_value": 5000000,
+            "min_value": 20000000,
             "refresh_period": 86400,
             "lookback_days": 3,
             "lookback_timeframe": "1d"
         },
         {
             "method": "AgeFilter",
-            "min_days_listed": 90
+            "min_days_listed": 180
         },
         {
             "method": "SpreadFilter",
-            "max_spread_ratio": 0.005
+            "max_spread_ratio": 0.003
         },
         {
             "method": "PriceFilter",
-            "min_price": 0.001,
+            "min_price": 0.01,
             "low_price_ratio": 0.02
         },
         {
             "method": "VolatilityFilter",
             "lookback_days": 14,
-            "min_volatility": 0.03,
-            "max_volatility": 0.75,
-            "refresh_period": 14400
+            "min_volatility": 0.02,
+            "max_volatility": 0.5,
+            "refresh_period": 86400
         },
         {
             "method": "RangeStabilityFilter",
             "lookback_days": 10,
-            "min_rate_of_change": 0.03,
-            "max_rate_of_change": 0.5,
-            "refresh_period": 14400
+            "min_rate_of_change": 0.02,
+            "max_rate_of_change": 0.4,
+            "refresh_period": 86400
         },
         {
             "method": "PrecisionFilter"
-        },
-        {
-            "method": "ShuffleFilter"
         }
     ],
     "webhook": {
@@ -183,19 +181,19 @@
         "listen_port": 8080,
         "verbosity": "error",
         "enable_openapi": true,
-        "jwt_secret_key": "master-trader-dev-key-change-for-prod",
+        "jwt_secret_key": "bear-crash-short-dev-key-change-for-prod",
         "CORS_origins": [
             "http://localhost:8080",
-            "http://localhost:8096"
+            "http://localhost:8097"
         ],
         "username": "freqtrader",
         "password": "mastertrader"
     },
-    "bot_name": "FundingFade",
+    "bot_name": "FundingShort",
     "initial_state": "running",
     "force_entry_enable": false,
     "internals": {
         "process_throttle_secs": 5
     },
-    "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.FundingFadeV1.sqlite"
+    "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.FundingShortV1.sqlite"
 }

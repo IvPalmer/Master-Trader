@@ -108,7 +108,7 @@ STRATEGIES = {
         "port": 8095,
         "max_open_trades": 3,
         "stake_amount": "unlimited",
-        "dry_run_wallet": 88,
+        "dry_run_wallet": 200,  # Upgraded from $88 on 2026-04-17 (fresh start)
         "image": "freqtradeorg/freqtrade:stable",
         "informative_tfs": ["1h"],  # BTC informative at 1h
         "backtest_config": "backtest-KeltnerBounceV1.json",
@@ -120,13 +120,29 @@ STRATEGIES = {
         "port": 8096,
         "max_open_trades": 3,
         "stake_amount": "unlimited",
-        "dry_run_wallet": 88,
+        "dry_run_wallet": 200,  # Upgraded from $88 on 2026-04-17 (fresh start)
         "image": "freqtradeorg/freqtrade:stable",
         "informative_tfs": ["1h"],
         "backtest_config": "backtest-FundingFadeV1.json",
         # Non-TA strategy: funding rate divergence + ADX/vol TA confirmations.
         # First orthogonal-edge strategy. Lab: 431 trades, PF 1.29, +60.66%, DD 19.6%, 6/6 WF.
         # Deployed dry-run 2026-04-17.
+        "status": "active",
+    },
+    "FundingShortV1": {
+        "timeframe": "1h",
+        "trading_mode": "futures",
+        "margin_mode": "isolated",
+        "port": 8097,
+        "max_open_trades": 3,
+        "stake_amount": "unlimited",
+        "dry_run_wallet": 200,
+        "image": "freqtradeorg/freqtrade:stable",
+        "informative_tfs": ["1h"],
+        "backtest_config": "backtest-FundingShortV1.json",
+        # Short-side mirror of FundingFade. Bear coverage. Futures 2x leverage.
+        # Backtest (limited to 2025-07 onward due to futures 1h data): 161 trades, PF 1.40,
+        # +51.78%, DD 14.41%. Full 3.3yr not possible until futures 1m data downloaded.
         "status": "active",
     },
 }

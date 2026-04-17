@@ -220,6 +220,22 @@ services:
           memory: 768M
     entrypoint: ["/bin/sh", "-c", "sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.json --strategy FundingFadeV1"]
 
+  fundingshortv1:
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-funding-short
+    extra_hosts: *binance-hosts
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8097:8080"
+    healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    entrypoint: ["/bin/sh", "-c", "sleep 80 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingShortV1.log --config /freqtrade/user_data/configs/FundingShortV1.json --strategy FundingShortV1"]
+
   # ── Grafana Bridge (candle data proxy for dashboards) ──────────────
 
   grafana-bridge:
@@ -235,6 +251,7 @@ services:
     depends_on:
       - keltnerbouncev1
       - fundingfadev1
+      - fundingshortv1
 
   # ── Monitoring Stack ───────────────────────────────────────────────
 
@@ -257,6 +274,7 @@ services:
     depends_on:
       - keltnerbouncev1
       - fundingfadev1
+      - fundingshortv1
 
   prometheus:
     image: prom/prometheus:latest

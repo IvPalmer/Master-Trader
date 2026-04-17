@@ -1,8 +1,8 @@
 {
   "dry_run": true,
   "dry_run_wallet": 200,
-  "trading_mode": "spot",
-  "margin_mode": "",
+  "trading_mode": "futures",
+  "margin_mode": "isolated",
   "stake_currency": "USDT",
   "stake_amount": "unlimited",
   "tradable_balance_ratio": 0.99,
@@ -10,12 +10,12 @@
   "max_open_trades": 3,
   "amount_reserve_percent": 0.05,
   "entry_pricing": {
-    "price_side": "same",
+    "price_side": "other",
     "use_order_book": true,
     "order_book_top": 1
   },
   "exit_pricing": {
-    "price_side": "same",
+    "price_side": "other",
     "use_order_book": true,
     "order_book_top": 1
   },
@@ -24,24 +24,20 @@
     "key": "",
     "secret": "",
     "pair_whitelist": [
-      "ADA/USDT",
-      "ARB/USDT",
-      "AVAX/USDT",
-      "BCH/USDT",
-      "BNB/USDT",
-      "DOGE/USDT",
-      "ENA/USDT",
-      "ETH/USDT",
-      "HBAR/USDT",
-      "LINK/USDT",
-      "LTC/USDT",
-      "NEAR/USDT",
-      "SOL/USDT",
-      "SUI/USDT",
-      "TRX/USDT",
-      "UNI/USDT",
-      "XRP/USDT",
-      "ZEC/USDT"
+      "BTC/USDT:USDT",
+      "ADA/USDT:USDT",
+      "AVAX/USDT:USDT",
+      "BNB/USDT:USDT",
+      "DOGE/USDT:USDT",
+      "ETH/USDT:USDT",
+      "LINK/USDT:USDT",
+      "LTC/USDT:USDT",
+      "NEAR/USDT:USDT",
+      "SOL/USDT:USDT",
+      "SUI/USDT:USDT",
+      "TRX/USDT:USDT",
+      "UNI/USDT:USDT",
+      "XRP/USDT:USDT"
     ],
     "pair_blacklist": []
   },
@@ -50,5 +46,5 @@
       "method": "StaticPairList"
     }
   ],
-  "bot_name": "Kelt-Viability"
+  "bot_name": "Backtest-FundingShortV1"
 }
