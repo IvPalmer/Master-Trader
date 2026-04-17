@@ -273,6 +273,22 @@ services:
           memory: 768M
     entrypoint: ["/bin/sh", "-c", "sleep 55 && exec freqtrade trade --logfile /freqtrade/user_data/logs/BollingerBounceV1.log --config /freqtrade/user_data/configs/BollingerBounceV1.json --strategy BollingerBounceV1"]
 
+  keltnerbouncev1:
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-keltner-bounce
+    extra_hosts: *binance-hosts
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8095:8080"
+    healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    entrypoint: ["/bin/sh", "-c", "sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KeltnerBounceV1.log --config /freqtrade/user_data/configs/KeltnerBounceV1.json --strategy KeltnerBounceV1"]
+
   # ── Grafana Bridge (candle data proxy for dashboards) ──────────────
 
   grafana-bridge:
@@ -291,6 +307,8 @@ services:
       - alligatortrendv1
       - gaussianchannelv1
       - bearcrashshortv1
+      - bollingerbouncev1
+      - keltnerbouncev1
 
   # ── Monitoring Stack ───────────────────────────────────────────────
 

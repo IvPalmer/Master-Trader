@@ -1,0 +1,54 @@
+{
+  "dry_run": true,
+  "dry_run_wallet": 88,
+  "trading_mode": "spot",
+  "margin_mode": "",
+  "stake_currency": "USDT",
+  "stake_amount": "unlimited",
+  "tradable_balance_ratio": 0.99,
+  "fiat_display_currency": "",
+  "max_open_trades": 3,
+  "amount_reserve_percent": 0.05,
+  "entry_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "exit_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "pair_whitelist": [
+      "ADA/USDT",
+      "ARB/USDT",
+      "AVAX/USDT",
+      "BCH/USDT",
+      "BNB/USDT",
+      "DOGE/USDT",
+      "ENA/USDT",
+      "ETH/USDT",
+      "HBAR/USDT",
+      "LINK/USDT",
+      "LTC/USDT",
+      "NEAR/USDT",
+      "SOL/USDT",
+      "SUI/USDT",
+      "TRX/USDT",
+      "UNI/USDT",
+      "XRP/USDT",
+      "ZEC/USDT"
+    ],
+    "pair_blacklist": []
+  },
+  "pairlists": [
+    {
+      "method": "StaticPairList"
+    }
+  ],
+  "bot_name": "Backtest-KeltnerBounceV1"
+}

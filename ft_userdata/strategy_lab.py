@@ -32,6 +32,7 @@ from strategy_lab.engine import (
     get_available_pairs,
     load_all_pairs,
     load_candle_data,
+    load_detail_data,
     screen_all,
 )
 from strategy_lab.exporter import export_strategy
@@ -41,10 +42,19 @@ USER_DATA = Path(__file__).parent / "user_data"
 DOCKER_IMAGE = "freqtradeorg/freqtrade:stable"
 
 VALIDATION_WINDOWS = {
-    "bull":   ("20250901", "20251101", "Bull (Sep-Oct 2025)"),
-    "bear":   ("20251101", "20260201", "Bear (Nov 2025-Jan 2026)"),
-    "recent": ("20260201", "20260331", "Recent (Feb-Mar 2026)"),
+    "early":   ("20230101", "20230701", "Early (Jan-Jun 2023)"),
+    "mid23":   ("20230701", "20240101", "Mid (Jul-Dec 2023)"),
+    "bull24":  ("20240101", "20240701", "Bull (Jan-Jun 2024)"),
+    "late24":  ("20240701", "20250101", "Late (Jul-Dec 2024)"),
+    "bull25":  ("20250101", "20250701", "Bull (Jan-Jun 2025)"),
+    "recent":  ("20250701", "20260415", "Recent (Jul 2025-Apr 2026)"),
 }
+
+# Top 8 pairs proven profitable in SupertrendStrategy 3.3yr optimization
+TOP_8_PAIRS = [
+    "SOL/USDT", "ETH/USDT", "BNB/USDT", "XRP/USDT",
+    "AVAX/USDT", "NEAR/USDT", "SUI/USDT", "LINK/USDT",
+]
 
 
 def log(msg):
@@ -86,6 +96,7 @@ def validate_via_freqtrade(strategy_path: Path, config_path: str) -> dict:
             "--strategy", strategy_name,
             "--timerange", timerange,
             "--timeframe", "1h",
+            "--timeframe-detail", "1m",
             "--config", f"/freqtrade/user_data/configs/{config_path}",
             "--enable-protections",
             "--export", "none",
@@ -141,12 +152,17 @@ def print_results(results: list, top_n: int):
 
 def main():
     parser = argparse.ArgumentParser(description="Strategy Lab — Signal combo discovery")
-    parser.add_argument("--timerange", default="20250901-20260331", help="Screening timerange")
+    parser.add_argument("--timerange", default="20230101-20260415", help="Screening timerange")
     parser.add_argument("--top", type=int, default=10, help="Top N combos to report/validate")
     parser.add_argument("--screen-only", action="store_true", help="Skip Freqtrade validation")
     parser.add_argument("--pairs-from", default=None, help="Load pairs from a strategy config")
+    parser.add_argument("--top-pairs", action="store_true", help="Use top 8 proven profitable pairs")
     parser.add_argument("--wallet", type=float, default=88, help="Wallet size for simulation")
     parser.add_argument("--max-open", type=int, default=3, help="Max concurrent trades")
+    parser.add_argument("--no-detail", action="store_true", help="Skip 1m detail (use 1h only)")
+    parser.add_argument("--min-trades", type=int, default=200, help="Minimum trades filter")
+    parser.add_argument("--min-wr", type=float, default=55, help="Minimum win rate %% filter")
+    parser.add_argument("--min-pf", type=float, default=1.2, help="Minimum profit factor filter")
     parser.add_argument("--validate-config", default="backtest-SupertrendStrategy.json",
                         help="Config file for Freqtrade validation")
     args = parser.parse_args()
@@ -157,20 +173,22 @@ def main():
     # ── Phase 1: Load Data ──────────────────────────────────
     log("Phase 1: Loading candle data...")
 
-    if args.pairs_from:
+    require_detail = not args.no_detail
+    if args.top_pairs:
+        pairs = TOP_8_PAIRS[:]
+        log(f"Using top 8 pairs (NOTE: survivorship bias — curated from Supertrend)")
+    elif args.pairs_from:
         pairs = get_pairs_from_config(args.pairs_from)
         if not pairs:
-            # Try backtest config
             pairs = get_pairs_from_config(f"backtest-{args.pairs_from}")
         if not pairs:
-            # Fall back to all available data
-            pairs = get_available_pairs()
+            pairs = get_available_pairs(require_detail=require_detail)
             log(f"Config had no static pairs, using all {len(pairs)} available")
         else:
             log(f"Using {len(pairs)} pairs from {args.pairs_from}")
     else:
-        pairs = get_available_pairs()
-        log(f"Found {len(pairs)} pairs with data")
+        pairs = get_available_pairs(require_detail=require_detail)
+        log(f"Found {len(pairs)} pairs with {'1h+1m' if require_detail else '1h'} data")
 
     if "BTC/USDT" not in pairs:
         pairs.append("BTC/USDT")
@@ -183,20 +201,29 @@ def main():
 
     # Remove BTC from trading pairs
     trading_data = {k: v for k, v in pair_data.items() if k != "BTC/USDT"}
-    log(f"Loaded data for {len(trading_data)} trading pairs + BTC")
+    log(f"Loaded 1h data for {len(trading_data)} trading pairs + BTC")
+
+    # Load 1m detail data for accurate trade simulation
+    detail_data = None
+    if not args.no_detail:
+        log("Loading 1m detail data for trade simulation...")
+        detail_data = load_detail_data(list(trading_data.keys()) + ["BTC/USDT"])
+        log(f"Loaded 1m detail for {len(detail_data)} pairs")
 
     # ── Phase 2: Screen Combos ──────────────────────────────
     log("Phase 2: Generating signal combinations...")
     combos = generate_combos()
     log(f"Generated {len(combos)} combos")
 
-    log(f"Screening across {args.timerange} (wallet=${args.wallet}, max_open={args.max_open})...")
+    detail_mode = "1m detail" if detail_data else "1h only"
+    log(f"Screening across {args.timerange} ({detail_mode}, wallet=${args.wallet}, max_open={args.max_open})...")
     results = screen_all(
         combos, trading_data, btc_df,
         wallet=args.wallet,
         max_open=args.max_open,
         timerange_start=tr_start,
         timerange_end=tr_end,
+        detail_data=detail_data,
     )
 
     screen_time = time.time() - start_time
@@ -207,7 +234,20 @@ def main():
     profitable = [r for r in results if r.profit_factor > 1.0]
     log(f"Results: {len(results)} combos with trades, {len(profitable)} profitable (PF > 1.0)")
 
+    # Apply quality filters
+    quality = [r for r in results
+               if len(r.trades) >= args.min_trades
+               and r.win_rate >= args.min_wr
+               and r.profit_factor >= args.min_pf]
+    log(f"Quality filter (trades>={args.min_trades}, WR>={args.min_wr}%, PF>={args.min_pf}): {len(quality)} pass")
+
     print_results(results, args.top)
+
+    if quality:
+        print(f"\n{'='*100}")
+        print(f" QUALITY FILTER PASSES (trades>={args.min_trades}, WR>={args.min_wr}%, PF>={args.min_pf})")
+        print(f"{'='*100}")
+        print_results(quality, len(quality))
 
     if args.screen_only:
         elapsed = time.time() - start_time
@@ -215,17 +255,19 @@ def main():
         return
 
     # ── Phase 3: Validate Winners ───────────────────────────
-    if not profitable:
-        log("No profitable combos found. Skipping validation.")
+    if not quality and not profitable:
+        log("No combos pass quality filter. Skipping validation.")
         return
 
-    top_n = min(args.top, len(results))
-    log(f"\nPhase 3: Validating top {top_n} via Freqtrade backtest...")
+    # Validate quality combos first, fall back to top scorers
+    validate_list = quality if quality else results
+    top_n = min(args.top, len(validate_list))
+    log(f"\nPhase 3: Validating top {top_n} via Freqtrade backtest (with 1m detail)...")
 
     strategies_dir = USER_DATA / "strategies"
     validated = []
 
-    for rank, r in enumerate(results[:top_n], 1):
+    for rank, r in enumerate(validate_list[:top_n], 1):
         log(f"  [{rank}/{top_n}] Exporting: {r.combo.label}")
         strat_path = export_strategy(r.combo, rank, strategies_dir)
         log(f"    Exported: {strat_path.name}")
@@ -244,7 +286,7 @@ def main():
             if pf >= 1.0:
                 profitable_windows += 1
 
-        robust = profitable_windows >= 2
+        robust = profitable_windows >= 4
         status = f"ROBUST ({profitable_windows}/{len(VALIDATION_WINDOWS)})" if robust else f"FRAGILE ({profitable_windows}/{len(VALIDATION_WINDOWS)})"
         log(f"    {status}")
 
@@ -269,7 +311,7 @@ def main():
     fragile_combos = [v for v in validated if not v["robust"]]
 
     if robust_combos:
-        print(f"\n ROBUST (profitable in 2+ windows):")
+        print(f"\n ROBUST (profitable in 4+ of {len(VALIDATION_WINDOWS)} windows):")
         for v in robust_combos:
             print(f"  #{v['rank']} {v['combo']}")
             print(f"     Screen: PF:{v['screen_pf']:.2f} P&L:{v['screen_pnl_pct']:+.2f}%")
@@ -277,7 +319,7 @@ def main():
                 print(f"     {m.get('desc', wname):30s}: PF:{m.get('pf',0):5.2f} P&L:{m.get('pnl_pct',0):+.2f}%")
             print(f"     Strategy: {v['strategy_file']}")
     else:
-        print("\n No robust combos found (none profitable in 2+ windows)")
+        print(f"\n No robust combos found (none profitable in 4+ of {len(VALIDATION_WINDOWS)} windows)")
 
     if fragile_combos:
         print(f"\n FRAGILE (profitable in 0-1 windows):")

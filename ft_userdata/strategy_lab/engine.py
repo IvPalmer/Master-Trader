@@ -23,7 +23,11 @@ from strategy_lab.signals import (
     btc_above_sma,
     btc_no_crash,
     btc_rsi_floor,
+    bullish_engulfing,
+    donchian_breakout,
     ema_crossover,
+    ichimoku_bullish,
+    keltner_bounce,
     macd_crossover,
     price_above_sma,
     rsi_range,
@@ -32,6 +36,7 @@ from strategy_lab.signals import (
     supertrend_all,
     volatility_regime,
     volume_spike,
+    vwap_reclaim,
 )
 
 USER_DATA = Path(__file__).parent.parent / "user_data"
@@ -116,6 +121,55 @@ class ComboResult:
             self.score *= 0.5
 
 
+# ── Detail Data (1m candles for accurate trade simulation) ──
+
+@dataclass
+class DetailData:
+    """Pre-indexed 1m candle data for a single pair."""
+    close: np.ndarray
+    high: np.ndarray
+    low: np.ndarray
+    ts: np.ndarray          # unix timestamps (seconds), sorted
+
+    def find_idx(self, target_ts: float) -> int:
+        """Find 1m index for a given timestamp via binary search.
+        Returns index if exact match within 1s, else -1."""
+        idx = np.searchsorted(self.ts, target_ts)
+        if idx < len(self.ts) and abs(self.ts[idx] - target_ts) < 1.0:
+            return int(idx)
+        if idx > 0 and abs(self.ts[idx - 1] - target_ts) < 1.0:
+            return int(idx - 1)
+        return -1
+
+
+def load_detail_data(pairs: list) -> dict:
+    """Load 1m candle data for all pairs. Returns {pair: DetailData}.
+
+    Only keeps OHLC arrays + timestamp index — no DataFrame overhead.
+    """
+    detail = {}
+    for pair in pairs:
+        pair_file = pair.replace("/", "_")
+        path = USER_DATA / "data" / "binance" / f"{pair_file}-1m.feather"
+        if not path.exists():
+            continue
+        df = pd.read_feather(path)
+        if "date" in df.columns:
+            ts = df["date"].values.astype("int64") // 10**9  # nanoseconds -> seconds
+        else:
+            ts = df["timestamp"].values
+            if ts[0] > 1e12:
+                ts = ts // 1000
+        ts = ts.astype(np.float64)
+        detail[pair] = DetailData(
+            close=df["close"].values.astype(np.float64),
+            high=df["high"].values.astype(np.float64),
+            low=df["low"].values.astype(np.float64),
+            ts=ts,
+        )
+    return detail
+
+
 # ── Data Loading ────────────────────────────────────────────
 
 def load_candle_data(pair: str, timeframe: str = "1h") -> pd.DataFrame:
@@ -155,13 +209,18 @@ def load_all_pairs(pairs: list, timeframe: str = "1h") -> dict:
     return data
 
 
-def get_available_pairs(timeframe: str = "1h") -> list:
-    """List all pairs with available data."""
+def get_available_pairs(timeframe: str = "1h", require_detail: bool = False) -> list:
+    """List all pairs with available data.
+    If require_detail=True, only returns pairs with both timeframe AND 1m data."""
     data_dir = USER_DATA / "data" / "binance"
     pairs = []
     for f in data_dir.iterdir():
         if f.suffix == ".feather" and f"-{timeframe}" in f.name:
             pair = f.name.replace(f"-{timeframe}.feather", "").replace("_", "/")
+            if require_detail:
+                detail_path = data_dir / f"{pair.replace('/', '_')}-1m.feather"
+                if not detail_path.exists():
+                    continue
             pairs.append(pair)
     return sorted(pairs)
 
@@ -180,8 +239,14 @@ def simulate_trade(
     trailing_offset: float,
     fee: float = 0.001,
     max_candles: int = 200,
+    candle_minutes: int = 60,
 ) -> TradeResult:
-    """Simulate a single trade forward from entry. Uses numpy for speed."""
+    """Simulate a single trade forward from entry.
+
+    candle_minutes: 1 for 1m detail data, 60 for 1h (default).
+    When using 1m detail, entry_idx points into the 1m array and
+    max_candles is scaled by the caller (200h = 12000 1m candles).
+    """
     length = len(candles_close)
     end_idx = min(entry_idx + max_candles, length)
 
@@ -196,7 +261,7 @@ def simulate_trade(
         candle_high = candles_high[i]
         candle_low = candles_low[i]
         candle_close = candles_close[i]
-        candle_minutes = (i - entry_idx) * 60  # Assuming 1h timeframe
+        elapsed_minutes = (i - entry_idx) * candle_minutes
 
         # Update highest
         if candle_high > highest:
@@ -223,7 +288,7 @@ def simulate_trade(
 
         # Check ROI (check all tiers, use the one with the smallest required profit)
         for roi_minutes, roi_pct in roi_entries:
-            if candle_minutes >= roi_minutes:
+            if elapsed_minutes >= roi_minutes:
                 roi_price = open_rate * (1 + roi_pct)
                 if candle_high >= roi_price:
                     profit_pct = roi_pct - (2 * fee)
@@ -256,8 +321,14 @@ def screen_combo(
     max_open: int = 3,
     timerange_start: float = 0,
     timerange_end: float = float("inf"),
+    detail_data: dict = None,
 ) -> ComboResult:
-    """Screen a single signal combo across all pairs."""
+    """Screen a single signal combo across all pairs.
+
+    Collects all candidate entries across pairs, then processes them
+    chronologically with a global max_open constraint (mirrors Freqtrade).
+    If detail_data is provided, trade simulation runs on 1m candles.
+    """
     exit_params = EXIT_PROFILES[combo.exit_profile]
 
     # Compute BTC gate once
@@ -265,48 +336,87 @@ def screen_combo(
     btc_ts = btc_df["ts"].values
     btc_gate_vals = btc_gate.values
 
-    all_trades = []
+    # ── Collect all candidate entries across pairs ──
+    candidates = []  # list of (ts, pair, idx, open_rate)
 
     for pair, df in pair_data.items():
         if pair == "BTC/USDT" and "btc" in combo.gate_desc.lower():
-            continue  # Don't trade BTC if using BTC as gate signal
+            continue
 
-        # Compute entry signal for this pair
         try:
             entry_signal = combo.entry_fn(df)
         except Exception:
             continue
 
-        # Apply volatility regime if it's pair-based
         pair_ts = df["ts"].values
         close = df["close"].values
-        high = df["high"].values
-        low = df["low"].values
 
-        # Map BTC gate to pair's timestamps
         gate_mapped = np.interp(pair_ts, btc_ts, btc_gate_vals.astype(float)) > 0.5
-
-        # Combined signal: entry AND gate
         combined = entry_signal.values & gate_mapped
-
-        # Find entries within timerange
-        stake_per_trade = wallet / max_open
-        open_trades = 0
-        last_exit_idx = 0
 
         for idx in np.where(combined)[0]:
             ts = pair_ts[idx]
             if ts < timerange_start or ts > timerange_end:
                 continue
-            if idx <= last_exit_idx + 1:  # Cooldown: at least 1 candle after last exit
-                continue
-            if open_trades >= max_open:
-                continue
-
             open_rate = close[idx]
             if open_rate <= 0:
                 continue
+            candidates.append((ts, pair, idx, open_rate))
 
+    # Sort all candidates chronologically
+    candidates.sort(key=lambda c: c[0])
+
+    # ── Simulate trades with global max_open + per-pair cooldown ──
+    stake_per_trade = wallet / max_open
+    all_trades = []
+    open_exit_times = []        # sorted list of pending exit timestamps (global)
+    pair_last_exit = {}         # {pair: last_exit_ts}  — prevents re-entry on same pair
+
+    for ts, pair, idx, open_rate in candidates:
+        # Prune expired open trades
+        open_exit_times = [t for t in open_exit_times if t > ts]
+
+        # Global concurrency cap
+        if len(open_exit_times) >= max_open:
+            continue
+
+        # Per-pair cooldown (no re-entry until prior trade on this pair exits)
+        if ts <= pair_last_exit.get(pair, 0):
+            continue
+
+        df = pair_data[pair]
+        close = df["close"].values
+        high = df["high"].values
+        low = df["low"].values
+        pair_ts = df["ts"].values
+
+        det = detail_data.get(pair) if detail_data else None
+
+        trade = None
+        if det is not None:
+            # 1h signal fires on close of bar at ts. Entry executes at start of
+            # next 1h bar — find 1m idx at ts, then skip 60 min to reach end-of-hour.
+            detail_hour_start = det.find_idx(ts)
+            detail_entry_idx = detail_hour_start + 60 if detail_hour_start >= 0 else -1
+
+            if 0 <= detail_entry_idx < len(det.ts):
+                trade = simulate_trade(
+                    candles_close=det.close,
+                    candles_high=det.high,
+                    candles_low=det.low,
+                    entry_idx=detail_entry_idx,
+                    open_rate=open_rate,
+                    stoploss=exit_params["stoploss"],
+                    roi_table=exit_params["minimal_roi"],
+                    trailing_positive=exit_params["trailing_stop_positive"],
+                    trailing_offset=exit_params["trailing_stop_positive_offset"],
+                    max_candles=72 * 60,
+                    candle_minutes=1,
+                )
+                exit_ts = det.ts[trade.close_idx] if trade.close_idx < len(det.ts) else det.ts[-1]
+
+        if trade is None:
+            # Fallback 1h simulation
             trade = simulate_trade(
                 candles_close=close,
                 candles_high=high,
@@ -317,14 +427,15 @@ def screen_combo(
                 roi_table=exit_params["minimal_roi"],
                 trailing_positive=exit_params["trailing_stop_positive"],
                 trailing_offset=exit_params["trailing_stop_positive_offset"],
+                candle_minutes=60,
             )
-            trade.pair = pair
-            trade.profit_abs = stake_per_trade * trade.profit_pct
-            last_exit_idx = trade.close_idx
-            all_trades.append(trade)
+            exit_ts = pair_ts[min(trade.close_idx, len(pair_ts) - 1)]
 
-    # Sort by entry time
-    all_trades.sort(key=lambda t: t.open_idx)
+        trade.pair = pair
+        trade.profit_abs = stake_per_trade * trade.profit_pct
+        all_trades.append(trade)
+        open_exit_times.append(exit_ts)
+        pair_last_exit[pair] = exit_ts
 
     result = ComboResult(combo=combo, trades=all_trades)
     result.compute_metrics(wallet)
@@ -339,6 +450,7 @@ def generate_combos() -> list:
 
     # ── Anchor signals with param variants ──
     anchors = [
+        # Trend-following
         ("st(3,10)", lambda df: supertrend(df, 3, 10)),
         ("st(4,8)", lambda df: supertrend(df, 4, 8)),
         ("st(5,14)", lambda df: supertrend(df, 5, 14)),
@@ -347,9 +459,22 @@ def generate_combos() -> list:
         ("ema(9,21)", lambda df: ema_crossover(df, 9, 21)),
         ("ema(12,26)", lambda df: ema_crossover(df, 12, 26)),
         ("ema(5,21)", lambda df: ema_crossover(df, 5, 21)),
+        ("macd", lambda df: macd_crossover(df)),
+        # Mean reversion
         ("bb(20,2)", lambda df: bollinger_bounce(df, 20, 2)),
         ("bb(20,3)", lambda df: bollinger_bounce(df, 20, 3)),
-        ("macd", lambda df: macd_crossover(df)),
+        ("kelt(20,2)", lambda df: keltner_bounce(df, 20, 2.0)),
+        ("kelt(20,2.5)", lambda df: keltner_bounce(df, 20, 2.5)),
+        # Breakout
+        ("donch(20)", lambda df: donchian_breakout(df, 20)),
+        ("donch(55)", lambda df: donchian_breakout(df, 55)),
+        # Multi-indicator
+        ("ichi", lambda df: ichimoku_bullish(df)),
+        # Volume-weighted
+        ("vwap(20)", lambda df: vwap_reclaim(df, 20)),
+        ("vwap(50)", lambda df: vwap_reclaim(df, 50)),
+        # Price action
+        ("engulf", lambda df: bullish_engulfing(df)),
     ]
 
     # ── Confirmation filters (0-2 added) ──
@@ -379,7 +504,7 @@ def generate_combos() -> list:
     ]
 
     # ── Exit profiles ──
-    exits = ["tight", "balanced", "wide"]
+    exits = ["tight", "balanced", "wide", "roi_only"]
 
     # Generate all combos
     for a_name, a_fn in anchors:
@@ -411,18 +536,20 @@ def screen_all(
     max_open: int = 3,
     timerange_start: float = 0,
     timerange_end: float = float("inf"),
+    detail_data: dict = None,
 ) -> list:
     """Screen all combos and return sorted results."""
     results = []
     total = len(combos)
+    mode = "1m detail" if detail_data else "1h only"
 
     for i, combo in enumerate(combos):
         if (i + 1) % 50 == 0 or i == 0:
-            print(f"[lab] Screening {i+1}/{total}...", flush=True)
+            print(f"[lab] Screening {i+1}/{total} ({mode})...", flush=True)
 
         result = screen_combo(
             combo, pair_data, btc_df, wallet, max_open,
-            timerange_start, timerange_end,
+            timerange_start, timerange_end, detail_data,
         )
         results.append(result)
 

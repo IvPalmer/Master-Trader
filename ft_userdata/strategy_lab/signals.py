@@ -103,6 +103,61 @@ def stoch_oversold(df: pd.DataFrame, threshold: float, period: int = 14) -> pd.S
     return (df[k_col] > threshold) & (df[k_col].shift(1) <= threshold)
 
 
+# ── New Entry Signal Modules (added 2026-04-16) ─────────────
+
+def donchian_breakout(df: pd.DataFrame, period: int) -> pd.Series:
+    """Price closes above the N-period high (from prior bars). Turtle-style."""
+    col = f"donch_{period}"
+    if col not in df.columns:
+        # Shift by 1 so we don't include current bar in the rolling max
+        df[col] = df["high"].rolling(period).max().shift(1)
+    return (df["close"] > df[col]) & (df["close"].shift(1) <= df[col].shift(1))
+
+
+def ichimoku_bullish(df: pd.DataFrame) -> pd.Series:
+    """Price crosses above Ichimoku cloud (both senkou_a and senkou_b)."""
+    if "ichi_sa" not in df.columns:
+        tenkan = (df["high"].rolling(9).max() + df["low"].rolling(9).min()) / 2
+        kijun = (df["high"].rolling(26).max() + df["low"].rolling(26).min()) / 2
+        df["ichi_sa"] = ((tenkan + kijun) / 2).shift(26)
+        df["ichi_sb"] = ((df["high"].rolling(52).max() + df["low"].rolling(52).min()) / 2).shift(26)
+    above_now = (df["close"] > df["ichi_sa"]) & (df["close"] > df["ichi_sb"])
+    below_prev = (df["close"].shift(1) <= df["ichi_sa"].shift(1)) | \
+                 (df["close"].shift(1) <= df["ichi_sb"].shift(1))
+    return above_now & below_prev
+
+
+def vwap_reclaim(df: pd.DataFrame, period: int = 20) -> pd.Series:
+    """Price crosses above rolling VWAP (volume-weighted avg price over period)."""
+    col = f"vwap_{period}"
+    if col not in df.columns:
+        typical = (df["high"] + df["low"] + df["close"]) / 3
+        tv = typical * df["volume"]
+        df[col] = tv.rolling(period).sum() / (df["volume"].rolling(period).sum() + 1e-10)
+    return (df["close"] > df[col]) & (df["close"].shift(1) <= df[col].shift(1))
+
+
+def keltner_bounce(df: pd.DataFrame, period: int = 20, atr_mult: float = 2.0) -> pd.Series:
+    """Price crosses above Keltner lower channel (SMA - atr_mult * ATR). ATR-based BB variant."""
+    col = f"kelt_lower_{period}_{atr_mult}"
+    if col not in df.columns:
+        sma = df["close"].rolling(period).mean()
+        atr = _atr(df, period)
+        df[col] = sma - atr_mult * atr
+    return (df["close"] > df[col]) & (df["close"].shift(1) <= df[col].shift(1))
+
+
+def bullish_engulfing(df: pd.DataFrame) -> pd.Series:
+    """Current green candle's body engulfs previous red candle's body."""
+    prev_red = df["close"].shift(1) < df["open"].shift(1)
+    curr_green = df["close"] > df["open"]
+    engulf_body = (df["open"] < df["close"].shift(1)) & (df["close"] > df["open"].shift(1))
+    curr_body = (df["close"] - df["open"]).abs()
+    prev_body = (df["close"].shift(1) - df["open"].shift(1)).abs()
+    bigger_body = curr_body > prev_body
+    return prev_red & curr_green & engulf_body & bigger_body
+
+
 # ── Regime Gate Modules (applied to BTC DataFrame) ──────────
 
 def btc_above_sma(btc_df: pd.DataFrame, period: int) -> pd.Series:
@@ -161,6 +216,15 @@ EXIT_PROFILES = {
         "trailing_stop_positive": 0.03,
         "trailing_stop_positive_offset": 0.05,
         "minimal_roi": {"0": 0.10, "360": 0.07, "720": 0.04, "1440": 0.02},
+        "exit_profit_only": True,
+        "exit_profit_offset": 0.01,
+    },
+    "roi_only": {
+        # Per engine v2 finding: trailing stops subtract value; ROI-only works better
+        "stoploss": -0.05,
+        "trailing_stop_positive": 0,
+        "trailing_stop_positive_offset": 0,
+        "minimal_roi": {"0": 0.08, "360": 0.05, "720": 0.03, "1440": 0.02},
         "exit_profit_only": True,
         "exit_profit_offset": 0.01,
     },

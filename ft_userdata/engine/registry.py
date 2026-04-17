@@ -32,7 +32,9 @@ STRATEGIES = {
         "image": "freqtradeorg/freqtrade:stable",
         "informative_tfs": ["1d"],
         "backtest_config": "backtest-SupertrendStrategy.json",
-        "status": "active",
+        "status": "killed",  # Killed 2026-04-17: 3 configs tested at 1m-detail, all losing.
+                              # Live config: -3.23%/3.3yr PF 1.00. Original trailing: -53.98% PF 0.92.
+                              # Live peak +$14.72 was regime luck (5 days of post-dip bull). Replaced by KeltnerBounceV1.
     },
     "MasterTraderV1": {
         "timeframe": "1h",
@@ -92,7 +94,21 @@ STRATEGIES = {
         "image": "freqtradeorg/freqtrade:stable",
         "informative_tfs": ["1d"],
         "backtest_config": "backtest-BollingerBounceV1.json",
-        "status": "active",
+        "status": "killed",  # Killed 2026-04-17: superseded by KeltnerBounceV1.
+                              # Same mean-reversion edge, but Keltner (ATR-based) outperforms Bollinger (std-based) for crypto.
+                              # Idle since Apr 7 (10 days). Lab grid scan showed Keltner consistently ranked higher.
+    },
+    "KeltnerBounceV1": {
+        "timeframe": "1h",
+        "trading_mode": "spot",
+        "port": 8095,
+        "max_open_trades": 3,
+        "stake_amount": "unlimited",
+        "dry_run_wallet": 88,
+        "image": "freqtradeorg/freqtrade:stable",
+        "informative_tfs": ["1h"],  # BTC informative at 1h
+        "backtest_config": "backtest-KeltnerBounceV1.json",
+        "status": "active",  # Deployed dry-run 2026-04-16 via KeltnerBounceV1.json
     },
 }
 
