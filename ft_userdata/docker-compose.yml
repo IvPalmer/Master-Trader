@@ -116,21 +116,7 @@ services:
   #     --config /freqtrade/user_data/configs/DoubleEMACrossoverWithTrend.json
   #     --strategy DoubleEMACrossoverWithTrend
 
-  mastertraderv1:
-    image: freqtradeorg/freqtrade:stable
-    restart: always
-    container_name: ft-mastertraderv1
-    extra_hosts: *binance-hosts
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8086:8080"
-    healthcheck: *bot-healthcheck
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-    entrypoint: ["/bin/sh", "-c", "sleep 35 && exec freqtrade trade --logfile /freqtrade/user_data/logs/MasterTraderV1.log --config /freqtrade/user_data/configs/MasterTraderV1.json --strategy MasterTraderV1"]
+  # mastertraderv1:  # KILLED 2026-04-17 — Viability backtest -53.69% over 3.3yr, PF 0.63. Live +$3.67 was regime luck. No long-term edge.
 
   # mastertraderai:  # KILLED 2026-03-14 — -$32.32, 30% WR, bleeding $31/day
   #   image: freqtradeorg/freqtrade:stable_freqai
@@ -198,21 +184,7 @@ services:
 
   # ── Bear Crash Short (futures, short-only during bear regimes) ────
 
-  bearcrashshortv1:
-    image: freqtradeorg/freqtrade:stable
-    restart: always
-    container_name: ft-bear-crash-short
-    extra_hosts: *binance-hosts
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8093:8080"
-    healthcheck: *bot-healthcheck
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-    entrypoint: ["/bin/sh", "-c", "sleep 45 && exec freqtrade trade --logfile /freqtrade/user_data/logs/BearCrashShortV1.log --config /freqtrade/user_data/configs/BearCrashShortV1.json --strategy BearCrashShortV1"]
+  # bearcrashshortv1:  # KILLED 2026-04-17 — 1h-only backtest Jul 2025-Apr 2026: PF 0.89, -12.96%, 34% DD. No edge. Revisit if futures 1m data downloaded.
 
   # bollingerbouncev1:  # KILLED 2026-04-17 — superseded by KeltnerBounceV1 (ATR > std for crypto)
 
@@ -261,8 +233,6 @@ services:
         limits:
           memory: 192M
     depends_on:
-      - mastertraderv1
-      - bearcrashshortv1
       - keltnerbouncev1
       - fundingfadev1
 
@@ -285,8 +255,8 @@ services:
         limits:
           memory: 128M
     depends_on:
-      - mastertraderv1
       - keltnerbouncev1
+      - fundingfadev1
 
   prometheus:
     image: prom/prometheus:latest

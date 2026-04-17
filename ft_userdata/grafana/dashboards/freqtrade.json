@@ -1731,12 +1731,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=\"MasterTraderV1\"})",
-          "legendFormat": "MasterV1",
+          "expr": "0",
+          "legendFormat": "slot",
           "refId": "A"
         }
       ],
-      "title": "MasterV1",
+      "title": "(available slot)",
       "type": "stat"
     },
     {
@@ -1792,12 +1792,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=\"AlligatorTrendV1\"})",
-          "legendFormat": "AlligatorTrend",
+          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=\"FundingFadeV1\"})",
+          "legendFormat": "FundingFade",
           "refId": "A"
         }
       ],
-      "title": "AlligatorTrend",
+      "title": "FundingFade",
       "type": "stat"
     },
     {
@@ -1853,12 +1853,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=\"GaussianChannelV1\"})",
-          "legendFormat": "GaussianChannel",
+          "expr": "0",
+          "legendFormat": "slot",
           "refId": "A"
         }
       ],
-      "title": "GaussianChannel",
+      "title": "(available slot)",
       "type": "stat"
     },
     {
@@ -1914,12 +1914,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=\"BearCrashShortV1\"})",
-          "legendFormat": "BearCrashShort",
+          "expr": "0",
+          "legendFormat": "slot",
           "refId": "A"
         }
       ],
-      "title": "BearCrashShort",
+      "title": "(available slot)",
       "type": "stat"
     },
     {
@@ -2101,12 +2101,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=\"BollingerBounceV1\"})",
-          "legendFormat": "BollingerBounce",
+          "expr": "0",
+          "legendFormat": "slot",
           "refId": "A"
         }
       ],
-      "title": "BollingerBounce",
+      "title": "(available slot)",
       "type": "stat"
     }
   ],
@@ -2120,26 +2120,26 @@
         "current": {
           "selected": true,
           "text": "All",
-          "value": "MasterTraderV1|BearCrashShortV1|KeltnerBounceV1"
+          "value": "KeltnerBounceV1|FundingFadeV1"
         },
         "name": "strategies",
         "label": "Timeframe",
         "type": "custom",
-        "query": "All : MasterTraderV1|BearCrashShortV1|KeltnerBounceV1,Spot : MasterTraderV1|KeltnerBounceV1,Futures : BearCrashShortV1",
+        "query": "All : KeltnerBounceV1|FundingFadeV1,TA : KeltnerBounceV1,Non-TA : FundingFadeV1",
         "options": [
           {
             "text": "All",
-            "value": "MasterTraderV1|BearCrashShortV1|KeltnerBounceV1",
+            "value": "KeltnerBounceV1|FundingFadeV1",
             "selected": true
           },
           {
-            "text": "Spot",
-            "value": "MasterTraderV1|KeltnerBounceV1",
+            "text": "TA (Keltner)",
+            "value": "KeltnerBounceV1",
             "selected": false
           },
           {
-            "text": "Futures",
-            "value": "BearCrashShortV1",
+            "text": "Non-TA (Funding)",
+            "value": "FundingFadeV1",
             "selected": false
           }
         ],

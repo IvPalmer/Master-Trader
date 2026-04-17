@@ -46,7 +46,9 @@ STRATEGIES = {
         "image": "freqtradeorg/freqtrade:stable",
         "informative_tfs": ["1d"],
         "backtest_config": "backtest-MasterTraderV1.json",
-        "status": "active",
+        "status": "killed",  # Killed 2026-04-17: Viability 3.3yr backtest -53.69%, PF 0.63, DD 54%.
+                             # Live +$3.67 was regime luck (same pattern as Supertrend). Calibration at 86%
+                             # match on Mar 11-Apr 11 window confirms backtest accuracy. No long-term edge.
     },
     "AlligatorTrendV1": {
         "timeframe": "1d",
@@ -82,7 +84,9 @@ STRATEGIES = {
         "informative_tfs": ["1d"],
         "backtest_config": "backtest-BearCrashShortV1.json",
         "pair_blacklist": ["BTC/USDT:USDT"],
-        "status": "active",
+        "status": "killed",  # Killed 2026-04-17: 1h-only backtest Jul 2025-Apr 2026 = PF 0.89, -12.96%,
+                              # 34% DD, 150 trades/9mo (way more than 'crash-only' should fire). 1m futures
+                              # data unavailable for proper 1m-detail test. Revisit if futures data downloaded.
     },
     "BollingerBounceV1": {
         "timeframe": "1h",
