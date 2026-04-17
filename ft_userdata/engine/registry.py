@@ -110,6 +110,21 @@ STRATEGIES = {
         "backtest_config": "backtest-KeltnerBounceV1.json",
         "status": "active",  # Deployed dry-run 2026-04-16 via KeltnerBounceV1.json
     },
+    "FundingFadeV1": {
+        "timeframe": "1h",
+        "trading_mode": "spot",
+        "port": 8096,
+        "max_open_trades": 3,
+        "stake_amount": "unlimited",
+        "dry_run_wallet": 88,
+        "image": "freqtradeorg/freqtrade:stable",
+        "informative_tfs": ["1h"],
+        "backtest_config": "backtest-FundingFadeV1.json",
+        # Non-TA strategy: funding rate divergence + ADX/vol TA confirmations.
+        # First orthogonal-edge strategy. Lab: 431 trades, PF 1.29, +60.66%, DD 19.6%, 6/6 WF.
+        # Deployed dry-run 2026-04-17.
+        "status": "active",
+    },
 }
 
 

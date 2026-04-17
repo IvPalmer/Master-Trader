@@ -1,0 +1,201 @@
+{
+    "dry_run": true,
+    "dry_run_wallet": 88,
+    "cancel_open_orders_on_exit": true,
+    "trading_mode": "spot",
+    "margin_mode": "",
+    "stake_currency": "USDT",
+    "stake_amount": "unlimited",
+    "tradable_balance_ratio": 0.99,
+    "fiat_display_currency": "",
+    "max_open_trades": 3,
+    "amount_reserve_percent": 0.05,
+    "unfilledtimeout": {
+        "entry": 10,
+        "exit": 10,
+        "exit_timeout_count": 0,
+        "unit": "minutes"
+    },
+    "order_types": {
+        "entry": "limit",
+        "exit": "limit",
+        "emergency_exit": "market",
+        "force_exit": "market",
+        "force_entry": "market",
+        "stoploss": "market",
+        "stoploss_on_exchange": false,
+        "stoploss_on_exchange_interval": 60
+    },
+    "entry_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1,
+        "price_last_balance": 0.0,
+        "check_depth_of_market": {
+            "enabled": false,
+            "bids_to_ask_delta": 1
+        }
+    },
+    "exit_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "exchange": {
+        "name": "binance",
+        "key": "",
+        "secret": "",
+        "ccxt_config": {},
+        "ccxt_async_config": {},
+        "pair_whitelist": [],
+        "pair_blacklist": [
+            ".*BULL/USDT",
+            ".*BEAR/USDT",
+            ".*UP/USDT",
+            ".*DOWN/USDT",
+            "USDC/USDT",
+            "BUSD/USDT",
+            "DAI/USDT",
+            "TUSD/USDT",
+            "FDUSD/USDT",
+            "USD1/USDT",
+            "XUSD/USDT",
+            "U/USDT",
+            "EUR/USDT",
+            ".*_PERP"
+        ]
+    },
+    "pairlists": [
+        {
+            "method": "VolumePairList",
+            "number_assets": 40,
+            "sort_key": "quoteVolume",
+            "min_value": 5000000,
+            "refresh_period": 86400,
+            "lookback_days": 3,
+            "lookback_timeframe": "1d"
+        },
+        {
+            "method": "AgeFilter",
+            "min_days_listed": 90
+        },
+        {
+            "method": "SpreadFilter",
+            "max_spread_ratio": 0.005
+        },
+        {
+            "method": "PriceFilter",
+            "min_price": 0.001,
+            "low_price_ratio": 0.02
+        },
+        {
+            "method": "VolatilityFilter",
+            "lookback_days": 14,
+            "min_volatility": 0.03,
+            "max_volatility": 0.75,
+            "refresh_period": 14400
+        },
+        {
+            "method": "RangeStabilityFilter",
+            "lookback_days": 10,
+            "min_rate_of_change": 0.03,
+            "max_rate_of_change": 0.5,
+            "refresh_period": 14400
+        },
+        {
+            "method": "PrecisionFilter"
+        },
+        {
+            "method": "ShuffleFilter"
+        }
+    ],
+    "webhook": {
+        "enabled": true,
+        "url": "http://host.docker.internal:8088/webhooks/freqtrade",
+        "webhookentry": {
+            "type": "entry",
+            "pair": "{pair}",
+            "stake_amount": "{stake_amount}",
+            "stake_currency": "{stake_currency}",
+            "limit": "{limit}",
+            "open_rate": "{open_rate}",
+            "order_type": "{order_type}",
+            "direction": "{direction}",
+            "leverage": "{leverage}"
+        },
+        "webhookentrycancel": {
+            "type": "entry_cancel",
+            "pair": "{pair}",
+            "reason": "{reason}"
+        },
+        "webhookentryfill": {
+            "type": "entry_fill",
+            "pair": "{pair}",
+            "stake_amount": "{stake_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "order_type": "{order_type}",
+            "direction": "{direction}",
+            "leverage": "{leverage}"
+        },
+        "webhookexit": {
+            "type": "exit",
+            "pair": "{pair}",
+            "profit_ratio": "{profit_ratio}",
+            "profit_amount": "{profit_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "close_rate": "{close_rate}",
+            "exit_reason": "{exit_reason}",
+            "direction": "{direction}",
+            "duration": "{duration}"
+        },
+        "webhookexitcancel": {
+            "type": "exit_cancel",
+            "pair": "{pair}",
+            "reason": "{reason}"
+        },
+        "webhookexitfill": {
+            "type": "exit_fill",
+            "pair": "{pair}",
+            "profit_ratio": "{profit_ratio}",
+            "profit_amount": "{profit_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "close_rate": "{close_rate}",
+            "exit_reason": "{exit_reason}",
+            "direction": "{direction}",
+            "duration": "{duration}"
+        },
+        "webhookstatus": {
+            "type": "status",
+            "status": "{status}"
+        }
+    },
+    "telegram": {
+        "enabled": false,
+        "token": "",
+        "chat_id": ""
+    },
+    "api_server": {
+        "enabled": true,
+        "listen_ip_address": "0.0.0.0",
+        "listen_port": 8080,
+        "verbosity": "error",
+        "enable_openapi": true,
+        "jwt_secret_key": "master-trader-dev-key-change-for-prod",
+        "CORS_origins": [
+            "http://localhost:8080",
+            "http://localhost:8096"
+        ],
+        "username": "freqtrader",
+        "password": "mastertrader"
+    },
+    "bot_name": "FundingFade",
+    "initial_state": "running",
+    "force_entry_enable": false,
+    "internals": {
+        "process_throttle_secs": 5
+    },
+    "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.FundingFadeV1.sqlite"
+}
