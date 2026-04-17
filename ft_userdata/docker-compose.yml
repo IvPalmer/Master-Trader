@@ -100,21 +100,7 @@ services:
 
   # emacrossoverv1:  # KILLED 2026-03-15 — 0 trades in 20h, dead on arrival (container removed 2026-03-22)
 
-  supertrendstrategy:
-    image: freqtradeorg/freqtrade:stable
-    restart: always
-    container_name: ft-supertrendstrategy
-    extra_hosts: *binance-hosts
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8084:8080"
-    healthcheck: *bot-healthcheck
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-    entrypoint: ["/bin/sh", "-c", "sleep 20 && exec freqtrade trade --logfile /freqtrade/user_data/logs/SupertrendStrategy.log --config /freqtrade/user_data/configs/SupertrendStrategy.json --strategy SupertrendStrategy"]
+  # supertrendstrategy:  # KILLED 2026-04-17 — 3 configs tested at 1m-detail ALL losing (-3% to -54% over 3.3yr). Live +$14.72 peak was 5-day regime luck. Replaced by KeltnerBounceV1.
 
   # doubleemacrossoverwithtrend:  # PAUSED — worst performer (-4.14 USDT, 0/2 W/L)
   #   image: freqtradeorg/freqtrade:stable
@@ -207,37 +193,8 @@ services:
 
   # ── Daily Timeframe Strategies ────────────────────────────────────
 
-  alligatortrendv1:
-    image: freqtradeorg/freqtrade:stable
-    restart: always
-    container_name: ft-alligator-trend
-    extra_hosts: *binance-hosts
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8091:8080"
-    healthcheck: *bot-healthcheck
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-    entrypoint: ["/bin/sh", "-c", "sleep 0 && exec freqtrade trade --logfile /freqtrade/user_data/logs/AlligatorTrendV1.log --config /freqtrade/user_data/configs/AlligatorTrendV1.json --strategy AlligatorTrendV1"]
-
-  gaussianchannelv1:
-    image: freqtradeorg/freqtrade:stable
-    restart: always
-    container_name: ft-gaussian-channel
-    extra_hosts: *binance-hosts
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8092:8080"
-    healthcheck: *bot-healthcheck
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-    entrypoint: ["/bin/sh", "-c", "sleep 10 && exec freqtrade trade --logfile /freqtrade/user_data/logs/GaussianChannelV1.log --config /freqtrade/user_data/configs/GaussianChannelV1.json --strategy GaussianChannelV1"]
+  # alligatortrendv1:  # KILLED 2026-04-10 — 0 trades/30d, PF 0.46 backtest, 7 trades/yr
+  # gaussianchannelv1:  # KILLED 2026-04-10 — ZERO trades in full-year backtest
 
   # ── Bear Crash Short (futures, short-only during bear regimes) ────
 
@@ -257,21 +214,7 @@ services:
           memory: 768M
     entrypoint: ["/bin/sh", "-c", "sleep 45 && exec freqtrade trade --logfile /freqtrade/user_data/logs/BearCrashShortV1.log --config /freqtrade/user_data/configs/BearCrashShortV1.json --strategy BearCrashShortV1"]
 
-  bollingerbouncev1:
-    image: freqtradeorg/freqtrade:stable
-    restart: always
-    container_name: ft-bollinger-bounce
-    extra_hosts: *binance-hosts
-    volumes:
-      - "./user_data:/freqtrade/user_data"
-    ports:
-      - "127.0.0.1:8094:8080"
-    healthcheck: *bot-healthcheck
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-    entrypoint: ["/bin/sh", "-c", "sleep 55 && exec freqtrade trade --logfile /freqtrade/user_data/logs/BollingerBounceV1.log --config /freqtrade/user_data/configs/BollingerBounceV1.json --strategy BollingerBounceV1"]
+  # bollingerbouncev1:  # KILLED 2026-04-17 — superseded by KeltnerBounceV1 (ATR > std for crypto)
 
   keltnerbouncev1:
     image: freqtradeorg/freqtrade:stable
@@ -302,12 +245,8 @@ services:
         limits:
           memory: 192M
     depends_on:
-      - supertrendstrategy
       - mastertraderv1
-      - alligatortrendv1
-      - gaussianchannelv1
       - bearcrashshortv1
-      - bollingerbouncev1
       - keltnerbouncev1
 
   # ── Monitoring Stack ───────────────────────────────────────────────
@@ -329,8 +268,8 @@ services:
         limits:
           memory: 128M
     depends_on:
-      - supertrendstrategy
       - mastertraderv1
+      - keltnerbouncev1
 
   prometheus:
     image: prom/prometheus:latest

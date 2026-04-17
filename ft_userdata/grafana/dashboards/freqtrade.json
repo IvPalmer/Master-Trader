@@ -1670,12 +1670,12 @@
       "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=\"SupertrendStrategy\"})",
-          "legendFormat": "Supertrend",
+          "expr": "max by (strategy)(freqtrade_true_pnl{strategy=\"KeltnerBounceV1\"})",
+          "legendFormat": "KeltnerBounce",
           "refId": "A"
         }
       ],
-      "title": "Supertrend",
+      "title": "KeltnerBounce",
       "type": "stat"
     },
     {
@@ -2120,26 +2120,21 @@
         "current": {
           "selected": true,
           "text": "All",
-          "value": "SupertrendStrategy|MasterTraderV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1"
+          "value": "MasterTraderV1|BearCrashShortV1|KeltnerBounceV1"
         },
         "name": "strategies",
         "label": "Timeframe",
         "type": "custom",
-        "query": "All : SupertrendStrategy|MasterTraderV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1,1h Bots : SupertrendStrategy|MasterTraderV1|BearCrashShortV1|BollingerBounceV1,1d Bots : AlligatorTrendV1|GaussianChannelV1,Futures : BearCrashShortV1",
+        "query": "All : MasterTraderV1|BearCrashShortV1|KeltnerBounceV1,Spot : MasterTraderV1|KeltnerBounceV1,Futures : BearCrashShortV1",
         "options": [
           {
             "text": "All",
-            "value": "SupertrendStrategy|MasterTraderV1|AlligatorTrendV1|GaussianChannelV1|BearCrashShortV1|BollingerBounceV1",
+            "value": "MasterTraderV1|BearCrashShortV1|KeltnerBounceV1",
             "selected": true
           },
           {
-            "text": "1h Bots",
-            "value": "SupertrendStrategy|MasterTraderV1|BearCrashShortV1|BollingerBounceV1",
-            "selected": false
-          },
-          {
-            "text": "1d Bots",
-            "value": "AlligatorTrendV1|GaussianChannelV1",
+            "text": "Spot",
+            "value": "MasterTraderV1|KeltnerBounceV1",
             "selected": false
           },
           {

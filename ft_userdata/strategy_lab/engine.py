@@ -26,6 +26,9 @@ from strategy_lab.signals import (
     bullish_engulfing,
     donchian_breakout,
     ema_crossover,
+    funding_below_mean,
+    funding_extreme_negative,
+    funding_negative,
     ichimoku_bullish,
     keltner_bounce,
     macd_crossover,
@@ -343,6 +346,9 @@ def screen_combo(
         if pair == "BTC/USDT" and "btc" in combo.gate_desc.lower():
             continue
 
+        # Attach pair for signals that need it (e.g. funding rate)
+        df.attrs["pair"] = pair
+
         try:
             entry_signal = combo.entry_fn(df)
         except Exception:
@@ -475,6 +481,11 @@ def generate_combos() -> list:
         ("vwap(50)", lambda df: vwap_reclaim(df, 50)),
         # Price action
         ("engulf", lambda df: bullish_engulfing(df)),
+        # Funding rate — pure funding-based entries (non-TA)
+        ("funding_neg", lambda df: funding_negative(df)),
+        ("funding_p5", lambda df: funding_extreme_negative(df, 0.05, 1000)),
+        ("funding_p10", lambda df: funding_extreme_negative(df, 0.10, 1000)),
+        ("funding_below_mean", lambda df: funding_below_mean(df, 500)),
     ]
 
     # ── Confirmation filters (0-2 added) ──
@@ -492,6 +503,9 @@ def generate_combos() -> list:
         ("rsi(30,70)+vol(1.5)", lambda df: rsi_range(df, 30, 70) & volume_spike(df, 1.5)),
         ("rsi(30,70)+adx(25)", lambda df: rsi_range(df, 30, 70) & adx_trending(df, 25)),
         ("adx(25)+vol(1.5)", lambda df: adx_trending(df, 25) & volume_spike(df, 1.5)),
+        # Funding-rate confirmations: require funding to be extreme-negative at entry
+        ("funding_neg", lambda df: funding_negative(df)),
+        ("funding_p10", lambda df: funding_extreme_negative(df, 0.10, 1000)),
     ]
 
     # ── Regime gates ──

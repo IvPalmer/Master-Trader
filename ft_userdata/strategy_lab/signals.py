@@ -158,6 +158,133 @@ def bullish_engulfing(df: pd.DataFrame) -> pd.Series:
     return prev_red & curr_green & engulf_body & bigger_body
 
 
+# ── Funding Rate Signals ────────────────────────────────────
+# Loaded from user_data/data/binance/funding/{PAIR}-funding.feather
+# These align with the pair's 1h candles via nearest-past funding rate.
+
+_FUNDING_CACHE = {}  # pair -> DataFrame with date, funding_rate
+
+
+def _load_funding(pair: str):
+    """Lazily load and cache funding rate data for a pair."""
+    if pair in _FUNDING_CACHE:
+        return _FUNDING_CACHE[pair]
+    from pathlib import Path
+    p = Path(__file__).parent.parent / "user_data" / "data" / "binance" / "funding" / f"{pair.replace('/', '_')}-funding.feather"
+    if not p.exists():
+        _FUNDING_CACHE[pair] = None
+        return None
+    df = pd.read_feather(p)
+    # Normalize to unix seconds — handle ms or ns precision datetime
+    df["ts"] = df["date"].apply(lambda x: x.timestamp()).astype(np.float64)
+    _FUNDING_CACHE[pair] = df.sort_values("ts").reset_index(drop=True)
+    return _FUNDING_CACHE[pair]
+
+
+def _align_funding_to_pair(pair_df: pd.DataFrame, funding_df: pd.DataFrame) -> pd.Series:
+    """For each pair_df row, return the funding rate active at that timestamp.
+
+    Uses nearest-past funding rate (funding fixes every 4-8h; carry-forward between fixes).
+    """
+    if funding_df is None or funding_df.empty:
+        return pd.Series(np.nan, index=pair_df.index)
+    pair_ts = pair_df["ts"].values
+    funding_ts = funding_df["ts"].values
+    funding_rates = funding_df["funding_rate"].values
+    # For each pair ts, find the latest funding_ts <= pair_ts
+    idx = np.searchsorted(funding_ts, pair_ts, side="right") - 1
+    idx = np.clip(idx, 0, len(funding_rates) - 1)
+    valid = idx >= 0
+    result = np.where(valid, funding_rates[idx], np.nan)
+    return pd.Series(result, index=pair_df.index)
+
+
+def funding_extreme_negative(df: pd.DataFrame, percentile: float = 0.05, lookback_periods: int = 1000) -> pd.Series:
+    """
+    Fire when funding rate is in its bottom percentile (e.g. p5) over lookback.
+
+    Extreme negative funding = perps trading below spot = shorts paying longs =
+    crowded short positioning. Often precedes upward reversion.
+
+    percentile: e.g. 0.05 for bottom 5%. Lower = more extreme.
+    lookback_periods: window for percentile computation (1000 periods ~= 333 days at 8h funding).
+    """
+    pair = df.attrs.get("pair", None)
+    if pair is None:
+        return pd.Series(False, index=df.index)
+    funding_df = _load_funding(pair)
+    if funding_df is None:
+        return pd.Series(False, index=df.index)
+
+    col = f"funding_{int(percentile*100)}_{lookback_periods}"
+    if col not in df.columns:
+        f_aligned = _align_funding_to_pair(df, funding_df)
+        # Rolling percentile threshold
+        threshold = f_aligned.rolling(lookback_periods, min_periods=100).quantile(percentile)
+        df["_funding_aligned"] = f_aligned
+        df[col] = f_aligned <= threshold
+
+    return df[col].fillna(False)
+
+
+def funding_extreme_positive(df: pd.DataFrame, percentile: float = 0.95, lookback_periods: int = 1000) -> pd.Series:
+    """
+    Fire when funding rate is in its top percentile.
+
+    Extreme positive funding = longs paying shorts heavily = crowded long positioning.
+    Often precedes downward reversion. USE FOR SHORT ENTRIES (not long-only strategies).
+    """
+    pair = df.attrs.get("pair", None)
+    if pair is None:
+        return pd.Series(False, index=df.index)
+    funding_df = _load_funding(pair)
+    if funding_df is None:
+        return pd.Series(False, index=df.index)
+
+    col = f"funding_hi_{int(percentile*100)}_{lookback_periods}"
+    if col not in df.columns:
+        f_aligned = _align_funding_to_pair(df, funding_df)
+        threshold = f_aligned.rolling(lookback_periods, min_periods=100).quantile(percentile)
+        df[col] = f_aligned >= threshold
+
+    return df[col].fillna(False)
+
+
+def funding_negative(df: pd.DataFrame) -> pd.Series:
+    """Simpler signal: funding rate is outright negative (rare — crowded shorts)."""
+    pair = df.attrs.get("pair", None)
+    if pair is None:
+        return pd.Series(False, index=df.index)
+    funding_df = _load_funding(pair)
+    if funding_df is None:
+        return pd.Series(False, index=df.index)
+
+    if "funding_neg" not in df.columns:
+        f_aligned = _align_funding_to_pair(df, funding_df)
+        df["funding_neg"] = f_aligned < 0
+
+    return df["funding_neg"].fillna(False)
+
+
+def funding_below_mean(df: pd.DataFrame, lookback_periods: int = 500) -> pd.Series:
+    """Fire when current funding is 1+ std below its rolling mean (relative-extreme)."""
+    pair = df.attrs.get("pair", None)
+    if pair is None:
+        return pd.Series(False, index=df.index)
+    funding_df = _load_funding(pair)
+    if funding_df is None:
+        return pd.Series(False, index=df.index)
+
+    col = f"funding_below_{lookback_periods}"
+    if col not in df.columns:
+        f_aligned = _align_funding_to_pair(df, funding_df)
+        roll_mean = f_aligned.rolling(lookback_periods, min_periods=50).mean()
+        roll_std = f_aligned.rolling(lookback_periods, min_periods=50).std()
+        df[col] = f_aligned < (roll_mean - roll_std)
+
+    return df[col].fillna(False)
+
+
 # ── Regime Gate Modules (applied to BTC DataFrame) ──────────
 
 def btc_above_sma(btc_df: pd.DataFrame, period: int) -> pd.Series:
