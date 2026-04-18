@@ -1,0 +1,42 @@
+{
+  "dry_run": true,
+  "dry_run_wallet": 1000,
+  "trading_mode": "futures",
+  "margin_mode": "isolated",
+  "stake_currency": "USDT",
+  "stake_amount": 10.7861,
+  "tradable_balance_ratio": 0.99,
+  "fiat_display_currency": "",
+  "max_open_trades": 0,
+  "amount_reserve_percent": 0.05,
+  "entry_pricing": {
+    "price_side": "other",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "exit_pricing": {
+    "price_side": "other",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "pair_whitelist": [
+      "BNB/USDT:USDT",
+      "DOGE/USDT:USDT",
+      "PAXG/USDT:USDT",
+      "SOL/USDT:USDT",
+      "TAO/USDT:USDT",
+      "XRP/USDT:USDT"
+    ],
+    "pair_blacklist": []
+  },
+  "pairlists": [
+    {
+      "method": "StaticPairList"
+    }
+  ],
+  "bot_name": "Calibrate-BearCrashShortV1"
+}

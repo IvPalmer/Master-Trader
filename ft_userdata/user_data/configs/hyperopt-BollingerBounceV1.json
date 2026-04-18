@@ -1,0 +1,58 @@
+{
+  "dry_run": true,
+  "dry_run_wallet": 1000,
+  "trading_mode": "spot",
+  "margin_mode": "",
+  "stake_currency": "USDT",
+  "stake_amount": 88,
+  "tradable_balance_ratio": 0.99,
+  "fiat_display_currency": "",
+  "max_open_trades": 3,
+  "amount_reserve_percent": 0.05,
+  "entry_pricing": {
+    "price_side": "other",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "exit_pricing": {
+    "price_side": "other",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "pair_whitelist": [
+      "BTC/USDT",
+      "ETH/USDT",
+      "TAO/USDT",
+      "SOL/USDT",
+      "USD1/USDT",
+      "ZEC/USDT",
+      "XRP/USDT",
+      "DOGE/USDT",
+      "BNB/USDT",
+      "DASH/USDT",
+      "WLFI/USDT",
+      "\u5e01\u5b89\u4eba\u751f/USDT",
+      "FF/USDT",
+      "PEPE/USDT",
+      "NOM/USDT",
+      "TRX/USDT",
+      "RLUSD/USDT",
+      "ENA/USDT",
+      "ADA/USDT",
+      "U/USDT",
+      "SUI/USDT",
+      "LINK/USDT"
+    ],
+    "pair_blacklist": []
+  },
+  "pairlists": [
+    {
+      "method": "StaticPairList"
+    }
+  ],
+  "bot_name": "Hyperopt-BollingerBounceV1"
+}

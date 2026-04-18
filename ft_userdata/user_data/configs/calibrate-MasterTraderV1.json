@@ -1,0 +1,37 @@
+{
+  "dry_run": true,
+  "dry_run_wallet": 88,
+  "trading_mode": "spot",
+  "margin_mode": "",
+  "stake_currency": "USDT",
+  "stake_amount": 29.71054,
+  "tradable_balance_ratio": 0.99,
+  "fiat_display_currency": "",
+  "max_open_trades": 1,
+  "amount_reserve_percent": 0.05,
+  "entry_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "exit_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "pair_whitelist": [
+      "UNI/USDT"
+    ],
+    "pair_blacklist": []
+  },
+  "pairlists": [
+    {
+      "method": "StaticPairList"
+    }
+  ],
+  "bot_name": "Calibrate-MasterTraderV1"
+}

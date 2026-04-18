@@ -1,0 +1,200 @@
+{
+  "train_size": 276,
+  "val_size": 173,
+  "test_size": 124,
+  "lgbm_val_auc": 0.5267206477732793,
+  "lgbm_test_auc": 0.5351778656126481,
+  "rf_val_auc": 0.49082321187584343,
+  "rf_test_auc": 0.4824769433465086,
+  "feature_importance": {
+    "btc_sma20_slope": 8,
+    "pair_atr_pct": 8,
+    "pair_rsi14": 6,
+    "btc_rv_24h": 5,
+    "breadth_above_sma50": 5,
+    "dow": 5,
+    "btc_sma50_slope": 4,
+    "pair_adx14": 3,
+    "fng": 3,
+    "btc_pos_vs_sma200": 1,
+    "btc_pos_vs_sma50": 1,
+    "pair_above_sma50": 1,
+    "btc_sma200_slope": 1,
+    "hour": 1,
+    "btc_rv_pct_30d": 1,
+    "btc_atr_pct": 0,
+    "btc_rsi14": 0
+  },
+  "baseline_test": {
+    "trades": 124.0,
+    "win_rate": 0.4435483870967742,
+    "pf": 0.43310296617798855,
+    "total_return": -0.10461607304939081,
+    "max_dd": -0.13647645101953026,
+    "final_equity": 895.3839269506092
+  },
+  "threshold_sweep_lgbm": [
+    {
+      "threshold": "raw",
+      "trades": 124,
+      "win_rate": 0.4435483870967742,
+      "pf": 0.43310296617798855,
+      "total_return": -0.10461607304939081,
+      "max_dd": -0.13647645101953026
+    },
+    {
+      "threshold": 0.4,
+      "trades": 124,
+      "win_rate": 0.4435483870967742,
+      "pf": 0.43310296617798855,
+      "total_return": -0.10461607304939081,
+      "max_dd": -0.13647645101953026
+    },
+    {
+      "threshold": 0.45,
+      "trades": 124,
+      "win_rate": 0.4435483870967742,
+      "pf": 0.43310296617798855,
+      "total_return": -0.10461607304939081,
+      "max_dd": -0.13647645101953026
+    },
+    {
+      "threshold": 0.5,
+      "trades": 67,
+      "win_rate": 0.4925373134328358,
+      "pf": 0.5057965430948851,
+      "total_return": -0.05387646893807812,
+      "max_dd": -0.0811025692985744
+    },
+    {
+      "threshold": 0.55,
+      "trades": 0,
+      "win_rate": 0.0,
+      "pf": 0.0,
+      "total_return": 0.0,
+      "max_dd": 0.0
+    },
+    {
+      "threshold": 0.6,
+      "trades": 0,
+      "win_rate": 0.0,
+      "pf": 0.0,
+      "total_return": 0.0,
+      "max_dd": 0.0
+    },
+    {
+      "threshold": 0.65,
+      "trades": 0,
+      "win_rate": 0.0,
+      "pf": 0.0,
+      "total_return": 0.0,
+      "max_dd": 0.0
+    },
+    {
+      "threshold": 0.7,
+      "trades": 0,
+      "win_rate": 0.0,
+      "pf": 0.0,
+      "total_return": 0.0,
+      "max_dd": 0.0
+    },
+    {
+      "threshold": 0.75,
+      "trades": 0,
+      "win_rate": 0.0,
+      "pf": 0.0,
+      "total_return": 0.0,
+      "max_dd": 0.0
+    },
+    {
+      "threshold": 0.8,
+      "trades": 0,
+      "win_rate": 0.0,
+      "pf": 0.0,
+      "total_return": 0.0,
+      "max_dd": 0.0
+    }
+  ],
+  "threshold_sweep_rf": [
+    {
+      "threshold": "raw",
+      "trades": 124,
+      "win_rate": 0.4435483870967742,
+      "pf": 0.43310296617798855,
+      "total_return": -0.10461607304939081,
+      "max_dd": -0.13647645101953026
+    },
+    {
+      "threshold": 0.4,
+      "trades": 89,
+      "win_rate": 0.43820224719101125,
+      "pf": 0.36971483300213853,
+      "total_return": -0.09535507151560443,
+      "max_dd": -0.11838557069713274
+    },
+    {
+      "threshold": 0.45,
+      "trades": 77,
+      "win_rate": 0.45454545454545453,
+      "pf": 0.38004724148940866,
+      "total_return": -0.08446140994460313,
+      "max_dd": -0.10681781522772886
+    },
+    {
+      "threshold": 0.5,
+      "trades": 57,
+      "win_rate": 0.40350877192982454,
+      "pf": 0.3011065912967204,
+      "total_return": -0.08082207347402606,
+      "max_dd": -0.09689757423265634
+    },
+    {
+      "threshold": 0.55,
+      "trades": 35,
+      "win_rate": 0.4,
+      "pf": 0.2565729383150306,
+      "total_return": -0.05580731164689598,
+      "max_dd": -0.0651060962538529
+    },
+    {
+      "threshold": 0.6,
+      "trades": 15,
+      "win_rate": 0.4,
+      "pf": 0.37909948124826565,
+      "total_return": -0.016846126759423215,
+      "max_dd": -0.020737124162041674
+    },
+    {
+      "threshold": 0.65,
+      "trades": 6,
+      "win_rate": 0.16666666666666666,
+      "pf": 0.15441036603401662,
+      "total_return": -0.013628659446431357,
+      "max_dd": -0.01608843835055497
+    },
+    {
+      "threshold": 0.7,
+      "trades": 2,
+      "win_rate": 0.0,
+      "pf": 0.0,
+      "total_return": -0.005794784759388449,
+      "max_dd": -0.005794784759388449
+    },
+    {
+      "threshold": 0.75,
+      "trades": 1,
+      "win_rate": 0.0,
+      "pf": 0.0,
+      "total_return": -0.004023703712751853,
+      "max_dd": -0.004023703712751853
+    },
+    {
+      "threshold": 0.8,
+      "trades": 0,
+      "win_rate": 0.0,
+      "pf": 0.0,
+      "total_return": 0.0,
+      "max_dd": 0.0
+    }
+  ]
+}
