@@ -92,6 +92,10 @@ def build_backtest_config(
             p if ":USDT" in p else f"{p}:USDT"
             for p in pairs
         ]
+        # Futures with market-order fallbacks requires entry_pricing.price_side="other"
+        # (force_exit/emergency_exit are market orders; Freqtrade 2025+ validates this)
+        config["entry_pricing"]["price_side"] = "other"
+        config["exit_pricing"]["price_side"] = "other"
 
     # Parameter overrides (from hyperopt results)
     if param_overrides:

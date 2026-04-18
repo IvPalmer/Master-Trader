@@ -1,0 +1,141 @@
+{
+  "meta": {
+    "mode": "rigorous",
+    "mode_config": {
+      "epochs": 1000,
+      "wf_windows": 6,
+      "train_days": 120,
+      "test_days": 30,
+      "mc_iterations": 1000,
+      "perturb_pcts": [
+        10,
+        20
+      ],
+      "description": "Initial / quarterly full analysis"
+    },
+    "strategies": [
+      "FundingShortV1"
+    ],
+    "stages_requested": [
+      "data",
+      "calibration",
+      "viability",
+      "walk_forward",
+      "robustness",
+      "reporting"
+    ],
+    "stages_completed": [
+      "data",
+      "calibration",
+      "viability",
+      "walk_forward",
+      "robustness",
+      "reporting"
+    ],
+    "run_dir": "/Users/palmer/ft_userdata/engine_results/20260418_174345_rigorous",
+    "started_at": "2026-04-18T17:43:45.912282",
+    "status": "killed",
+    "total_duration": "5m 37s",
+    "finished_at": "2026-04-18T17:49:22.514731",
+    "killed_strategies": [
+      "FundingShortV1"
+    ]
+  },
+  "strategies": {
+    "FundingShortV1": {
+      "calibration": {
+        "strategy": "FundingShortV1",
+        "score": 0,
+        "grade": "Broken",
+        "metrics": {},
+        "component_scores": {},
+        "divergent_trades": [],
+        "live_trade_count": 0,
+        "bt_trade_count": 0,
+        "timerange": "",
+        "pairlist": [],
+        "needs_investigation": true,
+        "code_change_date": "2026-04-17T20:49:49-03:00",
+        "trades_excluded_old_code": 0,
+        "total_trades_in_db": 0,
+        "error": "No closed trades found after last code change (2026-04-17) in tradesv3.dryrun.FundingShortV1.sqlite. 0 older trades excluded."
+      },
+      "viability": {
+        "strategy": "FundingShortV1",
+        "classification": "DEAD",
+        "reasons": [
+          "KILL: Max drawdown 52.1% > 50.0%"
+        ],
+        "lookahead": {
+          "passed": true,
+          "flagged_indicators": [
+            "filename"
+          ],
+          "raw": "2026-04-18 20:44:11,337 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:11,417 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ETH/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:11,424 - freqtrade.optimize.backtesting - INFO - Loading data from 2023-01-01 00:00:00 up to 2023-04-06 11:00:00 (95 days).\n2026-04-18 20:44:11,424 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-18 20:44:11,461 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 1h from 2022-12-23 16:00:00 to 2023-04-06 11:00:00\n2026-04-18 20:44:11,471 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:11,558 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ARB/USDT:USDT, futures, 1h, data starts at 2023-03-23 15:00:00\n2026-04-18 20:44:11,567 - freqtrade.optimize.backtesting - INFO - Loading data from 2023-03-23 15:00:00 up to 2023-04-14 17:00:00 (22 days).\n2026-04-18 20:44:11,567 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-18 20:44:11,597 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 1h from 2022-12-23 16:00:00 to 2023-04-14 17:00:00\n2026-04-18 20:44:11,605 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:11,650 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ARB/USDT:USDT, futures, 1h, data starts at 2023-03-23 15:00:00\n2026-04-18 20:44:11,658 - freqtrade.optimize.backtesting - INFO - Loading data from 2023-03-23 15:00:00 up to 2023-04-14 18:00:00 (22 days).\n2026-04-18 20:44:11,658 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-18 20:44:11,689 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 1h from 2022-12-23 16:00:00 to 2023-04-14 18:00:00\n2026-04-18 20:44:11,697 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:11,750 - freqtrade.data.history.datahandlers.idatahandler - WARNING - DOGE/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:11,758 - freqtrade.optimize.backtesting - INFO - Loading data from 2023-01-01 00:00:00 up to 2023-04-14 17:00:00 (103 days).\n2026-04-18 20:44:11,758 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-18 20:44:11,800 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 1h from 2022-12-23 16:00:00 to 2023-04-14 17:00:00\n2026-04-18 20:44:11,808 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:11,874 - freqtrade.data.history.datahandlers.idatahandler - WARNING - DOGE/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:11,884 - freqtrade.optimize.backtesting - INFO - Loading data from 2023-01-01 00:00:00 up to 2023-04-14 18:00:00 (103 days).\n2026-04-18 20:44:11,884 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-18 20:44:11,921 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 1h from 2022-12-23 16:00:00 to 2023-04-14 18:00:00\n2026-04-18 20:44:11,929 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:12,031 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ARB/USDT:USDT, futures, 1h, data starts at 2023-03-23 15:00:00\n2026-04-18 20:44:12,038 - freqtrade.optimize.backtesting - INFO - Loading data from 2023-03-23 15:00:00 up to 2023-04-14 19:00:00 (22 days).\n2026-04-18 20:44:12,038 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-18 20:44:12,068 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 1h from 2022-12-23 16:00:00 to 2023-04-14 19:00:00\n2026-04-18 20:44:12,079 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:12,125 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ARB/USDT:USDT, futures, 1h, data starts at 2023-03-23 15:00:00\n2026-04-18 20:44:12,131 - freqtrade.optimize.backtesting - INFO - Loading data from 2023-03-23 15:00:00 up to 2023-04-14 19:00:00 (22 days).\n2026-04-18 20:44:12,131 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-18 20:44:12,159 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 1h from 2022-12-23 16:00:00 to 2023-04-14 19:00:00\n2026-04-18 20:44:12,171 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:12,222 - freqtrade.optimize.analysis.lookahead - INFO - Found targeted trade amount = 20 signals.\n2026-04-18 20:44:12,222 - freqtrade.loggers.set_log_levels - INFO - Restoring log verbosity.\n2026-04-18 20:44:12,223 - freqtrade.optimize.analysis.lookahead - INFO - FundingShortV1: no bias detected\n2026-04-18 20:44:12,224 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Checking look ahead bias via backtests of FundingShortV1.py took 21 seconds."
+        },
+        "recursive": {
+          "warning": false,
+          "flagged_indicators": [],
+          "raw": "2026-04-18 20:44:17,949 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'limit', 'exit': 'limit', 'stoploss': 'limit', 'stoploss_on_exchange': False, \n'stoploss_on_exchange_interval': 60}\n2026-04-18 20:44:17,950 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-18 20:44:17,950 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-18 20:44:17,950 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: unlimited\n2026-04-18 20:44:17,950 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-18 20:44:17,951 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: False\n2026-04-18 20:44:17,951 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: True\n2026-04-18 20:44:17,952 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-18 20:44:17,952 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.01\n2026-04-18 20:44:17,952 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-18 20:44:17,952 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-18 20:44:17,953 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-18 20:44:17,953 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-18 20:44:17,953 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: 3\n2026-04-18 20:44:17,954 - freqtrade.configuration.config_validation - INFO - Validating configuration ...\n2026-04-18 20:44:17,962 - freqtrade.resolvers.iresolver - INFO - Using resolved pairlist StaticPairList from '/freqtrade/freqtrade/plugins/pairlist/StaticPairList.py'...\n2026-04-18 20:44:17,976 - freqtrade.optimize.backtesting - INFO - Using fee 0.0500% - worst case fee from exchange (lowest tier).\n2026-04-18 20:44:17,991 - freqtrade.optimize.analysis.recursive - INFO - Using pair ADA/USDT:USDT only for recursive analysis. Replacing whitelist.\n2026-04-18 20:44:18,005 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:18,005 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT:USDT, futures, 1h, data ends at 2026-03-23 02:00:00\n2026-04-18 20:44:18,028 - freqtrade.optimize.backtesting - INFO - Loading data from 2023-01-01 00:00:00 up to 2026-03-23 02:00:00 (1177 days).\n2026-04-18 20:44:18,028 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-18 20:44:18,045 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT:USDT, mark, 1h, data ends at 2026-03-23 01:00:00\n2026-04-18 20:44:18,232 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 1h from 2022-12-23 16:00:00 to 2026-04-18 00:00:00\n2026-04-18 20:44:18,241 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:18,242 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data ends at 2026-04-11 10:00:00\n2026-04-18 20:44:18,304 - freqtrade.loggers.set_log_levels - INFO - Reducing verbosity for bias tester.\n2026-04-18 20:44:18,304 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators to test lookahead on indicators.\n2026-04-18 20:44:18,339 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:18,345 - freqtrade.optimize.backtesting - INFO - Loading data from 2023-01-01 00:00:00 up to 2023-01-01 10:00:00 (0 days).\n2026-04-18 20:44:18,345 - freqtrade.configuration.timerange - WARNING - Moving start-date by 200 candles to account for startup time.\n2026-04-18 20:44:18,351 - freqtrade.data.history.datahandlers.idatahandler - WARNING - No history for ADA/USDT:USDT, funding_rate, 1h found. Use `freqtrade download-data` to download the data\n2026-04-18 20:44:18,360 - freqtrade.data.history.datahandlers.idatahandler - WARNING - No history for ADA/USDT:USDT, mark, 1h found. Use `freqtrade download-data` to download the data\n2026-04-18 20:44:18,365 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT:USDT 1h from 2022-12-23 16:00:00 to 2023-01-01 10:00:00\n2026-04-18 20:44:18,372 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:18,385 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 199.\n2026-04-18 20:44:18,417 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT:USDT, futures, 1h, data ends at 2026-03-23 02:00:00\n2026-04-18 20:44:18,419 - freqtrade.data.history.datahandlers.idatahandler - WARNING - No history for ADA/USDT:USDT, futures, 1h found. Use `freqtrade download-data` to download the data\n2026-04-18 20:44:18,419 - freqtrade - ERROR - No data found. Terminating."
+        },
+        "metrics": {
+          "strategy": "FundingShortV1Viability",
+          "total_trades": 835,
+          "avg_profit_pct": 0.14,
+          "total_profit": 49.502,
+          "total_profit_pct": 24.75,
+          "wins": 467,
+          "draws": 0,
+          "losses": 368,
+          "win_rate": 55.9,
+          "max_drawdown_pct": 52.15,
+          "sortino": 1.18,
+          "sharpe": 0.34,
+          "calmar": 0.76,
+          "profit_factor": 1.06,
+          "avg_stake": 46.969,
+          "total_volume": 156836.709,
+          "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-18_20-49-20.zip"
+        },
+        "pair_analysis": {
+          "pairs": [],
+          "top_5": [],
+          "bottom_5": [],
+          "concentration_risk": false,
+          "concentration_details": "",
+          "total_pairs_traded": 0,
+          "error": "no trades in export"
+        }
+      },
+      "walk_forward": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      },
+      "robustness": {
+        "skipped": true,
+        "reason": "classified DEAD in viability"
+      }
+    }
+  },
+  "stage_durations": {
+    "calibration": 0.1695561408996582,
+    "viability": 334.9835410118103,
+    "walk_forward": 0.00010800361633300781,
+    "robustness": 8.392333984375e-05,
+    "reporting": 0.0017991065979003906
+  },
+  "data": {
+    "status": "skipped"
+  },
+  "reporting": {
+    "stage": "reporting",
+    "status": "success",
+    "recommendations": {
+      "FundingShortV1": "KILL"
+    },
+    "report_dir": "/Users/palmer/ft_userdata/engine_results/20260418_rigorous",
+    "report_cards": "+--------------------------------------------------+\n| FUNDINGSHORTV1 -- REPORT CARD                    |\n+--------------------------------------------------+\n| Calibration:    0/100 (Poor)                     |\n| Viability:      DEAD (PF 1.06, 835 trades)       |\n| Lookahead:      PASS                             |\n| Walk-Forward:   SKIPPED                          |\n| Consensus:      SKIPPED                          |\n| Monte Carlo:    SKIPPED                          |\n| Perturbation:   SKIPPED                          |\n|                                                  |\n| RECOMMENDATION: FLAG -- RECOMMEND REMOVAL (manual action required)|\n|                                                  |\n| Max Drawdown:   52.1%                            |\n+--------------------------------------------------+",
+    "telegram_message": "Engine v2 Report -- 2026-04-18 17:49\n\n[X] FundingShortV1\n  KILL\n  DEAD | PF 1.06 | 835T | Cal 0\n\n---\nKILL: 1 | INVESTIGATE: 0 | MONITOR: 0 | OPTIMIZE: 0 | KEEP: 0",
+    "telegram_sent": null
+  }
+}

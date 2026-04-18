@@ -1,0 +1,47 @@
+{
+  "strategy": "FundingShortV1",
+  "classification": "DEAD",
+  "reasons": [
+    "KILL: Max drawdown 52.1% > 50.0%"
+  ],
+  "lookahead": {
+    "passed": true,
+    "flagged_indicators": [
+      "filename"
+    ],
+    "raw": "2026-04-18 20:44:11,337 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:11,417 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ETH/USDT:USDT, futures, 1h, data starts at 2023-01-01 00:00:00\n2026-04-18 20:44:11,424 - freqtrade.optimize.backtesting - INFO - Loading data from 2023-01-01 00:00:00 up to 2023-04-06 11:00:00 (95 days).\n2026-04-18 20:44:11,424 - freqtrade.configuration.timerange... (truncated)"
+  },
+  "recursive": {
+    "warning": false,
+    "flagged_indicators": [],
+    "raw": "2026-04-18 20:44:17,949 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'limit', 'exit': 'limit', 'stoploss': 'limit', 'stoploss_on_exchange': False, \n'stoploss_on_exchange_interval': 60}\n2026-04-18 20:44:17,950 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-18 20:44:17,950 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-18 20:44:17,950... (truncated)"
+  },
+  "metrics": {
+    "strategy": "FundingShortV1Viability",
+    "total_trades": 835,
+    "avg_profit_pct": 0.14,
+    "total_profit": 49.502,
+    "total_profit_pct": 24.75,
+    "wins": 467,
+    "draws": 0,
+    "losses": 368,
+    "win_rate": 55.9,
+    "max_drawdown_pct": 52.15,
+    "sortino": 1.18,
+    "sharpe": 0.34,
+    "calmar": 0.76,
+    "profit_factor": 1.06,
+    "avg_stake": 46.969,
+    "total_volume": 156836.709,
+    "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-18_20-49-20.zip"
+  },
+  "pair_analysis": {
+    "pairs": [],
+    "top_5": [],
+    "bottom_5": [],
+    "concentration_risk": false,
+    "concentration_details": "",
+    "total_pairs_traded": 0,
+    "error": "no trades in export"
+  }
+}

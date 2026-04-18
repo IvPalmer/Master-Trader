@@ -140,10 +140,13 @@ STRATEGIES = {
         "image": "freqtradeorg/freqtrade:stable",
         "informative_tfs": ["1h"],
         "backtest_config": "backtest-FundingShortV1.json",
-        # Short-side mirror of FundingFade. Bear coverage. Futures 2x leverage.
-        # Backtest (limited to 2025-07 onward due to futures 1h data): 161 trades, PF 1.40,
-        # +51.78%, DD 14.41%. Full 3.3yr not possible until futures 1m data downloaded.
-        "status": "active",
+        # KILLED 2026-04-18. Full 3.3yr 1m-detail backtest (20 futures pairs, Viability wrapper):
+        # 835 trades, PF 1.06, +24.75%, DD 52.1%, Sharpe 0.34. Engine verdict: DEAD (>50% DD).
+        # 1h-only Jul2025-Apr2026 was PF 1.40/+51.78%/DD 14.41% — regime-luck bull window.
+        # Same pattern as MasterTraderV1 + SupertrendStrategy: profitable in narrow window,
+        # collapses full cycle. Also confirmed by BitMEX 2025 report (delta-neutral yield decay)
+        # + Oct 10-11 2025 ADL cascade. Retired from fleet. Possible meta-labeling revival.
+        "status": "retired",
     },
 }
 
