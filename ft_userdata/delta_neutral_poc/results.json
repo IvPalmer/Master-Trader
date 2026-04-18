@@ -1,0 +1,546 @@
+{
+  "H8": {
+    "delta_neutral": {
+      "trades": 536,
+      "wr": 0.0018656716417910447,
+      "pf": 0.000518374169542281,
+      "total_return_pct": -41.71398400000002,
+      "cagr_pct": -15.327884495181031,
+      "max_dd_pct": -41.66537180984156,
+      "sharpe": -8.937221481993191,
+      "sortino": -7.646272975219491,
+      "calmar": -0.36788066035115796,
+      "trades_per_month": 13.767510548523207,
+      "avg_trade_pct": -0.23347379104477617,
+      "median_trade_pct": -0.24212800000000004,
+      "final_equity": 116.57203199999996
+    },
+    "directional": {
+      "trades": 536,
+      "wr": 0.47574626865671643,
+      "pf": 1.2109250475232007,
+      "total_return_pct": 32.5989961113764,
+      "cagr_pct": 9.086325549669972,
+      "max_dd_pct": -13.693195926387899,
+      "sharpe": 0.6686560120036341,
+      "sortino": 0.5818489860573552,
+      "calmar": 0.6635649996185248,
+      "trades_per_month": 13.767510548523207,
+      "avg_trade_pct": 0.18245706778755424,
+      "median_trade_pct": -0.08544668182226757,
+      "final_equity": 265.1979922227528
+    },
+    "regime_delta_neutral": {
+      "positive": {
+        "trades": 492,
+        "wr": 0.0,
+        "pf": 0.0,
+        "total_return_pct": -38.47632799999998,
+        "cagr_pct": -14.389187763829558,
+        "max_dd_pct": -38.42501551292742,
+        "sharpe": -8.652345303789513,
+        "sortino": -7.2208996343437315,
+        "calmar": -0.3744744815779858,
+        "trades_per_month": 13.11317863397548,
+        "avg_trade_pct": -0.23461175609756102,
+        "median_trade_pct": -0.24268200000000006,
+        "final_equity": 123.04734400000004
+      },
+      "negative": {
+        "trades": 44,
+        "wr": 0.022727272727272728,
+        "pf": 0.006637845126219687,
+        "total_return_pct": -3.237656,
+        "cagr_pct": -2.058315337489558,
+        "max_dd_pct": -3.159531566098755,
+        "sharpe": -3.4656523061366395,
+        "sortino": -1.4150485442504268,
+        "calmar": -0.6514621849564465,
+        "trades_per_month": 2.3170415224913494,
+        "avg_trade_pct": -0.22074927272727274,
+        "median_trade_pct": -0.23820150000000004,
+        "final_equity": 193.524688
+      },
+      "unknown": {
+        "trades": 0
+      }
+    },
+    "regime_directional": {
+      "positive": {
+        "trades": 492,
+        "wr": 0.47560975609756095,
+        "pf": 1.1251936531717257,
+        "total_return_pct": 18.213333972719916,
+        "cagr_pct": 5.497259768481078,
+        "max_dd_pct": -12.677128339929267,
+        "sharpe": 0.40352194278516246,
+        "sortino": 0.3284791302835652,
+        "calmar": 0.433636042885699,
+        "trades_per_month": 13.11317863397548,
+        "avg_trade_pct": 0.11105691446780404,
+        "median_trade_pct": -0.08544668182226757,
+        "final_equity": 236.42666794543982
+      },
+      "negative": {
+        "trades": 44,
+        "wr": 0.4772727272727273,
+        "pf": 2.5858567263642707,
+        "total_return_pct": 14.385662138656507,
+        "cagr_pct": 8.864479307468297,
+        "max_dd_pct": -2.083903695669344,
+        "sharpe": 1.2632903048063469,
+        "sortino": 0.9247523017128406,
+        "calmar": 4.253785492050318,
+        "trades_per_month": 2.3170415224913494,
+        "avg_trade_pct": 0.9808406003629434,
+        "median_trade_pct": -0.078028847060032,
+        "final_equity": 228.771324277313
+      },
+      "unknown": {
+        "trades": 0
+      }
+    },
+    "adl_oct_2025": {
+      "delta_neutral": {
+        "trades": 1,
+        "wr": 0.0,
+        "pf": 0.0,
+        "total_return_pct": -0.08333333333332416,
+        "cagr_pct": 0,
+        "max_dd_pct": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0,
+        "trades_per_month": 1.0,
+        "avg_trade_pct": -0.25,
+        "median_trade_pct": -0.25,
+        "final_equity": 199.83333333333334
+      },
+      "directional": {
+        "trades": 1,
+        "wr": 1.0,
+        "pf": Infinity,
+        "total_return_pct": 0.12696130426241847,
+        "cagr_pct": 0,
+        "max_dd_pct": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0,
+        "trades_per_month": 1.0,
+        "avg_trade_pct": 0.3808839127872866,
+        "median_trade_pct": 0.3808839127872866,
+        "final_equity": 200.25392260852485
+      },
+      "dn_trade_count": 1,
+      "dd_trade_count": 1
+    }
+  },
+  "H16": {
+    "delta_neutral": {
+      "trades": 470,
+      "wr": 0.010638297872340425,
+      "pf": 0.0033307980534266982,
+      "total_return_pct": -36.122048333333304,
+      "cagr_pct": -12.902888574425809,
+      "max_dd_pct": -36.06663942083135,
+      "sharpe": -8.89260293372833,
+      "sortino": -7.971680115720435,
+      "calmar": -0.357751339787243,
+      "trades_per_month": 12.072257383966246,
+      "avg_trade_pct": -0.23056626595744684,
+      "median_trade_pct": -0.2452735,
+      "final_equity": 127.7559033333334
+    },
+    "directional": {
+      "trades": 470,
+      "wr": 0.4957446808510638,
+      "pf": 1.4744624900717451,
+      "total_return_pct": 77.45188066868667,
+      "cagr_pct": 19.336577758574137,
+      "max_dd_pct": -11.217399616702272,
+      "sharpe": 1.2583465231999564,
+      "sortino": 1.3383284407965694,
+      "calmar": 1.7238021662153076,
+      "trades_per_month": 12.072257383966246,
+      "avg_trade_pct": 0.494373706395872,
+      "median_trade_pct": -0.01992966517674545,
+      "final_equity": 354.90376133737334
+    },
+    "regime_delta_neutral": {
+      "positive": {
+        "trades": 432,
+        "wr": 0.009259259259259259,
+        "pf": 0.002465419730525265,
+        "total_return_pct": -33.383733666666615,
+        "cagr_pct": -12.183718381389419,
+        "max_dd_pct": -33.32594948955756,
+        "sharpe": -8.599573049122775,
+        "sortino": -7.557205288227897,
+        "calmar": -0.3655925357867777,
+        "trades_per_month": 11.51401050788091,
+        "avg_trade_pct": -0.2318314837962963,
+        "median_trade_pct": -0.24617850000000002,
+        "final_equity": 133.23253266666677
+      },
+      "negative": {
+        "trades": 38,
+        "wr": 0.02631578947368421,
+        "pf": 0.013761453020809824,
+        "total_return_pct": -2.7383146666666636,
+        "cagr_pct": -1.739228125102743,
+        "max_dd_pct": -2.659410059992658,
+        "sharpe": -3.5344992836625675,
+        "sortino": -1.4694607487504439,
+        "calmar": -0.653990203040574,
+        "trades_per_month": 2.001081314878893,
+        "avg_trade_pct": -0.2161827368421052,
+        "median_trade_pct": -0.23891650000000003,
+        "final_equity": 194.52337066666666
+      },
+      "unknown": {
+        "trades": 0
+      }
+    },
+    "regime_directional": {
+      "positive": {
+        "trades": 432,
+        "wr": 0.5,
+        "pf": 1.4208781625999394,
+        "total_return_pct": 63.24975634485974,
+        "cagr_pct": 16.97078380513586,
+        "max_dd_pct": -10.311378798664114,
+        "sharpe": 1.1152737211564543,
+        "sortino": 1.1432250435472133,
+        "calmar": 1.6458307018392633,
+        "trades_per_month": 11.51401050788091,
+        "avg_trade_pct": 0.43923441906152594,
+        "median_trade_pct": -0.0015531258760769374,
+        "final_equity": 326.4995126897195
+      },
+      "negative": {
+        "trades": 38,
+        "wr": 0.4473684210526316,
+        "pf": 2.0957691452216176,
+        "total_return_pct": 14.202124323826904,
+        "cagr_pct": 8.754063596061457,
+        "max_dd_pct": -3.4911509724064462,
+        "sharpe": 0.9522540079213424,
+        "sortino": 0.4528155422657209,
+        "calmar": 2.507500725477733,
+        "trades_per_month": 2.001081314878893,
+        "avg_trade_pct": 1.1212203413547557,
+        "median_trade_pct": -0.36265121249639753,
+        "final_equity": 228.4042486476538
+      },
+      "unknown": {
+        "trades": 0
+      }
+    },
+    "adl_oct_2025": {
+      "delta_neutral": {
+        "trades": 1,
+        "wr": 0.0,
+        "pf": 0.0,
+        "total_return_pct": -0.08501866666666968,
+        "cagr_pct": 0,
+        "max_dd_pct": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0,
+        "trades_per_month": 1.0,
+        "avg_trade_pct": -0.25505600000000006,
+        "median_trade_pct": -0.25505600000000006,
+        "final_equity": 199.82996266666666
+      },
+      "directional": {
+        "trades": 1,
+        "wr": 0.0,
+        "pf": 0.0,
+        "total_return_pct": -0.2855313297976725,
+        "cagr_pct": 0,
+        "max_dd_pct": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0,
+        "trades_per_month": 1.0,
+        "avg_trade_pct": -0.8565939893930418,
+        "median_trade_pct": -0.8565939893930418,
+        "final_equity": 199.42893734040464
+      },
+      "dn_trade_count": 1,
+      "dd_trade_count": 1
+    }
+  },
+  "H24": {
+    "delta_neutral": {
+      "trades": 433,
+      "wr": 0.020785219399538105,
+      "pf": 0.011488056283228208,
+      "total_return_pct": -33.04798599999999,
+      "cagr_pct": -11.631902828035246,
+      "max_dd_pct": -32.987674907416654,
+      "sharpe": -8.861305361722268,
+      "sortino": -8.112325818964255,
+      "calmar": -0.3526136007063666,
+      "trades_per_month": 11.12188818565401,
+      "avg_trade_pct": -0.2289698799076213,
+      "median_trade_pct": -0.24912700000000004,
+      "final_equity": 133.90402800000004
+    },
+    "directional": {
+      "trades": 433,
+      "wr": 0.5103926096997691,
+      "pf": 1.4343313968619038,
+      "total_return_pct": 82.28623760676297,
+      "cagr_pct": 20.329360240889383,
+      "max_dd_pct": -15.032804588116882,
+      "sharpe": 1.1041779821751736,
+      "sortino": 1.2268615471398856,
+      "calmar": 1.3523331672227894,
+      "trades_per_month": 11.12188818565401,
+      "avg_trade_pct": 0.5701125007396962,
+      "median_trade_pct": 0.07982238010656238,
+      "final_equity": 364.57247521352593
+    },
+    "regime_delta_neutral": {
+      "positive": {
+        "trades": 395,
+        "wr": 0.020253164556962026,
+        "pf": 0.011047778107118952,
+        "total_return_pct": -30.348498999999972,
+        "cagr_pct": -10.914332770343727,
+        "max_dd_pct": -30.28575618056248,
+        "sharpe": -8.560918995310152,
+        "sortino": -7.657007886249499,
+        "calmar": -0.36037841370949786,
+        "trades_per_month": 10.518646106736657,
+        "avg_trade_pct": -0.23049492911392408,
+        "median_trade_pct": -0.25019100000000005,
+        "final_equity": 139.30300200000005
+      },
+      "negative": {
+        "trades": 38,
+        "wr": 0.02631578947368421,
+        "pf": 0.01641096183896631,
+        "total_return_pct": -2.6994870000000004,
+        "cagr_pct": -1.7144419133073519,
+        "max_dd_pct": -2.620676615193697,
+        "sharpe": -3.501294291218219,
+        "sortino": -1.4824577773508947,
+        "calmar": -0.6541981957513043,
+        "trades_per_month": 2.001081314878893,
+        "avg_trade_pct": -0.21311739473684213,
+        "median_trade_pct": -0.239172,
+        "final_equity": 194.601026
+      },
+      "unknown": {
+        "trades": 0
+      }
+    },
+    "regime_directional": {
+      "positive": {
+        "trades": 395,
+        "wr": 0.5012658227848101,
+        "pf": 1.372074132360864,
+        "total_return_pct": 64.56037081183803,
+        "cagr_pct": 17.253970869970246,
+        "max_dd_pct": -12.718989068987982,
+        "sharpe": 0.9346983791828763,
+        "sortino": 0.983180812408532,
+        "calmar": 1.3565520637201949,
+        "trades_per_month": 10.518646106736657,
+        "avg_trade_pct": 0.4903319302164906,
+        "median_trade_pct": 0.036072644721905175,
+        "final_equity": 329.12074162367605
+      },
+      "negative": {
+        "trades": 38,
+        "wr": 0.6052631578947368,
+        "pf": 2.1120260236223336,
+        "total_return_pct": 17.725866794924894,
+        "cagr_pct": 10.862686481020823,
+        "max_dd_pct": -5.656293246509999,
+        "sharpe": 1.024374811713623,
+        "sortino": 0.6521571986481667,
+        "calmar": 1.9204602745310686,
+        "trades_per_month": 2.001081314878893,
+        "avg_trade_pct": 1.39941053644144,
+        "median_trade_pct": 0.31290304577122685,
+        "final_equity": 235.4517335898498
+      },
+      "unknown": {
+        "trades": 0
+      }
+    },
+    "adl_oct_2025": {
+      "delta_neutral": {
+        "trades": 1,
+        "wr": 0.0,
+        "pf": 0.0,
+        "total_return_pct": -0.08542000000000272,
+        "cagr_pct": -26.81135351092313,
+        "max_dd_pct": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0,
+        "trades_per_month": 1.0,
+        "avg_trade_pct": -0.25626000000000004,
+        "median_trade_pct": -0.25626000000000004,
+        "final_equity": 199.82916
+      },
+      "directional": {
+        "trades": 1,
+        "wr": 0.0,
+        "pf": 0.0,
+        "total_return_pct": -0.3542801021410358,
+        "cagr_pct": -72.645953290731,
+        "max_dd_pct": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0,
+        "trades_per_month": 1.0,
+        "avg_trade_pct": -1.0628403064230982,
+        "median_trade_pct": -1.0628403064230982,
+        "final_equity": 199.29143979571793
+      },
+      "dn_trade_count": 1,
+      "dd_trade_count": 1
+    }
+  },
+  "H48": {
+    "delta_neutral": {
+      "trades": 355,
+      "wr": 0.03380281690140845,
+      "pf": 0.028656285570312932,
+      "total_return_pct": -27.86780033333335,
+      "cagr_pct": -9.57087431726158,
+      "max_dd_pct": -27.795595929262618,
+      "sharpe": -7.773951714944464,
+      "sortino": -6.676296916294931,
+      "calmar": -0.3443306033667573,
+      "trades_per_month": 9.110718802698145,
+      "avg_trade_pct": -0.23550253802816903,
+      "median_trade_pct": -0.26096800000000003,
+      "final_equity": 144.2643993333333
+    },
+    "directional": {
+      "trades": 355,
+      "wr": 0.5633802816901409,
+      "pf": 1.912316861164048,
+      "total_return_pct": 172.56394555213137,
+      "cagr_pct": 36.17905522835927,
+      "max_dd_pct": -11.327209122968343,
+      "sharpe": 1.8486026733243894,
+      "sortino": 1.7580154542889712,
+      "calmar": 3.1939955231336272,
+      "trades_per_month": 9.110718802698145,
+      "avg_trade_pct": 1.4582868638208284,
+      "median_trade_pct": 0.9127635327635365,
+      "final_equity": 545.1278911042627
+    },
+    "regime_delta_neutral": {
+      "positive": {
+        "trades": 326,
+        "wr": 0.03067484662576687,
+        "pf": 0.027398310087789635,
+        "total_return_pct": -25.92795366666667,
+        "cagr_pct": -9.152898432866829,
+        "max_dd_pct": -25.85380747414081,
+        "sharpe": -7.55215587964906,
+        "sortino": -6.376352850481864,
+        "calmar": -0.35402516406999757,
+        "trades_per_month": 8.688813485113835,
+        "avg_trade_pct": -0.23860080061349695,
+        "median_trade_pct": -0.26351300000000005,
+        "final_equity": 148.14409266666667
+      },
+      "negative": {
+        "trades": 29,
+        "wr": 0.06896551724137931,
+        "pf": 0.04516324651124783,
+        "total_return_pct": -1.939846666666667,
+        "cagr_pct": -1.2281325212022742,
+        "max_dd_pct": -1.8576223283708564,
+        "sharpe": -3.0948468155447504,
+        "sortino": -1.1507860800183105,
+        "calmar": -0.6611314379922169,
+        "trades_per_month": 1.5245034542314335,
+        "avg_trade_pct": -0.20067379310344832,
+        "median_trade_pct": -0.23979300000000003,
+        "final_equity": 196.12030666666666
+      },
+      "unknown": {
+        "trades": 0
+      }
+    },
+    "regime_directional": {
+      "positive": {
+        "trades": 326,
+        "wr": 0.5552147239263804,
+        "pf": 1.7772486464640875,
+        "total_return_pct": 139.20159269825078,
+        "cagr_pct": 32.172615662412454,
+        "max_dd_pct": -11.59995890715463,
+        "sharpe": 1.6141932054909447,
+        "sortino": 1.4491820770187664,
+        "calmar": 2.7735111753343373,
+        "trades_per_month": 8.688813485113835,
+        "avg_trade_pct": 1.2809962518243934,
+        "median_trade_pct": 0.8740892908852472,
+        "final_equity": 478.4031853965016
+      },
+      "negative": {
+        "trades": 29,
+        "wr": 0.6551724137931034,
+        "pf": 4.3183762842343825,
+        "total_return_pct": 33.36235285388063,
+        "cagr_pct": 19.915300844115457,
+        "max_dd_pct": -2.644816571278858,
+        "sharpe": 1.500887279028024,
+        "sortino": 1.019662086098341,
+        "calmar": 7.5299365031147465,
+        "trades_per_month": 1.5245034542314335,
+        "avg_trade_pct": 3.451277881435925,
+        "median_trade_pct": 1.2703743315508034,
+        "final_equity": 266.72470570776125
+      },
+      "unknown": {
+        "trades": 0
+      }
+    },
+    "adl_oct_2025": {
+      "delta_neutral": {
+        "trades": 1,
+        "wr": 0.0,
+        "pf": 0.0,
+        "total_return_pct": -0.07638933333333764,
+        "cagr_pct": -13.025858096357545,
+        "max_dd_pct": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0,
+        "trades_per_month": 1.0,
+        "avg_trade_pct": -0.22916800000000004,
+        "median_trade_pct": -0.22916800000000004,
+        "final_equity": 199.84722133333332
+      },
+      "directional": {
+        "trades": 1,
+        "wr": 0.0,
+        "pf": 0.0,
+        "total_return_pct": -0.83552150854449,
+        "cagr_pct": -78.39577690285846,
+        "max_dd_pct": 0.0,
+        "sharpe": 0.0,
+        "sortino": 0.0,
+        "calmar": 0,
+        "trades_per_month": 1.0,
+        "avg_trade_pct": -2.5065645256334723,
+        "median_trade_pct": -2.5065645256334723,
+        "final_equity": 198.32895698291102
+      },
+      "dn_trade_count": 1,
+      "dd_trade_count": 1
+    }
+  }
+}

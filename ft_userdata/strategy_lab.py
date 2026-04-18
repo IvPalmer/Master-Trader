@@ -14,8 +14,10 @@ Usage:
 """
 
 import argparse
+import csv
 import json
 import os
+import random
 import subprocess
 import sys
 import tempfile
@@ -150,6 +152,117 @@ def print_results(results: list, top_n: int):
         )
 
 
+def _compute_trade_moments(trades: list) -> dict:
+    """Sharpe, skew, kurt (full, not excess) from per-trade profit_pct."""
+    import math
+    if not trades:
+        return {"sr_per_trade": 0.0, "skew": 0.0, "kurt": 3.0}
+    r = [t.profit_pct for t in trades]
+    n = len(r)
+    mu = sum(r) / n
+    var = sum((x - mu) ** 2 for x in r) / max(n - 1, 1)
+    sigma = math.sqrt(var) if var > 0 else 0.0
+    if sigma == 0:
+        return {"sr_per_trade": 0.0, "skew": 0.0, "kurt": 3.0}
+    m3 = sum(((x - mu) / sigma) ** 3 for x in r) / n
+    m4 = sum(((x - mu) / sigma) ** 4 for x in r) / n
+    return {"sr_per_trade": mu / sigma, "skew": m3, "kurt": m4}
+
+
+def persist_all_combos(results: list, args, total_grid_size: int,
+                       screen_seconds: float) -> None:
+    """Dump every combo (pass + fail) to CSV + per-trade parquet."""
+    import math
+
+    results_dir = Path(__file__).parent / "strategy_lab" / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    csv_path = results_dir / f"all_combos_{ts}.csv"
+    parquet_path = results_dir / f"all_trades_{ts}.parquet"
+    meta_path = results_dir / f"all_combos_{ts}.meta.json"
+
+    # ── Per-combo summary CSV ──
+    fields = [
+        "combo", "entry_desc", "gate_desc", "exit_profile",
+        "total_trades", "wins", "losses", "win_rate",
+        "profit_factor", "total_pnl", "total_pnl_pct",
+        "max_drawdown_pct", "score",
+        "sr_per_trade", "skew", "kurt",
+    ]
+    combo_ids = []
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        for i, r in enumerate(results):
+            moments = _compute_trade_moments(r.trades)
+            combo_id = r.combo.label
+            combo_ids.append(combo_id)
+            writer.writerow({
+                "combo": combo_id,
+                "entry_desc": r.combo.entry_desc,
+                "gate_desc": r.combo.gate_desc,
+                "exit_profile": r.combo.exit_profile,
+                "total_trades": len(r.trades),
+                "wins": r.wins,
+                "losses": r.losses,
+                "win_rate": round(r.win_rate, 4),
+                "profit_factor": round(r.profit_factor, 4),
+                "total_pnl": round(r.total_pnl, 4),
+                "total_pnl_pct": round(r.total_pnl_pct, 4),
+                "max_drawdown_pct": round(r.max_drawdown_pct, 4),
+                "score": round(r.score, 4),
+                "sr_per_trade": round(moments["sr_per_trade"], 6),
+                "skew": round(moments["skew"], 6),
+                "kurt": round(moments["kurt"], 6),
+            })
+    log(f"Persisted {len(results)} combo summaries → {csv_path}")
+
+    # ── Per-trade parquet (optional: falls back to CSV if pyarrow missing) ──
+    rows = []
+    for r in results:
+        cid = r.combo.label
+        for t in r.trades:
+            rows.append({
+                "combo": cid,
+                "pair": t.pair,
+                "open_ts": t.open_ts,
+                "close_ts": t.close_ts,
+                "profit_pct": t.profit_pct,
+                "profit_abs": t.profit_abs,
+                "exit_reason": t.exit_reason,
+            })
+    try:
+        import pandas as pd
+        df = pd.DataFrame(rows)
+        try:
+            df.to_parquet(parquet_path, index=False)
+            log(f"Persisted {len(rows)} trades → {parquet_path}")
+        except Exception as e:
+            # No pyarrow/fastparquet — fall back to gzipped CSV
+            gz_path = parquet_path.with_suffix(".csv.gz")
+            df.to_csv(gz_path, index=False, compression="gzip")
+            log(f"Parquet write failed ({e}); wrote CSV.gz → {gz_path}")
+    except Exception as e:
+        log(f"Failed to persist per-trade data: {e}")
+
+    # ── Meta ──
+    meta = {
+        "timestamp": ts,
+        "total_grid_size": total_grid_size,
+        "n_screened": len(results),
+        "sample_n": args.sample_n,
+        "sample_seed": args.sample_seed,
+        "timerange": args.timerange,
+        "wallet": args.wallet,
+        "max_open": args.max_open,
+        "detail_mode": "1m" if not args.no_detail else "1h",
+        "screen_seconds": round(screen_seconds, 1),
+    }
+    with open(meta_path, "w") as f:
+        json.dump(meta, f, indent=2)
+    log(f"Run meta → {meta_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Strategy Lab — Signal combo discovery")
     parser.add_argument("--timerange", default="20230101-20260415", help="Screening timerange")
@@ -165,6 +278,15 @@ def main():
     parser.add_argument("--min-pf", type=float, default=1.2, help="Minimum profit factor filter")
     parser.add_argument("--validate-config", default="backtest-SupertrendStrategy.json",
                         help="Config file for Freqtrade validation")
+    parser.add_argument("--sample-n", type=int, default=0,
+                        help="Random-sample N combos from the generated grid "
+                             "(0 = all). For fast DSR/correlation runs.")
+    parser.add_argument("--sample-seed", type=int, default=42,
+                        help="Seed for --sample-n")
+    parser.add_argument("--persist-all", action="store_true", default=True,
+                        help="Dump ALL combos (pass+fail) to "
+                             "strategy_lab/results/all_combos_*.csv + "
+                             "per-trade parquet. Enabled by default.")
     args = parser.parse_args()
 
     start_time = time.time()
@@ -213,7 +335,14 @@ def main():
     # ── Phase 2: Screen Combos ──────────────────────────────
     log("Phase 2: Generating signal combinations...")
     combos = generate_combos()
-    log(f"Generated {len(combos)} combos")
+    total_grid_size = len(combos)
+    log(f"Generated {total_grid_size} combos")
+
+    if args.sample_n and args.sample_n < total_grid_size:
+        rng = random.Random(args.sample_seed)
+        combos = rng.sample(combos, args.sample_n)
+        log(f"Random-sampled {len(combos)} combos (seed={args.sample_seed}) "
+            f"from grid of {total_grid_size}")
 
     detail_mode = "1m detail" if detail_data else "1h only"
     log(f"Screening across {args.timerange} ({detail_mode}, wallet=${args.wallet}, max_open={args.max_open})...")
@@ -233,6 +362,16 @@ def main():
     results = [r for r in results if len(r.trades) > 0]
     profitable = [r for r in results if r.profit_factor > 1.0]
     log(f"Results: {len(results)} combos with trades, {len(profitable)} profitable (PF > 1.0)")
+
+    # Persist ALL combos (pass + fail) for DSR / effective-N analysis.
+    # Writes:
+    #   strategy_lab/results/all_combos_<ts>.csv     — one row per combo
+    #   strategy_lab/results/all_trades_<ts>.parquet — per-trade returns (long form)
+    # Does NOT replace the existing PF>1 / validated JSON dump in phase 4.
+    if args.persist_all and results:
+        persist_all_combos(results, args,
+                           total_grid_size=total_grid_size,
+                           screen_seconds=screen_time)
 
     # Apply quality filters
     quality = [r for r in results

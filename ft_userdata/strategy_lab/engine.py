@@ -73,6 +73,10 @@ class TradeResult:
     profit_pct: float
     profit_abs: float
     exit_reason: str
+    # Timestamps in unix seconds (set by screen_combo after simulate_trade
+    # returns). Default 0.0 keeps simulate_trade internals unchanged.
+    open_ts: float = 0.0
+    close_ts: float = 0.0
 
 
 @dataclass
@@ -439,6 +443,8 @@ def screen_combo(
 
         trade.pair = pair
         trade.profit_abs = stake_per_trade * trade.profit_pct
+        trade.open_ts = float(ts)
+        trade.close_ts = float(exit_ts)
         all_trades.append(trade)
         open_exit_times.append(exit_ts)
         pair_last_exit[pair] = exit_ts
