@@ -41,3 +41,9 @@ logs/
 backtest_results/
 *.log
 *.sqlite.bak*
+*.json.bak*
+lab_output_*.txt
+ft_userdata/user_data/configs/test-*.json
+
+# Local tool config (MCP, etc)
+.mcp.json
