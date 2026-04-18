@@ -1,0 +1,15 @@
++--------------------------------------------------+
+| FUNDINGSHORTV1 -- REPORT CARD                    |
++--------------------------------------------------+
+| Calibration:    0/100 (Poor)                     |
+| Viability:      DEAD (PF 1.06, 835 trades)       |
+| Lookahead:      PASS                             |
+| Walk-Forward:   SKIPPED                          |
+| Consensus:      SKIPPED                          |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: FLAG -- RECOMMEND REMOVAL (manual action required)|
+|                                                  |
+| Max Drawdown:   52.1%                            |
++--------------------------------------------------+

@@ -1,0 +1,543 @@
+{
+  "meta": {
+    "mode": "rigorous",
+    "mode_config": {
+      "epochs": 1000,
+      "wf_windows": 6,
+      "train_days": 120,
+      "test_days": 30,
+      "mc_iterations": 1000,
+      "perturb_pcts": [
+        10,
+        20
+      ],
+      "description": "Initial / quarterly full analysis"
+    },
+    "strategies": [
+      "KeltnerBounceV1"
+    ],
+    "stages_requested": [
+      "viability",
+      "walk_forward",
+      "robustness",
+      "reporting"
+    ],
+    "stages_completed": [
+      "viability",
+      "walk_forward",
+      "robustness",
+      "reporting"
+    ],
+    "run_dir": "/Users/palmer/ft_userdata/engine_results/20260416_213242_rigorous",
+    "started_at": "2026-04-16T21:32:42.858327",
+    "status": "success",
+    "total_duration": "9h 2m",
+    "finished_at": "2026-04-17T06:35:40.718853"
+  },
+  "strategies": {
+    "KeltnerBounceV1": {
+      "viability": {
+        "strategy": "KeltnerBounceV1",
+        "classification": "MARGINAL",
+        "reasons": [
+          "MARGINAL: Recursive analysis warning \u2014 indicators may depend on dataset length"
+        ],
+        "lookahead": {
+          "passed": true,
+          "flagged_indicators": [],
+          "raw": "2026-04-17 00:32:48,103 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Forced max_open_trades to -1 (same amount as there are pairs)\n2026-04-17 00:32:48,104 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Dry run wallet was not set to 1 billion, pushing it up there just to avoid false positives\n2026-04-17 00:32:48,104 - freqtrade.optimize.analysis.lookahead_helpers - INFO - fixing stake_amount to 10k\n2026-04-17 00:32:48,220 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Bias test of KeltnerBounceV1.py started.\n2026-04-17 00:32:48,222 - freqtrade.exchange.exchange - INFO - Instance is running with dry_run enabled\n2026-04-17 00:32:48,222 - freqtrade.exchange.exchange - INFO - Using CCXT 4.5.39\n2026-04-17 00:32:48,232 - freqtrade.exchange.exchange - INFO - Using Exchange \"Binance\"\n2026-04-17 00:32:49,751 - freqtrade.resolvers.exchange_resolver - INFO - Using resolved exchange 'Binance'...\n2026-04-17 00:32:49,762 - freqtrade.resolvers.iresolver - INFO - Using resolved strategy KeltnerBounceV1 from '/freqtrade/user_data/strategies/KeltnerBounceV1.py'...\n2026-04-17 00:32:49,763 - freqtrade.strategy.hyper - INFO - Found no parameter file.\n2026-04-17 00:32:49,764 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'order_types' with value from the configuration: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', \n'stoploss_on_exchange': False}.\n2026-04-17 00:32:49,764 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_currency' with value from the configuration: USDT.\n2026-04-17 00:32:49,764 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'stake_amount' with value from the configuration: 10000.\n2026-04-17 00:32:49,765 - freqtrade.resolvers.strategy_resolver - INFO - Override strategy 'max_open_trades' with value from the configuration: -1.\n2026-04-17 00:32:49,765 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using minimal_roi: {'0': 0.1, '360': 0.07, '720': 0.04, '1440': 0.02}\n2026-04-17 00:32:49,765 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using timeframe: 1h\n2026-04-17 00:32:49,765 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stoploss: -0.07\n2026-04-17 00:32:49,766 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop: True\n2026-04-17 00:32:49,766 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive: 0.03\n2026-04-17 00:32:49,766 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_stop_positive_offset: 0.05\n2026-04-17 00:32:49,767 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using trailing_only_offset_is_reached: True\n2026-04-17 00:32:49,767 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_custom_stoploss: False\n2026-04-17 00:32:49,767 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using process_only_new_candles: True\n2026-04-17 00:32:49,767 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_types: {'entry': 'market', 'exit': 'market', 'stoploss': 'market', 'stoploss_on_exchange': False}\n2026-04-17 00:32:49,767 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using order_time_in_force: {'entry': 'GTC', 'exit': 'GTC'}\n2026-04-17 00:32:49,768 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_currency: USDT\n2026-04-17 00:32:49,768 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using stake_amount: 10000\n2026-04-17 00:32:49,768 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using startup_candle_count: 200\n2026-04-17 00:32:49,768 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using use_exit_signal: False\n2026-04-17 00:32:49,768 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_only: True\n2026-04-17 00:32:49,769 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_roi_if_entry_signal: False\n2026-04-17 00:32:49,769 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using exit_profit_offset: 0.01\n2026-04-17 00:32:49,769 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using disable_dataframe_checks: False\n2026-04-17 00:32:49,769 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using ignore_buying_expired_candle_after: 0\n2026-04-17 00:32:49,769 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using position_adjustment_enable: False\n2026-04-17 00:32:49,769 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_entry_position_adjustment: -1\n2026-04-17 00:32:49,770 - freqtrade.resolvers.strategy_resolver - INFO - Strategy using max_open_trades: -1\n2026-04-17 00:32:49,770 - freqtrade - ERROR - Configuration error: Market entry orders require entry_pricing.price_side = \"other\".\nPlease make sure to review the documentation at https://www.freqtrade.io/en/stable."
+        },
+        "recursive": {
+          "warning": true,
+          "flagged_indicators": [],
+          "raw": "2026-04-17 00:32:55,127 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2023-01-01 00:00:00\n2026-04-17 00:32:55,135 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 199.\n2026-04-17 00:32:55,184 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 10:00:00\n2026-04-17 00:32:55,189 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-04-07 16:00:00 up to 2026-04-11 10:00:00 (3 days).\n2026-04-17 00:32:55,194 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-04-07 16:00:00 to 2026-04-16 00:00:00\n2026-04-17 00:32:55,201 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 09:00:00\n2026-04-17 00:32:55,209 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 200.\n2026-04-17 00:32:55,259 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 10:00:00\n2026-04-17 00:32:55,263 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-04-07 15:00:00 up to 2026-04-11 10:00:00 (3 days).\n2026-04-17 00:32:55,266 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-04-07 15:00:00 to 2026-04-16 00:00:00\n2026-04-17 00:32:55,274 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 09:00:00\n2026-04-17 00:32:55,281 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 399.\n2026-04-17 00:32:55,328 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 10:00:00\n2026-04-17 00:32:55,332 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-30 08:00:00 up to 2026-04-11 10:00:00 (12 days).\n2026-04-17 00:32:55,337 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-30 08:00:00 to 2026-04-16 00:00:00\n2026-04-17 00:32:55,345 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 09:00:00\n2026-04-17 00:32:55,353 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 499.\n2026-04-17 00:32:55,417 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 10:00:00\n2026-04-17 00:32:55,422 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-26 04:00:00 up to 2026-04-11 10:00:00 (16 days).\n2026-04-17 00:32:55,428 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-26 04:00:00 to 2026-04-16 00:00:00\n2026-04-17 00:32:55,436 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 09:00:00\n2026-04-17 00:32:55,443 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 999.\n2026-04-17 00:32:55,492 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 10:00:00\n2026-04-17 00:32:55,497 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-03-05 08:00:00 up to 2026-04-11 10:00:00 (37 days).\n2026-04-17 00:32:55,506 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-03-05 08:00:00 to 2026-04-16 00:00:00\n2026-04-17 00:32:55,514 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 09:00:00\n2026-04-17 00:32:55,520 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 1999.\n2026-04-17 00:32:55,564 - freqtrade.exchange.exchange - WARNING - Using 2 calls to get OHLCV. This can result in slower operations for the bot. Please check if you really need 1999 candles for your \nstrategy.\n2026-04-17 00:32:55,574 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 10:00:00\n2026-04-17 00:32:55,580 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-01-22 16:00:00 up to 2026-04-11 10:00:00 (78 days).\n2026-04-17 00:32:55,593 - freqtrade.data.dataprovider - INFO - Loading data for BTC/USDT 1h from 2026-01-22 16:00:00 to 2026-04-16 00:00:00\n2026-04-17 00:32:55,602 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data ends at 2026-04-11 09:00:00\n2026-04-17 00:32:55,610 - freqtrade.loggers.set_log_levels - INFO - Restoring log verbosity.\n2026-04-17 00:32:55,610 - freqtrade.optimize.analysis.recursive - INFO - Start checking for recursive bias\n2026-04-17 00:32:55,612 - freqtrade.optimize.analysis.recursive - INFO - No variance on indicator(s) found due to recursive formula.\n2026-04-17 00:32:55,613 - freqtrade.optimize.analysis.recursive - INFO - Start checking for lookahead bias on indicators only\n2026-04-17 00:32:55,613 - freqtrade.optimize.analysis.recursive - INFO - Check indicators at 2023-01-01T10:00:00\n2026-04-17 00:32:55,614 - freqtrade.optimize.analysis.recursive - INFO - No lookahead bias on indicators found.\n2026-04-17 00:32:55,614 - freqtrade.optimize.analysis.recursive_helpers - INFO - Checking recursive and indicator-only lookahead bias of indicators of KeltnerBounceV1.py took 3 seconds."
+        },
+        "metrics": {
+          "strategy": "KeltnerBounceV1",
+          "total_trades": 139,
+          "avg_profit_pct": 1.13,
+          "total_profit": 56.653,
+          "total_profit_pct": 64.38,
+          "wins": 115,
+          "draws": 0,
+          "losses": 24,
+          "win_rate": 82.7,
+          "max_drawdown_pct": 12.89,
+          "sortino": 3.69,
+          "sharpe": 0.62,
+          "calmar": 8.03,
+          "profit_factor": 1.88,
+          "avg_stake": 37.074,
+          "total_volume": 10383.974,
+          "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-17_00-35-38.zip"
+        },
+        "pair_analysis": {
+          "pairs": [
+            {
+              "pair": "ADA/USDT",
+              "trades": 9,
+              "total_profit": 12.89033155,
+              "wins": 9,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "XRP/USDT",
+              "trades": 15,
+              "total_profit": 8.33062892,
+              "wins": 13,
+              "losses": 2,
+              "win_rate": 86.7
+            },
+            {
+              "pair": "ZEC/USDT",
+              "trades": 7,
+              "total_profit": 5.521824839999999,
+              "wins": 6,
+              "losses": 1,
+              "win_rate": 85.7
+            },
+            {
+              "pair": "SUI/USDT",
+              "trades": 13,
+              "total_profit": 5.402568089999999,
+              "wins": 10,
+              "losses": 3,
+              "win_rate": 76.9
+            },
+            {
+              "pair": "BNB/USDT",
+              "trades": 10,
+              "total_profit": 4.909866149999999,
+              "wins": 9,
+              "losses": 1,
+              "win_rate": 90.0
+            },
+            {
+              "pair": "NEAR/USDT",
+              "trades": 6,
+              "total_profit": 4.82559392,
+              "wins": 5,
+              "losses": 1,
+              "win_rate": 83.3
+            },
+            {
+              "pair": "BCH/USDT",
+              "trades": 5,
+              "total_profit": 4.646555820000001,
+              "wins": 5,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "UNI/USDT",
+              "trades": 12,
+              "total_profit": 4.3946318600000005,
+              "wins": 10,
+              "losses": 2,
+              "win_rate": 83.3
+            },
+            {
+              "pair": "ARB/USDT",
+              "trades": 2,
+              "total_profit": 2.6478539999999997,
+              "wins": 2,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "LTC/USDT",
+              "trades": 11,
+              "total_profit": 2.499648750000001,
+              "wins": 9,
+              "losses": 2,
+              "win_rate": 81.8
+            },
+            {
+              "pair": "HBAR/USDT",
+              "trades": 1,
+              "total_profit": 1.80535235,
+              "wins": 1,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "TRX/USDT",
+              "trades": 23,
+              "total_profit": 1.2767499400000015,
+              "wins": 18,
+              "losses": 5,
+              "win_rate": 78.3
+            },
+            {
+              "pair": "LINK/USDT",
+              "trades": 5,
+              "total_profit": 0.56075014,
+              "wins": 4,
+              "losses": 1,
+              "win_rate": 80.0
+            },
+            {
+              "pair": "AVAX/USDT",
+              "trades": 11,
+              "total_profit": 0.22056403000000036,
+              "wins": 8,
+              "losses": 3,
+              "win_rate": 72.7
+            },
+            {
+              "pair": "DOGE/USDT",
+              "trades": 9,
+              "total_profit": -3.280276539999999,
+              "wins": 6,
+              "losses": 3,
+              "win_rate": 66.7
+            }
+          ],
+          "top_5": [
+            {
+              "pair": "ADA/USDT",
+              "trades": 9,
+              "total_profit": 12.89033155,
+              "wins": 9,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "XRP/USDT",
+              "trades": 15,
+              "total_profit": 8.33062892,
+              "wins": 13,
+              "losses": 2,
+              "win_rate": 86.7
+            },
+            {
+              "pair": "ZEC/USDT",
+              "trades": 7,
+              "total_profit": 5.521824839999999,
+              "wins": 6,
+              "losses": 1,
+              "win_rate": 85.7
+            },
+            {
+              "pair": "SUI/USDT",
+              "trades": 13,
+              "total_profit": 5.402568089999999,
+              "wins": 10,
+              "losses": 3,
+              "win_rate": 76.9
+            },
+            {
+              "pair": "BNB/USDT",
+              "trades": 10,
+              "total_profit": 4.909866149999999,
+              "wins": 9,
+              "losses": 1,
+              "win_rate": 90.0
+            }
+          ],
+          "bottom_5": [
+            {
+              "pair": "HBAR/USDT",
+              "trades": 1,
+              "total_profit": 1.80535235,
+              "wins": 1,
+              "losses": 0,
+              "win_rate": 100.0
+            },
+            {
+              "pair": "TRX/USDT",
+              "trades": 23,
+              "total_profit": 1.2767499400000015,
+              "wins": 18,
+              "losses": 5,
+              "win_rate": 78.3
+            },
+            {
+              "pair": "LINK/USDT",
+              "trades": 5,
+              "total_profit": 0.56075014,
+              "wins": 4,
+              "losses": 1,
+              "win_rate": 80.0
+            },
+            {
+              "pair": "AVAX/USDT",
+              "trades": 11,
+              "total_profit": 0.22056403000000036,
+              "wins": 8,
+              "losses": 3,
+              "win_rate": 72.7
+            },
+            {
+              "pair": "DOGE/USDT",
+              "trades": 9,
+              "total_profit": -3.280276539999999,
+              "wins": 6,
+              "losses": 3,
+              "win_rate": 66.7
+            }
+          ],
+          "concentration_risk": false,
+          "concentration_details": "",
+          "total_pairs_traded": 15
+        }
+      },
+      "walk_forward": {
+        "strategy": "KeltnerBounceV1",
+        "stage": "walk_forward",
+        "mode": {
+          "windows": 6,
+          "train_days": 120,
+          "test_days": 30,
+          "epochs": 1000
+        },
+        "pairs": [
+          "ADA/USDT",
+          "ARB/USDT",
+          "AVAX/USDT",
+          "BCH/USDT",
+          "BNB/USDT",
+          "DOGE/USDT",
+          "HBAR/USDT",
+          "LINK/USDT",
+          "LTC/USDT",
+          "NEAR/USDT",
+          "SUI/USDT",
+          "TRX/USDT",
+          "UNI/USDT",
+          "XRP/USDT",
+          "ZEC/USDT"
+        ],
+        "windows": [
+          {
+            "window_num": 1,
+            "train_start": "2025-06-20",
+            "train_end": "2025-10-18",
+            "test_start": "2025-10-18",
+            "test_end": "2025-11-17",
+            "train_range": "20250620-20251018",
+            "test_range": "20251018-20251117"
+          },
+          {
+            "window_num": 2,
+            "train_start": "2025-07-20",
+            "train_end": "2025-11-17",
+            "test_start": "2025-11-17",
+            "test_end": "2025-12-17",
+            "train_range": "20250720-20251117",
+            "test_range": "20251117-20251217"
+          },
+          {
+            "window_num": 3,
+            "train_start": "2025-08-19",
+            "train_end": "2025-12-17",
+            "test_start": "2025-12-17",
+            "test_end": "2026-01-16",
+            "train_range": "20250819-20251217",
+            "test_range": "20251217-20260116"
+          },
+          {
+            "window_num": 4,
+            "train_start": "2025-09-18",
+            "train_end": "2026-01-16",
+            "test_start": "2026-01-16",
+            "test_end": "2026-02-15",
+            "train_range": "20250918-20260116",
+            "test_range": "20260116-20260215"
+          },
+          {
+            "window_num": 5,
+            "train_start": "2025-10-18",
+            "train_end": "2026-02-15",
+            "test_start": "2026-02-15",
+            "test_end": "2026-03-17",
+            "train_range": "20251018-20260215",
+            "test_range": "20260215-20260317"
+          },
+          {
+            "window_num": 6,
+            "train_start": "2025-11-17",
+            "train_end": "2026-03-17",
+            "test_start": "2026-03-17",
+            "test_end": "2026-04-16",
+            "train_range": "20251117-20260317",
+            "test_range": "20260317-20260416"
+          }
+        ],
+        "consensus": {
+          "consensus_params": null,
+          "avg_oos_sharpe": 0,
+          "robustness_pct": 0,
+          "per_window_results": [
+            {
+              "window_num": 1,
+              "window": {
+                "window_num": 1,
+                "train_start": "2025-06-20",
+                "train_end": "2025-10-18",
+                "test_start": "2025-10-18",
+                "test_end": "2025-11-17",
+                "train_range": "20250620-20251018",
+                "test_range": "20251018-20251117"
+              },
+              "hyperopt_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              },
+              "oos_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              }
+            },
+            {
+              "window_num": 2,
+              "window": {
+                "window_num": 2,
+                "train_start": "2025-07-20",
+                "train_end": "2025-11-17",
+                "test_start": "2025-11-17",
+                "test_end": "2025-12-17",
+                "train_range": "20250720-20251117",
+                "test_range": "20251117-20251217"
+              },
+              "hyperopt_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              },
+              "oos_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              }
+            },
+            {
+              "window_num": 3,
+              "window": {
+                "window_num": 3,
+                "train_start": "2025-08-19",
+                "train_end": "2025-12-17",
+                "test_start": "2025-12-17",
+                "test_end": "2026-01-16",
+                "train_range": "20250819-20251217",
+                "test_range": "20251217-20260116"
+              },
+              "hyperopt_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              },
+              "oos_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              }
+            },
+            {
+              "window_num": 4,
+              "window": {
+                "window_num": 4,
+                "train_start": "2025-09-18",
+                "train_end": "2026-01-16",
+                "test_start": "2026-01-16",
+                "test_end": "2026-02-15",
+                "train_range": "20250918-20260116",
+                "test_range": "20260116-20260215"
+              },
+              "hyperopt_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              },
+              "oos_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              }
+            },
+            {
+              "window_num": 5,
+              "window": {
+                "window_num": 5,
+                "train_start": "2025-10-18",
+                "train_end": "2026-02-15",
+                "test_start": "2026-02-15",
+                "test_end": "2026-03-17",
+                "train_range": "20251018-20260215",
+                "test_range": "20260215-20260317"
+              },
+              "hyperopt_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              },
+              "oos_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              }
+            },
+            {
+              "window_num": 6,
+              "window": {
+                "window_num": 6,
+                "train_start": "2025-11-17",
+                "train_end": "2026-03-17",
+                "test_start": "2026-03-17",
+                "test_end": "2026-04-16",
+                "train_range": "20251117-20260317",
+                "test_range": "20260317-20260416"
+              },
+              "hyperopt_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              },
+              "oos_results": {
+                "SharpeHyperOptLossDaily": null,
+                "SortinoHyperOptLossDaily": null,
+                "CalmarHyperOptLoss": null
+              }
+            }
+          ],
+          "per_loss_results": {
+            "SharpeHyperOptLossDaily": [],
+            "SortinoHyperOptLossDaily": [],
+            "CalmarHyperOptLoss": []
+          },
+          "passed": false,
+          "rejection_reasons": [
+            "Only 0/3 loss functions had majority-profitable windows (need 2)",
+            "Only 0/6 windows profitable (need 4)"
+          ],
+          "windows_profitable": 0,
+          "windows_total": 6,
+          "loss_functions_profitable": 0
+        }
+      },
+      "robustness": {
+        "error": "argument of type 'NoneType' is not a container or iterable"
+      }
+    }
+  },
+  "stage_durations": {
+    "viability": 175.76869106292725,
+    "walk_forward": 32400.607754945755,
+    "robustness": 0.034394025802612305,
+    "reporting": 0.00968313217163086
+  },
+  "reporting": {
+    "stage": "reporting",
+    "status": "success",
+    "recommendations": {
+      "KeltnerBounceV1": "MONITOR"
+    },
+    "report_dir": "/Users/palmer/ft_userdata/engine_results/20260417_rigorous",
+    "report_cards": "+--------------------------------------------------+\n| KELTNERBOUNCEV1 -- REPORT CARD                   |\n+--------------------------------------------------+\n| Calibration:    SKIPPED                          |\n| Viability:      MARGINAL (PF 1.88, 139 trades)   |\n| Lookahead:      PASS                             |\n| Walk-Forward:   0/6 windows profitable           |\n| Consensus:      0.00 (avg OOS Sharpe)            |\n| Monte Carlo:    SKIPPED                          |\n| Perturbation:   SKIPPED                          |\n|                                                  |\n| RECOMMENDATION: MONITOR -- REVIEW NEXT CYCLE     |\n|                                                  |\n| Top pairs: ADA, XRP, ZEC, SUI, BNB               |\n| Drop pairs: HBAR, TRX, LINK, AVAX, DOGE (negative expectancy)|\n|                                                  |\n| Max Drawdown:   12.9%                            |\n+--------------------------------------------------+",
+    "telegram_message": "Engine v2 Report -- 2026-04-17 06:35\n\n[?] KeltnerBounceV1\n  MONITOR\n  MARGINAL | PF 1.88 | 139T\n\n---\nKILL: 0 | INVESTIGATE: 0 | MONITOR: 1 | OPTIMIZE: 0 | KEEP: 0",
+    "telegram_sent": null
+  }
+}

@@ -1,0 +1,8 @@
+Engine v2 Report -- 2026-04-17 06:35
+
+[?] KeltnerBounceV1
+  MONITOR
+  MARGINAL | PF 1.88 | 139T
+
+---
+KILL: 0 | INVESTIGATE: 0 | MONITOR: 1 | OPTIMIZE: 0 | KEEP: 0

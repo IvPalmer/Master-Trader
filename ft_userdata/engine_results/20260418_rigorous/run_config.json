@@ -1,0 +1,10 @@
+{
+  "date": "2026-04-18T17:49:22.513672",
+  "mode": "rigorous",
+  "strategies": [
+    "FundingShortV1"
+  ],
+  "recommendations": {
+    "FundingShortV1": "KILL"
+  }
+}

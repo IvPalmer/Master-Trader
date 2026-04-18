@@ -1,0 +1,235 @@
+{
+  "strategy": "KeltnerBounceV1",
+  "stage": "walk_forward",
+  "mode": {
+    "windows": 6,
+    "train_days": 120,
+    "test_days": 30,
+    "epochs": 1000
+  },
+  "pairs": [
+    "ADA/USDT",
+    "ARB/USDT",
+    "AVAX/USDT",
+    "BCH/USDT",
+    "BNB/USDT",
+    "DOGE/USDT",
+    "HBAR/USDT",
+    "LINK/USDT",
+    "LTC/USDT",
+    "NEAR/USDT",
+    "SUI/USDT",
+    "TRX/USDT",
+    "UNI/USDT",
+    "XRP/USDT",
+    "ZEC/USDT"
+  ],
+  "windows": [
+    {
+      "window_num": 1,
+      "train_start": "2025-06-20",
+      "train_end": "2025-10-18",
+      "test_start": "2025-10-18",
+      "test_end": "2025-11-17",
+      "train_range": "20250620-20251018",
+      "test_range": "20251018-20251117"
+    },
+    {
+      "window_num": 2,
+      "train_start": "2025-07-20",
+      "train_end": "2025-11-17",
+      "test_start": "2025-11-17",
+      "test_end": "2025-12-17",
+      "train_range": "20250720-20251117",
+      "test_range": "20251117-20251217"
+    },
+    {
+      "window_num": 3,
+      "train_start": "2025-08-19",
+      "train_end": "2025-12-17",
+      "test_start": "2025-12-17",
+      "test_end": "2026-01-16",
+      "train_range": "20250819-20251217",
+      "test_range": "20251217-20260116"
+    },
+    {
+      "window_num": 4,
+      "train_start": "2025-09-18",
+      "train_end": "2026-01-16",
+      "test_start": "2026-01-16",
+      "test_end": "2026-02-15",
+      "train_range": "20250918-20260116",
+      "test_range": "20260116-20260215"
+    },
+    {
+      "window_num": 5,
+      "train_start": "2025-10-18",
+      "train_end": "2026-02-15",
+      "test_start": "2026-02-15",
+      "test_end": "2026-03-17",
+      "train_range": "20251018-20260215",
+      "test_range": "20260215-20260317"
+    },
+    {
+      "window_num": 6,
+      "train_start": "2025-11-17",
+      "train_end": "2026-03-17",
+      "test_start": "2026-03-17",
+      "test_end": "2026-04-16",
+      "train_range": "20251117-20260317",
+      "test_range": "20260317-20260416"
+    }
+  ],
+  "consensus": {
+    "consensus_params": null,
+    "avg_oos_sharpe": 0,
+    "robustness_pct": 0,
+    "per_window_results": [
+      {
+        "window_num": 1,
+        "window": {
+          "window_num": 1,
+          "train_start": "2025-06-20",
+          "train_end": "2025-10-18",
+          "test_start": "2025-10-18",
+          "test_end": "2025-11-17",
+          "train_range": "20250620-20251018",
+          "test_range": "20251018-20251117"
+        },
+        "hyperopt_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        },
+        "oos_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        }
+      },
+      {
+        "window_num": 2,
+        "window": {
+          "window_num": 2,
+          "train_start": "2025-07-20",
+          "train_end": "2025-11-17",
+          "test_start": "2025-11-17",
+          "test_end": "2025-12-17",
+          "train_range": "20250720-20251117",
+          "test_range": "20251117-20251217"
+        },
+        "hyperopt_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        },
+        "oos_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        }
+      },
+      {
+        "window_num": 3,
+        "window": {
+          "window_num": 3,
+          "train_start": "2025-08-19",
+          "train_end": "2025-12-17",
+          "test_start": "2025-12-17",
+          "test_end": "2026-01-16",
+          "train_range": "20250819-20251217",
+          "test_range": "20251217-20260116"
+        },
+        "hyperopt_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        },
+        "oos_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        }
+      },
+      {
+        "window_num": 4,
+        "window": {
+          "window_num": 4,
+          "train_start": "2025-09-18",
+          "train_end": "2026-01-16",
+          "test_start": "2026-01-16",
+          "test_end": "2026-02-15",
+          "train_range": "20250918-20260116",
+          "test_range": "20260116-20260215"
+        },
+        "hyperopt_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        },
+        "oos_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        }
+      },
+      {
+        "window_num": 5,
+        "window": {
+          "window_num": 5,
+          "train_start": "2025-10-18",
+          "train_end": "2026-02-15",
+          "test_start": "2026-02-15",
+          "test_end": "2026-03-17",
+          "train_range": "20251018-20260215",
+          "test_range": "20260215-20260317"
+        },
+        "hyperopt_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        },
+        "oos_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        }
+      },
+      {
+        "window_num": 6,
+        "window": {
+          "window_num": 6,
+          "train_start": "2025-11-17",
+          "train_end": "2026-03-17",
+          "test_start": "2026-03-17",
+          "test_end": "2026-04-16",
+          "train_range": "20251117-20260317",
+          "test_range": "20260317-20260416"
+        },
+        "hyperopt_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        },
+        "oos_results": {
+          "SharpeHyperOptLossDaily": null,
+          "SortinoHyperOptLossDaily": null,
+          "CalmarHyperOptLoss": null
+        }
+      }
+    ],
+    "per_loss_results": {
+      "SharpeHyperOptLossDaily": [],
+      "SortinoHyperOptLossDaily": [],
+      "CalmarHyperOptLoss": []
+    },
+    "passed": false,
+    "rejection_reasons": [
+      "Only 0/3 loss functions had majority-profitable windows (need 2)",
+      "Only 0/6 windows profitable (need 4)"
+    ],
+    "windows_profitable": 0,
+    "windows_total": 6,
+    "loss_functions_profitable": 0
+  }
+}

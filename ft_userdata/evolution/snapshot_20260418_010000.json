@@ -1,0 +1,22 @@
+{
+  "id": "20260418_010000",
+  "timestamp": "2026-04-18T01:00:00Z",
+  "note": "daily auto-snapshot",
+  "bots": {
+    "KeltnerBounceV1": {
+      "total_trades": 0,
+      "open_trades": 0,
+      "open_stake": 0
+    },
+    "FundingFadeV1": {
+      "total_trades": 0,
+      "open_trades": 0,
+      "open_stake": 0
+    },
+    "FundingShortV1": {
+      "total_trades": 0,
+      "open_trades": 0,
+      "open_stake": 0
+    }
+  }
+}

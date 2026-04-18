@@ -1,74 +1,66 @@
 {
-  "Supertrend": {
-    "PUMP/USDT": {
-      "stake_amount": 221.22026153172,
-      "timestamp": "2026-03-16T22:14:14.134977"
+  "MasterTraderV1": {
+    "BARD/USDT": {
+      "stake_amount": 30.071272796532,
+      "timestamp": "2026-04-15T21:10:10.966534"
     },
-    "AVAX/USDT": {
-      "stake_amount": 221.22026153172,
-      "timestamp": "2026-03-16T22:06:54.465828"
-    },
-    "DOGE/USDT": {
-      "stake_amount": 23.56619159435508,
-      "timestamp": "2026-04-07T09:00:07.598133"
-    },
-    "DOT/USDT": {
-      "stake_amount": 31.494356600097603,
-      "timestamp": "2026-03-18T12:00:14.847052"
-    },
-    "RENDER/USDT": {
-      "stake_amount": 30.675939978946868,
-      "timestamp": "2026-04-04T11:00:07.255741"
-    },
-    "FET/USDT": {
-      "stake_amount": 31.0758610181976,
-      "timestamp": "2026-03-25T08:58:40.154206"
-    },
-    "PENGU/USDT": {
-      "stake_amount": 31.358100903597602,
-      "timestamp": "2026-03-25T12:17:00.259304"
-    },
-    "TRUMP/USDT": {
-      "stake_amount": 31.773366588073443,
-      "timestamp": "2026-04-01T05:00:06.326576"
-    },
-    "SUI/USDT": {
-      "stake_amount": 32.01683659507344,
-      "timestamp": "2026-04-01T17:03:15.913850"
-    },
-    "XPL/USDT": {
-      "stake_amount": 31.214972660220326,
-      "timestamp": "2026-04-02T01:30:46.927478"
-    },
-    "LTC/USDT": {
-      "stake_amount": 31.68635826667344,
-      "timestamp": "2026-04-05T23:32:09.027663"
-    },
-    "ADA/USDT": {
-      "stake_amount": 31.903655762473438,
-      "timestamp": "2026-04-06T02:36:22.110470"
-    },
-    "ENA/USDT": {
-      "stake_amount": 32.18031194022033,
-      "timestamp": "2026-04-06T16:18:24.017500"
-    },
-    "BNB/USDT": {
-      "stake_amount": 31.593725809020327,
-      "timestamp": "2026-04-06T17:01:33.962716"
-    },
-    "ETH/USDT": {
-      "stake_amount": 31.884273938520323,
-      "timestamp": "2026-04-06T21:00:31.739089"
+    "PAXG/USDT": {
+      "stake_amount": 30.251166765731995,
+      "timestamp": "2026-04-17T13:00:05.847756"
     }
   },
-  "MasterTraderV1": {
-    "APT/USDT": {
-      "stake_amount": 29.0322405329352,
-      "timestamp": "2026-03-23T15:00:02.549014"
+  "Supertrend": {
+    "DOGE/USDT": {
+      "stake_amount": 29.723030589373437,
+      "timestamp": "2026-04-16T16:00:08.054393"
     },
+    "XRP/USDT": {
+      "stake_amount": 29.632761178746883,
+      "timestamp": "2026-04-16T16:00:08.687179"
+    },
+    "ADA/USDT": {
+      "stake_amount": 29.83009610287344,
+      "timestamp": "2026-04-16T20:00:25.175130"
+    }
+  },
+  "Backtest-SupertrendStrategy": {
+    "ETH/USDT": {
+      "stake_amount": 34.99386,
+      "timestamp": "2026-04-17T05:03:59.864397"
+    },
+    "NEAR/USDT": {
+      "stake_amount": 35.1137,
+      "timestamp": "2026-04-17T05:04:01.120408"
+    },
+    "XRP/USDT": {
+      "stake_amount": 35.2958,
+      "timestamp": "2026-04-17T05:04:02.158650"
+    }
+  },
+  "Backtest-Supertrend-Live": {
+    "ADA/USDT": {
+      "stake_amount": 28.73,
+      "timestamp": "2026-04-17T05:29:37.547555"
+    },
+    "TRX/USDT": {
+      "stake_amount": 28.32191,
+      "timestamp": "2026-04-17T05:29:40.345274"
+    },
+    "SOL/USDT": {
+      "stake_amount": 28.4765,
+      "timestamp": "2026-04-17T05:29:41.472460"
+    }
+  },
+  "Backtest-MasterTraderV1": {
     "LTC/USDT": {
-      "stake_amount": 29.610917467032,
-      "timestamp": "2026-04-05T19:00:06.624344"
+      "stake_amount": 29.200300000000002,
+      "timestamp": "2026-04-17T13:14:19.207468"
+    }
+  },
+  "MetaLabel-MasterTraderV1": {
+    "LTC/USDT": {
+      "stake_amount": 49.99528,
+      "timestamp": "2026-04-18T21:27:26.779560"
     }
   }
 }

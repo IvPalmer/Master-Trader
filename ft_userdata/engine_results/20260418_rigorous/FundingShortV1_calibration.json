@@ -1,0 +1,17 @@
+{
+  "strategy": "FundingShortV1",
+  "score": 0,
+  "grade": "Broken",
+  "metrics": {},
+  "component_scores": {},
+  "divergent_trades": [],
+  "live_trade_count": 0,
+  "bt_trade_count": 0,
+  "timerange": "",
+  "pairlist": [],
+  "needs_investigation": true,
+  "code_change_date": "2026-04-17T20:49:49-03:00",
+  "trades_excluded_old_code": 0,
+  "total_trades_in_db": 0,
+  "error": "No closed trades found after last code change (2026-04-17) in tradesv3.dryrun.FundingShortV1.sqlite. 0 older trades excluded."
+}

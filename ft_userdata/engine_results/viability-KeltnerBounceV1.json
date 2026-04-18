@@ -1,0 +1,247 @@
+{
+  "strategy": "KeltnerBounceV1",
+  "classification": "MARGINAL",
+  "reasons": [
+    "MARGINAL: Recursive analysis warning \u2014 indicators may depend on dataset length"
+  ],
+  "lookahead": {
+    "passed": true,
+    "flagged_indicators": [],
+    "raw": "2026-04-17 00:32:48,103 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Forced max_open_trades to -1 (same amount as there are pairs)\n2026-04-17 00:32:48,104 - freqtrade.optimize.analysis.lookahead_helpers - INFO - Dry run wallet was not set to 1 billion, pushing it up there just to avoid false positives\n2026-04-17 00:32:48,104 - freqtrade.optimize.analysis.lookahead_helpers - INFO - fixing stake_amount to 10k\n2026-04-17 00:32:48,220 - freqtrade.optimize.analysis.lookahead_helpers - INF... (truncated)"
+  },
+  "recursive": {
+    "warning": true,
+    "flagged_indicators": [],
+    "raw": "2026-04-17 00:32:55,127 - freqtrade.data.history.datahandlers.idatahandler - WARNING - BTC/USDT, spot, 1h, data starts at 2023-01-01 00:00:00\n2026-04-17 00:32:55,135 - freqtrade.optimize.analysis.recursive - INFO - Calculating indicators using startup candle of 199.\n2026-04-17 00:32:55,184 - freqtrade.data.history.datahandlers.idatahandler - WARNING - ADA/USDT, spot, 1h, data ends at 2026-04-11 10:00:00\n2026-04-17 00:32:55,189 - freqtrade.optimize.backtesting - INFO - Loading data from 2026-04-0... (truncated)"
+  },
+  "metrics": {
+    "strategy": "KeltnerBounceV1",
+    "total_trades": 139,
+    "avg_profit_pct": 1.13,
+    "total_profit": 56.653,
+    "total_profit_pct": 64.38,
+    "wins": 115,
+    "draws": 0,
+    "losses": 24,
+    "win_rate": 82.7,
+    "max_drawdown_pct": 12.89,
+    "sortino": 3.69,
+    "sharpe": 0.62,
+    "calmar": 8.03,
+    "profit_factor": 1.88,
+    "avg_stake": 37.074,
+    "total_volume": 10383.974,
+    "_result_file": "/Users/palmer/ft_userdata/user_data/backtest_results/backtest-result-2026-04-17_00-35-38.zip"
+  },
+  "pair_analysis": {
+    "pairs": [
+      {
+        "pair": "ADA/USDT",
+        "trades": 9,
+        "total_profit": 12.89033155,
+        "wins": 9,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "XRP/USDT",
+        "trades": 15,
+        "total_profit": 8.33062892,
+        "wins": 13,
+        "losses": 2,
+        "win_rate": 86.7
+      },
+      {
+        "pair": "ZEC/USDT",
+        "trades": 7,
+        "total_profit": 5.521824839999999,
+        "wins": 6,
+        "losses": 1,
+        "win_rate": 85.7
+      },
+      {
+        "pair": "SUI/USDT",
+        "trades": 13,
+        "total_profit": 5.402568089999999,
+        "wins": 10,
+        "losses": 3,
+        "win_rate": 76.9
+      },
+      {
+        "pair": "BNB/USDT",
+        "trades": 10,
+        "total_profit": 4.909866149999999,
+        "wins": 9,
+        "losses": 1,
+        "win_rate": 90.0
+      },
+      {
+        "pair": "NEAR/USDT",
+        "trades": 6,
+        "total_profit": 4.82559392,
+        "wins": 5,
+        "losses": 1,
+        "win_rate": 83.3
+      },
+      {
+        "pair": "BCH/USDT",
+        "trades": 5,
+        "total_profit": 4.646555820000001,
+        "wins": 5,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "UNI/USDT",
+        "trades": 12,
+        "total_profit": 4.3946318600000005,
+        "wins": 10,
+        "losses": 2,
+        "win_rate": 83.3
+      },
+      {
+        "pair": "ARB/USDT",
+        "trades": 2,
+        "total_profit": 2.6478539999999997,
+        "wins": 2,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "LTC/USDT",
+        "trades": 11,
+        "total_profit": 2.499648750000001,
+        "wins": 9,
+        "losses": 2,
+        "win_rate": 81.8
+      },
+      {
+        "pair": "HBAR/USDT",
+        "trades": 1,
+        "total_profit": 1.80535235,
+        "wins": 1,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "TRX/USDT",
+        "trades": 23,
+        "total_profit": 1.2767499400000015,
+        "wins": 18,
+        "losses": 5,
+        "win_rate": 78.3
+      },
+      {
+        "pair": "LINK/USDT",
+        "trades": 5,
+        "total_profit": 0.56075014,
+        "wins": 4,
+        "losses": 1,
+        "win_rate": 80.0
+      },
+      {
+        "pair": "AVAX/USDT",
+        "trades": 11,
+        "total_profit": 0.22056403000000036,
+        "wins": 8,
+        "losses": 3,
+        "win_rate": 72.7
+      },
+      {
+        "pair": "DOGE/USDT",
+        "trades": 9,
+        "total_profit": -3.280276539999999,
+        "wins": 6,
+        "losses": 3,
+        "win_rate": 66.7
+      }
+    ],
+    "top_5": [
+      {
+        "pair": "ADA/USDT",
+        "trades": 9,
+        "total_profit": 12.89033155,
+        "wins": 9,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "XRP/USDT",
+        "trades": 15,
+        "total_profit": 8.33062892,
+        "wins": 13,
+        "losses": 2,
+        "win_rate": 86.7
+      },
+      {
+        "pair": "ZEC/USDT",
+        "trades": 7,
+        "total_profit": 5.521824839999999,
+        "wins": 6,
+        "losses": 1,
+        "win_rate": 85.7
+      },
+      {
+        "pair": "SUI/USDT",
+        "trades": 13,
+        "total_profit": 5.402568089999999,
+        "wins": 10,
+        "losses": 3,
+        "win_rate": 76.9
+      },
+      {
+        "pair": "BNB/USDT",
+        "trades": 10,
+        "total_profit": 4.909866149999999,
+        "wins": 9,
+        "losses": 1,
+        "win_rate": 90.0
+      }
+    ],
+    "bottom_5": [
+      {
+        "pair": "HBAR/USDT",
+        "trades": 1,
+        "total_profit": 1.80535235,
+        "wins": 1,
+        "losses": 0,
+        "win_rate": 100.0
+      },
+      {
+        "pair": "TRX/USDT",
+        "trades": 23,
+        "total_profit": 1.2767499400000015,
+        "wins": 18,
+        "losses": 5,
+        "win_rate": 78.3
+      },
+      {
+        "pair": "LINK/USDT",
+        "trades": 5,
+        "total_profit": 0.56075014,
+        "wins": 4,
+        "losses": 1,
+        "win_rate": 80.0
+      },
+      {
+        "pair": "AVAX/USDT",
+        "trades": 11,
+        "total_profit": 0.22056403000000036,
+        "wins": 8,
+        "losses": 3,
+        "win_rate": 72.7
+      },
+      {
+        "pair": "DOGE/USDT",
+        "trades": 9,
+        "total_profit": -3.280276539999999,
+        "wins": 6,
+        "losses": 3,
+        "win_rate": 66.7
+      }
+    ],
+    "concentration_risk": false,
+    "concentration_details": "",
+    "total_pairs_traded": 15
+  }
+}

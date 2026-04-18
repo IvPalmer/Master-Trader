@@ -1,0 +1,18 @@
++--------------------------------------------------+
+| KELTNERBOUNCEV1 -- REPORT CARD                   |
++--------------------------------------------------+
+| Calibration:    SKIPPED                          |
+| Viability:      MARGINAL (PF 1.88, 139 trades)   |
+| Lookahead:      PASS                             |
+| Walk-Forward:   0/6 windows profitable           |
+| Consensus:      0.00 (avg OOS Sharpe)            |
+| Monte Carlo:    SKIPPED                          |
+| Perturbation:   SKIPPED                          |
+|                                                  |
+| RECOMMENDATION: MONITOR -- REVIEW NEXT CYCLE     |
+|                                                  |
+| Top pairs: ADA, XRP, ZEC, SUI, BNB               |
+| Drop pairs: HBAR, TRX, LINK, AVAX, DOGE (negative expectancy)|
+|                                                  |
+| Max Drawdown:   12.9%                            |
++--------------------------------------------------+

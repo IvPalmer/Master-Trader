@@ -1,0 +1,8 @@
+Engine v2 Report -- 2026-04-18 17:49
+
+[X] FundingShortV1
+  KILL
+  DEAD | PF 1.06 | 835T | Cal 0
+
+---
+KILL: 1 | INVESTIGATE: 0 | MONITOR: 0 | OPTIMIZE: 0 | KEEP: 0
