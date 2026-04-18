@@ -12,6 +12,6 @@
     "BollingerBounceV1": {"port": 8094, "timeframe": "1h", "type": "mean-reversion", "active": false},
     "KeltnerBounceV1": {"port": 8095, "timeframe": "1h", "type": "mean-reversion", "active": true},
     "FundingFadeV1": {"port": 8096, "timeframe": "1h", "type": "funding-divergence", "active": true},
-    "FundingShortV1": {"port": 8097, "timeframe": "1h", "type": "bear-short", "active": true, "trading_mode": "futures"}
+    "FundingShortV1": {"port": 8097, "timeframe": "1h", "type": "bear-short", "active": false, "trading_mode": "futures"}
   }
 }
