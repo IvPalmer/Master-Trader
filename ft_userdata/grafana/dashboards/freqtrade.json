@@ -1644,7 +1644,7 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 3,
+        "w": 8,
         "x": 0,
         "y": 3
       },
@@ -1705,69 +1705,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 3,
-        "x": 3,
-        "y": 3
-      },
-      "id": 104,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "value",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.1",
-      "targets": [
-        {
-          "expr": "0",
-          "legendFormat": "slot",
-          "refId": "A"
-        }
-      ],
-      "title": "(available slot)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 2,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 6,
+        "w": 8,
+        "x": 8,
         "y": 3
       },
       "id": 109,
@@ -1806,128 +1745,6 @@
       },
       "fieldConfig": {
         "defaults": {
-          "decimals": 2,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 9,
-        "y": 3
-      },
-      "id": 110,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "value",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.1",
-      "targets": [
-        {
-          "expr": "0",
-          "legendFormat": "slot",
-          "refId": "A"
-        }
-      ],
-      "title": "(available slot)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 2,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": 0
-              },
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 12,
-        "y": 3
-      },
-      "id": 111,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "value",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.4.1",
-      "targets": [
-        {
-          "expr": "0",
-          "legendFormat": "slot",
-          "refId": "A"
-        }
-      ],
-      "title": "(available slot)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "fieldConfig": {
-        "defaults": {
           "decimals": 0,
           "mappings": [],
           "thresholds": {
@@ -1953,8 +1770,8 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 6,
-        "x": 18,
+        "w": 8,
+        "x": 16,
         "y": 3
       },
       "id": 7,
@@ -2049,64 +1866,196 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity"
       },
+      "description": "What the fleet would have earned if Keltner + FundingFade had been live since Jan 2023. From full 3.3yr 1m-detail backtests. Compare to live Portfolio Total above.",
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
           "decimals": 2,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
+          "unit": "currencyUSD"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "portfolio"
+            },
+            "properties": [
               {
-                "color": "red",
-                "value": 0
+                "id": "color",
+                "value": {
+                  "fixedColor": "white",
+                  "mode": "fixed"
+                }
               },
               {
-                "color": "green",
-                "value": 0
+                "id": "custom.lineWidth",
+                "value": 3
               }
             ]
           },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "KeltnerBounceV1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FundingFadeV1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 3,
-        "w": 3,
-        "x": 15,
-        "y": 3
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 51
       },
-      "id": 112,
+      "id": 200,
       "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
+        "legend": {
           "calcs": [
-            "lastNotNull"
+            "lastNotNull",
+            "max"
           ],
-          "fields": "",
-          "values": false
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showPercentChange": false,
-        "textMode": "value",
-        "wideLayout": true
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       },
-      "pluginVersion": "12.4.1",
       "targets": [
         {
-          "expr": "0",
-          "legendFormat": "slot",
-          "refId": "A"
+          "columns": [
+            {
+              "selector": "timestamp_ms",
+              "text": "time",
+              "type": "timestamp_epoch"
+            },
+            {
+              "selector": "equity",
+              "text": "KeltnerBounceV1",
+              "type": "number"
+            }
+          ],
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
+          "filters": [],
+          "format": "timeseries",
+          "global_query_id": "",
+          "parser": "backend",
+          "refId": "A",
+          "root_selector": "",
+          "source": "url",
+          "type": "csv",
+          "url": "http://grafana-bridge:5555/overlay/expected_KeltnerBounceV1.csv",
+          "url_options": {
+            "method": "GET"
+          }
+        },
+        {
+          "columns": [
+            {
+              "selector": "timestamp_ms",
+              "text": "time",
+              "type": "timestamp_epoch"
+            },
+            {
+              "selector": "equity",
+              "text": "FundingFadeV1",
+              "type": "number"
+            }
+          ],
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
+          "filters": [],
+          "format": "timeseries",
+          "global_query_id": "",
+          "parser": "backend",
+          "refId": "B",
+          "root_selector": "",
+          "source": "url",
+          "type": "csv",
+          "url": "http://grafana-bridge:5555/overlay/expected_FundingFadeV1.csv",
+          "url_options": {
+            "method": "GET"
+          }
+        },
+        {
+          "columns": [
+            {
+              "selector": "timestamp_ms",
+              "text": "time",
+              "type": "timestamp_epoch"
+            },
+            {
+              "selector": "equity",
+              "text": "portfolio",
+              "type": "number"
+            }
+          ],
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity"
+          },
+          "filters": [],
+          "format": "timeseries",
+          "global_query_id": "",
+          "parser": "backend",
+          "refId": "C",
+          "root_selector": "",
+          "source": "url",
+          "type": "csv",
+          "url": "http://grafana-bridge:5555/overlay/expected_portfolio.csv",
+          "url_options": {
+            "method": "GET"
+          }
         }
       ],
-      "title": "(available slot)",
-      "type": "stat"
+      "title": "Expected Equity \u2014 3.3yr Backtest (Hypothetical Since 2023-01)",
+      "type": "timeseries"
     }
   ],
   "preload": false,

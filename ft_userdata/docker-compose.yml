@@ -246,6 +246,7 @@ services:
     container_name: ft-grafana-bridge
     volumes:
       - "./grafana/dashboards:/dashboards"
+      - "./grafana/overlays:/overlays:ro"
     deploy:
       resources:
         limits:

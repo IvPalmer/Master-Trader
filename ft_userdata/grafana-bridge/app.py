@@ -6,24 +6,25 @@ with entry/exit markers embedded in candle data.
 
 import json
 import logging
+import os
 import threading
 import time as time_mod
 from datetime import datetime, timezone
 from collections import defaultdict
 
 import requests
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request, send_from_directory
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 BOTS = {
-    "SupertrendStrategy": {"url": "http://supertrendstrategy:8080", "timeframe": "1h"},
-    "MasterTraderV1": {"url": "http://mastertraderv1:8080", "timeframe": "1h"},
-    "AlligatorTrendV1": {"url": "http://alligatortrendv1:8080", "timeframe": "1d"},
-    "GaussianChannelV1": {"url": "http://gaussianchannelv1:8080", "timeframe": "1d"},
+    "KeltnerBounceV1": {"url": "http://keltnerbouncev1:8080", "timeframe": "1h"},
+    "FundingFadeV1": {"url": "http://fundingfadev1:8080", "timeframe": "1h"},
 }
+
+OVERLAYS_DIR = "/overlays"
 
 API_AUTH = ("freqtrader", "mastertrader")
 TIMEOUT = 15
@@ -517,6 +518,21 @@ def _loop():
 def refresh():
     write_dashboard()
     return jsonify({"status": "ok"})
+
+
+@app.route("/overlay/<path:name>")
+def overlay(name):
+    """Serve static equity-curve CSVs for Grafana's Infinity datasource.
+
+    Files live in /overlays (bind-mounted from ft_userdata/grafana/overlays).
+    Produced by scripts/generate_overlays.py from backtest zip exports.
+    """
+    if ".." in name or name.startswith("/"):
+        return "", 400
+    path = os.path.join(OVERLAYS_DIR, name)
+    if not os.path.isfile(path):
+        return "", 404
+    return send_from_directory(OVERLAYS_DIR, name, mimetype="text/csv")
 
 
 threading.Thread(target=_loop, daemon=True).start()
