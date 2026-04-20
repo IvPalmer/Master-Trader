@@ -35,7 +35,7 @@ from scipy.stats import norm
 LAB_LOG = Path("/Users/palmer/ft_userdata/lab_output_funding_20260417.txt")
 KELTNER_ZIP = Path("/Users/palmer/ft_userdata/user_data/backtest_results/"
                    "backtest-result-2026-04-17_00-35-38.zip")
-OUT_DIR = Path("/Users/palmer/Work/Dev/Master Trader/ft_userdata/analysis")
+OUT_DIR = Path("/Users/palmer/Work/Dev/master-trader/ft_userdata/analysis")
 OUT_CSV = OUT_DIR / "dsr_results.csv"
 
 # Lab run parameters

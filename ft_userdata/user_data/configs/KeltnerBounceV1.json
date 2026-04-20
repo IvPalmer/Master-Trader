@@ -62,6 +62,9 @@
             "XUSD/USDT",
             "U/USDT",
             "EUR/USDT",
+            "RLUSD/USDT",
+            "USDE/USDT",
+            "XAUT/USDT",
             ".*_PERP"
         ]
     },

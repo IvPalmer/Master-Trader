@@ -5,8 +5,8 @@
 **Scope**: Apply Bailey & López de Prado (2014) Deflated Sharpe Ratio to the 6900-combo Strategy Lab run logged 2026-04-17, plus live-fleet strategies (KeltnerBounceV1, FundingFadeV1).
 
 Artifacts:
-- Script: `/Users/palmer/Work/Dev/Master Trader/ft_userdata/analysis/dsr_analysis.py`
-- Machine-readable output: `/Users/palmer/Work/Dev/Master Trader/ft_userdata/analysis/dsr_results.csv`
+- Script: `/Users/palmer/Work/Dev/master-trader/ft_userdata/analysis/dsr_analysis.py`
+- Machine-readable output: `/Users/palmer/Work/Dev/master-trader/ft_userdata/analysis/dsr_results.csv`
 
 ---
 

@@ -1,18 +1,30 @@
 {
   "dry_run": true,
-  "dry_run_wallet": 88,
+  "dry_run_wallet": 1000,
+  "cancel_open_orders_on_exit": false,
   "trading_mode": "spot",
   "margin_mode": "",
   "stake_currency": "USDT",
   "stake_amount": "unlimited",
   "tradable_balance_ratio": 0.99,
-  "fiat_display_currency": "",
-  "max_open_trades": 3,
+  "fiat_display_currency": "BRL",
+  "max_open_trades": 5,
   "amount_reserve_percent": 0.05,
+  "unfilledtimeout": {
+    "entry": 10,
+    "exit": 10,
+    "exit_timeout_count": 0,
+    "unit": "minutes"
+  },
   "entry_pricing": {
     "price_side": "same",
     "use_order_book": true,
-    "order_book_top": 1
+    "order_book_top": 1,
+    "price_last_balance": 0.0,
+    "check_depth_of_market": {
+      "enabled": false,
+      "bids_to_ask_delta": 1
+    }
   },
   "exit_pricing": {
     "price_side": "same",
@@ -23,15 +35,39 @@
     "name": "binance",
     "key": "",
     "secret": "",
+    "ccxt_config": {},
+    "ccxt_async_config": {},
     "pair_whitelist": [
-      "SOL/USDT",
       "BTC/USDT",
-      "XRP/USDT",
       "ETH/USDT",
-      "NEAR/USDT",
+      "SOL/USDT",
+      "XRP/USDT",
+      "DOGE/USDT",
+      "BNB/USDT",
       "ADA/USDT",
+      "AVAX/USDT",
       "LINK/USDT",
-      "TRX/USDT"
+      "NEAR/USDT",
+      "SUI/USDT",
+      "PEPE/USDT",
+      "TRX/USDT",
+      "DOT/USDT",
+      "SHIB/USDT",
+      "UNI/USDT",
+      "MATIC/USDT",
+      "FIL/USDT",
+      "APT/USDT",
+      "ARB/USDT",
+      "OP/USDT",
+      "ATOM/USDT",
+      "FET/USDT",
+      "RENDER/USDT",
+      "INJ/USDT",
+      "AAVE/USDT",
+      "LTC/USDT",
+      "ICP/USDT",
+      "XLM/USDT",
+      "ALGO/USDT"
     ],
     "pair_blacklist": []
   },
@@ -41,11 +77,8 @@
     }
   ],
   "bot_name": "Backtest-SupertrendStrategy",
-  "stoploss": -0.256,
-  "minimal_roi": {
-    "0": 0.249,
-    "327": 0.207,
-    "913": 0.06,
-    "1899": 0
+  "initial_state": "running",
+  "internals": {
+    "process_throttle_secs": 5
   }
 }

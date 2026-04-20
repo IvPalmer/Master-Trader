@@ -1,0 +1,25 @@
+{
+  "id": "20260419_010000",
+  "timestamp": "2026-04-19T01:00:00Z",
+  "note": "daily auto-snapshot",
+  "parameters": {
+    "stoploss": -0.05,
+    "trailing_stop": "False",
+    "timeframe": "1h",
+    "minimal_roi": "\"0\":    0.08,\n        \"360\":  0.05,\n        \"720\":  0.03,\n        \"1440\": 0.02,",
+    "_file_hash": "a22de9736cb7"
+  },
+  "config": {
+    "dry_run": true,
+    "dry_run_wallet": 200,
+    "max_open_trades": 3,
+    "stake_amount": "unlimited",
+    "stoploss_on_exchange": false,
+    "trading_mode": "spot"
+  },
+  "metrics": {
+    "total_trades": 0,
+    "open_trades": 0,
+    "open_stake": 0
+  }
+}

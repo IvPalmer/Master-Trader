@@ -31,7 +31,7 @@ from scipy.stats import norm
 LAB_RESULTS = Path("/Users/palmer/ft_userdata/strategy_lab/results")
 KELTNER_ZIP = Path("/Users/palmer/ft_userdata/user_data/backtest_results/"
                    "backtest-result-2026-04-17_00-35-38.zip")
-OUT_DIR = Path("/Users/palmer/Work/Dev/Master Trader/ft_userdata/analysis")
+OUT_DIR = Path("/Users/palmer/Work/Dev/master-trader/ft_userdata/analysis")
 OUT_CSV = OUT_DIR / "dsr_results_v2.csv"
 
 EULER = 0.5772156649

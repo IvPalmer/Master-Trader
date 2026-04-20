@@ -233,7 +233,7 @@ If MT prints PF > 1.5 on ≥ 30 trades in that window alone, revisit.
 
 ## 8. Artifacts
 
-All under `/Users/palmer/Work/Dev/Master Trader/ft_userdata/meta_labeling/`:
+All under `/Users/palmer/Work/Dev/master-trader/ft_userdata/meta_labeling/`:
 
 - `01_extract_trades.py` — extracts trades from backtest zip
 - `02_build_features.py` — computes regime features (no look-ahead)
