@@ -10,6 +10,7 @@ deferred persistence for safe state writes.
 
 import json
 import logging
+import os
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -19,8 +20,11 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar
 import requests
 from requests.auth import HTTPBasicAuth
 
-API_USER = "freqtrader"
-API_PASS = "mastertrader"
+# Read from env (populated by .env via docker-compose for bots, or by the user's
+# shell for host-side tools). Fallback to legacy dev defaults so dry-run-only
+# bots keep working before .env is loaded in the shell.
+API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "freqtrader")
+API_PASS = os.environ.get("FREQTRADE__API_SERVER__PASSWORD", "mastertrader")
 AUTH = HTTPBasicAuth(API_USER, API_PASS)
 
 log = logging.getLogger("api-utils")

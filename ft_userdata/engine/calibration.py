@@ -1085,22 +1085,33 @@ def run_calibration_stage(strategy_name: str) -> dict:
     # Filter live_trades to only include valid pairs
     live_trades_filtered = [t for t in live_trades if t["pair"] in valid_pairs]
 
-    # Filter out stoploss_on_exchange exits — these trigger at tick-level prices
-    # via exchange-side orders. Backtest cannot reproduce this mechanism accurately.
+    # stoploss_on_exchange exits trigger at tick-level via exchange-side orders,
+    # so backtest reproduction is approximate rather than exact. Previously these
+    # trades were dropped from calibration, which silently undercounted live SL
+    # losses in graduation stats. Now INCLUDED by default: the real live DD is
+    # whatever fired, reproducibility caveat or not.
+    # Set env MT_CALIB_EXCLUDE_SL_ON_EXCHANGE=1 to restore the old filter.
+    import os
+    exclude_sl = os.environ.get("MT_CALIB_EXCLUDE_SL_ON_EXCHANGE") == "1"
     sl_exchange = [t for t in live_trades_filtered
                    if "stoploss_on_exchange" in t.get("exit_reason", "")]
-    if sl_exchange:
+    if sl_exchange and exclude_sl:
         live_trades_filtered = [t for t in live_trades_filtered
                                 if "stoploss_on_exchange" not in t.get("exit_reason", "")]
         log.info("Excluded %d stoploss_on_exchange trades (tick-level exits, "
-                 "not reproducible in backtest)", len(sl_exchange))
+                 "env-opt-in filter)", len(sl_exchange))
+    elif sl_exchange:
+        log.info("Included %d stoploss_on_exchange trades in calibration "
+                 "(reproducibility is approximate; live SL losses count toward "
+                 "graduation stats)", len(sl_exchange))
 
     excluded_trades = len(live_trades) - len(live_trades_filtered)
     if excluded_trades:
+        sl_excluded = len(sl_exchange) if exclude_sl else 0
         log.info("Excluded %d live trades total (%d no data, %d stoploss_on_exchange)",
                  excluded_trades,
-                 excluded_trades - len(sl_exchange),
-                 len(sl_exchange))
+                 excluded_trades - sl_excluded,
+                 sl_excluded)
 
     pairlist = valid_pairs
     result["timerange"] = timerange

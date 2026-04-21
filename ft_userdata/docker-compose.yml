@@ -209,6 +209,8 @@ services:
     restart: always
     container_name: ft-funding-fade
     extra_hosts: *binance-hosts
+    env_file:
+      - ../.env
     volumes:
       - "./user_data:/freqtrade/user_data"
     ports:
@@ -218,7 +220,10 @@ services:
       resources:
         limits:
           memory: 768M
-    entrypoint: ["/bin/sh", "-c", "sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.json --strategy FundingFadeV1"]
+    # LIVE config. Uses FundingFadeV1.live.json (static 19-pair whitelist,
+    # stake 15 / max_open 2, stoploss_on_exchange off, dedicated live DB).
+    # Binance creds + local API creds injected via FREQTRADE__ env vars from ../.env.
+    entrypoint: ["/bin/sh", "-c", "sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1"]
 
   # FundingShortV1 KILLED 2026-04-18 — full 3.3yr 1m-detail backtest: PF 1.06, DD 52.1%.
   # Same regime-luck pattern as MasterTrader + Supertrend. Bull-window 1h mirage.

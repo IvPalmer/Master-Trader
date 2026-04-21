@@ -18,6 +18,7 @@ Cron (daily 23:00 UTC = 20:00 São Paulo):
 import argparse
 import json
 import logging
+import os
 import sqlite3
 import sys
 from collections import defaultdict
@@ -58,8 +59,8 @@ def _load_bots_config() -> dict:
 
 BOTS = _load_bots_config()
 
-API_USER = "freqtrader"
-API_PASS = "mastertrader"
+API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "freqtrader")
+API_PASS = os.environ.get("FREQTRADE__API_SERVER__PASSWORD", "mastertrader")
 AUTH = HTTPBasicAuth(API_USER, API_PASS)
 INITIAL_CAPITAL = 528.0   # 6x R$500/bot = R$3,000 = $528 USDT
 WEBHOOK_URL = "http://localhost:8088/webhooks/freqtrade"

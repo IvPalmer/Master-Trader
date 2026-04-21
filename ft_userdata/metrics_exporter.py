@@ -6,6 +6,7 @@ Scrapes all Freqtrade bot REST APIs and exposes metrics for Prometheus.
 Runs as a long-lived process, updating metrics every 60 seconds.
 """
 
+import os
 import time
 import logging
 import requests
@@ -67,7 +68,10 @@ def _load_bots_config() -> list[dict]:
 
 BOTS = _load_bots_config()
 
-AUTH = HTTPBasicAuth("freqtrader", "mastertrader")
+AUTH = HTTPBasicAuth(
+    os.environ.get("FREQTRADE__API_SERVER__USERNAME", "freqtrader"),
+    os.environ.get("FREQTRADE__API_SERVER__PASSWORD", "mastertrader"),
+)
 API_PORT = 8080
 SCRAPE_INTERVAL = 60  # seconds
 

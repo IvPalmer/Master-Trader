@@ -78,7 +78,9 @@ class FundingFadeV1(IStrategy):
     btc_sma50_period = 50
     btc_sma200_period = 200
 
-    # Funding data cache (pair -> aligned funding series)
+    # Funding data cache: pair -> (mtime_ns, funding_df)
+    # Reloaded whenever the underlying feather file mtime changes, so a live
+    # refresh via `download_funding_rates.py` propagates into a running bot.
     _funding_cache: dict = {}
 
     @informative("1h", "BTC/{stake}")
@@ -93,6 +95,7 @@ class FundingFadeV1(IStrategy):
         # Funding rate alignment
         funding_series = self._get_aligned_funding(pair, dataframe)
         dataframe["funding_rate"] = funding_series
+        self._warn_if_funding_stale(pair, dataframe)
 
         roll_mean = dataframe["funding_rate"].rolling(self.funding_lookback, min_periods=50).mean()
         roll_std = dataframe["funding_rate"].rolling(self.funding_lookback, min_periods=50).std()
@@ -134,33 +137,65 @@ class FundingFadeV1(IStrategy):
     # ── Funding rate loader ──────────────────────────────────
 
     def _get_aligned_funding(self, pair: str, dataframe: DataFrame) -> pd.Series:
-        """Load historical funding rate feather and align to pair's 1h timestamps.
+        """Load historical funding feather, reloading when the file is refreshed.
 
-        Live deployment: funding updates every 4-8h via Binance API. For backtesting
-        we read from pre-downloaded feather files.
+        Live deployment: Binance publishes new funding every 8h. A cron runs
+        `download_funding_rates.py` daily to refresh the feather files. This
+        method invalidates the in-memory cache whenever the file mtime changes,
+        so the running bot picks up new data without a restart.
         """
-        if pair in self._funding_cache:
-            # Realign to current dataframe length
-            cached = self._funding_cache[pair]
-            return self._align_to_dataframe(cached, dataframe)
-
         pair_file = pair.replace("/", "_")
         path = FUNDING_DIR / f"{pair_file}-funding.feather"
+
         if not path.exists():
-            logger.warning("No funding data for %s — signal will never fire", pair)
-            self._funding_cache[pair] = None
+            if self._funding_cache.get(pair) != (None, None):
+                logger.warning("No funding data for %s — signal will never fire", pair)
+                self._funding_cache[pair] = (None, None)
             return pd.Series(np.nan, index=dataframe.index)
+
+        mtime_ns = path.stat().st_mtime_ns
+        cached = self._funding_cache.get(pair)
+        if cached and cached[0] == mtime_ns and cached[1] is not None:
+            return self._align_to_dataframe(cached[1], dataframe)
 
         try:
             fdf = pd.read_feather(path)
             fdf["ts"] = fdf["date"].apply(lambda x: x.timestamp())
             fdf = fdf.sort_values("ts").reset_index(drop=True)
-            self._funding_cache[pair] = fdf
+            self._funding_cache[pair] = (mtime_ns, fdf)
+            latest = pd.to_datetime(fdf["ts"].iloc[-1], unit="s", utc=True) if len(fdf) else None
+            logger.info(
+                "Funding data loaded for %s: %d rows, latest %s (mtime %d)",
+                pair, len(fdf), latest, mtime_ns,
+            )
             return self._align_to_dataframe(fdf, dataframe)
         except Exception as e:
-            logger.warning("Funding load failed for %s: %s", pair, e)
-            self._funding_cache[pair] = None
+            # Do NOT cache the failure. Next call retries the read so a transient
+            # filesystem hiccup (mid-write, NFS glitch) doesn't poison signals.
+            logger.warning("Funding load failed for %s: %s — will retry next bar", pair, e)
             return pd.Series(np.nan, index=dataframe.index)
+
+    # Binance publishes every 8h (00/08/16 UTC). With a 4h incremental cron,
+    # healthy staleness-at-signal-time ≤ 5h (4h cron + 1h candle). A threshold of
+    # 12h catches (a) a missed cron run, (b) a silent download failure, (c) the
+    # end-time/day-boundary bug in the downloader, well before 24h stale.
+    _STALE_FUNDING_HOURS = 12
+
+    def _warn_if_funding_stale(self, pair: str, dataframe: DataFrame) -> None:
+        cached = self._funding_cache.get(pair)
+        if not cached or cached[1] is None or cached[1].empty:
+            return
+        if dataframe.empty:
+            return
+        latest_bar = dataframe["date"].iloc[-1]
+        latest_funding = cached[1]["date"].iloc[-1]
+        if pd.Timestamp(latest_bar).tz_convert("UTC") - pd.Timestamp(latest_funding).tz_convert("UTC") \
+                > pd.Timedelta(hours=self._STALE_FUNDING_HOURS):
+            logger.warning(
+                "Funding data for %s is stale: latest funding %s vs latest bar %s. "
+                "Check `download_funding_rates.py` cron.",
+                pair, latest_funding, latest_bar,
+            )
 
     def _align_to_dataframe(self, funding_df, dataframe) -> pd.Series:
         if funding_df is None or funding_df.empty:

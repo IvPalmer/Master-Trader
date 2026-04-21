@@ -1,0 +1,213 @@
+{
+    "dry_run": false,
+    "cancel_open_orders_on_exit": true,
+    "trading_mode": "spot",
+    "margin_mode": "",
+    "stake_currency": "USDT",
+    "stake_amount": 15,
+    "tradable_balance_ratio": 0.99,
+    "fiat_display_currency": "",
+    "max_open_trades": 2,
+    "amount_reserve_percent": 0.05,
+    "unfilledtimeout": {
+        "entry": 10,
+        "exit": 10,
+        "exit_timeout_count": 0,
+        "unit": "minutes"
+    },
+    "order_types": {
+        "entry": "limit",
+        "exit": "limit",
+        "emergency_exit": "market",
+        "force_exit": "market",
+        "force_entry": "market",
+        "stoploss": "market",
+        "stoploss_on_exchange": false,
+        "stoploss_on_exchange_interval": 60
+    },
+    "entry_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1,
+        "price_last_balance": 0.0,
+        "check_depth_of_market": {
+            "enabled": false,
+            "bids_to_ask_delta": 1
+        }
+    },
+    "exit_pricing": {
+        "price_side": "same",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "exchange": {
+        "name": "binance",
+        "key": "",
+        "secret": "",
+        "ccxt_config": {},
+        "ccxt_async_config": {},
+        "fees": {
+            "taker": 0.001,
+            "maker": 0.001
+        },
+        "pair_whitelist": [
+            "ADA/USDT",
+            "ARB/USDT",
+            "AVAX/USDT",
+            "BCH/USDT",
+            "BNB/USDT",
+            "DOGE/USDT",
+            "ENA/USDT",
+            "ETH/USDT",
+            "HBAR/USDT",
+            "LINK/USDT",
+            "LTC/USDT",
+            "NEAR/USDT",
+            "SOL/USDT",
+            "SUI/USDT",
+            "TAO/USDT",
+            "TRX/USDT",
+            "UNI/USDT",
+            "XRP/USDT",
+            "ZEC/USDT"
+        ],
+        "pair_blacklist": [
+            ".*BULL/USDT",
+            ".*BEAR/USDT",
+            ".*UP/USDT",
+            ".*DOWN/USDT",
+            "USDC/USDT",
+            "BUSD/USDT",
+            "DAI/USDT",
+            "TUSD/USDT",
+            "FDUSD/USDT",
+            "USD1/USDT",
+            "XUSD/USDT",
+            "U/USDT",
+            "EUR/USDT",
+            "RLUSD/USDT",
+            "USDE/USDT",
+            "XAUT/USDT",
+            "BTC/USDT",
+            ".*_PERP"
+        ]
+    },
+    "pairlists": [
+        {
+            "method": "StaticPairList"
+        }
+    ],
+    "webhook": {
+        "enabled": true,
+        "url": "http://host.docker.internal:8088/webhooks/freqtrade",
+        "webhookentry": {
+            "type": "entry",
+            "pair": "{pair}",
+            "stake_amount": "{stake_amount}",
+            "stake_currency": "{stake_currency}",
+            "limit": "{limit}",
+            "open_rate": "{open_rate}",
+            "order_type": "{order_type}",
+            "direction": "{direction}",
+            "leverage": "{leverage}"
+        },
+        "webhookentrycancel": {
+            "type": "entry_cancel",
+            "pair": "{pair}",
+            "reason": "{reason}"
+        },
+        "webhookentryfill": {
+            "type": "entry_fill",
+            "pair": "{pair}",
+            "stake_amount": "{stake_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "order_type": "{order_type}",
+            "direction": "{direction}",
+            "leverage": "{leverage}"
+        },
+        "webhookexit": {
+            "type": "exit",
+            "pair": "{pair}",
+            "profit_ratio": "{profit_ratio}",
+            "profit_amount": "{profit_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "close_rate": "{close_rate}",
+            "exit_reason": "{exit_reason}",
+            "direction": "{direction}",
+            "duration": "{duration}"
+        },
+        "webhookexitcancel": {
+            "type": "exit_cancel",
+            "pair": "{pair}",
+            "reason": "{reason}"
+        },
+        "webhookexitfill": {
+            "type": "exit_fill",
+            "pair": "{pair}",
+            "profit_ratio": "{profit_ratio}",
+            "profit_amount": "{profit_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "close_rate": "{close_rate}",
+            "exit_reason": "{exit_reason}",
+            "direction": "{direction}",
+            "duration": "{duration}"
+        },
+        "webhookstatus": {
+            "type": "status",
+            "status": "{status}"
+        }
+    },
+    "telegram": {
+        "enabled": false,
+        "token": "",
+        "chat_id": "",
+        "notification_settings": {
+            "status": "on",
+            "warning": "on",
+            "startup": "on",
+            "entry": "on",
+            "entry_fill": "on",
+            "entry_cancel": "on",
+            "exit": {
+                "roi": "on",
+                "emergency_exit": "on",
+                "force_exit": "on",
+                "exit_signal": "on",
+                "trailing_stop_loss": "on",
+                "stop_loss": "on",
+                "custom_exit": "on",
+                "partial_exit": "on"
+            },
+            "exit_fill": "on",
+            "exit_cancel": "on",
+            "protection_trigger": "on",
+            "protection_trigger_global": "on",
+            "strategy_msg": "on",
+            "show_candle": "off"
+        }
+    },
+    "api_server": {
+        "enabled": true,
+        "listen_ip_address": "0.0.0.0",
+        "listen_port": 8080,
+        "verbosity": "error",
+        "enable_openapi": true,
+        "jwt_secret_key": "OVERRIDE_VIA_ENV",
+        "CORS_origins": [
+            "http://localhost:8080",
+            "http://localhost:8096"
+        ],
+        "username": "OVERRIDE_VIA_ENV",
+        "password": "OVERRIDE_VIA_ENV"
+    },
+    "bot_name": "FundingFadeLive",
+    "initial_state": "running",
+    "force_entry_enable": false,
+    "internals": {
+        "process_throttle_secs": 5
+    },
+    "db_url": "sqlite:////freqtrade/user_data/tradesv3.live.FundingFadeV1.sqlite"
+}
