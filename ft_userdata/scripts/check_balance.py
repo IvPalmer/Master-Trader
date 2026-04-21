@@ -71,6 +71,22 @@ def main():
 
     print(f"[check] API key ...{key[-4:]} (secret ...{secret[-4:]})")
 
+    # 0. Server time drift — HMAC-signed requests reject if local clock skews >1s
+    try:
+        t0 = int(time.time() * 1000)
+        tr = requests.get(f"{BINANCE_SPOT}/api/v3/time", timeout=5).json()
+        t1 = int(time.time() * 1000)
+        drift_ms = tr["serverTime"] - (t0 + t1) // 2
+        marker = "  " if abs(drift_ms) < 1000 else "!!"
+        print(f"  {marker} server-time drift: {drift_ms:+d} ms (tolerance ±1000)")
+    except Exception as e:
+        print(f"  !! server time fetch failed: {e}")
+
+    print()
+    print("[check] IMPORTANT: API calls from this host succeed only if this IP is in")
+    print("        the key whitelist. Enforcement cannot be proven from the same host —")
+    print("        verify by trying a curl from a different IP and expecting rejection.")
+
     # 1. Account info (balance + permissions)
     r = signed_request("/api/v3/account", {}, key, secret)
     if r.status_code != 200:

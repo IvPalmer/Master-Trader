@@ -144,6 +144,48 @@ graduates.
 Use **Binance auto-invest** UI (native feature, no Freqtrade). $20-50/week into
 BTC+ETH. Set up after live budget deposited. No regime gate, no model risk.
 
+## Codex review findings (MUST address next session)
+
+Codex reviewed the live-deployment handoff and flagged real gaps. Patched into
+`live_deployment_checklist.md` but worth restating at the top:
+
+1. **Blast radius is the WHOLE account, not $50.** Main Binance account currently
+   holds ~$366 BTC + BNB/dust. A trading-scope key (even with withdrawals off) can
+   churn ALL spot assets via bad trades. **Mandatory**: create a dedicated sub-account,
+   fund only the bot sleeve, move BTC out first. Not optional.
+
+2. **Dynamic VolumePairList ≠ validated backtest universe.** Current
+   `FundingFadeV1.json` uses VolumePairList (changes daily). Backtest was on 19
+   static pairs. Live should FREEZE to static whitelist for the first 30 trades
+   or "same bot" is not guaranteed.
+
+3. **Weak local Freqtrade credentials**: `freqtrader`/`mastertrader` + dev JWT are
+   defaults. Rotate before flipping live — the host running the trading key must
+   not have default local creds.
+
+4. **Silent-bleed scenario**: `engine/calibration.py` line ~1088 filters out
+   `stoploss_on_exchange` trades. Phase D turns that ON. Live stop-losses will be
+   undercounted in graduation stats. Either patch calibration or track SL manually.
+
+5. **Phase D safety rails added**: max_open_trades 3→2 until wallet >$75; static
+   whitelist for first 30 trades; dedicated live DB file; explicit fees; Telegram
+   before flip; pre-start `show-config` validation; per-pair `minNotional`/`stepSize`/
+   `tickSize` check via `exchangeInfo`.
+
+6. **check_balance.py now checks**: server time drift (±1s for HMAC signing),
+   IP enforcement caveat (flag tells you the setting, not whether it's enforced —
+   verify by trying from a different IP).
+
+7. **Delete from graduation ceremony**: for a $50 first-deploy, the elaborate Phase G
+   progressive stake scaling is over-engineered. Focus on isolation, config
+   correctness, first 3 trades, hard abort rules. Defer stake scaling until after
+   first 30 trades.
+
+Most-likely-bad-ending per Codex: bot trades drifting dynamic universe with small-edge
+limit orders; missed entries + poor exits + stoplosses accumulate; calibration view
+looks cleaner than reality because SL-on-exchange trades filtered. Catch early via
+per-trade reconciliation + alert on every SL + daily wallet reconciliation.
+
 ## Files in play
 
 ### Committed this session (on main)

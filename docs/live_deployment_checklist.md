@@ -4,14 +4,24 @@
 > Codex thesis: FundingFade is the faster measurement instrument (~2.5 trades/wk vs
 > Keltner ~1/wk). Keltner stays dry-run until FundingFade completes 30 live trades.
 
-## Phase A — Key provisioning (user does)
+## Phase A — Isolation + key provisioning (user does) — REQUIRED ORDER
 
-- [ ] Binance API key created with label `master-trader-fundingfade`
+**Blast radius rule (Codex review)**: A trading-scope API key on the main account can
+churn ALL spot assets into losses even with withdrawals off. With BTC/BNB/dust in the
+same account, the blast radius is ~$400, not $50. Sub-account isolation is MANDATORY.
+
+- [ ] **Create Binance sub-account** specifically for this bot (one sub-account per bot)
+- [ ] **Fund sub-account with ONLY the live bot budget** ($50-75 USDT). No BTC, no dust.
+      Keep BTC/BNB/etc on the main account, out of the bot's reach.
+- [ ] Binance API key created **on the sub-account** with label `master-trader-fundingfade`
 - [ ] Scopes enabled: **Habilitar Leitura** + **Ativar Trading Spot e de Margem** ONLY
 - [ ] Scopes explicitly DISABLED: Habilitar Saques, Habilitar Futuros, Permitir Transferência Universal, Habilitar Empréstimo/Reembolso/Margem
 - [ ] IP whitelist enabled with your actual IP (`curl ifconfig.me` from the bot host)
+- [ ] 2FA confirmed active on main Binance account (not verifiable via API)
 - [ ] Key + secret pasted into `~/Work/Dev/master-trader/.env` (NOT committed, NOT shared in chat)
 - [ ] `.env` is in `.gitignore` (verified)
+- [ ] **Rotate local Freqtrade API creds** — current `freqtrader`/`mastertrader` + dev JWT
+      secret in config are defaults, unsafe for a host that also holds a trading key.
 
 ## Phase B — Pre-flight verification (I run)
 
@@ -29,19 +39,39 @@
 
 ## Phase D — Live config preparation (I do)
 
+Per Codex review: dynamic pairlist ≠ validated backtest universe. Freeze a static
+whitelist for the first 30 trades. Start small, scale conservatively.
+
 - [ ] `ft_userdata/user_data/configs/FundingFadeV1.live.json` created with:
   - `dry_run: false`
   - `dry_run_wallet` removed
-  - `stake_amount: 15` (smaller than dry-run's "unlimited")
-  - `max_open_trades: 3` (unchanged, but means up to $45 exposed)
+  - `stake_amount: 15`
+  - `max_open_trades: 2` (down from 3 — until wallet > $75)
   - `stoploss_on_exchange: true`
   - `stoploss_on_exchange_interval: 60`
   - `cancel_open_orders_on_exit: true`
+  - **StaticPairList** (replaces VolumePairList for live) — freeze the 19 pairs from
+    `backtest-FundingFadeV1.json` so live matches validated universe exactly
+  - **Dedicated live DB**: `db_url: sqlite:////freqtrade/user_data/tradesv3.live.FundingFadeV1.sqlite`
+  - **Exchange fees explicit**: `"exchange": { "fees": { "taker": 0.001, "maker": 0.001 } }` unless BNB-fee discount is active
   - `exchange.key` + `exchange.secret` read from env via docker-compose env_file
+  - New local API creds (replace `freqtrader`/`mastertrader`) + new JWT secret
 - [ ] docker-compose.yml `fundingfadev1` service updated:
   - `env_file: - .env`
   - entrypoint points at `FundingFadeV1.live.json`
-- [ ] Telegram bot token added for live alerts (new Phase 5 requirement per v2 Gate 4)
+- [ ] **Telegram bot token + chat_id configured** before flip (Codex: required, not optional)
+- [ ] Pre-start validation: `docker run --rm ... show-config` with the live config + env
+  to prove the container loads the intended strategy, universe, and keys before
+  `trade` is started.
+- [ ] **Static whitelist sanity check**: for each pair in the live whitelist, verify
+  via `exchangeInfo`:
+  - Symbol status == `TRADING`
+  - `minNotional` ≤ `stake_amount`
+  - Order size passes `LOT_SIZE` stepSize + `PRICE_FILTER` tickSize for current price
+- [ ] **Calibration caveat logged**: `engine/calibration.py` filters out
+  `stoploss_on_exchange` trades (line ~1088). Live stop-losses will be UNDERCOUNTED
+  in graduation stats unless calibration logic is patched. Either patch it or track
+  SL-on-exchange trades manually during the first 30.
 
 ## Phase E — First live trade monitoring (user + I)
 
@@ -51,6 +81,12 @@
   - Entry fill vs requested price (slippage measurement)
   - Exit fill vs ROI trigger
   - Any force-exit or stop-loss event
+- [ ] **Per-trade reconciliation**: each closed trade compared line-by-line to the
+  corresponding Binance trade history (exact fill, exact fee, exact stop-loss path).
+  Needed because SL-on-exchange trades are excluded from the calibration engine.
+- [ ] **Alert on every stop-loss exit** — highest-risk exit class, must not be silent.
+- [ ] **Daily wallet reconciliation**: real Binance wallet vs Freqtrade trade log.
+  Divergence > $1 without a pending order = investigate.
 - [ ] Calibration starts ticking: live PnL / PF / DD vs scaled backtest expectation
 
 ## Phase F — Abort triggers (automatic)
