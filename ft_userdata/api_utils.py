@@ -20,12 +20,28 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar
 import requests
 from requests.auth import HTTPBasicAuth
 
-# Read from env (populated by .env via docker-compose for bots, or by the user's
-# shell for host-side tools). Fallback to legacy dev defaults so dry-run-only
-# bots keep working before .env is loaded in the shell.
-API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "freqtrader")
-API_PASS = os.environ.get("FREQTRADE__API_SERVER__PASSWORD", "mastertrader")
-AUTH = HTTPBasicAuth(API_USER, API_PASS)
+# Mixed-cred fleet: live bots use rotated FREQTRADE__API_SERVER__* creds;
+# dry-run bots still carry legacy freqtrader/mastertrader defaults. We try the
+# rotated creds first (covers all live + any dry-run migrated to rotated) and
+# fall back to legacy on 401 so the health monitor keeps working across the
+# transition without per-bot config.
+_ROTATED_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME")
+_ROTATED_PASS = os.environ.get("FREQTRADE__API_SERVER__PASSWORD")
+_LEGACY_USER = "freqtrader"
+_LEGACY_PASS = "mastertrader"
+
+if _ROTATED_USER and _ROTATED_PASS:
+    _AUTH_CANDIDATES = (
+        HTTPBasicAuth(_ROTATED_USER, _ROTATED_PASS),
+        HTTPBasicAuth(_LEGACY_USER, _LEGACY_PASS),
+    )
+else:
+    _AUTH_CANDIDATES = (HTTPBasicAuth(_LEGACY_USER, _LEGACY_PASS),)
+
+# Preserve the pre-existing AUTH symbol for any caller importing it directly.
+AUTH = _AUTH_CANDIDATES[0]
+API_USER = _AUTH_CANDIDATES[0].username
+API_PASS = _AUTH_CANDIDATES[0].password
 
 log = logging.getLogger("api-utils")
 
@@ -55,23 +71,32 @@ def api_get(
     backoff = 1  # seconds — doubles each retry (1, 2, 4, ...)
 
     for attempt in range(1, retries + 1):
-        try:
-            resp = requests.get(url, auth=AUTH, timeout=timeout)
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as exc:
-            if attempt < retries:
-                log.warning(
-                    "Retry %d/%d for %s: %s (backoff %ds)",
-                    attempt, retries, url, exc, backoff,
-                )
-                time.sleep(backoff)
-                backoff *= 2
-            else:
-                log.error(
-                    "Failed after %d attempts for %s: %s",
-                    retries, url, exc,
-                )
+        last_exc: Optional[Exception] = None
+        # Try each cred set in order; on 401 move to the next candidate without
+        # counting it as a retry. Other HTTP errors fall through to the backoff.
+        for auth in _AUTH_CANDIDATES:
+            try:
+                resp = requests.get(url, auth=auth, timeout=timeout)
+                if resp.status_code == 401:
+                    last_exc = Exception(f"401 Unauthorized with user={auth.username}")
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+            except Exception as exc:
+                last_exc = exc
+                break  # non-auth error — stop trying creds, apply backoff
+        if attempt < retries:
+            log.warning(
+                "Retry %d/%d for %s: %s (backoff %ds)",
+                attempt, retries, url, last_exc, backoff,
+            )
+            time.sleep(backoff)
+            backoff *= 2
+        else:
+            log.error(
+                "Failed after %d attempts for %s: %s",
+                retries, url, last_exc,
+            )
     return None
 
 

@@ -29,6 +29,23 @@ from typing import Any, Optional
 import requests
 from requests.auth import HTTPBasicAuth
 
+
+def _load_dotenv() -> None:
+    """Load .env from repo root so rotated FREQTRADE__ creds propagate when the
+    script is invoked without the shell having sourced .env first (cron, ad-hoc,
+    double-click). setdefault preserves any explicit shell-level overrides."""
+    for root in (Path.home() / "Work/Dev/master-trader", Path(__file__).resolve().parent.parent):
+        env_file = root / ".env"
+        if env_file.exists():
+            for line in env_file.read_text().splitlines():
+                if "=" in line and not line.lstrip().startswith("#"):
+                    k, _, v = line.partition("=")
+                    os.environ.setdefault(k.strip(), v)
+            return
+
+
+_load_dotenv()
+
 from api_utils import api_get as _api_get_with_retry
 
 # ---------------------------------------------------------------------------
