@@ -1,0 +1,77 @@
+{
+  "dry_run": true,
+  "dry_run_wallet": 10000,
+  "trading_mode": "spot",
+  "margin_mode": "",
+  "stake_currency": "USDT",
+  "stake_amount": 17.6,
+  "tradable_balance_ratio": 0.99,
+  "fiat_display_currency": "",
+  "max_open_trades": 3,
+  "amount_reserve_percent": 0.05,
+  "entry_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1,
+    "price_last_balance": 0.0,
+    "check_depth_of_market": {
+      "enabled": false,
+      "bids_to_ask_delta": 1
+    }
+  },
+  "exit_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1
+  },
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "ccxt_config": {},
+    "ccxt_async_config": {},
+    "pair_whitelist": [
+      "ADA/USDT",
+      "AVAX/USDT",
+      "BNB/USDT",
+      "DOGE/USDT",
+      "ETH/USDT",
+      "LINK/USDT",
+      "LTC/USDT",
+      "NEAR/USDT",
+      "SOL/USDT",
+      "TRX/USDT",
+      "UNI/USDT",
+      "XRP/USDT",
+      "FET/USDT",
+      "RENDER/USDT",
+      "BCH/USDT",
+      "PAXG/USDT",
+      "AAVE/USDT",
+      "ONDO/USDT",
+      "DOT/USDT"
+    ],
+    "pair_blacklist": [
+      ".*BULL/USDT",
+      ".*BEAR/USDT",
+      ".*UP/USDT",
+      ".*DOWN/USDT",
+      "USDC/USDT",
+      "BUSD/USDT",
+      "DAI/USDT",
+      "TUSD/USDT",
+      "FDUSD/USDT",
+      "USD1/USDT",
+      "XUSD/USDT",
+      "U/USDT",
+      "EUR/USDT",
+      ".*_PERP"
+    ]
+  },
+  "pairlists": [
+    {
+      "method": "StaticPairList"
+    }
+  ],
+  "bot_name": "Backtest-FundingFadeV1"
+}
