@@ -268,6 +268,10 @@ services:
       dockerfile: exporter/Dockerfile
     restart: unless-stopped
     container_name: ft-metrics-exporter
+    # Load .env so api_utils can try rotated FREQTRADE__API_SERVER__* creds
+    # against live FundingFadeV1 (and fall back to legacy for dry-run bots).
+    env_file:
+      - ../.env
     volumes:
       - "./metrics_exporter.py:/app/metrics_exporter.py:ro"
       - "./api_utils.py:/app/api_utils.py:ro"
