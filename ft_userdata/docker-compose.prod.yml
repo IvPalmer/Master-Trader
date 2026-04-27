@@ -52,6 +52,13 @@ services:
       - "sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KeltnerBounceV1.log --config /freqtrade/user_data/configs/KeltnerBounceV1.json --strategy KeltnerBounceV1"
 
   fundingfadev1:
+    # Gated behind compose profile `live` so the dry-run/monitoring stack can
+    # be deployed first without this LIVE bot starting before its real-money
+    # SQLite (`tradesv3.live.FundingFadeV1.sqlite`) is rsynced from Mac to VPS.
+    # Cutover sequence: stop Mac bot → wal_checkpoint → rsync state → set
+    # COMPOSE_PROFILES=live in Dokploy env → redeploy.
+    profiles:
+      - live
     image: freqtradeorg/freqtrade:stable
     restart: always
     container_name: ft-funding-fade
@@ -83,7 +90,6 @@ services:
           memory: 192M
     depends_on:
       - keltnerbouncev1
-      - fundingfadev1
 
   metrics-exporter:
     build:
@@ -106,7 +112,6 @@ services:
           memory: 128M
     depends_on:
       - keltnerbouncev1
-      - fundingfadev1
 
   prometheus:
     image: prom/prometheus:latest
