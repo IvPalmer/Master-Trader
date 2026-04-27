@@ -107,7 +107,18 @@ services:
       - |
         while true; do
           echo "[funding-refresh] $$(date -u +%FT%TZ) starting incremental refresh"
-          python3 -u /app/download_funding_rates.py --incremental || echo "[funding-refresh] failed; will retry next cycle"
+          attempt=1
+          for backoff in 5 30 120; do
+            if python3 -u /app/download_funding_rates.py --incremental; then
+              break
+            fi
+            echo "[funding-refresh] attempt $$attempt failed; retrying in $${backoff}s"
+            sleep "$$backoff"
+            attempt=$$((attempt + 1))
+          done
+          if [ "$$attempt" -gt 3 ]; then
+            echo "[funding-refresh] all 3 retries failed; will retry next cycle"
+          fi
           echo "[funding-refresh] $$(date -u +%FT%TZ) sleeping 4h"
           sleep 14400
         done
