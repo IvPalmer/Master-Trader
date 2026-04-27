@@ -84,6 +84,34 @@ services:
       - "-c"
       - "sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1"
 
+  # Refreshes user_data/data/binance/funding/*.feather every 4h. Required by
+  # FundingFadeV1: stale funding rates → strategy filters out signals. Replaces
+  # the Mac crontab `0 */4 * * * ... download_funding_rates.py --incremental`
+  # that was disabled at VPS cutover (2026-04-27).
+  funding-refresh:
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-funding-refresh
+    user: "1000:1000"
+    volumes:
+      - "ft_user_data:/app/user_data"
+      - "./download_funding_rates.py:/app/download_funding_rates.py:ro"
+    working_dir: /app
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    entrypoint:
+      - "/bin/sh"
+      - "-c"
+      - |
+        while true; do
+          echo "[funding-refresh] $$(date -u +%FT%TZ) starting incremental refresh"
+          python3 -u /app/download_funding_rates.py --incremental || echo "[funding-refresh] failed; will retry next cycle"
+          echo "[funding-refresh] $$(date -u +%FT%TZ) sleeping 4h"
+          sleep 14400
+        done
+
   grafana-bridge:
     build: ./grafana-bridge
     restart: unless-stopped
