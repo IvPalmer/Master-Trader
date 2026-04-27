@@ -1,0 +1,159 @@
+---
+# Production compose for elder-brain VPS deployment via Dokploy.
+#
+# Differences from the dev docker-compose.yml on Mac:
+#   - No `extra_hosts` Binance-IP pinning (Mac VPN bypass; not needed on VPS).
+#   - No `env_file: ../.env` (Dokploy injects secrets at runtime via the project
+#     "Environment" UI; values land as env vars on every service).
+#   - All killed/paused strategy blocks removed (kept in dev compose for history).
+#   - Port binds remain 127.0.0.1 — tailnet-only access via Tailscale.
+#
+# Secrets to set in Dokploy project env (matches keys used below):
+#   FREQTRADE__EXCHANGE__KEY
+#   FREQTRADE__EXCHANGE__SECRET
+#   FREQTRADE__API_SERVER__USERNAME
+#   FREQTRADE__API_SERVER__PASSWORD
+#   FREQTRADE__API_SERVER__JWT_SECRET_KEY
+#   BINANCE_API_KEY               (mirror, used by ad-hoc check_balance.py)
+#   BINANCE_API_SECRET            (mirror)
+
+x-healthcheck: &bot-healthcheck
+  test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/v1/ping || exit 1"]
+  interval: 30s
+  timeout: 10s
+  retries: 5
+  start_period: 120s
+
+x-bot-env: &bot-env
+  FREQTRADE__EXCHANGE__KEY: ${FREQTRADE__EXCHANGE__KEY}
+  FREQTRADE__EXCHANGE__SECRET: ${FREQTRADE__EXCHANGE__SECRET}
+  FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
+  FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+  FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FREQTRADE__API_SERVER__JWT_SECRET_KEY}
+
+services:
+  keltnerbouncev1:
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-keltner-bounce
+    environment: *bot-env
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8095:8080"
+    healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    entrypoint:
+      - "/bin/sh"
+      - "-c"
+      - "sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KeltnerBounceV1.log --config /freqtrade/user_data/configs/KeltnerBounceV1.json --strategy KeltnerBounceV1"
+
+  fundingfadev1:
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-funding-fade
+    environment: *bot-env
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8096:8080"
+    healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    entrypoint:
+      - "/bin/sh"
+      - "-c"
+      - "sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1"
+
+  grafana-bridge:
+    build: ./grafana-bridge
+    restart: unless-stopped
+    container_name: ft-grafana-bridge
+    volumes:
+      - "./grafana/dashboards:/dashboards"
+      - "./grafana/overlays:/overlays:ro"
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+    depends_on:
+      - keltnerbouncev1
+      - fundingfadev1
+
+  metrics-exporter:
+    build:
+      context: .
+      dockerfile: exporter/Dockerfile
+    restart: unless-stopped
+    container_name: ft-metrics-exporter
+    environment:
+      FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
+      FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+    volumes:
+      - "./metrics_exporter.py:/app/metrics_exporter.py:ro"
+      - "./api_utils.py:/app/api_utils.py:ro"
+      - "./bots_config.json:/app/bots_config.json:ro"
+    ports:
+      - "127.0.0.1:9090:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    depends_on:
+      - keltnerbouncev1
+      - fundingfadev1
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    container_name: ft-prometheus
+    volumes:
+      - "./prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "prometheus_data:/prometheus"
+    ports:
+      - "127.0.0.1:9091:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=90d"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    depends_on:
+      - metrics-exporter
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    container_name: ft-grafana
+    volumes:
+      - "grafana_data:/var/lib/grafana"
+      - "./grafana/provisioning:/etc/grafana/provisioning:ro"
+      - "./grafana/dashboards:/var/lib/grafana/dashboards"
+    ports:
+      - "127.0.0.1:3030:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_USERS_DEFAULT_THEME=dark
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/freqtrade.json
+      - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
+    depends_on:
+      - prometheus
+      - grafana-bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:
