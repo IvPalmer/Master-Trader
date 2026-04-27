@@ -38,7 +38,12 @@ services:
     container_name: ft-keltner-bounce
     environment: *bot-env
     volumes:
-      - "./user_data:/freqtrade/user_data"
+      # Named volume = persistent across Dokploy redeploys (Dokploy wipes
+      # the cloned ./user_data each pull). configs + strategies overlay
+      # from the cloned repo so code changes flow via git push.
+      - "ft_user_data:/freqtrade/user_data"
+      - "./user_data/configs:/freqtrade/user_data/configs:ro"
+      - "./user_data/strategies:/freqtrade/user_data/strategies"
     ports:
       - "127.0.0.1:8095:8080"
     healthcheck: *bot-healthcheck
@@ -64,7 +69,9 @@ services:
     container_name: ft-funding-fade
     environment: *bot-env
     volumes:
-      - "./user_data:/freqtrade/user_data"
+      - "ft_user_data:/freqtrade/user_data"
+      - "./user_data/configs:/freqtrade/user_data/configs:ro"
+      - "./user_data/strategies:/freqtrade/user_data/strategies"
     ports:
       - "127.0.0.1:8096:8080"
     healthcheck: *bot-healthcheck
@@ -162,3 +169,4 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
+  ft_user_data:
