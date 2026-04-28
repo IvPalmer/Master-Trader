@@ -80,10 +80,11 @@ API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "freqtrader")
 API_PASS = os.environ.get("FREQTRADE__API_SERVER__PASSWORD", "mastertrader")
 AUTH = HTTPBasicAuth(API_USER, API_PASS)
 INITIAL_CAPITAL = 528.0   # 6x R$500/bot = R$3,000 = $528 USDT
-WEBHOOK_URL = "http://localhost:8088/webhooks/freqtrade"
-DB_DIR = Path.home() / "ft_userdata" / "user_data"
-STATE_FILE = Path.home() / "ft_userdata" / "health_report_state.json"
-LOGS_DIR = Path.home() / "ft_userdata" / "logs"
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "http://localhost:8088/webhooks/freqtrade")
+FT_DIR = Path(os.environ.get("FT_DIR", str(Path.home() / "ft_userdata")))
+DB_DIR = FT_DIR / "user_data"
+STATE_FILE = FT_DIR / "health_report_state.json"
+LOGS_DIR = FT_DIR / "logs"
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
