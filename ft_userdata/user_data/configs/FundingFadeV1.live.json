@@ -99,7 +99,7 @@
     ],
     "webhook": {
         "enabled": true,
-        "url": "http://raphaels-mac-studio.tail5d4d09.ts.net:8088/webhooks/freqtrade",
+        "url": "http://trade-webhook:8088/freqtrade/event",
         "webhookentry": {
             "type": "entry",
             "pair": "{pair}",
