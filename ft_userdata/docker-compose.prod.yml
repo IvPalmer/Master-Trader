@@ -184,26 +184,60 @@ services:
     image: grafana/grafana:latest
     restart: unless-stopped
     container_name: ft-grafana
+    networks:
+      - default
+      - dokploy-network
     volumes:
       - "grafana_data:/var/lib/grafana"
       - "./grafana/provisioning:/etc/grafana/provisioning:ro"
       - "./grafana/dashboards:/var/lib/grafana/dashboards"
     ports:
+      # TODO: drop this port mapping after CF Access is verified end-to-end
+      # (see docs/HOMEPAGE-DEPLOY-CHECKLIST.md). Kept temporarily so the user
+      # can SSH-tunnel to verify Grafana is healthy before flipping DNS.
       - "127.0.0.1:3030:3000"
     deploy:
       resources:
         limits:
           memory: 384M
     environment:
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      # ── Auth: anonymous OFF, CF Access JWT becomes Grafana user ──
+      - GF_AUTH_ANONYMOUS_ENABLED=false
       - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_PROXY_ENABLED=true
+      - GF_AUTH_PROXY_HEADER_NAME=Cf-Access-Authenticated-User-Email
+      - GF_AUTH_PROXY_HEADER_PROPERTY=username
+      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+      # ── UX defaults ──
       - GF_USERS_DEFAULT_THEME=dark
       - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/freqtrade.json
       - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
+    labels:
+      # ── Traefik: master-trader.grooveops.dev → ft-grafana:3000 ──
+      # CF Access (proxied OFF in CF DNS) gates the entire host.
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      # HTTPS router
+      - "traefik.http.routers.master-trader.rule=Host(`master-trader.grooveops.dev`)"
+      - traefik.http.routers.master-trader.entrypoints=websecure
+      - traefik.http.routers.master-trader.tls=true
+      - traefik.http.routers.master-trader.tls.certresolver=letsencrypt
+      - traefik.http.routers.master-trader.service=master-trader
+      - traefik.http.services.master-trader.loadbalancer.server.port=3000
+      # HTTP → HTTPS redirect
+      - "traefik.http.routers.master-trader-http.rule=Host(`master-trader.grooveops.dev`)"
+      - traefik.http.routers.master-trader-http.entrypoints=web
+      - traefik.http.routers.master-trader-http.middlewares=master-trader-https-redirect@docker
+      - traefik.http.middlewares.master-trader-https-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.master-trader-https-redirect.redirectscheme.permanent=true
     depends_on:
       - prometheus
       - grafana-bridge
+
+networks:
+  default:
+  dokploy-network:
+    external: true
 
 volumes:
   prometheus_data:
