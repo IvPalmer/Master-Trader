@@ -208,13 +208,17 @@ services:
       - GF_AUTH_PROXY_HEADER_NAME=Cf-Access-Authenticated-User-Email
       - GF_AUTH_PROXY_HEADER_PROPERTY=username
       - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+      # Admin creds come from Dokploy env (also mirrored in ~/.secrets/master-trader-grafana.env).
+      # Safety net: if auth-proxy chain breaks, you can still reach /login with these.
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
       # ── UX defaults ──
       - GF_USERS_DEFAULT_THEME=dark
       - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/freqtrade.json
       - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
     labels:
       # ── Traefik: master-trader.grooveops.dev → ft-grafana:3000 ──
-      # CF Access (proxied OFF in CF DNS) gates the entire host.
+      # CF Access gates the entire host (DNS proxied=ON).
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
       # HTTPS router
