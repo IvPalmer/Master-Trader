@@ -114,7 +114,7 @@
     ],
     "webhook": {
         "enabled": true,
-        "url": "http://host.docker.internal:8088/webhooks/freqtrade",
+        "url": "http://trade-webhook:8088/freqtrade/event",
         "webhookentry": {
             "type": "entry",
             "pair": "{pair}",
@@ -124,12 +124,14 @@
             "open_rate": "{open_rate}",
             "order_type": "{order_type}",
             "direction": "{direction}",
-            "leverage": "{leverage}"
+            "leverage": "{leverage}",
+            "bot_name": "KeltnerBounceV1"
         },
         "webhookentrycancel": {
             "type": "entry_cancel",
             "pair": "{pair}",
-            "reason": "{reason}"
+            "reason": "{reason}",
+            "bot_name": "KeltnerBounceV1"
         },
         "webhookentryfill": {
             "type": "entry_fill",
@@ -139,7 +141,8 @@
             "open_rate": "{open_rate}",
             "order_type": "{order_type}",
             "direction": "{direction}",
-            "leverage": "{leverage}"
+            "leverage": "{leverage}",
+            "bot_name": "KeltnerBounceV1"
         },
         "webhookexit": {
             "type": "exit",
@@ -151,12 +154,14 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}"
+            "duration": "{duration}",
+            "bot_name": "KeltnerBounceV1"
         },
         "webhookexitcancel": {
             "type": "exit_cancel",
             "pair": "{pair}",
-            "reason": "{reason}"
+            "reason": "{reason}",
+            "bot_name": "KeltnerBounceV1"
         },
         "webhookexitfill": {
             "type": "exit_fill",
@@ -168,12 +173,15 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}"
+            "duration": "{duration}",
+            "bot_name": "KeltnerBounceV1"
         },
         "webhookstatus": {
             "type": "status",
-            "status": "{status}"
-        }
+            "status": "{status}",
+            "bot_name": "KeltnerBounceV1"
+        },
+        "format": "json"
     },
     "telegram": {
         "enabled": false,

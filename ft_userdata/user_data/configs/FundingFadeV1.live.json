@@ -110,12 +110,14 @@
             "open_rate": "{open_rate}",
             "order_type": "{order_type}",
             "direction": "{direction}",
-            "leverage": "{leverage}"
+            "leverage": "{leverage}",
+            "bot_name": "FundingFadeV1"
         },
         "webhookentrycancel": {
             "type": "entry_cancel",
             "pair": "{pair}",
-            "reason": "{reason}"
+            "reason": "{reason}",
+            "bot_name": "FundingFadeV1"
         },
         "webhookentryfill": {
             "type": "entry_fill",
@@ -125,7 +127,8 @@
             "open_rate": "{open_rate}",
             "order_type": "{order_type}",
             "direction": "{direction}",
-            "leverage": "{leverage}"
+            "leverage": "{leverage}",
+            "bot_name": "FundingFadeV1"
         },
         "webhookexit": {
             "type": "exit",
@@ -137,12 +140,14 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}"
+            "duration": "{duration}",
+            "bot_name": "FundingFadeV1"
         },
         "webhookexitcancel": {
             "type": "exit_cancel",
             "pair": "{pair}",
-            "reason": "{reason}"
+            "reason": "{reason}",
+            "bot_name": "FundingFadeV1"
         },
         "webhookexitfill": {
             "type": "exit_fill",
@@ -154,11 +159,13 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}"
+            "duration": "{duration}",
+            "bot_name": "FundingFadeV1"
         },
         "webhookstatus": {
             "type": "status",
-            "status": "{status}"
+            "status": "{status}",
+            "bot_name": "FundingFadeV1"
         }
     },
     "telegram": {
