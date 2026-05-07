@@ -81,13 +81,21 @@ def fetch_funding_history(symbol: str, start_ms: int, end_ms: int) -> list:
     return all_records
 
 
+# Binance perpetual funding cap is ±0.75% per 8h period. Anything outside
+# this is an API anomaly (NaN, malformed payload, decimal-shift bug) and
+# poisons the rolling mean/std the strategy uses for entries. Reject the
+# whole batch rather than merge a single bad rate.
+FUNDING_RATE_CAP = 0.0075
+
+
 def save_pair(pair: str, records: list):
     """Merge new records with any existing feather, then atomically replace.
 
+    - Validates funding rate range; rejects the whole batch on out-of-bounds.
     - Merges with existing file so a partial API page doesn't truncate history.
+    - On corrupt-feather read, ABORTS the save (does NOT fall back to new-only)
+      because that path silently truncates the historical series.
     - Writes to a temp file in the same directory, then os.replace() for atomic swap.
-      A live bot reading the feather mid-refresh sees either the old file or the new
-      file, never a half-written blob.
     """
     if not records:
         return 0
@@ -97,16 +105,34 @@ def save_pair(pair: str, records: list):
     df_new = df_new.rename(columns={"fundingTime": "date", "fundingRate": "funding_rate"})
     df_new = df_new[["date", "funding_rate"]]
 
+    rates = df_new["funding_rate"]
+    if rates.isna().any():
+        log(f"    REJECT {pair}: batch contains NaN funding_rate (count={int(rates.isna().sum())})")
+        return 0
+    if (rates.abs() > FUNDING_RATE_CAP).any():
+        out_of_range = rates[rates.abs() > FUNDING_RATE_CAP]
+        log(
+            f"    REJECT {pair}: {len(out_of_range)} funding_rate(s) outside ±{FUNDING_RATE_CAP} "
+            f"(min={rates.min():.6f}, max={rates.max():.6f})"
+        )
+        return 0
+
     pair_file = pair.replace("/", "_")
     out = FUNDING_DIR / f"{pair_file}-funding.feather"
 
     if out.exists():
         try:
             df_old = pd.read_feather(out)[["date", "funding_rate"]]
-            df = pd.concat([df_old, df_new], ignore_index=True)
         except Exception as e:
-            log(f"    merge read failed on {pair} ({e}); keeping new records only")
-            df = df_new
+            log(f"    ABORT {pair}: existing feather unreadable ({e}); refusing to truncate history")
+            sentinel = out.with_suffix(out.suffix + ".CORRUPT")
+            try:
+                os.replace(out, sentinel)
+                log(f"    moved corrupt feather to {sentinel.name}; manual recovery required")
+            except Exception as move_err:
+                log(f"    sentinel rename also failed: {move_err}")
+            return 0
+        df = pd.concat([df_old, df_new], ignore_index=True)
     else:
         df = df_new
 

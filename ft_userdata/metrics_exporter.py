@@ -6,9 +6,12 @@ Scrapes all Freqtrade bot REST APIs and exposes metrics for Prometheus.
 Runs as a long-lived process, updating metrics every 60 seconds.
 """
 
+import json
 import os
 import time
 import logging
+from pathlib import Path
+
 import requests
 from requests.auth import HTTPBasicAuth
 from prometheus_client import start_http_server, Gauge, Info
@@ -76,14 +79,64 @@ API_PORT = 8080
 SCRAPE_INTERVAL = 60  # seconds
 
 # ── Circuit Breaker ───────────────────────────────────────────────
-INITIAL_CAPITAL = 550.0  # Total across active bots (4x$88 spot + $22 short = $374) + killed bots historical
-CIRCUIT_BREAKER_PCT = 10.0  # Trigger at 10% portfolio drawdown ($700)
-CIRCUIT_BREAKER_COOLDOWN = 3600  # Don't re-alert for 1 hour after triggering
-WEBHOOK_URL = "http://host.docker.internal:8088/webhooks/freqtrade"
+# Dynamic capital tracking: starting capital is read from each LIVE bot's
+# /balance endpoint and summed. Dry-run bots are excluded — their simulated
+# P&L would dilute the breaker math and let real money go to zero without
+# tripping the threshold (this is what the hardcoded INITIAL_CAPITAL=550
+# regression caused on the $52 live FundingFade wallet).
+CIRCUIT_BREAKER_PCT = 10.0
+CIRCUIT_BREAKER_COOLDOWN = 3600
+WEBHOOK_URL = os.environ.get(
+    "CIRCUIT_BREAKER_WEBHOOK_URL",
+    "http://trade-webhook:8088/webhooks/freqtrade",
+)
+CAPITAL_REFRESH_EVERY = 60  # rescrape /show_config + /balance every N scrapes
+PEAK_STATE_FILE = Path(os.environ.get("PEAK_STATE_FILE", "/state/portfolio_peak.json"))
 
-_portfolio_peak = INITIAL_CAPITAL  # Track high-water mark
+_live_initial_capital = 0.0  # Sum of starting_capital across LIVE bots
+_live_bots: list[dict] = []  # Subset of BOTS that report dry_run=False
+_capital_refresh_counter = 0
+
+_portfolio_peak = 0.0
 _circuit_breaker_triggered = False
 _last_trigger_time = 0.0
+
+
+def _load_peak_state() -> None:
+    """Restore high-water mark from disk so a restart mid-drawdown doesn't
+    erase the real peak. Without this, _portfolio_peak resets every restart
+    and the breaker silently shifts its threshold downward."""
+    global _portfolio_peak, _circuit_breaker_triggered, _last_trigger_time
+    try:
+        if PEAK_STATE_FILE.exists():
+            with open(PEAK_STATE_FILE) as f:
+                state = json.load(f)
+            _portfolio_peak = float(state.get("peak", 0.0))
+            _circuit_breaker_triggered = bool(state.get("triggered", False))
+            _last_trigger_time = float(state.get("last_trigger_time", 0.0))
+            log.info(
+                "Restored portfolio peak from %s: $%.2f (triggered=%s)",
+                PEAK_STATE_FILE, _portfolio_peak, _circuit_breaker_triggered,
+            )
+    except Exception as exc:
+        log.error("Failed to load peak state: %s — starting from zero", exc)
+
+
+def _save_peak_state() -> None:
+    """Persist peak after every update. Atomic via temp + rename."""
+    try:
+        PEAK_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = PEAK_STATE_FILE.with_suffix(PEAK_STATE_FILE.suffix + ".tmp")
+        with open(tmp, "w") as f:
+            json.dump({
+                "peak": _portfolio_peak,
+                "triggered": _circuit_breaker_triggered,
+                "last_trigger_time": _last_trigger_time,
+                "saved_at": time.time(),
+            }, f)
+        os.replace(tmp, PEAK_STATE_FILE)
+    except Exception as exc:
+        log.warning("Failed to save peak state: %s", exc)
 
 # ── Prometheus metrics ───────────────────────────────────────────────
 profit_total = Gauge(
@@ -151,6 +204,60 @@ def fetch_json(service: str, endpoint: str, timeout: int = 10) -> dict | None:
     return _api_get_with_retry(API_PORT, endpoint, timeout=timeout, base_host=service)
 
 
+def fetch_bot_meta(service: str) -> dict | None:
+    """Fetch dry_run flag and starting_capital from a bot.
+
+    /show_config exposes `dry_run`; /balance exposes `starting_capital`.
+    Returns None if either call fails — caller treats that as 'unknown' and
+    excludes the bot from breaker math until next refresh.
+    """
+    cfg = fetch_json(service, "show_config")
+    if cfg is None:
+        return None
+    bal = fetch_json(service, "balance")
+    if bal is None:
+        return None
+    return {
+        "dry_run": bool(cfg.get("dry_run", True)),
+        "starting_capital": float(bal.get("starting_capital", 0.0) or 0.0),
+    }
+
+
+def refresh_live_capital() -> None:
+    """Rebuild the list of LIVE (non-dry-run) bots and sum their starting
+    capital. Called on startup and periodically — a config change or a bot
+    being added/removed propagates without an exporter restart."""
+    global _live_bots, _live_initial_capital
+    live = []
+    total = 0.0
+    for bot in BOTS:
+        meta = fetch_bot_meta(bot["service"])
+        if meta is None:
+            log.warning(
+                "Could not read meta for %s — excluding from breaker until next refresh",
+                bot["strategy"],
+            )
+            continue
+        if meta["dry_run"]:
+            log.debug("Excluding %s from breaker (dry_run)", bot["strategy"])
+            continue
+        if meta["starting_capital"] <= 0:
+            log.warning(
+                "%s reports starting_capital=$%.2f — excluding from breaker",
+                bot["strategy"], meta["starting_capital"],
+            )
+            continue
+        live.append({**bot, "starting_capital": meta["starting_capital"]})
+        total += meta["starting_capital"]
+
+    _live_bots = live
+    _live_initial_capital = total
+    log.info(
+        "Circuit breaker capital refreshed: %d live bots, $%.2f total starting capital",
+        len(_live_bots), _live_initial_capital,
+    )
+
+
 def scrape_bot(bot: dict) -> float | None:
     """Scrape one bot and update its Prometheus metrics. Returns true P&L or None."""
     service = bot["service"]
@@ -211,19 +318,31 @@ def scrape_bot(bot: dict) -> float | None:
     return bot_true_pnl
 
 
-def scrape_all() -> float | None:
-    """Scrape every configured bot. Returns total portfolio true P&L or None."""
+def scrape_all() -> tuple[float | None, float | None]:
+    """Scrape every configured bot.
+
+    Returns (total_pnl_all_bots, live_pnl_only). `live_pnl_only` is the sum
+    across bots in `_live_bots` and is the only number fed into the circuit
+    breaker — dry-run P&L (simulated) cannot be allowed to dilute the
+    threshold for real-money positions.
+    """
     total_pnl = 0.0
+    live_pnl = 0.0
     reachable = 0
+    live_services = {b["service"] for b in _live_bots}
     for bot in BOTS:
         try:
             pnl = scrape_bot(bot)
             if pnl is not None:
                 total_pnl += pnl
                 reachable += 1
+                if bot["service"] in live_services:
+                    live_pnl += pnl
         except Exception as exc:
             log.error("Unexpected error scraping %s: %s", bot["strategy"], exc)
-    return total_pnl if reachable > 0 else None
+    if reachable == 0:
+        return None, None
+    return total_pnl, live_pnl
 
 
 def stop_bot(bot: dict) -> bool:
@@ -245,10 +364,12 @@ def send_circuit_breaker_alert(portfolio_value: float, drawdown_pct: float) -> N
     """Send emergency alert via webhook to Telegram."""
     message = (
         f"CIRCUIT BREAKER TRIGGERED\n\n"
-        f"Portfolio drawdown: {drawdown_pct:.1f}% (threshold: {CIRCUIT_BREAKER_PCT}%)\n"
-        f"Portfolio value: ${portfolio_value:,.2f} (initial: ${INITIAL_CAPITAL:,.0f})\n"
-        f"Loss: ${INITIAL_CAPITAL - portfolio_value:,.2f}\n\n"
-        f"ALL BOTS STOPPED. Manual restart required.\n"
+        f"Live portfolio drawdown: {drawdown_pct:.1f}% (threshold: {CIRCUIT_BREAKER_PCT}%)\n"
+        f"Live portfolio value: ${portfolio_value:,.2f} "
+        f"(starting: ${_live_initial_capital:,.2f})\n"
+        f"Loss: ${_live_initial_capital - portfolio_value:,.2f}\n\n"
+        f"LIVE BOTS STOPPED ({', '.join(b['strategy'] for b in _live_bots)}). "
+        f"Manual restart required.\n"
         f"Review positions before restarting."
     )
     try:
@@ -262,20 +383,32 @@ def send_circuit_breaker_alert(portfolio_value: float, drawdown_pct: float) -> N
         log.error("Failed to send circuit breaker alert: %s", exc)
 
 
-def check_circuit_breaker(portfolio_pnl: float) -> None:
-    """Check if portfolio drawdown exceeds threshold and stop all bots if so."""
+def check_circuit_breaker(live_pnl: float) -> None:
+    """Check if LIVE portfolio drawdown exceeds threshold and stop LIVE bots if so.
+
+    Inputs are scoped to live (non-dry-run) bots only. The dry-run sleeve has
+    no real money and must not influence the breaker.
+    """
     global _portfolio_peak, _circuit_breaker_triggered, _last_trigger_time
 
-    portfolio_value = INITIAL_CAPITAL + portfolio_pnl
+    if _live_initial_capital <= 0 or not _live_bots:
+        # No live bots configured — breaker is a no-op. Don't update Prometheus
+        # gauges so a stale 'all good' signal doesn't show on Grafana.
+        return
 
-    # Update high-water mark
+    portfolio_value = _live_initial_capital + live_pnl
+
     if portfolio_value > _portfolio_peak:
         _portfolio_peak = portfolio_value
+        _save_peak_state()
 
-    # Calculate drawdown from peak
+    if _portfolio_peak <= 0:
+        # First scrape and we're at or below initial capital — seed the peak.
+        _portfolio_peak = max(portfolio_value, _live_initial_capital)
+        _save_peak_state()
+
     drawdown_pct = ((_portfolio_peak - portfolio_value) / _portfolio_peak) * 100
 
-    # Update Prometheus gauges
     portfolio_drawdown_pct.set(round(drawdown_pct, 2))
     portfolio_value_total.set(round(portfolio_value, 2))
 
@@ -283,38 +416,55 @@ def check_circuit_breaker(portfolio_pnl: float) -> None:
         now = time.time()
         if not _circuit_breaker_triggered or (now - _last_trigger_time > CIRCUIT_BREAKER_COOLDOWN):
             log.critical(
-                "CIRCUIT BREAKER: Portfolio drawdown %.1f%% >= %.1f%% threshold! "
-                "Value: $%.2f, Peak: $%.2f",
-                drawdown_pct, CIRCUIT_BREAKER_PCT, portfolio_value, _portfolio_peak,
+                "CIRCUIT BREAKER: Live portfolio drawdown %.1f%% >= %.1f%%! "
+                "Value: $%.2f, Peak: $%.2f, Live starting capital: $%.2f",
+                drawdown_pct, CIRCUIT_BREAKER_PCT, portfolio_value,
+                _portfolio_peak, _live_initial_capital,
             )
-            # Stop all bots
-            for bot in BOTS:
+            for bot in _live_bots:
                 stop_bot(bot)
-            # Alert via Telegram
             send_circuit_breaker_alert(portfolio_value, drawdown_pct)
             _circuit_breaker_triggered = True
             _last_trigger_time = now
+            _save_peak_state()
     elif _circuit_breaker_triggered and drawdown_pct < CIRCUIT_BREAKER_PCT * 0.5:
-        # Reset trigger once drawdown recovers below half the threshold
         _circuit_breaker_triggered = False
         log.info("Circuit breaker reset: drawdown recovered to %.1f%%", drawdown_pct)
+        _save_peak_state()
 
 
 def main() -> None:
+    global _capital_refresh_counter
+
     log.info("Starting Freqtrade metrics exporter on :9090")
-    log.info("Circuit breaker: %.0f%% drawdown threshold ($%.0f loss)",
-             CIRCUIT_BREAKER_PCT, INITIAL_CAPITAL * CIRCUIT_BREAKER_PCT / 100)
+    _load_peak_state()
+    refresh_live_capital()
+    log.info(
+        "Circuit breaker: %.0f%% live-portfolio drawdown threshold ($%.2f loss on $%.2f live capital)",
+        CIRCUIT_BREAKER_PCT,
+        _live_initial_capital * CIRCUIT_BREAKER_PCT / 100,
+        _live_initial_capital,
+    )
     start_http_server(9090)
 
     while True:
-        log.info("Scraping %d bots...", len(BOTS))
-        portfolio_pnl = scrape_all()
-        if portfolio_pnl is not None:
-            log.info("Scrape complete. Portfolio P&L: $%.2f. Sleeping %ds.",
-                     portfolio_pnl, SCRAPE_INTERVAL)
-            check_circuit_breaker(portfolio_pnl)
+        log.info("Scraping %d bots (%d live)...", len(BOTS), len(_live_bots))
+        total_pnl, live_pnl = scrape_all()
+        if total_pnl is not None:
+            log.info(
+                "Scrape complete. Total P&L: $%.2f, Live P&L: $%.2f. Sleeping %ds.",
+                total_pnl, live_pnl or 0.0, SCRAPE_INTERVAL,
+            )
+            if live_pnl is not None:
+                check_circuit_breaker(live_pnl)
         else:
             log.warning("No bots reachable. Sleeping %ds.", SCRAPE_INTERVAL)
+
+        _capital_refresh_counter += 1
+        if _capital_refresh_counter >= CAPITAL_REFRESH_EVERY:
+            _capital_refresh_counter = 0
+            refresh_live_capital()
+
         time.sleep(SCRAPE_INTERVAL)
 
 

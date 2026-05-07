@@ -276,6 +276,7 @@ services:
       - "./metrics_exporter.py:/app/metrics_exporter.py:ro"
       - "./api_utils.py:/app/api_utils.py:ro"
       - "./bots_config.json:/app/bots_config.json:ro"
+      - "ft_exporter_state:/state"
     ports:
       - "127.0.0.1:9090:9090"
     deploy:
@@ -335,3 +336,4 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
+  ft_exporter_state:

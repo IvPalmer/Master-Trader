@@ -34,6 +34,7 @@ Generated 2026-04-17.
 """
 
 import logging
+import time
 from pathlib import Path
 
 import numpy as np
@@ -82,6 +83,13 @@ class FundingFadeV1(IStrategy):
     # Reloaded whenever the underlying feather file mtime changes, so a live
     # refresh via `download_funding_rates.py` propagates into a running bot.
     _funding_cache: dict = {}
+
+    # Tracks last warn timestamp per pair when funding file is MISSING. Earlier
+    # versions logged once and went silent forever — a never-existed file
+    # produced zero entries with no further alert. Re-warn every 4h to keep
+    # the failure visible in container logs.
+    _missing_funding_last_warn: dict = {}
+    _MISSING_REWARN_INTERVAL_S = 4 * 3600
 
     @informative("1h", "BTC/{stake}")
     def populate_indicators_btc_1h(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -148,9 +156,24 @@ class FundingFadeV1(IStrategy):
         path = FUNDING_DIR / f"{pair_file}-funding.feather"
 
         if not path.exists():
-            if self._funding_cache.get(pair) != (None, None):
-                logger.warning("No funding data for %s — signal will never fire", pair)
+            now = time.time()
+            last_warn = self._missing_funding_last_warn.get(pair, 0.0)
+            first_time = self._funding_cache.get(pair) != (None, None)
+            if first_time:
+                logger.error(
+                    "MISSING funding feather for %s at %s — entries DISABLED for this pair "
+                    "until the file is restored. Check ft-funding-refresh logs.",
+                    pair, path,
+                )
                 self._funding_cache[pair] = (None, None)
+                self._missing_funding_last_warn[pair] = now
+            elif now - last_warn >= self._MISSING_REWARN_INTERVAL_S:
+                logger.error(
+                    "MISSING funding feather still absent for %s after %.0fh — "
+                    "this pair has been silently producing zero entries.",
+                    pair, (now - last_warn) / 3600,
+                )
+                self._missing_funding_last_warn[pair] = now
             return pd.Series(np.nan, index=dataframe.index)
 
         mtime_ns = path.stat().st_mtime_ns
