@@ -560,82 +560,77 @@ function dash() {
         const fmt = v => Number(v).toFixed(decimals);
         const pct = (a, b) => ((a - b) / b * 100);
 
-        // ROI target: bot's first ROI rung (8%). Approximation — Freqtrade
-        // ROI ladder steps down over time, but the initial target is the
-        // most actionable reference for a fresh trade.
-        const roiTarget = pos.open_rate != null ? pos.open_rate * 1.08 : null;
         const stop = pos.stop_loss_abs;
         const entry = pos.open_rate;
         const now = pos.current_rate;
-        const yMin = Math.min(...ohlc.flat(), stop ?? Infinity);
-        const yMax = Math.max(...ohlc.flat(), roiTarget ?? -Infinity, entry ?? -Infinity);
-        const padY = (yMax - yMin) * 0.04;
 
-        // Zones: green from entry to ROI target (gain region), red from
-        // entry to stop (loss region). Painted as full-width markAreas so
-        // the user can see at a glance where price would be a winning vs
-        // losing exit.
+        // Y-axis range driven by candles + entry + stop only. ROI target
+        // (entry × 1.08) is intentionally excluded from axis math because
+        // it's typically 8% above price and would crush the candles into
+        // the bottom 30% of the chart. We still draw the ROI marker as a
+        // dashed line at the top edge of the visible area when applicable.
+        const lows = ohlc.map(c => c[2]);
+        const highs = ohlc.map(c => c[3]);
+        const candleMin = Math.min(...lows, stop ?? Infinity, entry ?? Infinity);
+        const candleMax = Math.max(...highs, entry ?? -Infinity);
+        const padY = (candleMax - candleMin) * 0.10;
+        const yMin = candleMin - padY;
+        const yMax = candleMax + padY;
+
+        // Zone fills only where they overlap the visible y-range.
         const areas = [];
-        if (entry != null && roiTarget != null) {
-          areas.push([
-            { yAxis: entry, itemStyle: { color: 'rgba(52, 211, 153, 0.10)' } },
-            { yAxis: roiTarget },
-          ]);
-        }
         if (entry != null && stop != null) {
           areas.push([
             { yAxis: stop, itemStyle: { color: 'rgba(248, 113, 113, 0.12)' } },
             { yAxis: entry },
           ]);
         }
+        if (entry != null && entry < yMax) {
+          // gain zone above entry up to top of visible range
+          areas.push([
+            { yAxis: entry, itemStyle: { color: 'rgba(52, 211, 153, 0.10)' } },
+            { yAxis: yMax },
+          ]);
+        }
 
-        // markLines: distinct color per role, labels anchored to the right
-        // edge with sufficient distance so they don't collide with each
-        // other or with the chart axis.
+        // markLines: distinct colors. Stagger labels horizontally so even
+        // when entry/now are within a few bps the labels don't overlap.
         const lines = [];
-        const labelBase = {
-          show: true, position: 'insideEndTop', distance: 4,
-          fontSize: 10, fontFamily: 'JetBrains Mono',
-          backgroundColor: COLORS.surface, padding: [2, 5], borderRadius: 2,
-          borderWidth: 1,
+        const baseLabel = {
+          show: true, fontSize: 10, fontFamily: 'JetBrains Mono',
+          backgroundColor: COLORS.bg ?? '#0a0d14',
+          padding: [3, 6], borderRadius: 2, borderWidth: 1,
         };
         if (entry != null) {
           lines.push({
             yAxis: entry,
-            lineStyle: { color: COLORS.accent, type: 'solid', width: 1.5 },
-            label: { ...labelBase, position: 'insideStartTop',
-                     formatter: 'ENTRY ' + fmt(entry),
+            lineStyle: { color: COLORS.accent, type: 'solid', width: 1.6 },
+            label: { ...baseLabel, position: 'insideStartTop', distance: 3,
+                     formatter: '▶ entry ' + fmt(entry),
                      color: COLORS.accent, borderColor: COLORS.accent },
-          });
-        }
-        if (roiTarget != null) {
-          lines.push({
-            yAxis: roiTarget,
-            lineStyle: { color: COLORS.pos, type: 'dashed', width: 1.2, opacity: 0.7 },
-            label: { ...labelBase, position: 'insideEndTop',
-                     formatter: 'ROI +8% · ' + fmt(roiTarget),
-                     color: COLORS.pos, borderColor: COLORS.pos },
           });
         }
         if (stop != null) {
           lines.push({
             yAxis: stop,
-            lineStyle: { color: COLORS.neg, type: 'dashed', width: 1.5 },
-            label: { ...labelBase, position: 'insideStartBottom',
-                     formatter: 'STOP −5% · ' + fmt(stop),
+            lineStyle: { color: COLORS.neg, type: 'dashed', width: 1.6 },
+            label: { ...baseLabel, position: 'insideStartBottom', distance: 3,
+                     formatter: '▼ stop −5% · ' + fmt(stop),
                      color: COLORS.neg, borderColor: COLORS.neg },
           });
         }
-        if (now != null && entry != null && Math.abs(now - entry) / entry > 0.005) {
-          // Only draw "now" line if price has moved >0.5% from entry, else
-          // the label collides with ENTRY.
+        if (now != null && entry != null) {
           const pnlPct = pct(now, entry);
+          const farFromEntry = Math.abs(pnlPct) > 0.5;
           lines.push({
             yAxis: now,
-            lineStyle: { color: COLORS.text, type: 'dotted', width: 1, opacity: 0.7 },
-            label: { ...labelBase, position: 'insideEndBottom',
-                     formatter: 'NOW ' + fmt(now) + ' · ' + (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%',
-                     color: COLORS.text, borderColor: COLORS.border },
+            lineStyle: { color: pnlPct >= 0 ? COLORS.pos : COLORS.neg, type: 'dotted', width: 1.2 },
+            label: { ...baseLabel,
+                     position: farFromEntry ? 'insideEndTop' : 'insideMiddleTop',
+                     distance: 3,
+                     formatter: 'now ' + fmt(now) + ' · ' + (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%',
+                     color: pnlPct >= 0 ? COLORS.pos : COLORS.neg,
+                     borderColor: pnlPct >= 0 ? COLORS.pos : COLORS.neg },
           });
         }
 
