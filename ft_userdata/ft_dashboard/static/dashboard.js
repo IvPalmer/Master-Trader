@@ -46,7 +46,13 @@ function dash() {
         this.$nextTick(() => this.renderCharts());
       });
       window.addEventListener('resize', () => {
-        Object.values(this._charts).forEach(c => c?.resize());
+        // Charts can fail resize if a series is mid-update or has stale
+        // state from a previous tab. Swallow per-chart errors so one bad
+        // panel doesn't break the others.
+        Object.entries(this._charts).forEach(([id, c]) => {
+          try { c?.resize(); }
+          catch (e) { console.warn('resize', id, e?.message); }
+        });
       });
       this.$watch('tab', () => this.$nextTick(() => this.renderCharts()));
     },
@@ -348,9 +354,11 @@ function dash() {
       let runningEquity = bot.wallet.starting_capital;
       for (const t of sortedClosed) {
         runningEquity += Number(t.profit_abs || 0);
-        const ts = new Date(t.close_timestamp);
+        // Pass coord as [ms-number, number] not [Date, number] — ECharts
+        // marker lookup gets confused with Date objects on resize and
+        // throws "Cannot read properties of undefined (reading 'type')".
         const y = liveByTs.get(t.close_timestamp) ?? runningEquity;
-        const m = { coord: [ts, y], pair: t.pair, pct: t.profit_pct };
+        const m = { coord: [t.close_timestamp, y], pair: t.pair, pct: t.profit_pct };
         if ((t.profit_abs || 0) >= 0) winMarks.push(m);
         else lossMarks.push(m);
       }
@@ -449,10 +457,16 @@ function dash() {
         yAxis: {
           // Lock min so the cap line is always visible. Without this, a
           // shallow live drawdown auto-scales to ±2% and the cap (e.g.
-          // -29.4%) lives off-screen. Title carries the cap value too.
-          type: 'value', max: 0, min: ddCap,
+          // -29.4%) lives off-screen. Round formatter — ECharts'
+          // auto-tick can produce values like -30.000000000000004 from
+          // float math, which the default '{value}%' formatter renders
+          // verbatim and the chart edge clips to "000002%".
+          type: 'value', max: 0, min: Math.floor(ddCap),
           axisLine: { show: false }, axisTick: { show: false },
-          axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '{value}%' },
+          axisLabel: {
+            color: COLORS.text3, fontSize: 10,
+            formatter: v => Math.round(v) + '%',
+          },
           splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.4 } },
         },
         series: [{
