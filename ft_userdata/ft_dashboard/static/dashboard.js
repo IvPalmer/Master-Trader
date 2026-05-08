@@ -315,10 +315,26 @@ function dash() {
       const chart = this._ensureChart('chart-equity');
       if (!chart) return;
       const bot = this.raw.bots[key];
-      // Backend now time-rebases expected so day-0 of CSV aligns to
-      // bot_start_ts. No client-side filtering needed — just plot.
-      const expected = (data?.expected || []).map(p => [new Date(p[0]), p[1]]);
+      // Build a smooth projected expected curve from the backtest's annual
+      // return — `equity(t) = starting * (1 + r)^(days_elapsed / 365)`.
+      // Earlier the chart drew the rebased CSV directly, which gave only
+      // 4-6 points (sparse trade-event sampling) and a dashed line that
+      // ended mid-chart. The smooth projection is a cleaner reference and
+      // always extends the full visible range.
       const live = (data?.live || []).map(p => [new Date(p[0]), p[1]]);
+      const startTs = data?.bot_start_ts_ms || (live[0]?.[0]?.getTime() ?? Date.now());
+      const startCap = data?.starting_capital ?? bot.wallet.starting_capital;
+      const annual = bot.baseline?.annual_return_pct ?? 0;
+      const lastLiveTs = live.length ? live[live.length - 1][0].getTime() : Date.now();
+      const horizon = Math.max(lastLiveTs, Date.now()) + 12 * 3600 * 1000;
+      const expected = [];
+      const POINTS = 80;
+      for (let i = 0; i <= POINTS; i++) {
+        const ts = startTs + (horizon - startTs) * i / POINTS;
+        const days = (ts - startTs) / 86400000;
+        const eq = startCap * Math.pow(1 + annual / 100, days / 365);
+        expected.push([new Date(ts), Number(eq.toFixed(4))]);
+      }
       // Build trade markers anchored to the live equity value at close time.
       // Earlier version used [ts, null] which ECharts treats as "no y" and
       // never renders. Here we match each closed trade to its corresponding
@@ -535,12 +551,6 @@ function dash() {
         const dates = candles.map(c => c[0]);
         const ohlc = candles.map(c => [c[1], c[2], c[3], c[4]]);
 
-        // Build markLines only for the price levels we actually have, with
-        // distinct vertical anchors so labels never collide. Each label is
-        // a short tag plus the price; positions ('start' anchors all to the
-        // left, with explicit y offsets) prevent ECharts auto-placement
-        // from clipping them at the right edge.
-        const lines = [];
         const decimals = (() => {
           const r = Math.max(...ohlc.flat());
           if (r >= 100) return 2;
@@ -548,34 +558,84 @@ function dash() {
           return 5;
         })();
         const fmt = v => Number(v).toFixed(decimals);
-        if (pos.open_rate != null) {
+        const pct = (a, b) => ((a - b) / b * 100);
+
+        // ROI target: bot's first ROI rung (8%). Approximation — Freqtrade
+        // ROI ladder steps down over time, but the initial target is the
+        // most actionable reference for a fresh trade.
+        const roiTarget = pos.open_rate != null ? pos.open_rate * 1.08 : null;
+        const stop = pos.stop_loss_abs;
+        const entry = pos.open_rate;
+        const now = pos.current_rate;
+        const yMin = Math.min(...ohlc.flat(), stop ?? Infinity);
+        const yMax = Math.max(...ohlc.flat(), roiTarget ?? -Infinity, entry ?? -Infinity);
+        const padY = (yMax - yMin) * 0.04;
+
+        // Zones: green from entry to ROI target (gain region), red from
+        // entry to stop (loss region). Painted as full-width markAreas so
+        // the user can see at a glance where price would be a winning vs
+        // losing exit.
+        const areas = [];
+        if (entry != null && roiTarget != null) {
+          areas.push([
+            { yAxis: entry, itemStyle: { color: 'rgba(52, 211, 153, 0.10)' } },
+            { yAxis: roiTarget },
+          ]);
+        }
+        if (entry != null && stop != null) {
+          areas.push([
+            { yAxis: stop, itemStyle: { color: 'rgba(248, 113, 113, 0.12)' } },
+            { yAxis: entry },
+          ]);
+        }
+
+        // markLines: distinct color per role, labels anchored to the right
+        // edge with sufficient distance so they don't collide with each
+        // other or with the chart axis.
+        const lines = [];
+        const labelBase = {
+          show: true, position: 'insideEndTop', distance: 4,
+          fontSize: 10, fontFamily: 'JetBrains Mono',
+          backgroundColor: COLORS.surface, padding: [2, 5], borderRadius: 2,
+          borderWidth: 1,
+        };
+        if (entry != null) {
           lines.push({
-            yAxis: pos.open_rate,
-            lineStyle: { color: COLORS.accent, type: 'solid', width: 1.2 },
-            label: { show: true, position: 'start', distance: 6,
-                     formatter: 'entry ' + fmt(pos.open_rate),
-                     color: COLORS.accent, fontSize: 10, fontFamily: 'JetBrains Mono',
-                     backgroundColor: COLORS.surface2, padding: [2, 4], borderRadius: 2 },
+            yAxis: entry,
+            lineStyle: { color: COLORS.accent, type: 'solid', width: 1.5 },
+            label: { ...labelBase, position: 'insideStartTop',
+                     formatter: 'ENTRY ' + fmt(entry),
+                     color: COLORS.accent, borderColor: COLORS.accent },
           });
         }
-        if (pos.current_rate != null) {
+        if (roiTarget != null) {
           lines.push({
-            yAxis: pos.current_rate,
-            lineStyle: { color: COLORS.text2, type: 'dotted', width: 1 },
-            label: { show: true, position: 'end', distance: 6,
-                     formatter: 'now ' + fmt(pos.current_rate),
-                     color: COLORS.text2, fontSize: 10, fontFamily: 'JetBrains Mono',
-                     backgroundColor: COLORS.surface2, padding: [2, 4], borderRadius: 2 },
+            yAxis: roiTarget,
+            lineStyle: { color: COLORS.pos, type: 'dashed', width: 1.2, opacity: 0.7 },
+            label: { ...labelBase, position: 'insideEndTop',
+                     formatter: 'ROI +8% · ' + fmt(roiTarget),
+                     color: COLORS.pos, borderColor: COLORS.pos },
           });
         }
-        if (pos.stop_loss_abs != null) {
+        if (stop != null) {
           lines.push({
-            yAxis: pos.stop_loss_abs,
-            lineStyle: { color: COLORS.neg, type: 'dashed', width: 1.2 },
-            label: { show: true, position: 'start', distance: 6,
-                     formatter: 'stop ' + fmt(pos.stop_loss_abs),
-                     color: COLORS.neg, fontSize: 10, fontFamily: 'JetBrains Mono',
-                     backgroundColor: COLORS.surface2, padding: [2, 4], borderRadius: 2 },
+            yAxis: stop,
+            lineStyle: { color: COLORS.neg, type: 'dashed', width: 1.5 },
+            label: { ...labelBase, position: 'insideStartBottom',
+                     formatter: 'STOP −5% · ' + fmt(stop),
+                     color: COLORS.neg, borderColor: COLORS.neg },
+          });
+        }
+        if (now != null && entry != null && Math.abs(now - entry) / entry > 0.005) {
+          // Only draw "now" line if price has moved >0.5% from entry, else
+          // the label collides with ENTRY.
+          const pnlPct = pct(now, entry);
+          lines.push({
+            yAxis: now,
+            lineStyle: { color: COLORS.text, type: 'dotted', width: 1, opacity: 0.7 },
+            label: { ...labelBase, position: 'insideEndBottom',
+                     formatter: 'NOW ' + fmt(now) + ' · ' + (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%',
+                     color: COLORS.text, borderColor: COLORS.border },
           });
         }
 
@@ -587,7 +647,7 @@ function dash() {
             backgroundColor: COLORS.surface2, borderColor: COLORS.border, borderWidth: 1,
             textStyle: { color: COLORS.text, fontSize: 11 },
           },
-          grid: { left: 70, right: 70, top: 16, bottom: 30 },
+          grid: { left: 60, right: 12, top: 14, bottom: 30 },
           xAxis: {
             type: 'category', data: dates,
             axisLine: { lineStyle: { color: COLORS.border } },
@@ -595,6 +655,7 @@ function dash() {
           },
           yAxis: {
             scale: true,
+            min: yMin - padY, max: yMax + padY,
             axisLine: { show: false }, axisTick: { show: false },
             axisLabel: { color: COLORS.text3, fontSize: 10, formatter: v => fmt(v) },
             splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.3 } },
@@ -606,10 +667,8 @@ function dash() {
               borderColor: COLORS.pos, borderColor0: COLORS.neg,
               borderWidth: 1,
             },
-            markLine: {
-              silent: true, symbol: 'none',
-              data: lines,
-            },
+            markArea: { silent: true, data: areas },
+            markLine: { silent: true, symbol: 'none', data: lines },
           }],
         }, true);
       } catch (e) { console.warn('candles', e); }
