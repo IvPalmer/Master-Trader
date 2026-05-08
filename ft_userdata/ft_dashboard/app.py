@@ -20,6 +20,7 @@ import csv
 import json
 import logging
 import os
+import re
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
@@ -105,17 +106,37 @@ def _per_pair_pnl(trades: list[dict]) -> list[dict]:
 
 
 def _concentration(per_pair: list[dict], total_pnl: float) -> dict:
-    if total_pnl <= 0 or not per_pair:
-        return {"top_pair": None, "top_share": 0.0, "ex_top_pnl": total_pnl, "warn": "ok"}
+    """Surface single-pair P&L concentration risk.
+
+    Use the *gross* positive contribution as the denominator for the share
+    ratio so it can't exceed 100% when other pairs lose money. Without this,
+    a winner-among-losers shows ratios > 1 (e.g. ZEC carries 127%) which
+    reads as a math error.
+
+    The ex-top P&L is reported in dollars regardless — that's the honest
+    number for "what's left if the top pair vanishes".
+    """
+    if not per_pair:
+        return {"top_pair": None, "top_share": 0.0, "ex_top_pnl": 0.0, "warn": "ok"}
     top = per_pair[0]
-    top_share = top["pnl"] / total_pnl if total_pnl else 0
-    ex_top = total_pnl - top["pnl"]
+    if top["pnl"] <= 0:
+        # No profitable pair — concentration metric is meaningless, but show
+        # the leader so the card isn't blank when the bot is in drawdown.
+        return {
+            "top_pair": top["pair"], "top_pair_trades": top["trades"],
+            "top_pair_pnl": round(top["pnl"], 2),
+            "top_share": 0.0,
+            "ex_top_pnl": round(total_pnl - top["pnl"], 2),
+            "warn": "ok",
+        }
+    gross_positive = sum(p["pnl"] for p in per_pair if p["pnl"] > 0)
+    top_share = top["pnl"] / gross_positive if gross_positive else 0
     warn = "danger" if top_share >= CONCENTRATION_DANGER else ("warn" if top_share >= CONCENTRATION_WARN else "ok")
     return {
         "top_pair": top["pair"], "top_pair_trades": top["trades"],
         "top_pair_pnl": round(top["pnl"], 2),
         "top_share": round(top_share, 3),
-        "ex_top_pnl": round(ex_top, 2),
+        "ex_top_pnl": round(total_pnl - top["pnl"], 2),
         "warn": warn,
     }
 
@@ -226,19 +247,35 @@ def _capital_at_risk(open_trades: list[dict]) -> dict:
     return {"abs_loss": round(risk, 2), "open_count": len(open_trades), "open_notional": round(notional, 2)}
 
 
-def _equity_curve_live(closed_trades: list[dict], starting_capital: float) -> list[list]:
-    """Return [[ts_ms, equity_usd], ...] from closed trades, sorted ascending."""
+def _equity_curve_live(
+    closed_trades: list[dict],
+    open_trades: list[dict],
+    starting_capital: float,
+    bot_start_ts_ms: int,
+) -> list[list]:
+    """Return [[ts_ms, equity_usd], ...] from launch onward.
+
+    Always seeds with [bot_start_ts_ms, starting_capital] so the curve renders
+    even before the first trade closes. Closed trades stack cumulatively. A
+    final synthetic point at 'now' includes unrealized P&L from open trades
+    so the live tip reflects the wallet right now.
+    """
+    out: list[list] = []
+    if bot_start_ts_ms:
+        out.append([bot_start_ts_ms, round(starting_capital, 4)])
     pts = sorted(
         [(t.get("close_timestamp") or 0, float(t.get("profit_abs") or 0)) for t in closed_trades],
         key=lambda x: x[0],
     )
-    out = [[None, starting_capital]]  # placeholder for "now-at-zero" baseline
     cum = 0.0
     for ts, pnl in pts:
+        if not ts:
+            continue
         cum += pnl
         out.append([ts, round(starting_capital + cum, 4)])
-    if out and out[0][0] is None:
-        out = out[1:] if len(out) > 1 else []
+    unrealized = sum(float(t.get("profit_abs") or 0) for t in open_trades)
+    if unrealized:
+        out.append([int(time.time() * 1000), round(starting_capital + cum + unrealized, 4)])
     return out
 
 
@@ -283,7 +320,8 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
 
     per_pair = _per_pair_pnl(closed_trades)
     closed_pnl = float((profit or {}).get("profit_closed_coin") or 0.0)
-    live_equity = _equity_curve_live(closed_trades, starting_capital)
+    bot_start_ts_ms = int(bot_start_ts * 1000) if bot_start_ts else 0
+    live_equity = _equity_curve_live(closed_trades, open_trades, starting_capital, bot_start_ts_ms)
     drawdown_curve = _drawdown_curve(live_equity)
 
     return {
@@ -370,7 +408,14 @@ async def _poll_loop():
                 results = await asyncio.gather(*[_poll_bot(client, b) for b in BOTS], return_exceptions=True)
                 for bot, r in zip(BOTS, results):
                     if isinstance(r, Exception):
-                        _cache["errors"][bot["key"]] = str(r)
+                        # Overwrite the cached snapshot so callers don't see
+                        # last successful run as still 'reachable'.
+                        msg = str(r)
+                        _cache["errors"][bot["key"]] = msg
+                        _cache["bots"][bot["key"]] = {
+                            "key": bot["key"], "name": bot["name"], "label": bot["label"],
+                            "reachable": False, "error": msg,
+                        }
                     else:
                         _cache["bots"][bot["key"]] = r
                         if r.get("reachable"):
@@ -445,17 +490,32 @@ async def api_equity(bot_key: str):
         return JSONResponse({"error": "not found"}, status_code=404)
 
     starting = snap["wallet"]["starting_capital"]
+    bot_start_ts_ms = int(snap.get("bot_start_ts", 0) * 1000)
+
+    # Read the backtest CSV (timestamp_ms, equity starting at $200) and rebase
+    # it onto the live timeline: equity scaled to live starting capital, AND
+    # timestamps shifted so day 0 of the backtest = bot_start_ts. Without the
+    # time shift the expected curve sits in 2023 and the chart filters it
+    # away when the user is looking at the live window.
     csv_path = OVERLAYS_DIR / f"expected_{snap['name']}.csv"
     expected: list[list] = []
-    if csv_path.exists() and starting > 0:
+    if csv_path.exists() and starting > 0 and bot_start_ts_ms:
         scale = starting / meta["baseline"]["starting_equity_in_csv"]
         try:
+            raw: list[tuple[int, float]] = []
             with open(csv_path) as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    ts = int(row["timestamp_ms"])
-                    eq = float(row["equity"]) * scale
-                    expected.append([ts, round(eq, 4)])
+                    raw.append((int(row["timestamp_ms"]), float(row["equity"])))
+            if raw:
+                csv_origin_ms = raw[0][0]
+                # End the projection at "now" so the dashed line stays in view.
+                horizon_ms = int(time.time() * 1000) + 86_400_000
+                for ts, eq in raw:
+                    shifted = bot_start_ts_ms + (ts - csv_origin_ms)
+                    if shifted > horizon_ms:
+                        break
+                    expected.append([shifted, round(eq * scale, 4)])
         except Exception as exc:
             log.warning("overlay parse %s: %s", csv_path.name, exc)
 
@@ -464,29 +524,61 @@ async def api_equity(bot_key: str):
         "live": snap.get("equity_live", []),
         "drawdown": snap.get("drawdown_curve", []),
         "expected": expected,
-        "bot_start_ts_ms": int(snap.get("bot_start_ts", 0) * 1000),
+        "bot_start_ts_ms": bot_start_ts_ms,
     })
+
+
+_ALLOWED_TIMEFRAMES = {"1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"}
+_PAIR_RE = re.compile(r"^[A-Z0-9]{2,15}/(USDT|USDC|BTC|ETH|BUSD)$")
 
 
 @app.get("/api/candles/{bot_key}")
 async def api_candles(bot_key: str, pair: str, timeframe: str = "1h", limit: int = 200):
-    """Proxy bot's pair_candles endpoint, return normalized OHLC."""
+    """Proxy bot's pair_candles endpoint, return normalized OHLC.
+
+    Inputs are validated and forwarded as proper httpx params (no string
+    concatenation into the URL), so a malicious `pair` can't smuggle extra
+    query params or path traversal into the upstream Freqtrade REST.
+    """
     bot = _bot_meta(bot_key)
     if not bot:
         return JSONResponse({"error": "bot not found"}, status_code=404)
-    async with httpx.AsyncClient() as client:
-        data, err = await _get(client, bot["url"], f"pair_candles?pair={pair}&timeframe={timeframe}&limit={limit}")
-    if err or not data:
-        return JSONResponse({"error": err or "no data"}, status_code=502)
+    pair = pair.strip().upper()
+    if not _PAIR_RE.match(pair):
+        return JSONResponse({"error": "invalid pair"}, status_code=400)
+    if timeframe not in _ALLOWED_TIMEFRAMES:
+        return JSONResponse({"error": "invalid timeframe"}, status_code=400)
+    limit = max(10, min(limit, 1000))
+
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                f"{bot['url']}/api/v1/pair_candles",
+                auth=(API_USER, API_PASS),
+                params={"pair": pair, "timeframe": timeframe, "limit": limit},
+                timeout=REQUEST_TIMEOUT,
+            )
+            if r.status_code != 200:
+                return JSONResponse({"error": f"HTTP {r.status_code}"}, status_code=502)
+            data = r.json()
+    except Exception as exc:
+        return JSONResponse({"error": f"{type(exc).__name__}: {exc}"}, status_code=502)
+
     cols = data.get("columns", [])
     rows = data.get("data", [])
     idx = {c: i for i, c in enumerate(cols)}
+    needed = ("date", "open", "high", "low", "close", "volume")
+    if not all(k in idx for k in needed):
+        return JSONResponse({"error": "unexpected schema"}, status_code=502)
     ohlc = []
     for row in rows:
         try:
-            ts = row[idx["date"]]
-            o, h, lo, c, v = row[idx["open"]], row[idx["high"]], row[idx["low"]], row[idx["close"]], row[idx["volume"]]
-            ohlc.append([ts, o, c, lo, h, v])  # ECharts candlestick: [open, close, low, high]
+            ohlc.append([
+                row[idx["date"]],
+                row[idx["open"]], row[idx["close"]],
+                row[idx["low"]], row[idx["high"]],
+                row[idx["volume"]],
+            ])
         except Exception:
             continue
     return JSONResponse({"pair": pair, "timeframe": timeframe, "candles": ohlc})

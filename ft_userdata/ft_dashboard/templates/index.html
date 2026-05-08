@@ -10,9 +10,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css?v=3">
-<script defer src="https://unpkg.com/alpinejs@3.14.3/dist/cdn.min.js"></script>
-<script defer src="https://unpkg.com/echarts@5.5.1/dist/echarts.min.js"></script>
+<link rel="stylesheet" href="/static/styles.css?v=4">
+<script defer
+        src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
+        integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
+        crossorigin="anonymous"></script>
+<script defer
+        src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"
+        integrity="sha384-Mx5lkUEQPM1pOJCwFtUICyX45KNojXbkWdYhkKUKsbv391mavbfoAmONbzkgYPzR"
+        crossorigin="anonymous"></script>
 </head>
 <body x-data="dash()" x-init="boot()">
 
@@ -78,10 +84,12 @@
         </div>
       </div>
       <div class="metric warn">
-        <div class="label">drawdown · live</div>
-        <div class="value num" x-text="fmtPct(hero.drawdownPct, 2)">—</div>
+        <div class="label">max drawdown</div>
+        <div class="value num" x-text="fmtPct(hero.drawdownMaxPct, 2)">—</div>
         <div class="footnote">
-          cap <span class="num" x-text="fmtPct(hero.drawdownCap, 1)"></span> · backtest <span class="num" x-text="fmtPct(hero.drawdownBacktest, 1)"></span>
+          now <span class="num" x-text="fmtPct(hero.drawdownCurrentPct, 2)"></span> ·
+          cap <span class="num" x-text="fmtPct(-hero.drawdownCap, 1)"></span> ·
+          lab <span class="num" x-text="fmtPct(-hero.drawdownBacktest, 1)"></span>
         </div>
       </div>
       <div class="metric">
@@ -153,20 +161,20 @@
         <div class="concentration" :class="hero.concentration?.warn">
           <div class="icon" x-text="hero.concentration?.warn === 'danger' ? '⚠' : (hero.concentration?.warn === 'warn' ? '!' : '◇')"></div>
           <div class="body">
-            <div class="label">concentration · single pair share</div>
+            <div class="label">concentration · top pair vs rest</div>
             <div class="text" x-show="hero.concentration?.top_pair" x-cloak>
               <strong x-text="hero.concentration?.top_pair"></strong>
-              carries
-              <strong class="num" x-text="((hero.concentration?.top_share ?? 0) * 100).toFixed(0) + '%'"></strong>
-              <span class="dim" x-show="hero.concentration?.top_share > 0" x-cloak>
-                · ex-<span x-text="hero.concentration?.top_pair"></span>
-                <span class="num" x-text="fmtUsdSigned(hero.concentration?.ex_top_pnl)"></span>
-              </span>
+              <span class="num pos" x-text="fmtUsdSigned(hero.concentration?.top_pair_pnl)"></span>
+              <span class="dim">·</span>
+              <span class="dim">ex-<span x-text="hero.concentration?.top_pair"></span></span>
+              <span class="num" :class="(hero.concentration?.ex_top_pnl ?? 0) >= 0 ? 'pos' : 'neg'"
+                    x-text="fmtUsdSigned(hero.concentration?.ex_top_pnl)"></span>
             </div>
             <div class="text dim" x-show="!hero.concentration?.top_pair">no closed trades yet</div>
           </div>
-          <div class="num-pill" x-show="hero.concentration?.top_pair" x-cloak
-               x-text="((hero.concentration?.top_share ?? 0) * 100).toFixed(0) + '%'"></div>
+          <div class="num-pill" x-show="hero.concentration?.top_pair && hero.concentration?.top_share > 0" x-cloak
+               x-text="Math.min(100, Math.round((hero.concentration?.top_share ?? 0) * 100)) + '%'"
+               title="share of GROSS positive p&l carried by top pair"></div>
         </div>
 
         <div class="card">
@@ -414,6 +422,6 @@
 
 </div>
 
-<script src="/static/dashboard.js?v=3"></script>
+<script src="/static/dashboard.js?v=4"></script>
 </body>
 </html>

@@ -78,31 +78,42 @@ function dash() {
       const live = this.liveBots;
       const start = live.reduce((s, b) => s + b.wallet.starting_capital, 0);
       const owned = live.reduce((s, b) => s + b.wallet.bot_owned, 0);
-      const closed = live.reduce((s, b) => s + b.pnl.closed, 0);
-      const all = live.reduce((s, b) => s + b.pnl.all_coin, 0);
+      // Wallet snapshot is canonical. Both walletNow and totalPnl derive
+      // from `bot_owned` so the hero tiles can never drift from each other.
+      // (Earlier versions read `pnl.all_coin` for the P&L tile, which
+      // rounds independently and produced $0.03 mismatches.)
+      const walletNow = (live.length && owned > 0) ? owned : start;
+      const totalPnl = walletNow - start;
       const closedTrades = live.reduce((s, b) => s + b.stats.closed_trade_count, 0);
       const totalWins = live.reduce((s, b) => s + b.stats.winning_trades, 0);
       const totalLosses = live.reduce((s, b) => s + b.stats.losing_trades, 0);
       const winRate = (totalWins + totalLosses) ? totalWins / (totalWins + totalLosses) : 0;
-      const dd = live.length ? Math.max(...live.map(b => b.stats.max_drawdown * 100)) : 0;
+      const ddMax = live.length ? Math.max(...live.map(b => b.stats.max_drawdown * 100)) : 0;
+      // Current drawdown from peak: derive from the latest underwater point
+      // each bot has reported. The "max" version comes from /api/profit
+      // and is historical worst.
+      const ddCurrentPerBot = live.map(b => {
+        const dd = b.drawdown_curve;
+        return dd && dd.length ? dd[dd.length - 1][1] : 0;
+      });
+      const ddCurrent = ddCurrentPerBot.length ? Math.min(...ddCurrentPerBot) : 0;
       const ddBacktest = live.length ? live[0].baseline.max_dd_pct : 0;
       const ddCap = ddBacktest * 1.5;
       const open = live.reduce((s, b) => s + b.open_trades.length, 0);
       const openNotional = live.reduce((s, b) => s + b.open_trades.reduce((a, t) => a + (t.stake_amount || 0), 0), 0);
       const car = live.reduce((s, b) => s + (b.capital_at_risk?.abs_loss || 0), 0);
       const carPct = start ? (car / start * 100) : 0;
-      // first live bot for concentration + expectancy (single live bot today)
       const primary = live[0];
       return {
-        walletNow: owned || start,
+        walletNow,
         walletStart: start,
-        totalPnl: all,
-        totalPct: start ? (all / start * 100) : 0,
-        closedPnl: closed,
+        totalPnl,
+        totalPct: start ? (totalPnl / start * 100) : 0,
         closedTrades,
         winRate,
         profitFactor: primary?.stats.profit_factor,
-        drawdownPct: dd,
+        drawdownMaxPct: ddMax,
+        drawdownCurrentPct: ddCurrent,
         drawdownBacktest: ddBacktest,
         drawdownCap: ddCap,
         openCount: open,
@@ -125,8 +136,10 @@ function dash() {
       return null;
     },
     get openPosAge() {
-      if (!this.openPos?.open_timestamp) return 0;
-      return Math.floor((Date.now() - this.openPos.open_timestamp) / 1000);
+      const ts = this.openPos?.open_timestamp;
+      if (!ts) return 0;
+      // Freqtrade returns ms; clamp negative if clocks drift.
+      return Math.max(0, Math.floor((Date.now() - ts) / 1000));
     },
     get recentLiveTrades() {
       const live = this.liveBots;
@@ -302,21 +315,29 @@ function dash() {
       const chart = this._ensureChart('chart-equity');
       if (!chart) return;
       const bot = this.raw.bots[key];
-      const startTs = data?.bot_start_ts_ms || 0;
-      const expectedRebased = (data?.expected || [])
-        .filter(p => p[0] >= startTs)
-        .map(p => [new Date(p[0]), p[1]]);
-      // shift expected so it begins at the same equity as bot's starting capital at startTs
+      // Backend now time-rebases expected so day-0 of CSV aligns to
+      // bot_start_ts. No client-side filtering needed — just plot.
+      const expected = (data?.expected || []).map(p => [new Date(p[0]), p[1]]);
       const live = (data?.live || []).map(p => [new Date(p[0]), p[1]]);
-      // Build trade markers
+      // Build trade markers anchored to the live equity value at close time.
+      // Earlier version used [ts, null] which ECharts treats as "no y" and
+      // never renders. Here we match each closed trade to its corresponding
+      // live equity point (built cumulatively in the same order).
+      const liveByTs = new Map(live.map(([d, v]) => [d.getTime(), v]));
       const winMarks = [];
       const lossMarks = [];
-      (bot.recent_trades || []).filter(t => !t.is_open).forEach(t => {
-        if (!t.close_timestamp) return;
-        const m = { name: t.exit_reason, value: [new Date(t.close_timestamp).toISOString(), null], pair: t.pair, pct: t.profit_pct, abs: t.profit_abs };
+      const sortedClosed = (bot.recent_trades || [])
+        .filter(t => !t.is_open && t.close_timestamp)
+        .sort((a, b) => a.close_timestamp - b.close_timestamp);
+      let runningEquity = bot.wallet.starting_capital;
+      for (const t of sortedClosed) {
+        runningEquity += Number(t.profit_abs || 0);
+        const ts = new Date(t.close_timestamp);
+        const y = liveByTs.get(t.close_timestamp) ?? runningEquity;
+        const m = { coord: [ts, y], pair: t.pair, pct: t.profit_pct };
         if ((t.profit_abs || 0) >= 0) winMarks.push(m);
         else lossMarks.push(m);
-      });
+      }
       chart.setOption({
         ...ECHART_COMMON,
         animation: false,
@@ -347,9 +368,10 @@ function dash() {
         series: [
           {
             name: 'backtest expected',
-            type: 'line', data: expectedRebased,
-            showSymbol: false, lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.2 },
-            itemStyle: { color: COLORS.text3 }, z: 1,
+            type: 'line', data: expected,
+            showSymbol: false,
+            lineStyle: { color: COLORS.text2, type: 'dashed', width: 1.4, opacity: 0.7 },
+            itemStyle: { color: COLORS.text2 }, z: 1,
           },
           {
             name: 'live equity',
@@ -363,16 +385,17 @@ function dash() {
             },
             itemStyle: { color: COLORS.accent },
             markPoint: {
-              symbol: 'circle', symbolSize: 8,
+              symbol: 'circle', symbolSize: 7,
               data: [
                 ...winMarks.map(m => ({
-                  coord: m.value, value: '↑', itemStyle: { color: COLORS.pos, borderColor: COLORS.bg },
+                  coord: m.coord, itemStyle: { color: COLORS.pos, borderColor: COLORS.surface, borderWidth: 1 },
                   label: { show: false },
-                  tooltip: { formatter: () => `${m.pair} · ${m.pct?.toFixed(2)}%` },
+                  tooltip: { formatter: () => `${m.pair} · +${m.pct?.toFixed(2)}%` },
                 })),
                 ...lossMarks.map(m => ({
-                  coord: m.value, value: '↓', itemStyle: { color: COLORS.neg, borderColor: COLORS.bg },
+                  coord: m.coord, itemStyle: { color: COLORS.neg, borderColor: COLORS.surface, borderWidth: 1 },
                   label: { show: false },
+                  tooltip: { formatter: () => `${m.pair} · ${m.pct?.toFixed(2)}%` },
                 })),
               ],
             },
@@ -408,7 +431,10 @@ function dash() {
           axisLabel: { color: COLORS.text3, fontSize: 10 },
         },
         yAxis: {
-          type: 'value', max: 0,
+          // Lock min so the cap line is always visible. Without this, a
+          // shallow live drawdown auto-scales to ±2% and the cap (e.g.
+          // -29.4%) lives off-screen. Title carries the cap value too.
+          type: 'value', max: 0, min: ddCap,
           axisLine: { show: false }, axisTick: { show: false },
           axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '{value}%' },
           splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.4 } },
@@ -424,8 +450,26 @@ function dash() {
           },
           markLine: {
             silent: true, symbol: 'none',
-            lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 },
-            data: [{ yAxis: ddCap, label: { show: true, formatter: 'cap ' + ddCap.toFixed(1) + '%', color: COLORS.warn, fontSize: 10 } }],
+            data: [
+              {
+                yAxis: ddCap,
+                lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 },
+                label: {
+                  show: true, position: 'insideEndTop',
+                  formatter: 'cap ' + ddCap.toFixed(1) + '%',
+                  color: COLORS.warn, fontSize: 10,
+                },
+              },
+              {
+                yAxis: -(bot?.baseline?.max_dd_pct || 0),
+                lineStyle: { color: COLORS.text3, type: 'dotted', width: 1, opacity: 0.6 },
+                label: {
+                  show: true, position: 'insideEndBottom',
+                  formatter: 'backtest ' + (-(bot?.baseline?.max_dd_pct || 0)).toFixed(1) + '%',
+                  color: COLORS.text3, fontSize: 10,
+                },
+              },
+            ],
           },
         }],
       }, true);
@@ -490,6 +534,51 @@ function dash() {
         if (!candles.length) return;
         const dates = candles.map(c => c[0]);
         const ohlc = candles.map(c => [c[1], c[2], c[3], c[4]]);
+
+        // Build markLines only for the price levels we actually have, with
+        // distinct vertical anchors so labels never collide. Each label is
+        // a short tag plus the price; positions ('start' anchors all to the
+        // left, with explicit y offsets) prevent ECharts auto-placement
+        // from clipping them at the right edge.
+        const lines = [];
+        const decimals = (() => {
+          const r = Math.max(...ohlc.flat());
+          if (r >= 100) return 2;
+          if (r >= 1) return 4;
+          return 5;
+        })();
+        const fmt = v => Number(v).toFixed(decimals);
+        if (pos.open_rate != null) {
+          lines.push({
+            yAxis: pos.open_rate,
+            lineStyle: { color: COLORS.accent, type: 'solid', width: 1.2 },
+            label: { show: true, position: 'start', distance: 6,
+                     formatter: 'entry ' + fmt(pos.open_rate),
+                     color: COLORS.accent, fontSize: 10, fontFamily: 'JetBrains Mono',
+                     backgroundColor: COLORS.surface2, padding: [2, 4], borderRadius: 2 },
+          });
+        }
+        if (pos.current_rate != null) {
+          lines.push({
+            yAxis: pos.current_rate,
+            lineStyle: { color: COLORS.text2, type: 'dotted', width: 1 },
+            label: { show: true, position: 'end', distance: 6,
+                     formatter: 'now ' + fmt(pos.current_rate),
+                     color: COLORS.text2, fontSize: 10, fontFamily: 'JetBrains Mono',
+                     backgroundColor: COLORS.surface2, padding: [2, 4], borderRadius: 2 },
+          });
+        }
+        if (pos.stop_loss_abs != null) {
+          lines.push({
+            yAxis: pos.stop_loss_abs,
+            lineStyle: { color: COLORS.neg, type: 'dashed', width: 1.2 },
+            label: { show: true, position: 'start', distance: 6,
+                     formatter: 'stop ' + fmt(pos.stop_loss_abs),
+                     color: COLORS.neg, fontSize: 10, fontFamily: 'JetBrains Mono',
+                     backgroundColor: COLORS.surface2, padding: [2, 4], borderRadius: 2 },
+          });
+        }
+
         chart.setOption({
           ...ECHART_COMMON,
           animation: false,
@@ -498,7 +587,7 @@ function dash() {
             backgroundColor: COLORS.surface2, borderColor: COLORS.border, borderWidth: 1,
             textStyle: { color: COLORS.text, fontSize: 11 },
           },
-          grid: { left: 55, right: 16, top: 16, bottom: 30 },
+          grid: { left: 70, right: 70, top: 16, bottom: 30 },
           xAxis: {
             type: 'category', data: dates,
             axisLine: { lineStyle: { color: COLORS.border } },
@@ -507,7 +596,7 @@ function dash() {
           yAxis: {
             scale: true,
             axisLine: { show: false }, axisTick: { show: false },
-            axisLabel: { color: COLORS.text3, fontSize: 10 },
+            axisLabel: { color: COLORS.text3, fontSize: 10, formatter: v => fmt(v) },
             splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.3 } },
           },
           series: [{
@@ -519,15 +608,7 @@ function dash() {
             },
             markLine: {
               silent: true, symbol: 'none',
-              lineStyle: { width: 1.2 },
-              data: [
-                { yAxis: pos.open_rate, lineStyle: { color: COLORS.accent, type: 'solid' },
-                  label: { show: true, formatter: 'entry ' + pos.open_rate, color: COLORS.accent, fontSize: 10, position: 'insideEndTop' } },
-                { yAxis: pos.stop_loss_abs, lineStyle: { color: COLORS.neg, type: 'dashed' },
-                  label: { show: true, formatter: 'stop ' + pos.stop_loss_abs, color: COLORS.neg, fontSize: 10, position: 'insideEndBottom' } },
-                { yAxis: pos.current_rate, lineStyle: { color: COLORS.text2, type: 'dotted' },
-                  label: { show: true, formatter: 'now ' + pos.current_rate, color: COLORS.text2, fontSize: 10 } },
-              ],
+              data: lines,
             },
           }],
         }, true);
