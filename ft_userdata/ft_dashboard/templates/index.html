@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css?v=5">
+<link rel="stylesheet" href="/static/styles.css?v=6">
 <script defer
         src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
         integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
@@ -93,9 +93,16 @@
         </div>
       </div>
       <div class="metric">
-        <div class="label">capital at risk</div>
+        <div class="label">at risk · open trades</div>
         <div class="value num neg" x-text="fmtUsdSigned(-hero.capitalAtRisk)">—</div>
-        <div class="footnote">if all stops hit · <span class="num" x-text="fmtPct(hero.capitalAtRiskPct, 1)"></span> wallet</div>
+        <div class="footnote">
+          <span x-show="hero.openCount > 0" x-cloak>
+            if <span class="num" x-text="hero.openCount"></span>
+            stop<span x-show="hero.openCount !== 1">s</span> hit ·
+            <span class="num" x-text="fmtPct(hero.capitalAtRiskPct, 1)"></span> wallet
+          </span>
+          <span x-show="hero.openCount === 0">no exposure</span>
+        </div>
       </div>
       <div class="metric">
         <div class="label">closed trades</div>
@@ -161,12 +168,19 @@
         <div class="concentration" :class="hero.concentration?.warn">
           <div class="icon" x-text="hero.concentration?.warn === 'danger' ? '⚠' : (hero.concentration?.warn === 'warn' ? '!' : '◇')"></div>
           <div class="body">
-            <div class="label">concentration · top pair vs rest</div>
+            <div class="label">
+              p&l concentration · closed trades
+              <span class="dim" style="text-transform: none; letter-spacing: 0;"
+                    x-show="hero.concentration?.top_pair_trades" x-cloak>
+                · n=<span x-text="hero.expectancySample"></span>
+              </span>
+            </div>
             <div class="text" x-show="hero.concentration?.top_pair" x-cloak>
               <strong x-text="hero.concentration?.top_pair"></strong>
               <span class="num pos" x-text="fmtUsdSigned(hero.concentration?.top_pair_pnl)"></span>
+              <span class="dim">in <span class="num" x-text="hero.concentration?.top_pair_trades"></span> trade<span x-show="hero.concentration?.top_pair_trades !== 1">s</span></span>
               <span class="dim">·</span>
-              <span class="dim">ex-<span x-text="hero.concentration?.top_pair"></span></span>
+              <span class="dim">rest of fleet</span>
               <span class="num" :class="(hero.concentration?.ex_top_pnl ?? 0) >= 0 ? 'pos' : 'neg'"
                     x-text="fmtUsdSigned(hero.concentration?.ex_top_pnl)"></span>
             </div>
@@ -422,6 +436,6 @@
 
 </div>
 
-<script src="/static/dashboard.js?v=5"></script>
+<script src="/static/dashboard.js?v=6"></script>
 </body>
 </html>
