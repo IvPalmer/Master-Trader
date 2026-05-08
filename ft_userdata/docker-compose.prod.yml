@@ -1,109 +1,76 @@
----
-# Production compose for elder-brain VPS deployment via Dokploy.
-#
-# Differences from the dev docker-compose.yml on Mac:
-#   - No `extra_hosts` Binance-IP pinning (Mac VPN bypass; not needed on VPS).
-#   - No `env_file: ../.env` (Dokploy injects secrets at runtime via the project
-#     "Environment" UI; values land as env vars on every service).
-#   - All killed/paused strategy blocks removed (kept in dev compose for history).
-#   - Port binds remain 127.0.0.1 — tailnet-only access via Tailscale.
-#
-# Secrets to set in Dokploy project env (matches keys used below):
-#   FREQTRADE__EXCHANGE__KEY
-#   FREQTRADE__EXCHANGE__SECRET
-#   FREQTRADE__API_SERVER__USERNAME
-#   FREQTRADE__API_SERVER__PASSWORD
-#   FREQTRADE__API_SERVER__JWT_SECRET_KEY
-#   BINANCE_API_KEY               (mirror, used by ad-hoc check_balance.py)
-#   BINANCE_API_SECRET            (mirror)
-
-x-healthcheck: &bot-healthcheck
-  test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/v1/ping || exit 1"]
+x-healthcheck: &a2
+  test:
+    - CMD-SHELL
+    - curl -sf http://localhost:8080/api/v1/ping || exit 1
   interval: 30s
   timeout: 10s
   retries: 5
   start_period: 120s
-
-x-bot-env: &bot-env
+x-bot-env: &a1
   FREQTRADE__EXCHANGE__KEY: ${FREQTRADE__EXCHANGE__KEY}
   FREQTRADE__EXCHANGE__SECRET: ${FREQTRADE__EXCHANGE__SECRET}
   FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
   FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
   FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FREQTRADE__API_SERVER__JWT_SECRET_KEY}
-
 services:
   keltnerbouncev1:
     image: freqtradeorg/freqtrade:stable
     restart: always
     container_name: ft-keltner-bounce
-    environment: *bot-env
+    environment: *a1
     volumes:
-      # Named volume = persistent across Dokploy redeploys (Dokploy wipes
-      # the cloned ./user_data each pull). configs + strategies overlay
-      # from the cloned repo so code changes flow via git push.
-      - "ft_user_data:/freqtrade/user_data"
-      - "./user_data/configs:/freqtrade/user_data/configs:ro"
-      - "./user_data/strategies:/freqtrade/user_data/strategies"
+      - ft_user_data:/freqtrade/user_data
+      - ./user_data/configs:/freqtrade/user_data/configs:ro
+      - ./user_data/strategies:/freqtrade/user_data/strategies
     ports:
-      - "127.0.0.1:8095:8080"
-    healthcheck: *bot-healthcheck
+      - 127.0.0.1:8095:8080
+    healthcheck: *a2
     deploy:
       resources:
         limits:
           memory: 768M
     entrypoint:
-      - "/bin/sh"
-      - "-c"
-      - "sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KeltnerBounceV1.log --config /freqtrade/user_data/configs/KeltnerBounceV1.json --strategy KeltnerBounceV1"
-
+      - /bin/sh
+      - -c
+      - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KeltnerBounceV1.log --config /freqtrade/user_data/configs/KeltnerBounceV1.json --strategy KeltnerBounceV1
   fundingfadev1:
-    # Gated behind compose profile `live` so the dry-run/monitoring stack can
-    # be deployed first without this LIVE bot starting before its real-money
-    # SQLite (`tradesv3.live.FundingFadeV1.sqlite`) is rsynced from Mac to VPS.
-    # Cutover sequence: stop Mac bot → wal_checkpoint → rsync state → set
-    # COMPOSE_PROFILES=live in Dokploy env → redeploy.
     profiles:
       - live
     image: freqtradeorg/freqtrade:stable
     restart: always
     container_name: ft-funding-fade
-    environment: *bot-env
+    environment: *a1
     volumes:
-      - "ft_user_data:/freqtrade/user_data"
-      - "./user_data/configs:/freqtrade/user_data/configs:ro"
-      - "./user_data/strategies:/freqtrade/user_data/strategies"
+      - ft_user_data:/freqtrade/user_data
+      - ./user_data/configs:/freqtrade/user_data/configs:ro
+      - ./user_data/strategies:/freqtrade/user_data/strategies
     ports:
-      - "127.0.0.1:8096:8080"
-    healthcheck: *bot-healthcheck
+      - 127.0.0.1:8096:8080
+    healthcheck: *a2
     deploy:
       resources:
         limits:
           memory: 768M
     entrypoint:
-      - "/bin/sh"
-      - "-c"
-      - "sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1"
-
-  # Refreshes user_data/data/binance/funding/*.feather every 4h. Required by
-  # FundingFadeV1: stale funding rates → strategy filters out signals. Replaces
-  # the Mac crontab `0 */4 * * * ... download_funding_rates.py --incremental`
-  # that was disabled at VPS cutover (2026-04-27).
+      - /bin/sh
+      - -c
+      - sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1
   funding-refresh:
     image: freqtradeorg/freqtrade:stable
     restart: always
     container_name: ft-funding-refresh
-    user: "1000:1000"
+    user: 1000:1000
     volumes:
-      - "ft_user_data:/app/user_data"
-      - "./download_funding_rates.py:/app/download_funding_rates.py:ro"
+      - ft_user_data:/app/user_data
+      - ./download_funding_rates.py:/app/download_funding_rates.py:ro
     working_dir: /app
     deploy:
       resources:
         limits:
           memory: 256M
     entrypoint:
-      - "/bin/sh"
-      - "-c"
+      - /bin/sh
+      - -c
       - |
         while true; do
           echo "[funding-refresh] $$(date -u +%FT%TZ) starting incremental refresh"
@@ -122,21 +89,6 @@ services:
           echo "[funding-refresh] $$(date -u +%FT%TZ) sleeping 4h"
           sleep 14400
         done
-
-  grafana-bridge:
-    build: ./grafana-bridge
-    restart: unless-stopped
-    container_name: ft-grafana-bridge
-    volumes:
-      - "./grafana/dashboards:/dashboards"
-      - "./grafana/overlays:/overlays:ro"
-    deploy:
-      resources:
-        limits:
-          memory: 192M
-    depends_on:
-      - keltnerbouncev1
-
   metrics-exporter:
     build:
       context: .
@@ -147,98 +99,78 @@ services:
       FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
     volumes:
-      - "./metrics_exporter.py:/app/metrics_exporter.py:ro"
-      - "./api_utils.py:/app/api_utils.py:ro"
-      - "./bots_config.json:/app/bots_config.json:ro"
+      - ./metrics_exporter.py:/app/metrics_exporter.py:ro
+      - ./api_utils.py:/app/api_utils.py:ro
+      - ./bots_config.json:/app/bots_config.json:ro
+      - ft_exporter_state:/state
     ports:
-      - "127.0.0.1:9090:9090"
+      - 127.0.0.1:9090:9090
     deploy:
       resources:
         limits:
           memory: 128M
     depends_on:
       - keltnerbouncev1
-
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
     container_name: ft-prometheus
     volumes:
-      - "./prometheus.yml:/etc/prometheus/prometheus.yml:ro"
-      - "prometheus_data:/prometheus"
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     ports:
-      - "127.0.0.1:9091:9090"
+      - 127.0.0.1:9091:9090
     deploy:
       resources:
         limits:
           memory: 256M
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=90d"
-      - "--web.enable-lifecycle"
-      - "--web.enable-admin-api"
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=90d
+      - --web.enable-lifecycle
+      - --web.enable-admin-api
     depends_on:
       - metrics-exporter
-
-  grafana:
-    image: grafana/grafana:latest
+  ft-dashboard:
+    build: ./ft_dashboard
     restart: unless-stopped
-    container_name: ft-grafana
+    container_name: ft-dashboard
     networks:
       - default
       - dokploy-network
+    environment:
+      FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
+      FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+      POLL_INTERVAL: "30"
+      OVERLAYS_DIR: /overlays
     volumes:
-      - "grafana_data:/var/lib/grafana"
-      - "./grafana/provisioning:/etc/grafana/provisioning:ro"
-      - "./grafana/dashboards:/var/lib/grafana/dashboards"
+      - ./overlays:/overlays:ro
     deploy:
       resources:
         limits:
-          memory: 384M
-    environment:
-      # ── Auth: anonymous OFF, CF Access JWT becomes Grafana user ──
-      - GF_AUTH_ANONYMOUS_ENABLED=false
-      - GF_AUTH_DISABLE_LOGIN_FORM=true
-      - GF_AUTH_PROXY_ENABLED=true
-      - GF_AUTH_PROXY_HEADER_NAME=Cf-Access-Authenticated-User-Email
-      - GF_AUTH_PROXY_HEADER_PROPERTY=username
-      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
-      # Admin creds come from Dokploy env (also mirrored in ~/.secrets/master-trader-grafana.env).
-      # Safety net: if auth-proxy chain breaks, you can still reach /login with these.
-      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
-      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
-      # ── UX defaults ──
-      - GF_USERS_DEFAULT_THEME=dark
-      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/freqtrade.json
-      - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
+          memory: 192M
     labels:
-      # ── Traefik: master-trader.grooveops.dev → ft-grafana:3000 ──
-      # CF Access gates the entire host (DNS proxied=ON).
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
-      # HTTPS router
-      - "traefik.http.routers.master-trader.rule=Host(`master-trader.grooveops.dev`)"
+      - traefik.http.routers.master-trader.rule=Host(`master-trader.grooveops.dev`)
       - traefik.http.routers.master-trader.entrypoints=websecure
       - traefik.http.routers.master-trader.tls=true
       - traefik.http.routers.master-trader.tls.certresolver=letsencrypt
       - traefik.http.routers.master-trader.service=master-trader
-      - traefik.http.services.master-trader.loadbalancer.server.port=3000
-      # HTTP → HTTPS redirect
-      - "traefik.http.routers.master-trader-http.rule=Host(`master-trader.grooveops.dev`)"
+      - traefik.http.services.master-trader.loadbalancer.server.port=8000
+      - traefik.http.routers.master-trader-http.rule=Host(`master-trader.grooveops.dev`)
       - traefik.http.routers.master-trader-http.entrypoints=web
       - traefik.http.routers.master-trader-http.middlewares=master-trader-https-redirect@docker
       - traefik.http.middlewares.master-trader-https-redirect.redirectscheme.scheme=https
       - traefik.http.middlewares.master-trader-https-redirect.redirectscheme.permanent=true
     depends_on:
-      - prometheus
-      - grafana-bridge
+      - keltnerbouncev1
 
 networks:
-  default:
+  default: null
   dokploy-network:
     external: true
-
 volumes:
-  prometheus_data:
-  grafana_data:
-  ft_user_data:
+  prometheus_data: null
+  ft_user_data: null
+  ft_exporter_state: null
