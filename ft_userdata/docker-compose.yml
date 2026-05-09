@@ -252,7 +252,7 @@ services:
     # Validation: Freqtrade native PF 1.76, 84% WR, max DD 0.51% (Oct 10 2025
     # cascade only) on 39mo backtest. 5/6 walk-forward windows positive. Wins
     # in 2023-H2 where Keltner LOST. See docs/cascade_fader_v1_validation_2026-05-09.md.
-    entrypoint: ["/bin/sh", "-c", "sleep 80 && exec freqtrade trade --logfile /freqtrade/user_data/logs/CascadeFaderV1.log --config /freqtrade/user_data/configs/CascadeFaderV1.json --strategy CascadeFaderV1"]
+    entrypoint: ["/bin/sh", "-c", "mkdir -p /freqtrade/user_data/logs && sleep 80 && exec freqtrade trade --logfile /freqtrade/user_data/logs/CascadeFaderV1.log --config /freqtrade/user_data/configs/CascadeFaderV1.json --strategy CascadeFaderV1"]
 
   # FundingShortV1 KILLED 2026-04-18 — full 3.3yr 1m-detail backtest: PF 1.06, DD 52.1%.
   # Same regime-luck pattern as MasterTrader + Supertrend. Bull-window 1h mirage.
