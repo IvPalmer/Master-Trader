@@ -230,17 +230,16 @@ services:
     restart: always
     container_name: ft-cascade-fader
     extra_hosts: *binance-hosts
-    # Mirror the mount pattern Keltner/FundingFade actually run with at the
-    # Docker-runtime layer: dedicated docker volume holds writable runtime
-    # state (logs/ + sqlite databases), with binds layered for live source
-    # updates. The bare-bind shortcut "./user_data:/freqtrade/user_data" fails
-    # because the host bind dir is owned by Dokploy/root and freqtrade runs as
-    # ftuser — first cold-start hits "permission denied" on the log file.
+    # Mirror Keltner/FundingFade prod pattern: named docker volume holds
+    # writable runtime state (logs/ + sqlite databases) with ftuser perms,
+    # binds layered on top for live source updates. The bare-bind shortcut
+    # "./user_data:/freqtrade/user_data" fails because the host bind dir is
+    # owned by Dokploy/root and freqtrade runs as ftuser — first cold-start
+    # hits "permission denied" creating its log file.
     volumes:
-      - "ft_cascade_data:/freqtrade/user_data"
-      - "./user_data/configs:/freqtrade/user_data/configs"
+      - "ft_user_data:/freqtrade/user_data"
+      - "./user_data/configs:/freqtrade/user_data/configs:ro"
       - "./user_data/strategies:/freqtrade/user_data/strategies"
-      - "./user_data/data:/freqtrade/user_data/data"
     ports:
       - "127.0.0.1:8097:8080"
     healthcheck: *bot-healthcheck
@@ -368,4 +367,4 @@ volumes:
   prometheus_data:
   grafana_data:
   ft_exporter_state:
-  ft_cascade_data:
+  ft_user_data:

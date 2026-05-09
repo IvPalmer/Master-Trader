@@ -55,6 +55,30 @@ services:
       - /bin/sh
       - -c
       - sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1
+  cascadefaderv1:
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-cascade-fader
+    environment: *a1
+    volumes:
+      - ft_user_data:/freqtrade/user_data
+      - ./user_data/configs:/freqtrade/user_data/configs:ro
+      - ./user_data/strategies:/freqtrade/user_data/strategies
+    ports:
+      - 127.0.0.1:8097:8080
+    healthcheck: *a2
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    # DRY-RUN. Liquidation-cascade rebound fader (third candidate strategy).
+    # Validation: Freqtrade native PF 1.76, 84% WR, max DD 0.51% (Oct 10 2025
+    # cascade only) on 39mo backtest. 5/6 walk-forward windows positive.
+    # Wins in 2023-H2 where Keltner LOST. See docs/cascade_fader_v1_validation_2026-05-09.md.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - mkdir -p /freqtrade/user_data/logs && sleep 80 && exec freqtrade trade --logfile /freqtrade/user_data/logs/CascadeFaderV1.log --config /freqtrade/user_data/configs/CascadeFaderV1.json --strategy CascadeFaderV1
   funding-refresh:
     image: freqtradeorg/freqtrade:stable
     restart: always
@@ -111,6 +135,7 @@ services:
           memory: 128M
     depends_on:
       - keltnerbouncev1
+      - cascadefaderv1
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
@@ -165,6 +190,7 @@ services:
       - traefik.http.middlewares.master-trader-https-redirect.redirectscheme.permanent=true
     depends_on:
       - keltnerbouncev1
+      - cascadefaderv1
 
 networks:
   default: null
