@@ -225,6 +225,26 @@ services:
     # Binance creds + local API creds injected via FREQTRADE__ env vars from ../.env.
     entrypoint: ["/bin/sh", "-c", "sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1"]
 
+  cascadefaderv1:
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-cascade-fader
+    extra_hosts: *binance-hosts
+    volumes:
+      - "./user_data:/freqtrade/user_data"
+    ports:
+      - "127.0.0.1:8097:8080"
+    healthcheck: *bot-healthcheck
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    # DRY-RUN. Liquidation-cascade rebound fader (third candidate strategy).
+    # Validation: Freqtrade native PF 1.76, 84% WR, max DD 0.51% (Oct 10 2025
+    # cascade only) on 39mo backtest. 5/6 walk-forward windows positive. Wins
+    # in 2023-H2 where Keltner LOST. See docs/cascade_fader_v1_validation_2026-05-09.md.
+    entrypoint: ["/bin/sh", "-c", "sleep 80 && exec freqtrade trade --logfile /freqtrade/user_data/logs/CascadeFaderV1.log --config /freqtrade/user_data/configs/CascadeFaderV1.json --strategy CascadeFaderV1"]
+
   # FundingShortV1 KILLED 2026-04-18 — full 3.3yr 1m-detail backtest: PF 1.06, DD 52.1%.
   # Same regime-luck pattern as MasterTrader + Supertrend. Bull-window 1h mirage.
   # fundingshortv1:
@@ -259,6 +279,7 @@ services:
     depends_on:
       - keltnerbouncev1
       - fundingfadev1
+      - cascadefaderv1
 
   # ── Monitoring Stack ───────────────────────────────────────────────
 
@@ -286,6 +307,7 @@ services:
     depends_on:
       - keltnerbouncev1
       - fundingfadev1
+      - cascadefaderv1
 
   prometheus:
     image: prom/prometheus:latest

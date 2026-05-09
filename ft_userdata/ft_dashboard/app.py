@@ -59,6 +59,17 @@ BOTS: list[dict[str, Any]] = [
             "starting_equity_in_csv": 200.0,
         },
     },
+    {
+        "key": "cascade",
+        "name": "CascadeFaderV1",
+        "label": "cascade-fader",
+        "url": "http://ft-cascade-fader:8080",
+        "baseline": {
+            "annual_return_pct": 17.0, "profit_factor": 1.76, "win_rate": 0.84,
+            "max_dd_pct": 0.51, "trades_per_year": 46, "worst_trade_pct": -8.0,
+            "starting_equity_in_csv": 200.0,
+        },
+    },
 ]
 
 API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "")
