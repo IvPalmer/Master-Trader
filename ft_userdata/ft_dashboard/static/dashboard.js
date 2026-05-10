@@ -369,10 +369,10 @@ function dash() {
       let candles = this._tradeCandles[cacheKey];
       if (!candles) {
         try {
-          // Binance-direct endpoint supports any timeframe (Freqtrade's
-          // pair_candles only serves the strategy's configured timeframe,
-          // which 502'd on 4h/5m for our 1h-strategy bots).
-          const url = `/api/binance_candles?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=1000`;
+          // Smaller fetch (250 candles) keeps high-TF charts readable without
+          // 167-day-of-history overshoot. Centered on trade close; user can
+          // pan via slider drag if they want more context.
+          const url = `/api/binance_candles?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=250`;
           const r = await fetch(url, { cache: 'no-store' });
           if (!r.ok) return;
           const data = await r.json();
@@ -383,86 +383,79 @@ function dash() {
       if (!candles.length) return;
 
       // Freqtrade open_timestamp/close_timestamp are EPOCH MILLISECONDS.
-      // Window: pad ~150% of trade span on each side (min 4h, max 7d) so the
-      // chart starts zoomed enough to see the full trade + plenty of context
-      // before/after. User can dataZoom drag/scroll to see more.
+      // Use ABSOLUTE-time visible window so it stays consistent across
+      // timeframe switches (was percentage-based, which made 4h zoom out to
+      // 167 days while 5m stayed at 8 hours - "inverted" feel).
       const span = trade.close_ts - trade.open_ts;
-      const padMs = Math.min(Math.max(span * 1.5, 4 * 3600 * 1000), 7 * 86400 * 1000);
-      const windowStart = trade.open_ts - padMs;
-      const windowEnd = trade.close_ts + padMs;
-      const sliced = candles.filter(c => {
-        const ts = typeof c[0] === 'number' ? c[0] : new Date(c[0]).getTime();
-        return ts >= windowStart && ts <= windowEnd;
-      });
-      if (!sliced.length) return;
+      const visiblePadMs = Math.max(span * 0.5, 30 * 60 * 1000);
+      const visibleStart = trade.open_ts - visiblePadMs;
+      const visibleEnd = trade.close_ts + visiblePadMs;
+
+      // Use all available candles (let user zoom/pan freely). Don't pre-slice.
+      const allCandles = candles.filter(c => c && c.length >= 5);
+      if (!allCandles.length) return;
 
       const chart = this._ensureChart(chartId);
       if (!chart) return;
 
-      const ohlc = sliced.map(c => [c[1], c[2], c[3], c[4]]);
-      const dates = sliced.map(c => typeof c[0] === 'number' ? c[0] : new Date(c[0]).getTime());
+      const dates = allCandles.map(c => typeof c[0] === 'number' ? c[0] : new Date(c[0]).getTime());
+      const ohlc = allCandles.map(c => [c[1], c[2], c[3], c[4]]);
 
       const winColor = trade.is_win ? COLORS.pos : COLORS.neg;
       const entryTs = trade.open_ts;
       const exitTs = trade.close_ts;
 
-      // Default visible range: tight on the trade itself + small pad. User
-      // can drag the slider or zoom out via mouse wheel.
-      const tradePad = Math.max(span * 0.3, 30 * 60 * 1000);
-      const startVisible = Math.max(windowStart, entryTs - tradePad);
-      const endVisible = Math.min(windowEnd, exitTs + tradePad);
-      const visibleStartPct = ((startVisible - dates[0]) / (dates[dates.length-1] - dates[0])) * 100;
-      const visibleEndPct = ((endVisible - dates[0]) / (dates[dates.length-1] - dates[0])) * 100;
-
       chart.setOption({
         ...ECHART_COMMON,
-        grid: { left: 56, right: 12, top: 12, bottom: 50, containLabel: false },
+        animation: false,
+        grid: { left: 56, right: 12, top: 12, bottom: 54, containLabel: false },
         xAxis: {
           type: 'time',
           axisLine: { lineStyle: { color: COLORS.border } },
-          axisLabel: { color: COLORS.text3, fontSize: 9 },
+          axisLabel: { color: COLORS.text3, fontSize: 9, hideOverlap: true },
           splitLine: { show: false },
+          axisPointer: { label: { show: false } },
         },
         yAxis: {
           type: 'value',
           scale: true,
+          position: 'right',
           axisLine: { lineStyle: { color: COLORS.border } },
           axisLabel: { color: COLORS.text3, fontSize: 9, formatter: v => v.toPrecision(4) },
           splitLine: { lineStyle: { color: COLORS.border, opacity: 0.3 } },
+          axisPointer: { label: { show: false } },
         },
-        // TradingView-style interaction: drag inside the chart to pan, mouse-wheel
-        // to zoom, plus a bottom slider as a fallback when wheel/touch isn't
-        // available. start/end values are %; we compute them from the visible
-        // window so the chart loads zoomed to the trade neighborhood.
+        // ABSOLUTE time bounds via startValue/endValue. Both inside (drag/wheel)
+        // and slider (handle drag) share the same range so they stay in sync.
+        // moveOnMouseMove: true + preventDefaultMouseMove: true = drag pan
+        // works inside the chart area without page scroll interference.
         dataZoom: [
           {
             type: 'inside',
             xAxisIndex: 0,
-            start: Math.max(0, visibleStartPct),
-            end: Math.min(100, visibleEndPct),
+            startValue: visibleStart,
+            endValue: visibleEnd,
             zoomOnMouseWheel: true,
             moveOnMouseWheel: false,
             moveOnMouseMove: true,
-            preventDefaultMouseMove: false,
+            preventDefaultMouseMove: true,
+            filterMode: 'none',
           },
           {
             type: 'slider',
             xAxisIndex: 0,
-            start: Math.max(0, visibleStartPct),
-            end: Math.min(100, visibleEndPct),
-            height: 16,
-            bottom: 16,
+            startValue: visibleStart,
+            endValue: visibleEnd,
+            height: 18,
+            bottom: 22,
             backgroundColor: COLORS.surface2,
-            fillerColor: 'rgba(34, 211, 238, 0.08)',
+            fillerColor: 'rgba(34, 211, 238, 0.10)',
             borderColor: COLORS.border,
             handleStyle: { color: COLORS.accent, borderColor: COLORS.accent },
             moveHandleStyle: { color: COLORS.accent, opacity: 0.6 },
             textStyle: { color: COLORS.text3, fontSize: 9 },
-            labelFormatter: ts => {
-              const d = new Date(ts);
-              return (d.getUTCMonth()+1) + '-' + String(d.getUTCDate()).padStart(2,'0') + ' ' +
-                     String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0');
-            },
+            showDetail: false,
+            filterMode: 'none',
           },
         ],
         series: [
@@ -476,22 +469,40 @@ function dash() {
               borderColor0: COLORS.neg,
               borderWidth: 1,
             },
+            // Horizontal lines: entry, exit, optional stop-loss. NO vertical
+            // markLines - they were rendering as confusing extra colored lines
+            // because ECharts paints them across the full visible y-range.
+            // markPoint dots already pin the exact entry/exit timestamps.
             markLine: {
               symbol: 'none',
+              silent: true,
               data: [
-                { yAxis: trade.open_rate, lineStyle: { color: COLORS.text2, type: 'solid', width: 1 }, label: { show: true, formatter: '↑ entry ' + (trade.open_rate||0).toPrecision(5), position: 'insideStartTop', color: COLORS.text2, fontSize: 9 } },
-                { yAxis: trade.close_rate, lineStyle: { color: winColor, type: 'solid', width: 1 }, label: { show: true, formatter: (trade.is_win ? '↓ exit roi ' : '↓ exit sl ') + (trade.close_rate||0).toPrecision(5), position: 'insideEndBottom', color: winColor, fontSize: 9 } },
-                ...(trade.stop_rate ? [{ yAxis: trade.stop_rate, lineStyle: { color: COLORS.neg, type: 'dashed', width: 1, opacity: 0.5 }, label: { show: true, formatter: 'sl ' + trade.stoploss_pct.toFixed(1) + '%', position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, opacity: 0.7 } }] : []),
-                // Vertical lines marking entry + exit timestamps
-                { xAxis: entryTs, lineStyle: { color: COLORS.text2, type: 'dotted', width: 1, opacity: 0.4 } },
-                { xAxis: exitTs, lineStyle: { color: winColor, type: 'dotted', width: 1, opacity: 0.4 } },
+                {
+                  yAxis: trade.open_rate,
+                  lineStyle: { color: COLORS.text2, type: 'solid', width: 1, opacity: 0.7 },
+                  label: { show: true, formatter: '↑ ' + (trade.open_rate||0).toPrecision(5),
+                           position: 'insideStartTop', color: COLORS.text2, fontSize: 9 },
+                },
+                {
+                  yAxis: trade.close_rate,
+                  lineStyle: { color: winColor, type: 'solid', width: 1, opacity: 0.7 },
+                  label: { show: true, formatter: (trade.is_win ? '↓ roi ' : '↓ sl ') + (trade.close_rate||0).toPrecision(5),
+                           position: 'insideEndTop', color: winColor, fontSize: 9 },
+                },
+                ...(trade.stop_rate ? [{
+                  yAxis: trade.stop_rate,
+                  lineStyle: { color: COLORS.neg, type: 'dashed', width: 1, opacity: 0.4 },
+                  label: { show: true, formatter: 'sl ' + trade.stoploss_pct.toFixed(1) + '%',
+                           position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, opacity: 0.7 },
+                }] : []),
               ],
             },
             markPoint: {
-              symbolSize: 10,
+              symbolSize: 9,
+              silent: true,
               data: [
-                { name: 'entry', coord: [entryTs, trade.open_rate], itemStyle: { color: COLORS.text }, symbol: 'circle', label: { show: false } },
-                { name: 'exit', coord: [exitTs, trade.close_rate], itemStyle: { color: winColor }, symbol: 'circle', label: { show: false } },
+                { name: 'entry', coord: [entryTs, trade.open_rate], itemStyle: { color: COLORS.text, borderColor: COLORS.surface, borderWidth: 2 }, symbol: 'circle' },
+                { name: 'exit',  coord: [exitTs,  trade.close_rate], itemStyle: { color: winColor, borderColor: COLORS.surface, borderWidth: 2 }, symbol: 'circle' },
               ],
             },
           },
