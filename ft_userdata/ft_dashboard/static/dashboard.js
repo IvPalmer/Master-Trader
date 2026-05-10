@@ -369,10 +369,15 @@ function dash() {
       let candles = this._tradeCandles[cacheKey];
       if (!candles) {
         try {
-          // Smaller fetch (250 candles) keeps high-TF charts readable without
-          // 167-day-of-history overshoot. Centered on trade close; user can
-          // pan via slider drag if they want more context.
-          const url = `/api/binance_candles?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=250`;
+          // Center the fetch on the trade window. Without this, the fetch
+          // returns the most-recent 250 candles, which at 5m TF only
+          // covers ~20 hours - so trades older than a day fall outside
+          // the fetched data and the chart shows wrong / empty candles.
+          const tfMs = { '5m': 5*60_000, '15m': 15*60_000, '1h': 60*60_000, '4h': 4*60*60_000 }[tf] || 60*60_000;
+          const padCandles = 100; // ~50 candles each side of the trade
+          const startMs = trade.open_ts - padCandles * tfMs;
+          const endMs = trade.close_ts + padCandles * tfMs;
+          const url = `/api/binance_candles?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=500&start_ms=${startMs}&end_ms=${endMs}`;
           const r = await fetch(url, { cache: 'no-store' });
           if (!r.ok) return;
           const data = await r.json();

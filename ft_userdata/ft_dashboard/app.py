@@ -586,11 +586,21 @@ async def api_closed_trades():
 
 
 @app.get("/api/binance_candles")
-async def api_binance_candles(pair: str, timeframe: str = "1h", limit: int = 500):
+async def api_binance_candles(
+    pair: str,
+    timeframe: str = "1h",
+    limit: int = 500,
+    start_ms: int | None = None,
+    end_ms: int | None = None,
+):
     """Hit Binance public klines REST directly. No auth needed, supports
     any timeframe, no Freqtrade-bot dependency. Used by the trades-tab
     candle charts so closed-trade history can be visualized at any
     timeframe even after a bot is killed.
+
+    start_ms / end_ms (optional) center the fetched window on a specific
+    time range. Without them Binance returns the most-recent `limit`
+    candles, which doesn't cover trades older than a few days at low TFs.
 
     Binance kline schema:
       [open_time_ms, open, high, low, close, volume, close_time_ms, ...]
@@ -607,11 +617,16 @@ async def api_binance_candles(pair: str, timeframe: str = "1h", limit: int = 500
 
     symbol = pair.replace("/", "")
     url = "https://api.binance.com/api/v3/klines"
+    params: dict[str, int | str] = {"symbol": symbol, "interval": timeframe, "limit": limit}
+    if start_ms is not None:
+        params["startTime"] = int(start_ms)
+    if end_ms is not None:
+        params["endTime"] = int(end_ms)
     try:
         async with httpx.AsyncClient() as client:
             r = await client.get(
                 url,
-                params={"symbol": symbol, "interval": timeframe, "limit": limit},
+                params=params,
                 timeout=REQUEST_TIMEOUT,
             )
             if r.status_code != 200:
