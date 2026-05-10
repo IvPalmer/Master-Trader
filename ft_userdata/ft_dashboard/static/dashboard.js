@@ -298,7 +298,20 @@ function dash() {
       const el = document.getElementById(id);
       if (!el) return null;
       if (!this._charts[id] || this._charts[id].isDisposed()) {
-        this._charts[id] = echarts.init(el, null, { renderer: 'canvas' });
+        const chart = echarts.init(el, null, { renderer: 'canvas' });
+        // Safari/refresh race: echarts.init snapshots clientWidth at call time,
+        // which can fire before flex/grid layout has settled. Force a resize
+        // on the next frame and observe future container size changes (tab
+        // switches, panel collapses, font load reflows).
+        requestAnimationFrame(() => { try { chart.resize(); } catch {} });
+        if (typeof ResizeObserver !== 'undefined') {
+          const ro = new ResizeObserver(() => { try { chart.resize(); } catch {} });
+          ro.observe(el);
+          this._chartObservers = this._chartObservers || {};
+          this._chartObservers[id]?.disconnect?.();
+          this._chartObservers[id] = ro;
+        }
+        this._charts[id] = chart;
       }
       return this._charts[id];
     },
