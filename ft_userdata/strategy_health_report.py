@@ -331,6 +331,9 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
     metrics["health_score"] = score
     metrics["health_label"] = _score_label(score)
 
+    # --- Per-pair drift (last 30 days) ---
+    metrics["pair_drift"] = _compute_pair_drift(closed, window_days=30)
+
     # --- Generate Flags and Recommendations ---
     _generate_flags(metrics)
 
@@ -345,6 +348,72 @@ def _compute_daily_returns(trades: list) -> list:
             day = close_dt.strftime("%Y-%m-%d")
             daily[day] += (t.get("profit_abs", 0) or 0)
     return list(daily.values())
+
+
+def _compute_pair_drift(closed_trades: list, window_days: int = 30) -> list[dict]:
+    """Per-pair drift detection. Flags pairs with concerning loss patterns
+    in the last `window_days` so the operator can review BEFORE the strategy
+    accumulates more loss on a structurally weak pair (e.g. ARB-style
+    "informed shorts" situations on FundingFade).
+
+    Triggers (any of):
+    - 3+ losses on the same pair in the window
+    - Trailing 3-trade loss streak on the pair
+    - Pair PF < 0.7 with at least 4 trades in the window
+
+    Returns list of flagged pair dicts. Empty list = no drift.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
+    by_pair: dict[str, list[dict]] = defaultdict(list)
+    for t in closed_trades:
+        close_dt = _parse_date(t.get("close_date"))
+        if not close_dt or close_dt < cutoff:
+            continue
+        by_pair[t.get("pair") or "?"].append(t)
+
+    flagged: list[dict] = []
+    for pair, plist in by_pair.items():
+        # Sort newest first for streak detection
+        plist_sorted = sorted(plist, key=lambda x: _parse_date(x.get("close_date")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        n = len(plist_sorted)
+        wins = [t for t in plist_sorted if (t.get("profit_abs") or 0) > 0]
+        losses = [t for t in plist_sorted if (t.get("profit_abs") or 0) <= 0]
+        gross_win = sum((t.get("profit_abs") or 0) for t in wins)
+        gross_loss = abs(sum((t.get("profit_abs") or 0) for t in losses))
+        pf = (gross_win / gross_loss) if gross_loss > 0 else (10.0 if gross_win > 0 else 0)
+
+        # Trailing loss streak: count consecutive losses from newest backward
+        streak = 0
+        for t in plist_sorted:
+            if (t.get("profit_abs") or 0) <= 0:
+                streak += 1
+            else:
+                break
+
+        flags: list[str] = []
+        if len(losses) >= 3:
+            flags.append(f"{len(losses)} losses / {n} trades")
+        if streak >= 3:
+            flags.append(f"loss streak = {streak}")
+        if n >= 4 and pf < 0.7:
+            flags.append(f"pair PF {pf:.2f}")
+
+        if flags:
+            net_pnl = sum((t.get("profit_abs") or 0) for t in plist_sorted)
+            flagged.append({
+                "pair": pair,
+                "trades": n,
+                "wins": len(wins),
+                "losses": len(losses),
+                "pf": round(pf, 2),
+                "loss_streak": streak,
+                "net_pnl": round(net_pnl, 2),
+                "flags": flags,
+            })
+
+    # Newest-first rough sort by absolute net PnL drag
+    flagged.sort(key=lambda x: x["net_pnl"])
+    return flagged
 
 
 def _parse_date(date_str: Optional[str]) -> Optional[datetime]:
@@ -741,6 +810,22 @@ def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dic
         lines.append("RED FLAGS")
         for f in all_flags:
             lines.append(f)
+
+    # Per-pair drift section (last 30 days, only render if any drift)
+    pair_drift_lines: list[str] = []
+    for m in sorted_bots:
+        for pd in m.get("pair_drift", []) or []:
+            pair_drift_lines.append(
+                f"  [{m['strategy']}] {pd['pair']}: "
+                f"{pd['wins']}W {pd['losses']}L · PF {pd['pf']} · "
+                f"net ${pd['net_pnl']:+.2f}"
+            )
+            for f in pd["flags"]:
+                pair_drift_lines.append(f"    → {f}")
+    if pair_drift_lines:
+        lines.append("")
+        lines.append("PAIR DRIFT (30d)")
+        lines.extend(pair_drift_lines)
 
     # Recommendations
     all_recs = []
