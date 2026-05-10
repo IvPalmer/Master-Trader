@@ -408,7 +408,7 @@ function dash() {
       chart.setOption({
         ...ECHART_COMMON,
         animation: false,
-        grid: { left: 56, right: 12, top: 12, bottom: 54, containLabel: false },
+        grid: { left: 12, right: 56, top: 12, bottom: 54, containLabel: false },
         xAxis: {
           type: 'time',
           axisLine: { lineStyle: { color: COLORS.border } },
