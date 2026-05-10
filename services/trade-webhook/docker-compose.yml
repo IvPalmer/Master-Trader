@@ -1,0 +1,52 @@
+# Plain `docker compose` deploy under /home/ubuntu/trade-webhook/, matching
+# the dsrptv/veludo/ocdj pattern. Joins dokploy-network so master-trader's
+# freqtrade containers can reach this service via Docker DNS as
+# `http://trade-webhook:8088/freqtrade/event` — no tailnet, no shared
+# secret in URL, intra-bridge only.
+#
+# Secrets live in /etc/lake/ops-bot.env (not in this repo). Lake JSONL
+# output goes to /srv/lake/raw/trades/ which is bind-mounted in.
+
+services:
+  trade-webhook:
+    build: .
+    image: trade-webhook:local
+    container_name: trade-webhook
+    restart: unless-stopped
+    env_file:
+      - /etc/lake/ops-bot.env
+    environment:
+      LOG_LEVEL: INFO
+      TRADES_DIR: /srv/lake/raw/trades
+    volumes:
+      - /srv/lake/raw/trades:/srv/lake/raw/trades
+    networks:
+      # dokploy-network: Swarm overlay shared with Dokploy-managed apps + Traefik.
+      # master-trader-net: master-trader's compose bridge, attached as external so
+      #   freqtrade containers can reach this service via Docker DNS as
+      #   `trade-webhook`. Decoupled from master-trader's lifecycle: if it gets
+      #   recreated under a new project name, update the `name:` below.
+      dokploy-network: {}
+      master-trader-net: {}
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8088/healthz', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  dokploy-network:
+    external: true
+  master-trader-net:
+    external: true
+    name: compose-bypass-mobile-port-fbk1m6_default
