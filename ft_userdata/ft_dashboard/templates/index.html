@@ -147,9 +147,11 @@
             </div>
             <div class="card-sub" x-text="openPos ? 'opened ' + fmtAge(openPosAge) + ' ago' : 'no exposure'"></div>
           </div>
-          <!-- Pair selector when more than one open trade -->
+          <!-- Pair selector when more than one open trade. Key on the unique
+               (bot + pair) tuple since open_trade payloads don't include
+               trade_id; using undefined keys collapses to one rendered pill. -->
           <div class="row gap-sm" x-show="openPositions.length > 1" x-cloak>
-            <template x-for="p in openPositions" :key="p.trade_id">
+            <template x-for="p in openPositions" :key="p._bot + ':' + p.pair">
               <button class="filter-pill"
                       :class="openPosKey === (p._bot + ':' + p.pair) ? 'on' : ''"
                       @click="setOpenPos(p)"
@@ -521,6 +523,6 @@
 
 </div>
 
-<script src="/static/dashboard.js?v=23"></script>
+<script src="/static/dashboard.js?v=24"></script>
 </body>
 </html>
