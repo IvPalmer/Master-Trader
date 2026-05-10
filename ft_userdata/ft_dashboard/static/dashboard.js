@@ -347,14 +347,13 @@ function dash() {
 
     async renderTradeChart(trade) {
       const chartId = 'trade-chart-' + trade.bot_key + '-' + trade.open_ts;
-      const cacheKey = trade.bot_key + ':' + trade.pair + ':' + trade.open_ts;
+      const cacheKey = trade.bot_key + ':' + trade.pair;
       let candles = this._tradeCandles[cacheKey];
       if (!candles) {
         try {
-          // Fetch ~500 candles of 1h or 5m depending on trade duration
-          const tf = (trade.duration_min || 60) < 240 ? '5m' : '1h';
-          const limit = 500;
-          const url = `/api/candles/${trade.bot_key}?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=${limit}`;
+          // 1h candles, 500 = ~21 days. Per-pair cache so we share fetches
+          // across multiple trades on the same pair (e.g. 5 ZEC trades).
+          const url = `/api/candles/${trade.bot_key}?pair=${encodeURIComponent(trade.pair)}&timeframe=1h&limit=500`;
           const r = await fetch(url, { cache: 'no-store' });
           if (!r.ok) return;
           const data = await r.json();
@@ -364,12 +363,12 @@ function dash() {
       }
       if (!candles.length) return;
 
-      // Slice candles to a window centered on the trade [open - 25%, close + 25%]
-      const span = (trade.close_ts - trade.open_ts) || 3600;
-      const padBefore = Math.max(span * 0.4, 1800);
-      const padAfter = Math.max(span * 0.4, 1800);
-      const windowStart = (trade.open_ts - padBefore) * 1000;
-      const windowEnd = (trade.close_ts + padAfter) * 1000;
+      // Freqtrade open_timestamp/close_timestamp are EPOCH MILLISECONDS.
+      // Window: [open - 40% of span, close + 40% of span], min 2h pad each side.
+      const span = trade.close_ts - trade.open_ts;
+      const padMs = Math.max(span * 0.5, 2 * 3600 * 1000); // min 2h pad each side
+      const windowStart = trade.open_ts - padMs;
+      const windowEnd = trade.close_ts + padMs;
       const sliced = candles.filter(c => {
         const ts = typeof c[0] === 'number' ? c[0] : new Date(c[0]).getTime();
         return ts >= windowStart && ts <= windowEnd;
@@ -383,8 +382,8 @@ function dash() {
       const dates = sliced.map(c => typeof c[0] === 'number' ? c[0] : new Date(c[0]).getTime());
 
       const winColor = trade.is_win ? COLORS.pos : COLORS.neg;
-      const entryTs = trade.open_ts * 1000;
-      const exitTs = trade.close_ts * 1000;
+      const entryTs = trade.open_ts;
+      const exitTs = trade.close_ts;
 
       chart.setOption({
         ...ECHART_COMMON,
