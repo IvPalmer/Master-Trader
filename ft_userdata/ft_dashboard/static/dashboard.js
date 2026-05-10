@@ -31,9 +31,10 @@ function dash() {
     equityBot: null,
     closedTrades: [],
     tradesFilter: 'all',
+    _tradeTfOverride: {},   // {tradeKey: '5m'|'15m'|'1h'|'4h'} — user override per trade
     _charts: {},
     _equityData: {},
-    _tradeCandles: {},
+    _tradeCandles: {},      // {bot:pair:tf -> candle array}
 
     // ─── lifecycle ───
     boot() {
@@ -322,12 +323,28 @@ function dash() {
     },
     formatTradeWindow(trade) {
       if (!trade.open_ts) return '';
-      const open = new Date(trade.open_ts * 1000);
+      // Freqtrade gives ms; Date constructor takes ms.
+      const open = new Date(trade.open_ts);
       const dur = trade.duration_min;
       const day = open.getUTCMonth() + 1 + '-' + String(open.getUTCDate()).padStart(2, '0');
       const hh = String(open.getUTCHours()).padStart(2, '0') + ':' + String(open.getUTCMinutes()).padStart(2, '0');
       const durStr = dur ? (dur < 60 ? dur + 'm' : (dur / 60).toFixed(1) + 'h') : '—';
       return `${day} ${hh} · ${durStr}`;
+    },
+    _tradeKey(trade) { return trade.bot_key + ':' + trade.pair + ':' + trade.open_ts; },
+    tradeTimeframe(trade) {
+      const k = this._tradeKey(trade);
+      if (this._tradeTfOverride[k]) return this._tradeTfOverride[k];
+      // Auto-pick based on duration. Goal: ≥ ~30 candles inside the trade.
+      const durMin = trade.duration_min || 60;
+      if (durMin < 90) return '5m';
+      if (durMin < 360) return '15m';
+      if (durMin < 1440) return '1h';
+      return '4h';
+    },
+    setTradeTimeframe(trade, tf) {
+      this._tradeTfOverride[this._tradeKey(trade)] = tf;
+      this.$nextTick(() => this.renderTradeChart(trade));
     },
 
     async fetchClosedTrades() {
@@ -347,13 +364,12 @@ function dash() {
 
     async renderTradeChart(trade) {
       const chartId = 'trade-chart-' + trade.bot_key + '-' + trade.open_ts;
-      const cacheKey = trade.bot_key + ':' + trade.pair;
+      const tf = this.tradeTimeframe(trade);
+      const cacheKey = trade.bot_key + ':' + trade.pair + ':' + tf;
       let candles = this._tradeCandles[cacheKey];
       if (!candles) {
         try {
-          // 1h candles, 500 = ~21 days. Per-pair cache so we share fetches
-          // across multiple trades on the same pair (e.g. 5 ZEC trades).
-          const url = `/api/candles/${trade.bot_key}?pair=${encodeURIComponent(trade.pair)}&timeframe=1h&limit=500`;
+          const url = `/api/candles/${trade.bot_key}?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=1000`;
           const r = await fetch(url, { cache: 'no-store' });
           if (!r.ok) return;
           const data = await r.json();
@@ -364,9 +380,11 @@ function dash() {
       if (!candles.length) return;
 
       // Freqtrade open_timestamp/close_timestamp are EPOCH MILLISECONDS.
-      // Window: [open - 40% of span, close + 40% of span], min 2h pad each side.
+      // Window: pad ~150% of trade span on each side (min 4h, max 7d) so the
+      // chart starts zoomed enough to see the full trade + plenty of context
+      // before/after. User can dataZoom drag/scroll to see more.
       const span = trade.close_ts - trade.open_ts;
-      const padMs = Math.max(span * 0.5, 2 * 3600 * 1000); // min 2h pad each side
+      const padMs = Math.min(Math.max(span * 1.5, 4 * 3600 * 1000), 7 * 86400 * 1000);
       const windowStart = trade.open_ts - padMs;
       const windowEnd = trade.close_ts + padMs;
       const sliced = candles.filter(c => {
@@ -378,16 +396,24 @@ function dash() {
       const chart = this._ensureChart(chartId);
       if (!chart) return;
 
-      const ohlc = sliced.map(c => [c[1], c[2], c[3], c[4]]); // open, close, low, high
+      const ohlc = sliced.map(c => [c[1], c[2], c[3], c[4]]);
       const dates = sliced.map(c => typeof c[0] === 'number' ? c[0] : new Date(c[0]).getTime());
 
       const winColor = trade.is_win ? COLORS.pos : COLORS.neg;
       const entryTs = trade.open_ts;
       const exitTs = trade.close_ts;
 
+      // Default visible range: tight on the trade itself + small pad. User
+      // can drag the slider or zoom out via mouse wheel.
+      const tradePad = Math.max(span * 0.3, 30 * 60 * 1000);
+      const startVisible = Math.max(windowStart, entryTs - tradePad);
+      const endVisible = Math.min(windowEnd, exitTs + tradePad);
+      const visibleStartPct = ((startVisible - dates[0]) / (dates[dates.length-1] - dates[0])) * 100;
+      const visibleEndPct = ((endVisible - dates[0]) / (dates[dates.length-1] - dates[0])) * 100;
+
       chart.setOption({
         ...ECHART_COMMON,
-        grid: { left: 50, right: 8, top: 8, bottom: 22, containLabel: false },
+        grid: { left: 56, right: 12, top: 12, bottom: 50, containLabel: false },
         xAxis: {
           type: 'time',
           axisLine: { lineStyle: { color: COLORS.border } },
@@ -401,6 +427,41 @@ function dash() {
           axisLabel: { color: COLORS.text3, fontSize: 9, formatter: v => v.toPrecision(4) },
           splitLine: { lineStyle: { color: COLORS.border, opacity: 0.3 } },
         },
+        // TradingView-style interaction: drag inside the chart to pan, mouse-wheel
+        // to zoom, plus a bottom slider as a fallback when wheel/touch isn't
+        // available. start/end values are %; we compute them from the visible
+        // window so the chart loads zoomed to the trade neighborhood.
+        dataZoom: [
+          {
+            type: 'inside',
+            xAxisIndex: 0,
+            start: Math.max(0, visibleStartPct),
+            end: Math.min(100, visibleEndPct),
+            zoomOnMouseWheel: true,
+            moveOnMouseWheel: false,
+            moveOnMouseMove: true,
+            preventDefaultMouseMove: false,
+          },
+          {
+            type: 'slider',
+            xAxisIndex: 0,
+            start: Math.max(0, visibleStartPct),
+            end: Math.min(100, visibleEndPct),
+            height: 16,
+            bottom: 16,
+            backgroundColor: COLORS.surface2,
+            fillerColor: 'rgba(34, 211, 238, 0.08)',
+            borderColor: COLORS.border,
+            handleStyle: { color: COLORS.accent, borderColor: COLORS.accent },
+            moveHandleStyle: { color: COLORS.accent, opacity: 0.6 },
+            textStyle: { color: COLORS.text3, fontSize: 9 },
+            labelFormatter: ts => {
+              const d = new Date(ts);
+              return (d.getUTCMonth()+1) + '-' + String(d.getUTCDate()).padStart(2,'0') + ' ' +
+                     String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0');
+            },
+          },
+        ],
         series: [
           {
             type: 'candlestick',
@@ -415,13 +476,16 @@ function dash() {
             markLine: {
               symbol: 'none',
               data: [
-                { yAxis: trade.open_rate, lineStyle: { color: COLORS.text2, type: 'solid', width: 1 }, label: { show: true, formatter: '↑ entry', position: 'insideStartTop', color: COLORS.text2, fontSize: 9 } },
-                { yAxis: trade.close_rate, lineStyle: { color: winColor, type: 'solid', width: 1 }, label: { show: true, formatter: trade.is_win ? '↓ exit roi' : '↓ exit sl', position: 'insideEndBottom', color: winColor, fontSize: 9 } },
+                { yAxis: trade.open_rate, lineStyle: { color: COLORS.text2, type: 'solid', width: 1 }, label: { show: true, formatter: '↑ entry ' + (trade.open_rate||0).toPrecision(5), position: 'insideStartTop', color: COLORS.text2, fontSize: 9 } },
+                { yAxis: trade.close_rate, lineStyle: { color: winColor, type: 'solid', width: 1 }, label: { show: true, formatter: (trade.is_win ? '↓ exit roi ' : '↓ exit sl ') + (trade.close_rate||0).toPrecision(5), position: 'insideEndBottom', color: winColor, fontSize: 9 } },
                 ...(trade.stop_rate ? [{ yAxis: trade.stop_rate, lineStyle: { color: COLORS.neg, type: 'dashed', width: 1, opacity: 0.5 }, label: { show: true, formatter: 'sl ' + trade.stoploss_pct.toFixed(1) + '%', position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, opacity: 0.7 } }] : []),
+                // Vertical lines marking entry + exit timestamps
+                { xAxis: entryTs, lineStyle: { color: COLORS.text2, type: 'dotted', width: 1, opacity: 0.4 } },
+                { xAxis: exitTs, lineStyle: { color: winColor, type: 'dotted', width: 1, opacity: 0.4 } },
               ],
             },
             markPoint: {
-              symbolSize: 8,
+              symbolSize: 10,
               data: [
                 { name: 'entry', coord: [entryTs, trade.open_rate], itemStyle: { color: COLORS.text }, symbol: 'circle', label: { show: false } },
                 { name: 'exit', coord: [exitTs, trade.close_rate], itemStyle: { color: winColor }, symbol: 'circle', label: { show: false } },
@@ -435,6 +499,15 @@ function dash() {
           backgroundColor: COLORS.surface2,
           borderColor: COLORS.border,
           textStyle: { color: COLORS.text, fontSize: 10 },
+          formatter: params => {
+            const p = params.find(x => x.seriesType === 'candlestick');
+            if (!p) return '';
+            const [, o, c, l, h] = p.data;
+            const d = new Date(p.axisValue);
+            const ts = (d.getUTCMonth()+1) + '-' + String(d.getUTCDate()).padStart(2,'0') + ' ' +
+                       String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0');
+            return `<b>${ts}</b><br/>O ${o.toPrecision(5)}<br/>H ${h.toPrecision(5)}<br/>L ${l.toPrecision(5)}<br/>C ${c.toPrecision(5)}`;
+          },
         },
       }, true);
     },

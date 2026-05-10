@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css?v=12">
+<link rel="stylesheet" href="/static/styles.css?v=13">
 <script defer
         src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
         integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
@@ -482,6 +482,15 @@
             <span>exit <strong x-text="(trade.close_rate||0).toPrecision(5)">—</strong></span>
             <span class="sep">·</span>
             <span x-text="formatTradeWindow(trade)">—</span>
+            <span class="grow"></span>
+            <div class="tf-pills">
+              <template x-for="tf in ['5m','15m','1h','4h']" :key="tf">
+                <button class="tf-pill"
+                        :class="tradeTimeframe(trade) === tf ? 'on' : ''"
+                        @click="setTradeTimeframe(trade, tf)"
+                        x-text="tf">tf</button>
+              </template>
+            </div>
           </div>
           <div class="trade-chart" :id="'trade-chart-' + trade.bot_key + '-' + trade.open_ts"></div>
         </div>
@@ -503,6 +512,6 @@
 
 </div>
 
-<script src="/static/dashboard.js?v=12"></script>
+<script src="/static/dashboard.js?v=13"></script>
 </body>
 </html>
