@@ -147,6 +147,15 @@
             </div>
             <div class="card-sub" x-text="openPos ? 'opened ' + fmtAge(openPosAge) + ' ago' : 'no exposure'"></div>
           </div>
+          <!-- Pair selector when more than one open trade -->
+          <div class="row gap-sm" x-show="openPositions.length > 1" x-cloak>
+            <template x-for="p in openPositions" :key="p.trade_id">
+              <button class="filter-pill"
+                      :class="openPosKey === (p._bot + ':' + p.pair) ? 'on' : ''"
+                      @click="setOpenPos(p)"
+                      x-text="p.pair.split('/')[0]">PAIR</button>
+            </template>
+          </div>
         </div>
         <div class="chart tall" id="chart-candles" x-show="openPos" x-cloak></div>
         <div class="empty" x-show="!openPos">
@@ -512,6 +521,6 @@
 
 </div>
 
-<script src="/static/dashboard.js?v=22"></script>
+<script src="/static/dashboard.js?v=23"></script>
 </body>
 </html>

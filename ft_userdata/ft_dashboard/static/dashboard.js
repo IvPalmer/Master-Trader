@@ -146,12 +146,33 @@ function dash() {
         expectancySample: primary?.expectancy?.sample || 0,
       };
     },
-    get openPos() {
-      const live = this.liveBots;
-      for (const b of live) {
-        if (b.open_trades.length) return { ...b.open_trades[0], _bot: b.key };
+    get openPositions() {
+      // Flatten every live bot's open_trades into one list, tagged with bot key.
+      // The right-side hero card shows ONE of these at a time; the user can
+      // switch via pair pills when >1 is open (e.g. FF max_open=2 → BCH + SUI).
+      const out = [];
+      for (const b of this.liveBots) {
+        for (const t of (b.open_trades || [])) {
+          out.push({ ...t, _bot: b.key });
+        }
       }
-      return null;
+      return out;
+    },
+    openPosKey: null,
+    setOpenPos(p) {
+      this.openPosKey = p._bot + ':' + p.pair;
+      this.$nextTick(() => this.renderCandles());
+    },
+    get openPos() {
+      const list = this.openPositions;
+      if (!list.length) return null;
+      if (this.openPosKey) {
+        const match = list.find(p => (p._bot + ':' + p.pair) === this.openPosKey);
+        if (match) return match;
+      }
+      // Default: pick the position newest by open_timestamp (most recent)
+      const sorted = [...list].sort((a, b) => (b.open_timestamp || 0) - (a.open_timestamp || 0));
+      return sorted[0];
     },
     get openPosAge() {
       const ts = this.openPos?.open_timestamp;
