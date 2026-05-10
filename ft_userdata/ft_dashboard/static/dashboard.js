@@ -429,24 +429,12 @@ function dash() {
         // and slider (handle drag) share the same range so they stay in sync.
         // moveOnMouseMove: true + preventDefaultMouseMove: true = drag pan
         // works inside the chart area without page scroll interference.
-        // Pan + zoom via the bottom slider only (ECharts inside-zoom on
-        // mouse wheel doesn't reliably preventDefault inside our scrolling
-        // page; click-drag inside the chart isn't a stock ECharts feature).
-        // The slider handles BOTH:
+        // Pan + zoom via the bottom slider only.
         //   - Drag the blue range left/right -> pan
         //   - Drag a handle (left or right edge) -> zoom in/out
+        // No inside-zoom: a disabled inside-zoom holds its own start/end
+        // state and prevents the slider drag from updating the chart.
         dataZoom: [
-          {
-            type: 'inside',
-            xAxisIndex: 0,
-            startValue: visibleStart,
-            endValue: visibleEnd,
-            zoomOnMouseWheel: false,
-            moveOnMouseWheel: false,
-            moveOnMouseMove: false,
-            zoomLock: false,
-            filterMode: 'filter',
-          },
           {
             type: 'slider',
             xAxisIndex: 0,
