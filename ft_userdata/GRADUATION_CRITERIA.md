@@ -1,12 +1,27 @@
-# Bot Graduation Criteria v3 — Probe / Pilot / Scale
+# Bot Graduation Criteria v4 — Probe / Pilot / Scale
 
 > **Core principle**: at sub-$200 deployed capital this is a **paid learning loop**, not portfolio capital allocation. Optimize for **controlled learning velocity**, not capital protection. Protect the operator's understanding, not the dollars (the dollars are intentionally trivial).
 
-> **Revised 2026-05-10** after codex-5.5 review of v2. v2 was "anxiety-calibrated, not strategy-calibrated" — its demotion triggers fired on every normal stoploss, every backtest-band drawdown, and every $2.50 loss; its stake ladder was fiction relative to actual flip practice ($15 not $50); it referenced infrastructure that was never built (10% portfolio circuit breaker) and contradicted live config (stoploss_on_exchange).
+> **Revised 2026-05-10 (v4)** after codex-5.5 second-pass review. v3 still conflated "strategy validation" (backtest) with "deployment validation" (plumbing) — v3's "≥3 dry-run trades + ≥1 ROI exit + ≥1 SL exit" probe-flip gate was an anxiety carry-over. **Plumbing bugs surface at boot or in config, not at trade close.** v4 strips the trade-observation gate from probe-flip criteria. Strategy-class trade minimums move from launch gate to **post-flip calibration windows** for probe→pilot tier-up.
+
+> **Original v3 motivation (preserved 2026-05-10)** after codex-5.5 review of v2: v2 was "anxiety-calibrated, not strategy-calibrated" — its demotion triggers fired on every normal stoploss, every backtest-band drawdown, and every $2.50 loss; its stake ladder was fiction relative to actual flip practice ($15 not $50); it referenced infrastructure that was never built (10% portfolio circuit breaker) and contradicted live config (stoploss_on_exchange).
+
+> **Precedent that prompted v4**: FundingFadeV1 flipped live 2026-04-21 with ~3-4 days dry-run, 1-2 dry-run trades, no SL exit observed. Live track since: 16d, 10 trades, +7.28% within green envelope. The flip was successful WITHOUT meeting v3's probe-flip plumbing gate. v3's gate would have blocked the live deploy that worked. Hence the strip.
 
 ---
 
-## What changed from v2
+## What changed across versions
+
+### v4 vs v3 (this revision, 2026-05-10)
+
+| Concept | v3 | v4 |
+|---|---|---|
+| Probe-flip gate | Backtest + 3 dry-run trades + ROI/SL observed | Backtest + boot/healthcheck/restart + Path 1½ |
+| Strategy-class trade minimums | Pre-flip launch gate | Post-flip calibration window (probe→pilot) |
+| Anti-pattern fixed | "Wait 9 days for trades that already validated at boot" | Boot validates plumbing; trades validate calibration |
+| Operator-comfort override | Implicit | Explicit clause: operator may wait for trades, but it's preference not requirement |
+
+### v3 vs v2 (preserved from 2026-05-10 morning)
 
 | Concept | v2 | v3 |
 |---|---|---|
@@ -44,9 +59,59 @@ This tier matches **what FundingFadeV1 actually flipped at** (2026-04-21): $15 s
 
 ---
 
-## Promotion gates (Probe → Pilot)
+## Probe-flip criteria (dry-run → live)
 
-Replace v2's universal "30 trades / 14 days / 5 pairs" with **strategy-aware minimums**:
+The decision to flip a bot from dry-run to Probe-tier live. Strategy validation
+and deployment validation are separated; both must pass.
+
+### Strategy validation
+- 3-method backtest passed (lab + Freqtrade native + walk-forward)
+- PF > 1.0 in native engine
+- Calibration ±25% across engines
+- No losing year > −15% in lab sample
+- WF ≥4/6 calendar halves OR ≥4/6 rolling windows positive
+
+### Deployment validation
+- Container boots cleanly with the live config
+- Healthcheck green for **≥60 minutes** straight (catches early CCXT/auth/network issues)
+- **Restart-recovery test passes** — stop + start the container once; confirms
+  state survives, no orphan trades, sqlite intact
+- Boot-time plumbing verified by log inspection:
+  - logs/ writable (volume mount + perms correct)
+  - Exchange API connectivity (CCXT auth success)
+  - Telegram webhook smoke test (alert delivered to elder_brain_bot)
+  - Position-tracker shared file readable
+
+### Risk envelope
+- Path 1½ blast radius **explicitly accepted** by operator (in writing or doc)
+- **Hard technical cap** enforced: `stake_amount × max_open_trades ≤ wallet × 0.99`
+- No leverage unless explicitly approved
+- Strategy SL configured in code (not "we'll set it later")
+
+### What v4 dropped (compared to v3)
+- ❌ "≥3 closed dry-run trades" — organic trade closes are a weak deployment test
+  (slow, random, cadence-dependent). FF flipped with 1-2 trades and worked.
+- ❌ "≥1 ROI exit observed" — config assertion verifies the ROI ladder; observing
+  one fire doesn't prove live exchange execution anyway.
+- ❌ "≥1 SL exit observed OR 30 days without one" — sparse strategies may not
+  fire an SL for weeks. Strategy SL is in code; we don't need to observe it.
+
+The gates that CATCH real plumbing bugs (mount perms, CCXT auth, sqlite path,
+telegram routing, restart recovery) all fire at boot, not at trade close. v4
+keeps those, drops the rest.
+
+### Operator-comfort override
+Operator may CHOOSE to wait for N dry-run trades before probe flip even though
+v4 doesn't require it. This is a personal comfort margin, not a graduation
+requirement. Document the choice ("waiting 3 trades for comfort") so future
+sessions don't mistake operator preference for v4 gate.
+
+---
+
+## Probe → Pilot tier-up gates (POST-flip calibration window)
+
+Once a bot is live in Probe, calibrate against backtest envelope before bumping
+stake. Strategy-aware minimums (NOT launch gates — these run post-flip):
 
 | Strategy class | Min runtime | Min closed trades | Min pairs |
 |---|---|---|---|
@@ -57,8 +122,8 @@ Replace v2's universal "30 trades / 14 days / 5 pairs" with **strategy-aware min
 **Plus** all of:
 - Net P&L > 0 OR live drift within calibration envelope (see below)
 - No kill-trigger events fired (see Demotion section)
-- At least one full ROI exit OBSERVED in live (verifies exit plumbing)
-- At least one stoploss exit OR 30 days without one (verifies SL plumbing OR confirmed regime didn't need it)
+- At least one full ROI exit observed in live (verifies live exchange ROI exec)
+- Operator review confirms "ready to bump"
 
 ### Calibration envelope (replaces v2 hard ±25% match)
 
@@ -173,13 +238,13 @@ Bumping within a tier (e.g., Probe $15 → $20) does NOT require new gates. Tier
 
 ---
 
-## How this maps to current fleet (2026-05-10)
+## How this maps to current fleet (2026-05-10, under v4)
 
-| Bot | Current tier | v3 status | Next decision |
+| Bot | Current tier | v4 status | Next decision |
 |---|---|---|---|
-| FundingFadeV1 | Probe ($15 × 2) | Active, 16 days, 10 trades, +7.28%, within green envelope | Continue Probe. Pilot tier-up review at trade ~30 (~mid-June). |
-| KeltnerBounceV1 | Dry-run | 17 days, 2 ROI wins, on backtest pace | 13-day verdict gate 2026-05-22. Pass = stay dry-run as regime-rotation candidate. Fail = kill. |
-| CascadeFaderV1 | Dry-run | 1 day, 0 trades | Plumbing-test clear at first 3 trades + ROI + SL observed. Probe flip 2026-05-19+. |
+| FundingFadeV1 | Probe ($15 × 2) | Active, 16 days, 10 trades, +7.28%, within green envelope | Continue Probe. Probe→Pilot tier-up at trade ~15 (~late May): bump to $30/trade. |
+| KeltnerBounceV1 | Dry-run | 17 days, 2 ROI wins, on backtest pace BUT abort policy + regime gates unresolved | 30-day verdict gate 2026-06-09. Pass = stay dry-run as regime-rotation candidate. Fail = kill. |
+| CascadeFaderV1 | Dry-run | 1 day, 0 trades. **Probe-flip-eligible under v4 today** — backtest ✓, boot/healthcheck ✓, restart-recovery ✓, Path 1½ ✓, hard cap ✓. | Operator chose comfort-margin: wait for ≥3 dry-run trades before flip. Realistic 2026-05-19+. |
 
 ---
 
@@ -208,7 +273,21 @@ Codex review trail: `docs/cascade_fader_v1_validation_2026-05-09.md` + this file
 
 ---
 
-## v2 archive (2026-04-20 to 2026-05-10)
+## v3 archive (2026-05-10 morning to 2026-05-10 afternoon)
+
+v3 introduced tiered Probe/Pilot/Scale and per-bot demotion thresholds — those
+landed correctly. v3's mistake was including "≥3 dry-run trades + ROI/SL
+observed" as a probe-flip launch gate. Codex's second pass identified this as
+residual anxiety: organic trade closes are a weak deployment test (slow,
+random, cadence-dependent). FF's actual successful flip 2026-04-21 with 1-2
+dry-run trades and no SL exit would have FAILED v3's gate. v4 strips the
+trade-observation gate, moves strategy-class minimums to post-flip calibration
+windows, adds explicit operator-comfort override.
+
+v3 file content available via:
+`git show 39c4b63:ft_userdata/GRADUATION_CRITERIA.md`.
+
+## v2 archive (2026-04-20 to 2026-05-10 morning)
 
 v2 was a calibration-match revision of v1's absolute-threshold approach (PF ≥ 2.0
 floor, WR ≥ 55%, etc.). v1 was provably unreachable; v2 fixed that conceptually but
