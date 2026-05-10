@@ -465,40 +465,36 @@ function dash() {
               borderColor0: COLORS.neg,
               borderWidth: 1,
             },
-            // Horizontal lines: entry, exit, optional stop-loss. NO vertical
-            // markLines - they were rendering as confusing extra colored lines
-            // because ECharts paints them across the full visible y-range.
-            // markPoint dots already pin the exact entry/exit timestamps.
+            // Horizontal price lines only. We dropped:
+            //   - vertical timestamp markLines (rendered as extra colored bars)
+            //   - markPoint dots (rendered at confusing positions when their
+            //     timestamps fell mid-candle, especially on 4h timeframe)
+            // The entry/exit/SL price levels are the actual signal; the lines
+            // convey them unambiguously.
             markLine: {
               symbol: 'none',
               silent: true,
+              animation: false,
+              precision: 6,
               data: [
                 {
                   yAxis: trade.open_rate,
-                  lineStyle: { color: COLORS.text2, type: 'solid', width: 1, opacity: 0.7 },
-                  label: { show: true, formatter: '↑ ' + (trade.open_rate||0).toPrecision(5),
-                           position: 'insideStartTop', color: COLORS.text2, fontSize: 9 },
+                  lineStyle: { color: COLORS.text2, type: 'solid', width: 1, opacity: 0.8 },
+                  label: { show: true, formatter: 'entry ' + (trade.open_rate||0).toPrecision(5),
+                           position: 'insideStartTop', color: COLORS.text2, fontSize: 10, padding: [2, 4] },
                 },
                 {
                   yAxis: trade.close_rate,
-                  lineStyle: { color: winColor, type: 'solid', width: 1, opacity: 0.7 },
-                  label: { show: true, formatter: (trade.is_win ? '↓ roi ' : '↓ sl ') + (trade.close_rate||0).toPrecision(5),
-                           position: 'insideEndTop', color: winColor, fontSize: 9 },
+                  lineStyle: { color: winColor, type: 'solid', width: 1, opacity: 0.8 },
+                  label: { show: true, formatter: (trade.is_win ? 'roi ' : 'sl ') + (trade.close_rate||0).toPrecision(5),
+                           position: 'insideEndTop', color: winColor, fontSize: 10, padding: [2, 4] },
                 },
                 ...(trade.stop_rate ? [{
                   yAxis: trade.stop_rate,
-                  lineStyle: { color: COLORS.neg, type: 'dashed', width: 1, opacity: 0.4 },
-                  label: { show: true, formatter: 'sl ' + trade.stoploss_pct.toFixed(1) + '%',
-                           position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, opacity: 0.7 },
+                  lineStyle: { color: COLORS.neg, type: 'dashed', width: 1, opacity: 0.35 },
+                  label: { show: true, formatter: 'stop ' + trade.stoploss_pct.toFixed(1) + '%',
+                           position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, padding: [2, 4], opacity: 0.7 },
                 }] : []),
-              ],
-            },
-            markPoint: {
-              symbolSize: 9,
-              silent: true,
-              data: [
-                { name: 'entry', coord: [entryTs, trade.open_rate], itemStyle: { color: COLORS.text, borderColor: COLORS.surface, borderWidth: 2 }, symbol: 'circle' },
-                { name: 'exit',  coord: [exitTs,  trade.close_rate], itemStyle: { color: winColor, borderColor: COLORS.surface, borderWidth: 2 }, symbol: 'circle' },
               ],
             },
           },
