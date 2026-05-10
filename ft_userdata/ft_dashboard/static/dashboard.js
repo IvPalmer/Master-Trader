@@ -26,11 +26,14 @@ function dash() {
   return {
     raw: { bots: {}, errors: {}, last_poll: null },
     pollInterval: 30,
-    tab: location.hash === '#dryrun' ? 'dryrun' : 'live',
+    tab: ['#dryrun', '#trades'].includes(location.hash) ? location.hash.slice(1) : 'live',
     clock: '—',
     equityBot: null,
+    closedTrades: [],
+    tradesFilter: 'all',
     _charts: {},
     _equityData: {},
+    _tradeCandles: {},
 
     // ─── lifecycle ───
     boot() {
@@ -38,11 +41,15 @@ function dash() {
       setInterval(() => this.tickClock(), 1000);
       this.refresh().then(() => {
         this.equityBot = this.liveBots[0]?.key || null;
+        this.fetchClosedTrades();
         this.$nextTick(() => this.renderCharts());
       });
-      setInterval(() => this.refresh().then(() => this.renderCharts()), this.pollInterval * 1000);
+      setInterval(() => this.refresh().then(() => {
+        this.fetchClosedTrades();
+        this.renderCharts();
+      }), this.pollInterval * 1000);
       window.addEventListener('hashchange', () => {
-        this.tab = location.hash === '#dryrun' ? 'dryrun' : 'live';
+        this.tab = ['#dryrun', '#trades'].includes(location.hash) ? location.hash.slice(1) : 'live';
         this.$nextTick(() => this.renderCharts());
       });
       window.addEventListener('resize', () => {
@@ -56,7 +63,11 @@ function dash() {
       });
       this.$watch('tab', () => this.$nextTick(() => this.renderCharts()));
     },
-    setTab(t) { this.tab = t; location.hash = t === 'live' ? '' : '#dryrun'; },
+    setTab(t) {
+      this.tab = t;
+      location.hash = t === 'live' ? '' : '#' + t;
+    },
+    setTradesFilter(f) { this.tradesFilter = f; this.$nextTick(() => this.renderCharts()); },
     tickClock() {
       const d = new Date();
       this.clock = String(d.getUTCHours()).padStart(2, '0') + ':' +
@@ -289,9 +300,144 @@ function dash() {
         this.renderDrawdown();
         this.renderPerPair();
         this.renderCandles();
+      } else if (this.tab === 'trades') {
+        this.renderTradesCharts();
       } else {
         this.dryRunBots.forEach(b => this.renderBotEquity(b.key));
       }
+    },
+
+    // ─── trades tab ───
+    get filteredTrades() {
+      if (this.tradesFilter === 'all') return this.closedTrades;
+      return this.closedTrades.filter(t => t.bot_key === this.tradesFilter);
+    },
+    get tradesWinRate() {
+      const f = this.filteredTrades;
+      if (!f.length) return '—';
+      return ((f.filter(t => t.is_win).length / f.length) * 100).toFixed(1);
+    },
+    get tradesTotalPnl() {
+      return this.filteredTrades.reduce((s, t) => s + (t.profit_abs || 0), 0);
+    },
+    formatTradeWindow(trade) {
+      if (!trade.open_ts) return '';
+      const open = new Date(trade.open_ts * 1000);
+      const dur = trade.duration_min;
+      const day = open.getUTCMonth() + 1 + '-' + String(open.getUTCDate()).padStart(2, '0');
+      const hh = String(open.getUTCHours()).padStart(2, '0') + ':' + String(open.getUTCMinutes()).padStart(2, '0');
+      const durStr = dur ? (dur < 60 ? dur + 'm' : (dur / 60).toFixed(1) + 'h') : '—';
+      return `${day} ${hh} · ${durStr}`;
+    },
+
+    async fetchClosedTrades() {
+      try {
+        const r = await fetch('/api/closed_trades', { cache: 'no-store' });
+        if (!r.ok) return;
+        const data = await r.json();
+        this.closedTrades = data.trades || [];
+        // Re-render if currently on trades tab
+        if (this.tab === 'trades') this.$nextTick(() => this.renderTradesCharts());
+      } catch (e) { console.warn('fetchClosedTrades', e); }
+    },
+
+    renderTradesCharts() {
+      this.filteredTrades.forEach(t => this.renderTradeChart(t));
+    },
+
+    async renderTradeChart(trade) {
+      const chartId = 'trade-chart-' + trade.bot_key + '-' + trade.open_ts;
+      const cacheKey = trade.bot_key + ':' + trade.pair + ':' + trade.open_ts;
+      let candles = this._tradeCandles[cacheKey];
+      if (!candles) {
+        try {
+          // Fetch ~500 candles of 1h or 5m depending on trade duration
+          const tf = (trade.duration_min || 60) < 240 ? '5m' : '1h';
+          const limit = 500;
+          const url = `/api/candles/${trade.bot_key}?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=${limit}`;
+          const r = await fetch(url, { cache: 'no-store' });
+          if (!r.ok) return;
+          const data = await r.json();
+          candles = data.candles || [];
+          this._tradeCandles[cacheKey] = candles;
+        } catch { return; }
+      }
+      if (!candles.length) return;
+
+      // Slice candles to a window centered on the trade [open - 25%, close + 25%]
+      const span = (trade.close_ts - trade.open_ts) || 3600;
+      const padBefore = Math.max(span * 0.4, 1800);
+      const padAfter = Math.max(span * 0.4, 1800);
+      const windowStart = (trade.open_ts - padBefore) * 1000;
+      const windowEnd = (trade.close_ts + padAfter) * 1000;
+      const sliced = candles.filter(c => {
+        const ts = typeof c[0] === 'number' ? c[0] : new Date(c[0]).getTime();
+        return ts >= windowStart && ts <= windowEnd;
+      });
+      if (!sliced.length) return;
+
+      const chart = this._ensureChart(chartId);
+      if (!chart) return;
+
+      const ohlc = sliced.map(c => [c[1], c[2], c[3], c[4]]); // open, close, low, high
+      const dates = sliced.map(c => typeof c[0] === 'number' ? c[0] : new Date(c[0]).getTime());
+
+      const winColor = trade.is_win ? COLORS.pos : COLORS.neg;
+      const entryTs = trade.open_ts * 1000;
+      const exitTs = trade.close_ts * 1000;
+
+      chart.setOption({
+        ...ECHART_COMMON,
+        grid: { left: 50, right: 8, top: 8, bottom: 22, containLabel: false },
+        xAxis: {
+          type: 'time',
+          axisLine: { lineStyle: { color: COLORS.border } },
+          axisLabel: { color: COLORS.text3, fontSize: 9 },
+          splitLine: { show: false },
+        },
+        yAxis: {
+          type: 'value',
+          scale: true,
+          axisLine: { lineStyle: { color: COLORS.border } },
+          axisLabel: { color: COLORS.text3, fontSize: 9, formatter: v => v.toPrecision(4) },
+          splitLine: { lineStyle: { color: COLORS.border, opacity: 0.3 } },
+        },
+        series: [
+          {
+            type: 'candlestick',
+            data: dates.map((d, i) => [d, ...ohlc[i]]),
+            itemStyle: {
+              color: COLORS.pos,
+              color0: COLORS.neg,
+              borderColor: COLORS.pos,
+              borderColor0: COLORS.neg,
+              borderWidth: 1,
+            },
+            markLine: {
+              symbol: 'none',
+              data: [
+                { yAxis: trade.open_rate, lineStyle: { color: COLORS.text2, type: 'solid', width: 1 }, label: { show: true, formatter: '↑ entry', position: 'insideStartTop', color: COLORS.text2, fontSize: 9 } },
+                { yAxis: trade.close_rate, lineStyle: { color: winColor, type: 'solid', width: 1 }, label: { show: true, formatter: trade.is_win ? '↓ exit roi' : '↓ exit sl', position: 'insideEndBottom', color: winColor, fontSize: 9 } },
+                ...(trade.stop_rate ? [{ yAxis: trade.stop_rate, lineStyle: { color: COLORS.neg, type: 'dashed', width: 1, opacity: 0.5 }, label: { show: true, formatter: 'sl ' + trade.stoploss_pct.toFixed(1) + '%', position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, opacity: 0.7 } }] : []),
+              ],
+            },
+            markPoint: {
+              symbolSize: 8,
+              data: [
+                { name: 'entry', coord: [entryTs, trade.open_rate], itemStyle: { color: COLORS.text }, symbol: 'circle', label: { show: false } },
+                { name: 'exit', coord: [exitTs, trade.close_rate], itemStyle: { color: winColor }, symbol: 'circle', label: { show: false } },
+              ],
+            },
+          },
+        ],
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'cross' },
+          backgroundColor: COLORS.surface2,
+          borderColor: COLORS.border,
+          textStyle: { color: COLORS.text, fontSize: 10 },
+        },
+      }, true);
     },
 
     _ensureChart(id) {

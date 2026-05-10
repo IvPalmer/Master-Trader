@@ -543,6 +543,48 @@ _ALLOWED_TIMEFRAMES = {"1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"}
 _PAIR_RE = re.compile(r"^[A-Z0-9]{2,15}/(USDT|USDC|BTC|ETH|BUSD)$")
 
 
+@app.get("/api/closed_trades")
+async def api_closed_trades():
+    """Aggregate closed trades across the fleet for the trades tab.
+
+    Reuses the snapshot cache's recent_trades (last 30 per bot, already in
+    timestamp form). Returns a flat list sorted newest-first with everything
+    a chart card needs: pair, timestamps, entry/exit rates, stoploss pct,
+    exit reason, win flag, bot identity for color theming.
+    """
+    out: list[dict] = []
+    for bot in BOTS:
+        snap = _cache["bots"].get(bot["key"])
+        if not snap:
+            continue
+        for t in snap.get("recent_trades", []):
+            if t.get("is_open") or not t.get("close_timestamp"):
+                continue
+            entry = t.get("open_rate")
+            stoploss_pct = bot.get("baseline", {}).get("worst_trade_pct", -5.0) / 100.0
+            stop_price = entry * (1 + stoploss_pct) if entry else None
+            out.append({
+                "bot_key": bot["key"],
+                "bot_name": bot["name"],
+                "pair": t.get("pair"),
+                "open_date": t.get("open_date"),
+                "close_date": t.get("close_date"),
+                "open_ts": t.get("open_timestamp"),
+                "close_ts": t.get("close_timestamp"),
+                "open_rate": entry,
+                "close_rate": t.get("close_rate"),
+                "stop_rate": stop_price,
+                "stoploss_pct": stoploss_pct * 100,
+                "profit_pct": t.get("profit_pct"),
+                "profit_abs": t.get("profit_abs"),
+                "exit_reason": t.get("exit_reason"),
+                "duration_min": t.get("trade_duration"),
+                "is_win": (t.get("profit_abs") or 0) > 0,
+            })
+    out.sort(key=lambda x: x.get("close_ts") or 0, reverse=True)
+    return JSONResponse({"trades": out, "count": len(out)})
+
+
 @app.get("/api/candles/{bot_key}")
 async def api_candles(bot_key: str, pair: str, timeframe: str = "1h", limit: int = 200):
     """Proxy bot's pair_candles endpoint, return normalized OHLC.

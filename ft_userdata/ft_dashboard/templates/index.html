@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css?v=10">
+<link rel="stylesheet" href="/static/styles.css?v=11">
 <script defer
         src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
         integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
@@ -52,6 +52,10 @@
     <button class="tab" :class="tab === 'dryrun' ? 'on' : ''" @click="setTab('dryrun')">
       dry-run
       <span class="badge" x-text="dryRunBots.length">0</span>
+    </button>
+    <button class="tab" :class="tab === 'trades' ? 'on' : ''" @click="setTab('trades')">
+      trades
+      <span class="badge" x-text="closedTrades.length">0</span>
     </button>
   </nav>
 
@@ -428,6 +432,69 @@
 
   </main>
 
+  <!-- ══════════════ TRADES TAB ══════════════ -->
+  <main class="tab-panel" x-show="tab === 'trades'" x-cloak>
+
+    <div class="trades-toolbar">
+      <div class="trades-summary">
+        <span class="trades-count" x-text="closedTrades.length + ' closed trades'">0 closed trades</span>
+        <span class="trades-sep">·</span>
+        <span class="trades-wr">
+          win <span x-text="tradesWinRate">—</span>%
+        </span>
+        <span class="trades-sep">·</span>
+        <span class="trades-pnl" :class="tradesTotalPnl >= 0 ? 'pos' : 'neg'">
+          <span x-text="(tradesTotalPnl >= 0 ? '+' : '') + fmtUsd(tradesTotalPnl)">—</span>
+        </span>
+      </div>
+      <div class="trades-filter">
+        <template x-for="bot in liveBots.concat(dryRunBots)" :key="bot.key">
+          <button class="filter-pill"
+                  :class="tradesFilter === bot.key ? 'on' : ''"
+                  @click="setTradesFilter(bot.key)"
+                  x-text="bot.label || bot.name">bot</button>
+        </template>
+        <button class="filter-pill"
+                :class="tradesFilter === 'all' ? 'on' : ''"
+                @click="setTradesFilter('all')">all</button>
+      </div>
+    </div>
+
+    <div class="trades-grid">
+      <template x-for="trade in filteredTrades" :key="trade.bot_key + '-' + trade.open_ts + '-' + trade.pair">
+        <div class="trade-card" :class="trade.is_win ? 'win' : 'loss'">
+          <div class="trade-card-head">
+            <div class="trade-card-pair">
+              <span class="bot-glyph" :data-bot="trade.bot_key" x-text="(trade.bot_name||'?').charAt(0).toUpperCase()">·</span>
+              <span class="pair-name" x-text="trade.pair">PAIR</span>
+            </div>
+            <div class="trade-card-meta">
+              <span class="trade-pnl" :class="trade.is_win ? 'pos' : 'neg'">
+                <span x-text="(trade.profit_pct >= 0 ? '+' : '') + (trade.profit_pct||0).toFixed(2) + '%'">—</span>
+                <span class="abs" x-text="'(' + (trade.profit_abs >= 0 ? '+' : '') + fmtUsd(trade.profit_abs) + ')'">—</span>
+              </span>
+              <span class="trade-reason" :class="'reason-' + (trade.exit_reason||'unknown')" x-text="trade.exit_reason || '—'">—</span>
+            </div>
+          </div>
+          <div class="trade-card-detail">
+            <span>entry <strong x-text="(trade.open_rate||0).toPrecision(5)">—</strong></span>
+            <span class="sep">→</span>
+            <span>exit <strong x-text="(trade.close_rate||0).toPrecision(5)">—</strong></span>
+            <span class="sep">·</span>
+            <span x-text="formatTradeWindow(trade)">—</span>
+          </div>
+          <div class="trade-chart" :id="'trade-chart-' + trade.bot_key + '-' + trade.open_ts"></div>
+        </div>
+      </template>
+
+      <div class="empty" x-show="!filteredTrades.length">
+        <div class="icon">∅</div>
+        no closed trades yet
+      </div>
+    </div>
+
+  </main>
+
   <footer class="foot">
     <span>last poll · <span x-text="lastPollLabel">—</span></span>
     <span>master-trader.grooveops.dev</span>
@@ -436,6 +503,6 @@
 
 </div>
 
-<script src="/static/dashboard.js?v=10"></script>
+<script src="/static/dashboard.js?v=11"></script>
 </body>
 </html>
