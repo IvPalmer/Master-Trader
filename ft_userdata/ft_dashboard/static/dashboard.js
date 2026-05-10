@@ -429,16 +429,22 @@ function dash() {
         // and slider (handle drag) share the same range so they stay in sync.
         // moveOnMouseMove: true + preventDefaultMouseMove: true = drag pan
         // works inside the chart area without page scroll interference.
+        // Pan + zoom via the bottom slider only (ECharts inside-zoom on
+        // mouse wheel doesn't reliably preventDefault inside our scrolling
+        // page; click-drag inside the chart isn't a stock ECharts feature).
+        // The slider handles BOTH:
+        //   - Drag the blue range left/right -> pan
+        //   - Drag a handle (left or right edge) -> zoom in/out
         dataZoom: [
           {
             type: 'inside',
             xAxisIndex: 0,
             startValue: visibleStart,
             endValue: visibleEnd,
-            zoomOnMouseWheel: true,
+            zoomOnMouseWheel: false,
             moveOnMouseWheel: false,
-            moveOnMouseMove: true,
-            preventDefaultMouseMove: true,
+            moveOnMouseMove: false,
+            zoomLock: false,
             filterMode: 'filter',
           },
           {
@@ -446,13 +452,15 @@ function dash() {
             xAxisIndex: 0,
             startValue: visibleStart,
             endValue: visibleEnd,
-            height: 18,
-            bottom: 22,
+            height: 22,
+            bottom: 12,
             backgroundColor: COLORS.surface2,
-            fillerColor: 'rgba(34, 211, 238, 0.10)',
+            fillerColor: 'rgba(34, 211, 238, 0.12)',
             borderColor: COLORS.border,
+            handleSize: '120%',
             handleStyle: { color: COLORS.accent, borderColor: COLORS.accent },
-            moveHandleStyle: { color: COLORS.accent, opacity: 0.6 },
+            moveHandleStyle: { color: COLORS.accent, opacity: 0.7 },
+            emphasis: { handleStyle: { color: COLORS.accent, borderColor: COLORS.accent, shadowBlur: 4, shadowColor: COLORS.accent } },
             textStyle: { color: COLORS.text3, fontSize: 9 },
             showDetail: false,
             filterMode: 'filter',
