@@ -369,7 +369,10 @@ function dash() {
       let candles = this._tradeCandles[cacheKey];
       if (!candles) {
         try {
-          const url = `/api/candles/${trade.bot_key}?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=1000`;
+          // Binance-direct endpoint supports any timeframe (Freqtrade's
+          // pair_candles only serves the strategy's configured timeframe,
+          // which 502'd on 4h/5m for our 1h-strategy bots).
+          const url = `/api/binance_candles?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=1000`;
           const r = await fetch(url, { cache: 'no-store' });
           if (!r.ok) return;
           const data = await r.json();

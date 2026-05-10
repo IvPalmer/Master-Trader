@@ -585,6 +585,57 @@ async def api_closed_trades():
     return JSONResponse({"trades": out, "count": len(out)})
 
 
+@app.get("/api/binance_candles")
+async def api_binance_candles(pair: str, timeframe: str = "1h", limit: int = 500):
+    """Hit Binance public klines REST directly. No auth needed, supports
+    any timeframe, no Freqtrade-bot dependency. Used by the trades-tab
+    candle charts so closed-trade history can be visualized at any
+    timeframe even after a bot is killed.
+
+    Binance kline schema:
+      [open_time_ms, open, high, low, close, volume, close_time_ms, ...]
+
+    We normalize to the same shape as /api/candles/{bot_key}:
+      [date_ms, open, close, low, high, volume]
+    """
+    pair = pair.strip().upper()
+    if not _PAIR_RE.match(pair):
+        return JSONResponse({"error": "invalid pair"}, status_code=400)
+    if timeframe not in _ALLOWED_TIMEFRAMES:
+        return JSONResponse({"error": "invalid timeframe"}, status_code=400)
+    limit = max(10, min(limit, 1000))
+
+    symbol = pair.replace("/", "")
+    url = "https://api.binance.com/api/v3/klines"
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                url,
+                params={"symbol": symbol, "interval": timeframe, "limit": limit},
+                timeout=REQUEST_TIMEOUT,
+            )
+            if r.status_code != 200:
+                return JSONResponse({"error": f"HTTP {r.status_code}"}, status_code=502)
+            rows = r.json()
+    except Exception as exc:
+        return JSONResponse({"error": f"{type(exc).__name__}: {exc}"}, status_code=502)
+
+    ohlc = []
+    for row in rows:
+        try:
+            ohlc.append([
+                int(row[0]),       # open_time_ms
+                float(row[1]),     # open
+                float(row[4]),     # close
+                float(row[3]),     # low
+                float(row[2]),     # high
+                float(row[5]),     # volume
+            ])
+        except Exception:
+            continue
+    return JSONResponse({"pair": pair, "timeframe": timeframe, "candles": ohlc})
+
+
 @app.get("/api/candles/{bot_key}")
 async def api_candles(bot_key: str, pair: str, timeframe: str = "1h", limit: int = 200):
     """Proxy bot's pair_candles endpoint, return normalized OHLC.
