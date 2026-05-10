@@ -424,6 +424,21 @@ function dash() {
           axisLabel: { color: COLORS.text3, fontSize: 9, formatter: v => v.toPrecision(4) },
           splitLine: { lineStyle: { color: COLORS.border, opacity: 0.3 } },
           axisPointer: { label: { show: false } },
+          // Force the y-axis to always include the trade's key levels
+          // (entry/exit/stop) plus a 5% headroom. Without this, when the user
+          // pans the slider to candles ABOVE or BELOW the trade range, the
+          // entry/exit lines get pushed off-screen because scale: true only
+          // fits visible candles.
+          min: ({ min, max }) => {
+            const lo = Math.min(min, trade.open_rate, trade.close_rate, trade.stop_rate || trade.open_rate);
+            const range = Math.max(max - min, 0.0001);
+            return lo - range * 0.05;
+          },
+          max: ({ min, max }) => {
+            const hi = Math.max(max, trade.open_rate, trade.close_rate);
+            const range = Math.max(max - min, 0.0001);
+            return hi + range * 0.05;
+          },
         },
         // ABSOLUTE time bounds via startValue/endValue. Both inside (drag/wheel)
         // and slider (handle drag) share the same range so they stay in sync.
@@ -465,12 +480,10 @@ function dash() {
               borderColor0: COLORS.neg,
               borderWidth: 1,
             },
-            // Horizontal price lines only. We dropped:
-            //   - vertical timestamp markLines (rendered as extra colored bars)
-            //   - markPoint dots (rendered at confusing positions when their
-            //     timestamps fell mid-candle, especially on 4h timeframe)
-            // The entry/exit/SL price levels are the actual signal; the lines
-            // convey them unambiguously.
+            // Horizontal price lines (entry / exit / stop) for value reference,
+            // bordered dots at the exact (timestamp, price) for the trade events.
+            // Vertical timestamp markLines were dropped (rendered as confusing
+            // extra colored bars across the full y-range).
             markLine: {
               symbol: 'none',
               silent: true,
@@ -495,6 +508,45 @@ function dash() {
                   label: { show: true, formatter: 'stop ' + trade.stoploss_pct.toFixed(1) + '%',
                            position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, padding: [2, 4], opacity: 0.7 },
                 }] : []),
+              ],
+            },
+            // Entry / exit dots at the exact (timestamp, price) of each event.
+            // Using markPoint.data with explicit `coord:[x,y]` was unreliable
+            // on candlestick series. Instead we use a separate scatter series
+            // (in markPoint via "value: [x, y]") so the dot positioning
+            // matches the same coord system as the candles themselves.
+            markPoint: {
+              symbolSize: 12,
+              animation: false,
+              silent: true,
+              label: { show: false },
+              data: [
+                {
+                  name: 'entry',
+                  value: trade.open_rate,
+                  xAxis: entryTs,
+                  yAxis: trade.open_rate,
+                  symbol: 'circle',
+                  itemStyle: {
+                    color: COLORS.text,
+                    borderColor: COLORS.surface,
+                    borderWidth: 2,
+                  },
+                },
+                {
+                  name: 'exit',
+                  value: trade.close_rate,
+                  xAxis: exitTs,
+                  yAxis: trade.close_rate,
+                  symbol: 'circle',
+                  itemStyle: {
+                    color: winColor,
+                    borderColor: COLORS.surface,
+                    borderWidth: 2,
+                    shadowBlur: 6,
+                    shadowColor: winColor,
+                  },
+                },
               ],
             },
           },
