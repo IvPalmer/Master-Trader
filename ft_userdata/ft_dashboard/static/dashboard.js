@@ -439,7 +439,7 @@ function dash() {
             moveOnMouseWheel: false,
             moveOnMouseMove: true,
             preventDefaultMouseMove: true,
-            filterMode: 'none',
+            filterMode: 'filter',
           },
           {
             type: 'slider',
@@ -455,7 +455,7 @@ function dash() {
             moveHandleStyle: { color: COLORS.accent, opacity: 0.6 },
             textStyle: { color: COLORS.text3, fontSize: 9 },
             showDetail: false,
-            filterMode: 'none',
+            filterMode: 'filter',
           },
         ],
         series: [
