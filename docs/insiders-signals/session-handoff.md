@@ -64,9 +64,41 @@ shouldn't live in this repo.
   script** (embeds 50 messages + ground truth). Run with
   `pip install anthropic && ANTHROPIC_API_KEY=sk-... python validate_llm.py`.
   Prints ✓/✗ per message + confusion matrix. ~$0.04 total.
+- `docs/insiders-signals/replay-results.md` — **MVP-1 results doc for Eduardo.**
+  Side-by-side LLM vs regex on all 428 messages: LLM +$230.80 / 23.08% vs
+  regex +$188.07 / 18.81%. The $42.73 delta is almost entirely from 16
+  market-entry trades the LLM recovers via WEEX kline fill.
+- `docs/insiders-signals/replay/classifications.jsonl` — frozen artifact:
+  428 LLM classifications, reproducible without API access.
+- `ft_userdata/insiders_bridge/{regex_replay,llm_simulator,render_report}.py`
+  — MVP-1 pipeline scripts. See `replay-results.md` for the reproduce steps.
 - `docs/insiders-signals/session-handoff.md` — this file.
 
-Committed on branch `claude/understand-project-Vo5vk` (commit `499efec`).
+Committed on branch `claude/understand-project-Vo5vk` (commits `499efec` +
+MVP-1 wrap-up).
+
+## MVP-1 status — DONE (2026-05-17)
+
+Eduardo shipped an updated prototype (`telegram.zip`, 2026-05-17) that
+overhauled `weex.py` and `simulator.py`:
+- Chronological event walk: SL moves now applied as the kline walk progresses
+- Partials book realized PnL at the close-event price
+- Breakeven stops labeled `manual` (scratch), not `sl` (loss)
+- Adaptive kline interval ladder (1m / 5m / 15m / 1h)
+- Risk-budget sizing model: $1k account, $10 risk/trade, $50 margin → variable
+  leverage = $10/SL_distance%
+
+His regex baseline on this updated prototype: **+$187.37 / 18.74% return,
+9.7x avg leverage** (per his `summary.md`). We reproduce within $1.
+
+The replay pipeline (`regex_replay.py`, `llm_simulator.py`, `render_report.py`)
+is parser-agnostic — both pipelines feed `simulator.simulate` (regex) /
+`build_trades` (LLM events) into Eduardo's `weex.resolve_exits` unchanged.
+
+**Gate passed:** LLM PnL ($230.80) > regex PnL ($188.07) by $42.73 / 4.27pp.
+No catastrophic false-close events. The bare-`stop` regex bug is gone (LLM
+correctly classifies all "Got stopped" / "stop-loss" mentions as either
+close_full or chat per their actual semantic).
 
 ## Three-lane investigation — compressed findings
 

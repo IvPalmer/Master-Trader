@@ -1,0 +1,428 @@
+{"id": 1048, "kind": "chat", "confidence": 0.95}
+{"id": 1050, "kind": "chat", "confidence": 0.9}
+{"id": 1051, "kind": "chat", "confidence": 0.9}
+{"id": 1052, "kind": "chat", "confidence": 0.95}
+{"id": 1054, "kind": "chat", "confidence": 0.9}
+{"id": 1055, "kind": "chat", "confidence": 0.85}
+{"id": 1056, "kind": "open", "symbol": "BTC", "direction": "short", "confidence": 0.9}
+{"id": 1057, "kind": "open", "symbol": "ETH", "direction": "short", "confidence": 0.9}
+{"id": 1058, "kind": "open", "symbol": "BTC", "direction": "short", "entry_range": [75800, 76600], "sl": 77300, "tp": 71000, "confidence": 0.98}
+{"id": 1059, "kind": "open", "symbol": "ETH", "direction": "short", "entry_range": [2360, 2420], "sl": 2480, "tp": 2100, "confidence": 0.98}
+{"id": 1061, "kind": "chat", "confidence": 0.95}
+{"id": 1064, "kind": "chat", "confidence": 0.9}
+{"id": 1065, "kind": "open", "symbol": "TST", "direction": "long", "sl": 0.012, "confidence": 0.9}
+{"id": 1066, "kind": "move_sl", "symbol": "BTC", "sl": 77900, "confidence": 0.95}
+{"id": 1067, "kind": "chat", "confidence": 0.7}
+{"id": 1068, "kind": "move_sl", "symbol": "BTC", "sl": 78200, "confidence": 0.9}
+{"id": 1069, "kind": "chat", "confidence": 0.95}
+{"id": 1070, "kind": "chat", "confidence": 0.9}
+{"id": 1071, "kind": "open", "applies_to": ["BTC", "ETH"], "direction": "short", "confidence": 0.9, "notes": "BTC entry 77000-77200 SL 78830; ETH entry 2410-2430 SL 2500; targets later"}
+{"id": 1072, "kind": "chat", "confidence": 0.95}
+{"id": 1073, "kind": "open", "symbol": "XTIU", "direction": "long", "entry_range": [79, 85], "sl": 73.5, "tp": 98, "confidence": 0.9, "notes": "Target 1: 98, Target 2: 118"}
+{"id": 1074, "kind": "close_partial", "applies_to": ["BTC", "ETH"], "pct": 30, "confidence": 0.95}
+{"id": 1076, "kind": "close_partial", "applies_to": ["BTC", "ETH"], "pct": 30, "confidence": 0.85}
+{"id": 1077, "kind": "chat", "confidence": 0.8}
+{"id": 1078, "kind": "open", "symbol": "BTC", "direction": "long", "confidence": 0.9, "notes": "Hedge position"}
+{"id": 1079, "kind": "chat", "confidence": 0.7}
+{"id": 1081, "kind": "chat", "confidence": 0.85}
+{"id": 1082, "kind": "chat", "confidence": 0.95}
+{"id": 1085, "kind": "chat", "confidence": 0.8}
+{"id": 1087, "kind": "chat", "confidence": 0.95}
+{"id": 1088, "kind": "open", "symbol": "HYPE", "direction": "short", "entry_range": [43.5, 45], "sl": 46.181, "tp": 36.4, "confidence": 0.98}
+{"id": 1089, "kind": "open", "symbol": "PUMP", "direction": "long", "entry_range": [0.00182, 0.00186], "sl": 0.001795, "tp": 0.00203, "confidence": 0.98}
+{"id": 1090, "kind": "chat", "confidence": 0.7}
+{"id": 1091, "kind": "move_sl", "symbol": "HYPE", "sl": "breakeven", "confidence": 0.95}
+{"id": 1092, "kind": "chat", "confidence": 0.7}
+{"id": 1093, "kind": "close_full", "symbol": "HYPE", "confidence": 0.95}
+{"id": 1094, "kind": "chat", "confidence": 0.8}
+{"id": 1095, "kind": "chat", "confidence": 0.9}
+{"id": 1096, "kind": "chat", "confidence": 0.95}
+{"id": 1099, "kind": "chat", "confidence": 0.95}
+{"id": 1100, "kind": "chat", "confidence": 0.95}
+{"id": 1101, "kind": "close_partial", "applies_to": ["BTC", "ETH"], "pct": 50, "confidence": 0.95}
+{"id": 1102, "kind": "move_sl", "symbol": "PUMP", "sl": 0.00178, "confidence": 0.95}
+{"id": 1103, "kind": "increase", "symbol": "BTC", "direction": "long", "entry": 74000, "sl": 73000, "pct": 50, "confidence": 0.9, "notes": "Set SL 73000, place limit at 74000 and add +50%"}
+{"id": 1104, "kind": "chat", "confidence": 0.85}
+{"id": 1105, "kind": "close_partial", "symbol": "BTC", "pct": 30, "confidence": 0.95, "notes": "BTC Long hedge"}
+{"id": 1106, "kind": "chat", "confidence": 0.7}
+{"id": 1107, "kind": "chat", "confidence": 0.9}
+{"id": 1108, "kind": "chat", "confidence": 0.9}
+{"id": 1109, "kind": "increase", "symbol": "ETH", "direction": "short", "pct": 20, "confidence": 0.85}
+{"id": 1110, "kind": "chat", "confidence": 0.7}
+{"id": 1111, "kind": "chat", "confidence": 0.95}
+{"id": 1114, "kind": "close_full", "symbol": "BTC", "confidence": 0.9, "notes": "BTC Long hedge fully closed at 76190"}
+{"id": 1117, "kind": "chat", "confidence": 0.6}
+{"id": 1118, "kind": "open", "symbol": "BTC", "direction": "short", "entry": null, "sl": 79800, "confidence": 0.95, "notes": "Staged: 10% by market, 20% - 76600, 20% - 77200, 20% - 78100, 20% - 78700"}
+{"id": 1119, "kind": "open", "symbol": "ETH", "direction": "short", "entry": null, "sl": 2480, "confidence": 0.95, "notes": "Staged: 20% - 2360, 20% - 2400, 30% - 2440 (already 30% of planned position)"}
+{"id": 1120, "kind": "chat", "confidence": 0.9}
+{"id": 1122, "kind": "open", "symbol": "BTC", "direction": "long", "entry_range": [75400, 75800], "sl": 75000, "tp": 79000, "confidence": 0.95, "notes": "Hedge position"}
+{"id": 1123, "kind": "chat", "confidence": 0.85}
+{"id": 1124, "kind": "close_partial", "symbol": "BTC", "pct": 50, "confidence": 0.9, "notes": "BTC Long hedge"}
+{"id": 1125, "kind": "chat", "confidence": 0.9}
+{"id": 1126, "kind": "move_sl", "symbol": "BTC", "sl": "breakeven", "confidence": 0.9, "notes": "BTC Long hedge"}
+{"id": 1127, "kind": "chat", "confidence": 0.75}
+{"id": 1128, "kind": "close_partial", "symbol": "BTC", "pct": 25, "confidence": 0.95, "notes": "BTC short"}
+{"id": 1129, "kind": "open", "symbol": "PUMP", "direction": "short", "entry_range": [0.00185, 0.00188], "sl": 0.0019, "tp": 0.00176, "confidence": 0.98}
+{"id": 1130, "kind": "open", "symbol": "ASTER", "direction": "short", "entry_range": [0.686, 0.698], "sl": 0.705, "tp": 0.666, "confidence": 0.98}
+{"id": 1132, "kind": "close_full", "symbol": "PUMP", "confidence": 0.95}
+{"id": 1133, "kind": "chat", "confidence": 0.6}
+{"id": 1134, "kind": "chat", "confidence": 0.7}
+{"id": 1135, "kind": "chat", "confidence": 0.9}
+{"id": 1136, "kind": "close_partial", "symbol": "ASTER", "pct": 50, "sl": "breakeven", "confidence": 0.95, "notes": "Close half and SL to breakeven"}
+{"id": 1137, "kind": "close_full", "symbol": "ASTER", "confidence": 0.95}
+{"id": 1139, "kind": "chat", "confidence": 0.85}
+{"id": 1140, "kind": "chat", "confidence": 0.7}
+{"id": 1141, "kind": "move_sl", "symbol": "BTC", "sl": 80500, "confidence": 0.97}
+{"id": 1142, "kind": "chat", "confidence": 0.95}
+{"id": 1144, "kind": "chat", "confidence": 0.9}
+{"id": 1145, "kind": "chat", "confidence": 0.9}
+{"id": 1146, "kind": "chat", "confidence": 0.95}
+{"id": 1147, "kind": "move_sl", "symbol": "BTC", "sl": 80933, "confidence": 0.95}
+{"id": 1149, "kind": "chat", "confidence": 0.95}
+{"id": 1150, "kind": "chat", "confidence": 0.8}
+{"id": 1151, "kind": "close_partial", "symbol": "ETH", "pct": 30, "confidence": 0.95}
+{"id": 1152, "kind": "chat", "confidence": 0.85}
+{"id": 1153, "kind": "chat", "confidence": 0.98}
+{"id": 1154, "kind": "chat", "confidence": 0.95}
+{"id": 1155, "kind": "chat", "confidence": 0.95}
+{"id": 1156, "kind": "chat", "confidence": 0.9}
+{"id": 1157, "kind": "chat", "confidence": 0.95}
+{"id": 1159, "kind": "chat", "confidence": 0.85}
+{"id": 1160, "kind": "open", "symbol": "PUMP", "direction": "long", "confidence": 0.9}
+{"id": 1161, "kind": "open", "symbol": "PUMP", "direction": "long", "entry_range": [0.00178, 0.0018], "sl": 0.00177, "tp": 0.00184, "confidence": 0.97}
+{"id": 1162, "kind": "open", "symbol": "ASTER", "direction": "long", "entry_range": [0.658, 0.672], "sl": 0.652, "tp": 0.71, "confidence": 0.97}
+{"id": 1163, "kind": "open", "symbol": "FF", "direction": "long", "entry": null, "sl": 0.0669, "tp": null, "notes": "Staged: 20% by Market (~0.0723), 30% at 0.0698, 50% at 0.0684", "confidence": 0.95}
+{"id": 1164, "kind": "chat", "confidence": 0.95}
+{"id": 1165, "kind": "close_partial", "symbol": "PUMP", "pct": 30, "sl": "breakeven", "confidence": 0.95}
+{"id": 1167, "kind": "chat", "confidence": 0.7}
+{"id": 1168, "kind": "chat", "confidence": 0.95}
+{"id": 1169, "kind": "chat", "confidence": 0.98}
+{"id": 1170, "kind": "chat", "confidence": 0.95}
+{"id": 1171, "kind": "close_partial", "symbol": "FF", "pct": 50, "sl": "breakeven", "confidence": 0.95}
+{"id": 1172, "kind": "open", "symbol": "HYPE", "direction": "short", "confidence": 0.9}
+{"id": 1173, "kind": "open", "symbol": "HYPE", "direction": "short", "entry_range": [41, 41.8], "sl": 42.4, "tp": 39.1, "confidence": 0.97}
+{"id": 1176, "kind": "open", "symbol": "PUMP", "direction": "long", "confidence": 0.9}
+{"id": 1177, "kind": "open", "symbol": "PUMP", "direction": "long", "entry_range": [0.00177, 0.0018], "sl": 0.175, "tp": 0.00188, "confidence": 0.92}
+{"id": 1178, "kind": "close_full", "symbol": "FF", "confidence": 0.97}
+{"id": 1179, "kind": "open", "symbol": "FF", "direction": "long", "confidence": 0.9}
+{"id": 1180, "kind": "open", "symbol": "FF", "direction": "long", "entry_range": [0.069, 0.071], "sl": 0.068, "tp": 0.074, "confidence": 0.97}
+{"id": 1181, "kind": "close_full", "symbol": "HYPE", "confidence": 0.97}
+{"id": 1182, "kind": "chat", "confidence": 0.95}
+{"id": 1184, "kind": "open", "symbol": "SOL", "direction": "short", "entry_range": [86.3, 88.5], "sl": 89.77, "tp": 81.53, "confidence": 0.97}
+{"id": 1185, "kind": "close_full", "symbol": "ASTER", "confidence": 0.97}
+{"id": 1186, "kind": "chat", "confidence": 0.9}
+{"id": 1187, "kind": "chat", "confidence": 0.95}
+{"id": 1188, "kind": "chat", "confidence": 0.9}
+{"id": 1189, "kind": "move_sl", "symbol": "ETH", "sl": "breakeven", "confidence": 0.95}
+{"id": 1190, "kind": "open", "symbol": "ETH", "direction": "short", "entry_range": [2390, 2470], "sl": 2520, "tp": 1800, "confidence": 0.97}
+{"id": 1192, "kind": "chat", "confidence": 0.95}
+{"id": 1193, "kind": "chat", "confidence": 0.95}
+{"id": 1194, "kind": "chat", "confidence": 0.9}
+{"id": 1196, "kind": "open", "symbol": "ETH", "direction": "long", "confidence": 0.9}
+{"id": 1197, "kind": "open", "symbol": "ETH", "direction": "long", "sl": 2305, "tp": 2350, "confidence": 0.95}
+{"id": 1198, "kind": "chat", "confidence": 0.95}
+{"id": 1199, "kind": "chat", "confidence": 0.9}
+{"id": 1200, "kind": "open", "symbol": "VIRTUAL", "direction": "long", "confidence": 0.9}
+{"id": 1201, "kind": "open", "symbol": "VIRTUAL", "direction": "long", "sl": 0.68, "tp": 0.715, "confidence": 0.95}
+{"id": 1202, "kind": "chat", "confidence": 0.98}
+{"id": 1203, "kind": "close_partial", "symbol": "SOL", "pct": 30, "confidence": 0.97}
+{"id": 1204, "kind": "move_sl", "symbol": "ETH", "sl": 2295, "confidence": 0.95}
+{"id": 1205, "kind": "chat", "confidence": 0.98}
+{"id": 1206, "kind": "close_full", "symbol": "VIRTUAL", "confidence": 0.95}
+{"id": 1207, "kind": "chat", "confidence": 0.98}
+{"id": 1208, "kind": "chat", "confidence": 0.98}
+{"id": 1209, "kind": "close_full", "symbol": "ETH", "confidence": 0.9, "notes": "Closing hedge long"}
+{"id": 1212, "kind": "chat", "confidence": 0.9}
+{"id": 1215, "kind": "chat", "confidence": 0.95}
+{"id": 1216, "kind": "close_partial", "applies_to": ["BTC", "SOL", "ETH"], "pct": 30, "confidence": 0.95}
+{"id": 1217, "kind": "close_partial", "applies_to": ["BTC", "SOL", "ETH"], "pct": 50, "confidence": 0.8}
+{"id": 1220, "kind": "chat", "confidence": 0.95}
+{"id": 1221, "kind": "chat", "confidence": 0.98}
+{"id": 1222, "kind": "open", "symbol": "FARTCOIN", "direction": "long", "confidence": 0.9}
+{"id": 1223, "kind": "open", "symbol": "FARTCOIN", "direction": "long", "entry_range": [0.19, 0.1953], "sl": 0.187, "tp": 0.203, "confidence": 0.97}
+{"id": 1224, "kind": "open", "symbol": "PUMP", "direction": "long", "confidence": 0.9}
+{"id": 1225, "kind": "open", "symbol": "PUMP", "direction": "long", "entry_range": [0.0017, 0.00175], "sl": 0.00168, "tp": 0.00183, "confidence": 0.97}
+{"id": 1226, "kind": "chat", "confidence": 0.95}
+{"id": 1227, "kind": "close_partial", "symbol": "FARTCOIN", "pct": 20, "sl": "breakeven", "confidence": 0.97}
+{"id": 1228, "kind": "close_full", "symbol": "PUMP", "confidence": 0.97}
+{"id": 1229, "kind": "chat", "confidence": 0.95}
+{"id": 1230, "kind": "chat", "confidence": 0.95}
+{"id": 1231, "kind": "chat", "confidence": 0.95}
+{"id": 1232, "kind": "chat", "confidence": 0.9}
+{"id": 1234, "kind": "chat", "confidence": 0.8}
+{"id": 1236, "kind": "close_partial", "symbol": "XTIU", "pct": 75, "sl": "breakeven", "confidence": 0.97}
+{"id": 1237, "kind": "chat", "confidence": 0.97}
+{"id": 1241, "kind": "chat", "confidence": 0.9}
+{"id": 1242, "kind": "chat", "confidence": 0.97}
+{"id": 1245, "kind": "move_sl", "symbol": "ETH", "sl": 2330, "confidence": 0.97}
+{"id": 1246, "kind": "close_partial", "symbol": "SOL", "pct": 50, "sl": "breakeven", "confidence": 0.97}
+{"id": 1247, "kind": "close_full", "symbol": "ETH", "confidence": 0.95}
+{"id": 1248, "kind": "open", "symbol": "ETH", "direction": "short", "entry_range": [2330, 2360], "sl": 2370, "tp": 1900, "confidence": 0.98}
+{"id": 1249, "kind": "increase", "symbol": "SOL", "pct": 100, "confidence": 0.97}
+{"id": 1250, "kind": "open", "symbol": "VIRTUAL", "direction": "short", "confidence": 0.95}
+{"id": 1251, "kind": "open", "symbol": "VIRTUAL", "direction": "short", "entry_range": [0.71, 0.721], "sl": 0.732, "tp": 0.671, "confidence": 0.97}
+{"id": 1252, "kind": "move_sl", "symbol": "SOL", "sl": "breakeven", "confidence": 0.95}
+{"id": 1253, "kind": "chat", "confidence": 0.95}
+{"id": 1254, "kind": "chat", "confidence": 0.95}
+{"id": 1255, "kind": "chat", "confidence": 0.95}
+{"id": 1256, "kind": "chat", "confidence": 0.97}
+{"id": 1257, "kind": "close_partial", "symbol": "VIRTUAL", "pct": 30, "sl": "breakeven", "confidence": 0.95}
+{"id": 1258, "kind": "close_full", "symbol": "VIRTUAL", "confidence": 0.9}
+{"id": 1259, "kind": "open", "symbol": "AAVE", "direction": "short", "confidence": 0.95}
+{"id": 1260, "kind": "open", "symbol": "AAVE", "direction": "short", "entry_range": [97.3, 98.5], "sl": 99.5, "tp": 93, "confidence": 0.98}
+{"id": 1261, "kind": "increase", "symbol": "ETH", "pct": 50, "confidence": 0.97}
+{"id": 1262, "kind": "open", "symbol": "BTC", "direction": "long", "entry_range": [77400, 77700], "sl": 77000, "confidence": 0.96}
+{"id": 1263, "kind": "close_full", "symbol": "BTC", "confidence": 0.93}
+{"id": 1265, "kind": "close_partial", "symbol": "AAVE", "pct": 30, "sl": "breakeven", "confidence": 0.95}
+{"id": 1266, "kind": "chat", "confidence": 0.7}
+{"id": 1267, "kind": "open", "symbol": "DYDX", "direction": "short", "entry": null, "sl": 0.186, "tp": 0.147, "notes": "30% by Market / 70% at 0.175; 1TP 0.147 - 70%, 2TP 0.133 - 30%; swing leverage x5-7", "confidence": 0.97}
+{"id": 1268, "kind": "close_partial", "symbol": "ETH", "pct": 30, "confidence": 0.97}
+{"id": 1269, "kind": "chat", "confidence": 0.9}
+{"id": 1270, "kind": "chat", "confidence": 0.97}
+{"id": 1271, "kind": "chat", "confidence": 0.97}
+{"id": 1273, "kind": "chat", "confidence": 0.97}
+{"id": 1274, "kind": "close_partial", "symbol": "AAVE", "pct": 50, "confidence": 0.96}
+{"id": 1275, "kind": "close_partial", "symbol": "DYDX", "pct": 30, "sl": "breakeven", "confidence": 0.97}
+{"id": 1276, "kind": "close_partial", "symbol": "SOL", "pct": 30, "sl": "breakeven", "confidence": 0.95}
+{"id": 1277, "kind": "chat", "confidence": 0.97}
+{"id": 1278, "kind": "chat", "confidence": 0.97}
+{"id": 1279, "kind": "chat", "confidence": 0.97}
+{"id": 1288, "kind": "chat", "confidence": 0.97}
+{"id": 1289, "kind": "close_full", "symbol": "AAVE", "confidence": 0.97}
+{"id": 1290, "kind": "chat", "confidence": 0.9}
+{"id": 1293, "kind": "close_partial", "pct": 50, "notes": "applies to all open shorts", "confidence": 0.85}
+{"id": 1295, "kind": "open", "symbol": "BTC", "direction": "long", "sl": 75300, "notes": "hedge position", "confidence": 0.93}
+{"id": 1296, "kind": "close_full", "symbol": "XTIU", "confidence": 0.97}
+{"id": 1297, "kind": "chat", "confidence": 0.95}
+{"id": 1298, "kind": "chat", "confidence": 0.9}
+{"id": 1300, "kind": "chat", "confidence": 0.85}
+{"id": 1304, "kind": "close_full", "symbol": "BTC", "confidence": 0.95}
+{"id": 1305, "kind": "chat", "confidence": 0.6}
+{"id": 1306, "kind": "open", "symbol": "BTC", "direction": "short", "sl": 77400, "confidence": 0.9}
+{"id": 1307, "kind": "close_full", "symbol": "BTC", "confidence": 0.95}
+{"id": 1308, "kind": "close_partial", "symbol": "BTC", "pct": 40, "sl": "breakeven", "confidence": 0.9}
+{"id": 1309, "kind": "open", "symbol": "BTC", "direction": "short", "entry_range": [77100, 77300], "sl": 77550, "tp": 76600, "confidence": 0.98}
+{"id": 1310, "kind": "chat", "confidence": 0.9}
+{"id": 1311, "kind": "chat", "confidence": 0.95}
+{"id": 1312, "kind": "open", "symbol": "ETH", "direction": "long", "entry_range": [2260, 2285], "sl": 2250, "tp": 2340, "confidence": 0.98}
+{"id": 1313, "kind": "close_full", "symbol": "BTC", "confidence": 0.93}
+{"id": 1314, "kind": "close_partial", "symbol": "ETH", "pct": 40, "sl": "breakeven", "confidence": 0.95}
+{"id": 1315, "kind": "open", "symbol": "BTC", "direction": "short", "confidence": 0.9}
+{"id": 1316, "kind": "open", "symbol": "APT", "direction": "short", "confidence": 0.9}
+{"id": 1317, "kind": "open", "symbol": "BTC", "direction": "short", "entry_range": [78500, 79500], "sl": 80300, "confidence": 0.97}
+{"id": 1318, "kind": "open", "symbol": "APT", "direction": "short", "entry": null, "sl": 1.09, "notes": "30% by Market / 70% at 1.05; swing position (wide entry)", "confidence": 0.97}
+{"id": 1319, "kind": "close_partial", "symbol": "BTC", "pct": 25, "confidence": 0.97}
+{"id": 1320, "kind": "chat", "confidence": 0.97}
+{"id": 1321, "kind": "chat", "confidence": 0.9}
+{"id": 1322, "kind": "chat", "confidence": 0.9}
+{"id": 1323, "kind": "close_full", "symbol": "BTC", "confidence": 0.8}
+{"id": 1324, "kind": "close_full", "symbol": "BTC", "confidence": 0.95}
+{"id": 1325, "kind": "chat", "confidence": 0.95}
+{"id": 1326, "kind": "open", "symbol": "BTC", "direction": "short", "entry": null, "sl": 82600, "tp": 55000, "notes": "Staged: 25% - 79,900 / 25% - 80,400 / 25% - 81,300 / 25% - 81,800", "confidence": 0.97}
+{"id": 1327, "kind": "close_partial", "symbol": "APT", "pct": 25, "confidence": 0.95}
+{"id": 1328, "kind": "open", "symbol": "FF", "direction": "long", "entry_range": [0.061, 0.0623], "sl": 0.0598, "tp": 0.068, "confidence": 0.98}
+{"id": 1329, "kind": "close_partial", "symbol": "APT", "pct": 50, "sl": "breakeven", "confidence": 0.95}
+{"id": 1330, "kind": "open", "symbol": "DOT", "direction": "long", "entry_range": [1.18, 1.21], "sl": 1.16, "tp": 1.28, "confidence": 0.98}
+{"id": 1331, "kind": "open", "symbol": "WLFI", "direction": "long", "entry_range": [0.053, 0.057], "sl": 0.0498, "confidence": 0.95}
+{"id": 1332, "kind": "close_partial", "symbol": "DOT", "pct": 40, "sl": "breakeven", "confidence": 0.95}
+{"id": 1333, "kind": "open", "symbol": "BTC", "direction": "long", "sl": 77900, "confidence": 0.95}
+{"id": 1334, "kind": "move_sl", "symbol": "BTC", "sl": 77600, "confidence": 0.9}
+{"id": 1335, "kind": "chat", "confidence": 0.9}
+{"id": 1336, "kind": "close_full", "symbol": "DOT", "confidence": 0.95}
+{"id": 1337, "kind": "close_full", "symbol": "ETH", "confidence": 0.95}
+{"id": 1338, "kind": "chat", "symbol": "SOL", "confidence": 0.8}
+{"id": 1339, "kind": "chat", "confidence": 0.95}
+{"id": 1340, "kind": "chat", "confidence": 0.9}
+{"id": 1341, "kind": "chat", "confidence": 0.95}
+{"id": 1342, "kind": "chat", "confidence": 0.95}
+{"id": 1344, "kind": "close_partial", "symbol": "WLFI", "pct": 25, "sl": "breakeven", "confidence": 0.95}
+{"id": 1345, "kind": "close_full", "symbol": "BTC", "confidence": 0.95}
+{"id": 1347, "kind": "open", "symbol": "BTC", "direction": "short", "sl": 79300, "confidence": 0.95}
+{"id": 1349, "kind": "chat", "confidence": 0.9}
+{"id": 1350, "kind": "close_partial", "symbol": "WLFI", "pct": 50, "sl": "breakeven", "confidence": 0.9}
+{"id": 1351, "kind": "close_full", "symbol": "BTC", "confidence": 0.85}
+{"id": 1352, "kind": "open", "symbol": "BTC", "direction": "long", "sl": 78200, "tp": 80300, "confidence": 0.95}
+{"id": 1353, "kind": "chat", "confidence": 0.9}
+{"id": 1354, "kind": "chat", "confidence": 0.9}
+{"id": 1355, "kind": "chat", "confidence": 0.95}
+{"id": 1356, "kind": "chat", "confidence": 0.95}
+{"id": 1358, "kind": "move_sl", "symbol": "BTC", "sl": "breakeven", "confidence": 0.85}
+{"id": 1359, "kind": "open", "symbol": "BTC", "direction": "short", "entry_range": [79000, 80500], "sl": 81500, "tp": 73500, "confidence": 0.98}
+{"id": 1360, "kind": "close_full", "symbol": "BTC", "confidence": 0.9}
+{"id": 1361, "kind": "chat", "confidence": 0.9}
+{"id": 1362, "kind": "chat", "confidence": 0.95}
+{"id": 1363, "kind": "close_full", "symbol": "WLFI", "confidence": 0.97}
+{"id": 1365, "kind": "chat", "confidence": 0.9}
+{"id": 1366, "kind": "chat", "confidence": 0.95}
+{"id": 1367, "kind": "open", "symbol": "ETH", "direction": "short", "confidence": 0.9}
+{"id": 1368, "kind": "open", "symbol": "ETH", "direction": "short", "entry_range": [2380, 2470], "sl": 2520, "confidence": 0.95}
+{"id": 1369, "kind": "open", "symbol": "PEPE", "direction": "short", "entry_range": [0.0041, 0.004162], "sl": 0.00421, "tp": 0.003614, "confidence": 0.98}
+{"id": 1370, "kind": "close_full", "symbol": "FF", "confidence": 0.9}
+{"id": 1371, "kind": "close_partial", "symbol": "PEPE", "pct": 30, "confidence": 0.95}
+{"id": 1372, "kind": "chat", "confidence": 0.95}
+{"id": 1373, "kind": "close_partial", "symbol": "PEPE", "pct": 20, "confidence": 0.9}
+{"id": 1374, "kind": "chat", "confidence": 0.9}
+{"id": 1375, "kind": "chat", "confidence": 0.95}
+{"id": 1376, "kind": "close_partial", "symbol": "PEPE", "pct": 20, "confidence": 0.9}
+{"id": 1377, "kind": "close_partial", "symbol": "PEPE", "pct": 50, "sl": "breakeven", "confidence": 0.9}
+{"id": 1378, "kind": "close_partial", "symbol": "BTC", "pct": 40, "confidence": 0.95}
+{"id": 1379, "kind": "chat", "confidence": 0.9}
+{"id": 1381, "kind": "close_partial", "pct": 30, "applies_to": ["BTC", "ETH", "SOL"], "notes": "Close 30% of all shorts", "confidence": 0.8}
+{"id": 1382, "kind": "chat", "confidence": 0.95}
+{"id": 1383, "kind": "chat", "confidence": 0.98}
+{"id": 1384, "kind": "chat", "confidence": 0.95}
+{"id": 1385, "kind": "increase", "applies_to": ["BTC", "ETH"], "notes": "Adding back what was closed earlier", "confidence": 0.9}
+{"id": 1386, "kind": "move_sl", "symbol": "BTC", "sl": 82500, "confidence": 0.95}
+{"id": 1387, "kind": "open", "symbol": "SOL", "direction": "short", "confidence": 0.9}
+{"id": 1388, "kind": "open", "symbol": "SOL", "direction": "short", "entry_range": [84.7, 86.5], "sl": 87.6, "tp": 81.2, "confidence": 0.97}
+{"id": 1389, "kind": "chat", "applies_to": ["BTC", "ETH"], "confidence": 0.85}
+{"id": 1390, "kind": "chat", "confidence": 0.95}
+{"id": 1391, "kind": "chat", "confidence": 0.95}
+{"id": 1392, "kind": "chat", "confidence": 0.98}
+{"id": 1393, "kind": "chat", "confidence": 0.95}
+{"id": 1394, "kind": "chat", "confidence": 0.9}
+{"id": 1395, "kind": "move_sl", "symbol": "SOL", "sl": 88.1, "confidence": 0.97}
+{"id": 1396, "kind": "close_full", "symbol": "SOL", "confidence": 0.95}
+{"id": 1397, "kind": "chat", "confidence": 0.9}
+{"id": 1398, "kind": "chat", "confidence": 0.9}
+{"id": 1399, "kind": "chat", "confidence": 0.98}
+{"id": 1400, "kind": "close_partial", "symbol": "ETH", "pct": 30, "confidence": 0.95}
+{"id": 1401, "kind": "chat", "confidence": 0.95}
+{"id": 1404, "kind": "open", "symbol": "MNT", "direction": "long", "entry_range": [0.641, 0.657], "sl": 0.638, "tp": 0.69, "confidence": 0.98}
+{"id": 1405, "kind": "open", "symbol": "AAVE", "direction": "long", "entry_range": [91.5, 93], "sl": 90.7, "tp": 98, "confidence": 0.98}
+{"id": 1406, "kind": "close_partial", "symbol": "ETH", "pct": 50, "sl": "breakeven", "confidence": 0.95}
+{"id": 1407, "kind": "chat", "confidence": 0.9}
+{"id": 1409, "kind": "chat", "confidence": 0.95}
+{"id": 1410, "kind": "chat", "confidence": 0.95}
+{"id": 1411, "kind": "move_sl", "applies_to": ["MNT", "AAVE"], "sl": "breakeven", "confidence": 0.9}
+{"id": 1412, "kind": "chat", "confidence": 0.95}
+{"id": 1413, "kind": "chat", "confidence": 0.85}
+{"id": 1414, "kind": "close_partial", "symbol": "AAVE", "pct": 50, "sl": "breakeven", "confidence": 0.95}
+{"id": 1415, "kind": "open", "symbol": "XPL", "direction": "short", "entry_range": [0.101, 0.104], "sl": 0.106, "tp": 0.09, "confidence": 0.98}
+{"id": 1416, "kind": "open", "symbol": "BTC", "direction": "long", "confidence": 0.95}
+{"id": 1417, "kind": "chat", "confidence": 0.7}
+{"id": 1418, "kind": "open", "symbol": "BTC", "direction": "long", "sl": 80235, "confidence": 0.85}
+{"id": 1419, "kind": "chat", "confidence": 0.9}
+{"id": 1420, "kind": "chat", "confidence": 0.9}
+{"id": 1421, "kind": "close_full", "symbol": "BTC", "confidence": 0.95}
+{"id": 1422, "kind": "close_full", "symbol": "AAVE", "confidence": 0.98}
+{"id": 1423, "kind": "close_full", "symbol": "ETH", "confidence": 0.98}
+{"id": 1424, "kind": "open", "symbol": "ETH", "direction": "long", "entry_range": [2250, 2300], "sl": 2220, "tp": 2420, "confidence": 0.98}
+{"id": 1425, "kind": "chat", "confidence": 0.8}
+{"id": 1426, "kind": "chat", "confidence": 0.85}
+{"id": 1427, "kind": "chat", "confidence": 0.95}
+{"id": 1428, "kind": "open", "symbol": "AAVE", "direction": "long", "entry_range": [91.4, 92.7], "sl": 90.8, "tp": 97, "confidence": 0.98}
+{"id": 1430, "kind": "close_partial", "symbol": "AAVE", "pct": 25, "sl": "breakeven", "confidence": 0.95}
+{"id": 1431, "kind": "close_full", "symbol": "AAVE", "confidence": 0.98}
+{"id": 1432, "kind": "chat", "confidence": 0.9}
+{"id": 1433, "kind": "open", "symbol": "PUMP", "direction": "long", "entry_range": [0.002005, 0.002060], "sl": 0.001991, "tp": 0.0022, "confidence": 0.98}
+{"id": 1435, "kind": "close_partial", "symbol": "PUMP", "pct": 30, "sl": "breakeven", "confidence": 0.95}
+{"id": 1436, "kind": "chat", "confidence": 0.95}
+{"id": 1437, "kind": "move_sl", "symbol": "PUMP", "sl": 0.001991, "confidence": 0.9}
+{"id": 1438, "kind": "chat", "confidence": 0.85}
+{"id": 1439, "kind": "chat", "confidence": 0.95}
+{"id": 1440, "kind": "chat", "confidence": 0.95}
+{"id": 1441, "kind": "move_sl", "symbol": "PUMP", "sl": "breakeven", "confidence": 0.95}
+{"id": 1442, "kind": "chat", "confidence": 0.9}
+{"id": 1443, "kind": "close_partial", "symbol": "ETH", "pct": 10, "confidence": 0.95}
+{"id": 1444, "kind": "move_sl", "symbol": "ETH", "sl": "breakeven", "confidence": 0.9}
+{"id": 1445, "kind": "close_partial", "symbol": "PUMP", "pct": 20, "confidence": 0.9}
+{"id": 1447, "kind": "close_partial", "symbol": "ETH", "pct": 10, "confidence": 0.95}
+{"id": 1448, "kind": "move_sl", "symbol": "PUMP", "sl": 0.002075, "confidence": 0.95}
+{"id": 1449, "kind": "chat", "confidence": 0.95}
+{"id": 1450, "kind": "close_partial", "symbol": "PUMP", "pct": 50, "confidence": 0.95}
+{"id": 1451, "kind": "close_partial", "symbol": "ETH", "pct": 10, "confidence": 0.95}
+{"id": 1452, "kind": "chat", "confidence": 0.9}
+{"id": 1453, "kind": "open", "symbol": "FARTCOIN", "direction": "long", "entry_range": [0.245, 0.255], "sl": 0.241, "tp": 0.29, "confidence": 0.98}
+{"id": 1454, "kind": "chat", "confidence": 0.9}
+{"id": 1455, "kind": "open", "symbol": "VIRTUAL", "direction": "long", "entry_range": [0.91, 0.9945], "sl": 0.89, "tp": 1.02, "confidence": 0.98}
+{"id": 1456, "kind": "chat", "confidence": 0.5}
+{"id": 1457, "kind": "chat", "confidence": 0.9}
+{"id": 1458, "kind": "chat", "confidence": 0.95}
+{"id": 1459, "kind": "chat", "confidence": 0.95}
+{"id": 1460, "kind": "chat", "confidence": 0.85}
+{"id": 1461, "kind": "close_full", "symbol": "PUMP", "confidence": 0.98}
+{"id": 1462, "kind": "move_sl", "symbol": "ETH", "sl": 2220, "confidence": 0.9}
+{"id": 1465, "kind": "close_partial", "symbol": "FARTCOIN", "pct": 20, "sl": "breakeven", "confidence": 0.95}
+{"id": 1466, "kind": "close_partial", "symbol": "ETH", "pct": 20, "confidence": 0.95}
+{"id": 1467, "kind": "chat", "confidence": 0.95}
+{"id": 1468, "kind": "close_partial", "symbol": "FARTCOIN", "pct": 10, "confidence": 0.9}
+{"id": 1469, "kind": "chat", "confidence": 0.6}
+{"id": 1470, "kind": "chat", "confidence": 0.85}
+{"id": 1471, "kind": "chat", "confidence": 0.95}
+{"id": 1472, "kind": "close_full", "symbol": "VIRTUAL", "confidence": 0.95}
+{"id": 1473, "kind": "close_full", "symbol": "FARTCOIN", "confidence": 0.95}
+{"id": 1475, "kind": "close_partial", "symbol": "ETH", "pct": 30, "confidence": 0.9}
+{"id": 1476, "kind": "close_partial", "symbol": "ETH", "pct": 20, "confidence": 0.9}
+{"id": 1477, "kind": "open", "symbol": "BTC", "direction": "short", "entry_range": [81300, 83500], "sl": 84500, "tp": 73000, "confidence": 0.98}
+{"id": 1478, "kind": "chat", "confidence": 0.6}
+{"id": 1479, "kind": "chat", "confidence": 0.7}
+{"id": 1481, "kind": "move_sl", "symbol": "ETH", "sl": 2310, "confidence": 0.95}
+{"id": 1483, "kind": "open", "symbol": "SOL", "direction": "short", "entry_range": [94.3, 95.7], "sl": 96.7, "tp": 89.3, "confidence": 0.98}
+{"id": 1484, "kind": "close_full", "symbol": "ETH", "confidence": 0.97}
+{"id": 1486, "kind": "chat", "confidence": 0.9}
+{"id": 1487, "kind": "chat", "confidence": 0.9}
+{"id": 1488, "kind": "chat", "confidence": 0.85}
+{"id": 1489, "kind": "open", "symbol": "ETH", "direction": "short", "entry_range": [2330, 2420], "sl": 2485, "tp": 1910, "confidence": 0.98}
+{"id": 1490, "kind": "open", "symbol": "SOL", "direction": "short", "entry_range": [95, 96], "sl": 97.3, "tp": 89, "confidence": 0.95}
+{"id": 1492, "kind": "chat", "confidence": 0.9}
+{"id": 1493, "kind": "close_full", "symbol": "SOL", "confidence": 0.95}
+{"id": 1494, "kind": "close_partial", "symbol": "BTC", "pct": 30, "confidence": 0.9}
+{"id": 1495, "kind": "close_partial", "symbol": "ETH", "pct": 30, "confidence": 0.95}
+{"id": 1496, "kind": "chat", "confidence": 0.95}
+{"id": 1497, "kind": "chat", "confidence": 0.9}
+{"id": 1498, "kind": "open", "symbol": "ETH", "direction": "long", "confidence": 0.9}
+{"id": 1499, "kind": "open", "symbol": "ETH", "direction": "long", "entry_range": [2265, 2288], "sl": 2250, "tp": 2315, "confidence": 0.95}
+{"id": 1500, "kind": "close_partial", "symbol": "BTC", "pct": 30, "confidence": 0.9}
+{"id": 1502, "kind": "open", "symbol": "NEAR", "direction": "short", "entry_range": [1.54, 1.62], "sl": 1.65, "tp": 1.41, "confidence": 0.95}
+{"id": 1503, "kind": "chat", "confidence": 0.85}
+{"id": 1504, "kind": "chat", "confidence": 0.9}
+{"id": 1505, "kind": "chat", "confidence": 0.9}
+{"id": 1506, "kind": "chat", "confidence": 0.9}
+{"id": 1507, "kind": "chat", "confidence": 0.9}
+{"id": 1508, "kind": "close_partial", "symbol": "ETH", "pct": 20, "confidence": 0.95}
+{"id": 1509, "kind": "close_partial", "applies_to": ["ETH", "BTC"], "pct": 25, "confidence": 0.95}
+{"id": 1510, "kind": "chat", "confidence": 0.85}
+{"id": 1511, "kind": "close_partial", "symbol": "ETH", "pct": 50, "confidence": 0.92}
+{"id": 1512, "kind": "chat", "confidence": 0.9}
+{"id": 1513, "kind": "increase", "applies_to": ["ETH", "BTC"], "pct": 30, "confidence": 0.95}
+{"id": 1514, "kind": "move_sl", "symbol": "ETH", "sl": "breakeven", "confidence": 0.95}
+{"id": 1515, "kind": "close_full", "symbol": "ETH", "confidence": 0.97}
+{"id": 1516, "kind": "chat", "confidence": 0.95}
+{"id": 1517, "kind": "chat", "confidence": 0.9}
+{"id": 1518, "kind": "chat", "confidence": 0.95}
+{"id": 1519, "kind": "chat", "confidence": 0.9}
+{"id": 1520, "kind": "chat", "confidence": 0.7}
+{"id": 1521, "kind": "chat", "confidence": 0.95}
+{"id": 1522, "kind": "chat", "confidence": 0.9}
+{"id": 1523, "kind": "open", "symbol": "FIDA", "direction": "long", "tp": 0.01855, "confidence": 0.9}
+{"id": 1524, "kind": "open", "symbol": "FIDA", "direction": "long", "entry_range": [0.01785, 0.01815], "sl": 0.01763, "confidence": 0.9}
+{"id": 1525, "kind": "open", "symbol": "PUMP", "direction": "long", "confidence": 0.9}
+{"id": 1526, "kind": "open", "symbol": "PUMP", "direction": "long", "entry_range": [0.001803, 0.001875], "sl": 0.001773, "tp": 0.002047, "confidence": 0.97}
+{"id": 1527, "kind": "open", "symbol": "HYPE", "direction": "long", "entry_range": [38.1, 38.9], "sl": 37.5, "tp": 42.1, "confidence": 0.97}
+{"id": 1528, "kind": "chat", "confidence": 0.95}
+{"id": 1529, "kind": "chat", "confidence": 0.95}
+{"id": 1530, "kind": "close_partial", "applies_to": ["BTC", "ETH"], "pct": 30, "confidence": 0.95}
+{"id": 1531, "kind": "chat", "confidence": 0.95}
+{"id": 1532, "kind": "close_partial", "symbol": "HYPE", "pct": 20, "sl": "breakeven", "confidence": 0.9}
+{"id": 1533, "kind": "close_partial", "symbol": "HYPE", "pct": 50, "confidence": 0.95}
+{"id": 1535, "kind": "close_full", "symbol": "HYPE", "confidence": 0.95}
+{"id": 1536, "kind": "close_partial", "symbol": "PUMP", "pct": 50, "sl": "breakeven", "confidence": 0.92}
+{"id": 1537, "kind": "close_full", "symbol": "FIDA", "confidence": 0.95}
+{"id": 1538, "kind": "open", "symbol": "BTC", "direction": "short", "entry_range": [79900, 80600], "sl": 81600, "confidence": 0.9}
+{"id": 1539, "kind": "chat", "confidence": 0.7}
+{"id": 1540, "kind": "chat", "confidence": 0.9}
+{"id": 1541, "kind": "move_sl", "symbol": "BTC", "sl": 82130, "confidence": 0.97}
+{"id": 1542, "kind": "chat", "confidence": 0.95}
+{"id": 1543, "kind": "chat", "confidence": 0.95}
+{"id": 1544, "kind": "chat", "confidence": 0.9}
+{"id": 1545, "kind": "chat", "confidence": 0.9}
+{"id": 1546, "kind": "open", "symbol": "PUMP", "direction": "long", "entry_range": [0.001789, 0.001859], "sl": 0.001665, "tp": 0.002237, "confidence": 0.97}
+{"id": 1547, "kind": "close_partial", "symbol": "BTC", "pct": 70, "sl": 81300, "confidence": 0.92}
+{"id": 1548, "kind": "chat", "confidence": 0.9}
+{"id": 1549, "kind": "close_partial", "symbol": "ETH", "pct": 70, "sl": "breakeven", "confidence": 0.92}
+{"id": 1550, "kind": "close_full", "applies_to": ["BTC", "ETH"], "confidence": 0.97}
+{"id": 1551, "kind": "open", "symbol": "ETH", "direction": "long", "entry": "market", "confidence": 0.95}
+{"id": 1552, "kind": "open", "symbol": "ETH", "direction": "long", "entry_range": [2080, 2180], "sl": 2040, "confidence": 0.9}
+{"id": 1553, "kind": "open", "symbol": "SKY", "direction": "long", "confidence": 0.9}
+{"id": 1554, "kind": "open", "symbol": "SKY", "direction": "long", "sl": 0.0659, "confidence": 0.85}
