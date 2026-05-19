@@ -38,6 +38,22 @@ Edge hypothesis:
   funding) where the crowded-short setup is empirically absent.
 
 Generated 2026-04-17. Macro gate v2 added 2026-05-19.
+
+Operational dependencies (gate v2):
+  - BTC informative 1h history (Freqtrade fetches via @informative decorator
+    using `startup_candle_count = 720`). Partial data → `btc_history_ok` False
+    → all entries BLOCKED for affected bars.
+  - BTC_USDT-funding.feather refreshed daily by ft-funding-refresh service
+    (cron in docker-compose.prod.yml). Missing or stale → fail-closed
+    (all entries blocked, ERROR log every 4h).
+  - Per-pair funding feathers used by the original signal (unchanged behavior).
+
+Alerting:
+  - Log line "MISSING BTC funding feather — macro gate v2 FAIL-CLOSED" → page
+  - Log line "BTC funding load failed" → investigate
+  - Log line "BTC 30d funding mean loaded" → normal startup
+  - Cron freshness: ft-funding-refresh runs every 4h; if last log >8h old,
+    investigate.
 """
 
 import logging
@@ -134,7 +150,8 @@ class FundingFadeV1(IStrategy):
         # Volume SMA
         dataframe["vol_sma"] = dataframe["volume"].rolling(self.vol_sma_period).mean()
 
-        # Macro gate v2 (added 2026-05-19): base gate + slope_positive AND not_regime_halt
+        # Macro gate v2 (added 2026-05-19): base gate + slope_positive AND
+        # not_regime_halt AND btc_history_ok. Fail-closed on missing dependencies.
         btc_close = dataframe["btc_usdt_close_1h"]
         btc_sma50 = dataframe["btc_usdt_sma50_1h"]
         btc_sma200 = dataframe["btc_usdt_sma200_1h"]
@@ -150,9 +167,21 @@ class FundingFadeV1(IStrategy):
         # — the exact regime where the strategy's edge is empirically absent.
         btc_return_30d = btc_close.pct_change(self.btc_regime_return_lookback_bars)
         btc_funding_30d = self._get_btc_funding_30d_mean(dataframe)
+
+        # Fail-closed: require all macro inputs valid before allowing entries.
+        # Partial BTC informative data or missing funding feather → block entries.
+        btc_history_ok = btc_close.shift(self.btc_regime_return_lookback_bars).notna()
+        btc_funding_ok = btc_funding_30d.notna()
+        macro_inputs_ok = btc_history_ok & btc_funding_ok
+
+        # regime_halt is True only when both conditions are valid AND triggered.
+        # If either input is NaN, the comparison is False, so halt = False — but
+        # macro_inputs_ok will be False, blocking entry via btc_gate AND below.
         regime_halt = (btc_return_30d < 0) & (btc_funding_30d > 0)
 
-        dataframe["btc_gate"] = (base_gate & slope_ok & ~regime_halt).astype(int)
+        dataframe["btc_gate"] = (
+            base_gate & slope_ok & ~regime_halt & macro_inputs_ok
+        ).astype(int)
 
         return dataframe
 
@@ -180,20 +209,26 @@ class FundingFadeV1(IStrategy):
 
         Cached at class level — same for every pair, mtime-invalidated so live
         refresh via download_funding_rates.py propagates without restart.
+
+        Fail-closed: returns Series of NaN on missing feather or load failure.
+        Caller's gate logic must include `.notna()` check; with NaN here, the
+        regime gate's `macro_inputs_ok` becomes False and ALL entries are
+        blocked until BTC funding is restored. This is intentional — the new
+        risk-control feature should not be silently neutered by its own
+        dependency disappearing.
         """
         path = FUNDING_DIR / "BTC_USDT-funding.feather"
         if not path.exists():
-            # Missing BTC funding: regime halt disabled. Don't kill entries —
-            # let other filters carry. Warn loudly.
             now = time.time()
             last = self._missing_funding_last_warn.get("__BTC_REGIME__", 0.0)
             if now - last >= self._MISSING_REWARN_INTERVAL_S:
                 logger.error(
-                    "MISSING BTC funding feather — regime halt rule DISABLED. "
-                    "Strategy falls back to slope-only macro gate."
+                    "MISSING BTC funding feather — macro gate v2 FAIL-CLOSED. "
+                    "All FundingFade entries BLOCKED until BTC funding restored. "
+                    "Check ft-funding-refresh service."
                 )
                 self._missing_funding_last_warn["__BTC_REGIME__"] = now
-            return pd.Series(0.0, index=dataframe.index)
+            return pd.Series(float("nan"), index=dataframe.index)
 
         mtime_ns = path.stat().st_mtime_ns
         cls = type(self)
@@ -211,8 +246,8 @@ class FundingFadeV1(IStrategy):
                     len(fdf), fdf["date"].iloc[-1] if len(fdf) else None,
                 )
             except Exception as e:
-                logger.warning("BTC funding load failed for regime gate: %s — disabled this bar", e)
-                return pd.Series(0.0, index=dataframe.index)
+                logger.warning("BTC funding load failed for regime gate: %s — FAIL-CLOSED this bar", e)
+                return pd.Series(float("nan"), index=dataframe.index)
 
         # Reindex onto the dataframe's 1h dates with forward-fill
         # (funding posts every 8h, so any 1h bar inherits the most recent value).
