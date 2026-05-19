@@ -34,8 +34,9 @@ services:
       - -c
       - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KeltnerBounceV1.log --config /freqtrade/user_data/configs/KeltnerBounceV1.json --strategy KeltnerBounceV1
   fundingfadev1:
-    profiles:
-      - live
+    # Re-enabled 2026-05-19 after macro gate v2 (slope + regime halt) upgrade.
+    # Pause was triggered by the May 10-16 5-SL streak; new gate's bootstrap
+    # P(MaxDD < baseline) = 92.5%. See project_funding_fade_gate_v2_2026-05-19.md.
     image: freqtradeorg/freqtrade:stable
     restart: always
     container_name: ft-funding-fade

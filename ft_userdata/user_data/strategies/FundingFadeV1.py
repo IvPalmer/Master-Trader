@@ -1,36 +1,43 @@
 """
-FundingFadeV1 — Funding rate divergence entry with TA confirmation.
-
-Discovered via Strategy Lab expanded sweep on 3.3 years of 1m-detail data.
-First non-TA-based strategy validated. Orthogonal edge to Keltner/EMA systems.
+FundingFadeV1 — Funding rate divergence entry with TA confirmation + macro gate v2.
 
 Signal:
   - Entry: Funding rate drops 1+ std below its 500-period rolling mean
     (crowded-short sentiment → reversion setup)
   - Confirm: ADX > 25 (trending market filter)
     AND Volume > 1.5x 20-period SMA (liquidity confirmation)
-  - Gate: BTC above 50 AND 200 SMA (macro trend alignment)
+  - Macro gate (v2 — see below): BTC > SMA50 AND > SMA200 (both 1h)
+    AND BTC SMA50 slope > 0 over last 24 bars
+    AND NOT (BTC 30d return < 0 AND BTC 30d funding-rate mean > 0)
   - Exit: ROI-only profile (trailing removed — confirmed trailing noise in 1m)
 
-Lab-validated metrics (3.3yr 1m-detail):
-  - 431 trades, WR 65.7%, PF 1.29, +60.66%, max DD 19.6%
-  - Walk-forward: 6/6 rolling windows profitable
-  - Year-by-year: 2023 PF 1.22, 2024 PF 1.80, 2025 PF 1.25, 2026 PF 0.74 (partial)
-  - 2024-H2 choppy regime: +20.85% (where Keltner/TA strategies struggle)
-  - Monte Carlo: 0% ruin probability, median max DD 11.5%
+Macro gate v2 (added 2026-05-19 after 5-SL streak May 10-16 paused live bot):
+  Codex-reviewed protocol — see project_funding_fade_gate_v2_2026-05-19.md.
+  Combined filter (slope + regime halt) dominates baseline in walk-forward,
+  bootstrap, and drop-year adversarial tests:
+    - 3.3yr backtest: +19.05% (vs baseline +14.01%), MaxDD 2.40% (vs 3.91%),
+      WR 68.6% (vs 64.5%), PF 1.54 (vs 1.21), 293 trades (vs 488)
+    - P(MaxDD < baseline) = 92.5% (block-bootstrap, 1000 iter, 30d blocks)
+    - Wins difficult quarters: 2025-Q1, 2025-Q4, 2026-Q1
+    - Drop-2024 test: still best (+13.80% / 1.90% DD vs baseline +5.56% / 4.22%)
+  Honest caveats: combined was meta-selected after seeing slope+regime singly
+  (≈4 effective dof). Headline +5pp uplift may be wiped by live execution noise.
+  Deploy reason is risk reduction, not return uplift.
+
+Original signal (lab-validated 3.3yr 1m-detail before gate v2):
+  - 431 trades, WR 65.7%, PF 1.29, +60.66% over $88, max DD 19.6%
+  - 2024 PF 1.80 (best regime), 2026 PF 0.74 (current bear-start regime)
+  - Known weakness in 2026: bear-start + positive funding (gate v2 addresses)
 
 Edge hypothesis:
   Funding rate reflects crowded positioning. When funding drops unusually low
   (shorts paying longs heavily), it signals over-shorted conditions — shorts
-  get squeezed, price mean-reverts. ADX confirms market is trending (not pure
-  chop), volume confirms real participation. BTC 50+200 SMA filter ensures
-  macro bullish bias to avoid fighting the tape.
+  get squeezed, price mean-reverts. The new macro gate ensures the
+  mean-reversion has room to play out by skipping (a) markets where BTC's own
+  trend has flattened/turned and (b) the specific regime (bear + positive
+  funding) where the crowded-short setup is empirically absent.
 
-Known weakness:
-  - 2026 YTD -9.70% (current regime = bear start, funding mostly positive)
-  - Higher DD than Keltner (19.6% vs 9%) — needs larger psychological tolerance
-
-Generated 2026-04-17.
+Generated 2026-04-17. Macro gate v2 added 2026-05-19.
 """
 
 import logging
@@ -69,7 +76,7 @@ class FundingFadeV1(IStrategy):
     exit_profit_only = True
     exit_profit_offset = 0.01
 
-    startup_candle_count = 200  # BTC SMA200 needs 200 candles
+    startup_candle_count = 720  # 30 days at 1h — needed for BTC 30d return regime check
 
     # Strategy params
     funding_lookback = 500       # Rolling window for funding mean/std
@@ -78,6 +85,11 @@ class FundingFadeV1(IStrategy):
     vol_sma_period = 20
     btc_sma50_period = 50
     btc_sma200_period = 200
+
+    # Macro gate v2 params (frozen 2026-05-19)
+    btc_sma50_slope_lookback_bars = 24       # 24 × 1h = 1 day
+    btc_regime_return_lookback_bars = 30 * 24  # 30d on 1h frame
+    btc_regime_funding_lookback_events = 30 * 3  # 30d × 3 funding-events/day
 
     # Funding data cache: pair -> (mtime_ns, funding_df)
     # Reloaded whenever the underlying feather file mtime changes, so a live
@@ -90,6 +102,11 @@ class FundingFadeV1(IStrategy):
     # the failure visible in container logs.
     _missing_funding_last_warn: dict = {}
     _MISSING_REWARN_INTERVAL_S = 4 * 3600
+
+    # Cached 30d BTC funding rate rolling-mean series (computed once globally;
+    # same value for every pair, no need to re-read per call).
+    _btc_funding_30d_series = None
+    _btc_funding_30d_mtime_ns = 0
 
     @informative("1h", "BTC/{stake}")
     def populate_indicators_btc_1h(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -117,11 +134,25 @@ class FundingFadeV1(IStrategy):
         # Volume SMA
         dataframe["vol_sma"] = dataframe["volume"].rolling(self.vol_sma_period).mean()
 
-        # BTC gate: sma50 AND sma200
-        dataframe["btc_gate"] = (
-            (dataframe["btc_usdt_close_1h"] > dataframe["btc_usdt_sma50_1h"])
-            & (dataframe["btc_usdt_close_1h"] > dataframe["btc_usdt_sma200_1h"])
-        ).astype(int)
+        # Macro gate v2 (added 2026-05-19): base gate + slope_positive AND not_regime_halt
+        btc_close = dataframe["btc_usdt_close_1h"]
+        btc_sma50 = dataframe["btc_usdt_sma50_1h"]
+        btc_sma200 = dataframe["btc_usdt_sma200_1h"]
+
+        base_gate = (btc_close > btc_sma50) & (btc_close > btc_sma200)
+
+        # SMA50 slope positive over last 24 1h bars (catches macro exhaustion
+        # before BTC actually breaks down — fragile-bull regime filter).
+        sma50_slope = btc_sma50 - btc_sma50.shift(self.btc_sma50_slope_lookback_bars)
+        slope_ok = sma50_slope > 0
+
+        # Regime halt: bear (BTC 30d < 0) AND positive funding (no crowded-short)
+        # — the exact regime where the strategy's edge is empirically absent.
+        btc_return_30d = btc_close.pct_change(self.btc_regime_return_lookback_bars)
+        btc_funding_30d = self._get_btc_funding_30d_mean(dataframe)
+        regime_halt = (btc_return_30d < 0) & (btc_funding_30d > 0)
+
+        dataframe["btc_gate"] = (base_gate & slope_ok & ~regime_halt).astype(int)
 
         return dataframe
 
@@ -141,6 +172,53 @@ class FundingFadeV1(IStrategy):
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # Exits handled entirely by ROI + stoploss
         return dataframe
+
+    # ── BTC 30d funding rate (for regime halt) ────────────────────────────
+
+    def _get_btc_funding_30d_mean(self, dataframe: DataFrame) -> pd.Series:
+        """30-day rolling mean of BTC funding rate, aligned to 1h dataframe.
+
+        Cached at class level — same for every pair, mtime-invalidated so live
+        refresh via download_funding_rates.py propagates without restart.
+        """
+        path = FUNDING_DIR / "BTC_USDT-funding.feather"
+        if not path.exists():
+            # Missing BTC funding: regime halt disabled. Don't kill entries —
+            # let other filters carry. Warn loudly.
+            now = time.time()
+            last = self._missing_funding_last_warn.get("__BTC_REGIME__", 0.0)
+            if now - last >= self._MISSING_REWARN_INTERVAL_S:
+                logger.error(
+                    "MISSING BTC funding feather — regime halt rule DISABLED. "
+                    "Strategy falls back to slope-only macro gate."
+                )
+                self._missing_funding_last_warn["__BTC_REGIME__"] = now
+            return pd.Series(0.0, index=dataframe.index)
+
+        mtime_ns = path.stat().st_mtime_ns
+        cls = type(self)
+        if cls._btc_funding_30d_series is None or cls._btc_funding_30d_mtime_ns != mtime_ns:
+            try:
+                fdf = pd.read_feather(path).sort_values("date").reset_index(drop=True)
+                fdf["date"] = pd.to_datetime(fdf["date"], utc=True)
+                roll = fdf["funding_rate"].rolling(
+                    self.btc_regime_funding_lookback_events, min_periods=10
+                ).mean()
+                cls._btc_funding_30d_series = pd.Series(roll.values, index=fdf["date"])
+                cls._btc_funding_30d_mtime_ns = mtime_ns
+                logger.info(
+                    "BTC 30d funding mean loaded: %d funding events, latest %s",
+                    len(fdf), fdf["date"].iloc[-1] if len(fdf) else None,
+                )
+            except Exception as e:
+                logger.warning("BTC funding load failed for regime gate: %s — disabled this bar", e)
+                return pd.Series(0.0, index=dataframe.index)
+
+        # Reindex onto the dataframe's 1h dates with forward-fill
+        # (funding posts every 8h, so any 1h bar inherits the most recent value).
+        dates = pd.to_datetime(dataframe["date"], utc=True) if "date" in dataframe.columns else dataframe.index
+        aligned = cls._btc_funding_30d_series.reindex(dates, method="ffill")
+        return pd.Series(aligned.values, index=dataframe.index)
 
     # ── Funding rate loader ──────────────────────────────────
 
