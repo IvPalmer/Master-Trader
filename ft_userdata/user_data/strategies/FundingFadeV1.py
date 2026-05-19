@@ -339,6 +339,10 @@ class FundingFadeV1(IStrategy):
         pair_ts = dataframe["date"].apply(lambda x: x.timestamp()).values
         funding_ts = funding_df["ts"].values
         funding_rates = funding_df["funding_rate"].values
+        # searchsorted-right - 1 finds the last funding event at-or-before each
+        # bar. For bars predating any funding (idx == -1) we must return NaN —
+        # the prior implementation clipped to 0 and assigned the first funding
+        # value, creating lookahead at the start of backtests.
         idx = np.searchsorted(funding_ts, pair_ts, side="right") - 1
-        idx = np.clip(idx, 0, len(funding_rates) - 1)
-        return pd.Series(funding_rates[idx], index=dataframe.index)
+        result = np.where(idx >= 0, funding_rates[np.clip(idx, 0, len(funding_rates) - 1)], np.nan)
+        return pd.Series(result, index=dataframe.index)
