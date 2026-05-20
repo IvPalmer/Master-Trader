@@ -247,6 +247,64 @@ MISSING:   MNT
 
 Skip-list for v1: just `MNT`. <1% of signal volume.
 
+## MVP-3 build requirements (codex-reviewed 2026-05-19)
+
+Codex architecture review nailed the design before any real-money MVP-3 build.
+Latency profile and 9 mandatory changes below.
+
+### Latency profile to plan for
+
+| Path | p50 | p90 | p99 |
+|---|---|---|---|
+| Single-part, LLM in path | 3–4s | 6–8s | 12s+ |
+| **Single-part, regex fast-path** | **0.7–1.2s** | 2s | — |
+| Two-part (8s adaptive buffer) | 11–13s | 16–20s | — |
+
+Verdict: 2–5s usable for $100–200 measurement bot. 10–13s materially
+degrades 0.5% SL scalps vs zero-latency backtest. Two-part signals are
+lower-quality by construction.
+
+### Required architecture changes before MVP-3 build
+
+1. **Regex fast-path + LLM as shadow validator.** Strict allowlist:
+   single-message signal with symbol + side + entry + SL + TP + Binance-valid
+   pair + no ambiguity + no reply dependency. Fire order at T+0.7s. LLM
+   validates by T+3s. **If LLM disagrees → `forceexit`, do NOT reverse.**
+   LLM remains primary for everything else.
+2. **Price-age + slippage gates** before entry. Reject if signal age > 8s
+   (single) or > 18s (two-part). Reject if price moved > 20-25% of SL
+   distance against expected R:R.
+3. **Persist every event before action** (raw msg → LLM/regex output →
+   order request → exchange response → trade_id). Audit/replay spine.
+4. **Reconciliation loop.** Poll Freqtrade + Binance position every few
+   seconds, repair mismatches. *"Worst failure is not 'missed trade'; it
+   is believing you are flat when Binance has exposure."*
+5. **Fail-closed on opens, fail-loud on exits.** Anthropic outage blocks
+   new entries (fail-closed). Close/move-SL need regex fallback + alert +
+   manual override (fail-loud).
+6. **Telegram health checks.** Heartbeat, alert on receive-lag > 5s,
+   reconnects, auth errors.
+7. **Don't open on header-only two-part signals.** No SL → no size, no
+   invalidation. Adaptive buffering: bypass when complete, wait up to 8s
+   when incomplete.
+8. **Near-null Freqtrade strategy.** Disable ROI (`{}` or ceiling), disable
+   strategy exit signals, no own entry logic. Entries via `forceenter` REST,
+   exits via `forceexit` REST + `custom_stoploss` for move_sl.
+9. **Multi-coin signals = independent idempotent per-symbol commands.**
+   Partial failure is normal; log + alert explicitly.
+
+### Latency-degradation forecast (precursor task, must run before MVP-3)
+
+Replay each of the 428 signals with synthetic delays (1s / 3s / 8s / 13s),
+recompute fills using Binance/WEEX second-level data. Output: latency
+sensitivity curve. Tells us what to expect live vs MVP-1 backtest's +$230.
+
+### Codex's "do not" list
+- Don't drop the LLM entirely (the +$42 / +4.27pp it added is real, mostly
+  market-entry recovery).
+- Don't reverse on LLM disagreement after fast-path — just exit.
+- Don't open on header-only two-part signals.
+
 ## How to onboard yourself (new session, fresh clone)
 
 ```bash
