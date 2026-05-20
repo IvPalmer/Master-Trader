@@ -6,26 +6,44 @@
 ## What we're building
 
 A copy-trading bot that mirrors signals from the **"Insiders Scalp"** private
-Telegram channel (signals from "Eduardo" — channel owner, friend of the
-project). Pipeline:
+Telegram group.
+
+Eduardo (friend of project) is a **member** of the group — NOT the signaler.
+The signaler is the group leader (unknown to us); they post their real-money
+trades into the channel. Eduardo has a proven track record copying these
+signals himself; we vouch through him.
+
+Phase 1 (this build): we don't have direct access to the group, so we
+piggyback through Eduardo's Telegram user session.
 
 ```
-Telegram channel → Telethon listener (Eduardo's user session)
-                 → Claude Haiku 4.5 classifier (structured JSON out)
-                 → FastAPI receiver in ft_userdata/
-                 → Freqtrade futures bot, dry-run first
+Signaler (group leader)
+   → Telegram group
+       → Eduardo (member, his Telegram client)
+           → our Telethon listener (uses Eduardo's .session file)
+               → Claude classifier (via Max subscription / agent runtime)
+                   → FastAPI receiver
+                       → Freqtrade futures bot (dry-run, then live)
 ```
 
-The goal of this phase is to **convince Eduardo the LLM is reliable enough** to
-trust real capital to, then build an MVP that paper-trades against the live
-channel for 14+ days before any money is at stake.
+Phase 2 (if phase 1 works): we get our own access to the group, drop the
+Eduardo-hop to reduce lag, and help Eduardo build his own copy bot. Same
+code base, two deployments — ours and his.
+
+The goal of this phase is to **prove the plumbing works end-to-end** —
+classifier matches the leader's intent, orders execute correctly, position
+state stays reconciled. Eduardo's session is a single point of failure for
+phase 1; phase 2 removes that dependency.
 
 ## Source material (not in this repo)
 
-Eduardo shipped a paper-trading prototype as a zip:
+Eduardo shipped HIS paper-trading prototype as a zip — this is what HE built
+to copy the group leader's signals into his own account. We're using his
+prototype as the reference for what good looks like:
 `papertrading copy/` — contains:
 - `reader.py` (Telethon, hardcoded `API_ID=28296606`, `API_HASH=04f9d5...`,
-  `CHANNEL_ID=-1003881583689` — Eduardo's channel, his user session)
+  `CHANNEL_ID=-1003881583689` — the Insiders Scalp group, accessed via
+  Eduardo's user session)
 - `parser.py` — the regex parser we're **replacing** with the LLM
 - `simulator.py` — thread builder + trade lifecycle, **keep this**
 - `weex.py` — WEEX/Bybit kline resolver for PnL backtesting, **keep this**
