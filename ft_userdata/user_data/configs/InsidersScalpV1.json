@@ -1,0 +1,59 @@
+{
+  "_comment": "Insiders Scalp copy trader. Futures dry-run config — flip dry_run=false for live. Pair whitelist is the union of Eduardo's signal coin set MINUS MNT (only coin not on Binance USDT-M Futures).",
+  "dry_run": true,
+  "dry_run_wallet": 200,
+  "trading_mode": "futures",
+  "margin_mode": "isolated",
+  "stake_currency": "USDT",
+  "stake_amount": "unlimited",
+  "tradable_balance_ratio": 0.99,
+  "fiat_display_currency": "",
+  "max_open_trades": 5,
+  "amount_reserve_percent": 0.05,
+  "entry_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1,
+    "price_last_balance": 0.0,
+    "check_depth_of_market": {"enabled": false, "bids_to_ask_delta": 1}
+  },
+  "exit_pricing": {"price_side": "same", "use_order_book": true, "order_book_top": 1},
+  "unfilledtimeout": {
+    "entry": 10,
+    "exit": 10,
+    "exit_timeout_count": 0,
+    "unit": "minutes"
+  },
+  "order_types": {
+    "entry": "limit",
+    "exit": "limit",
+    "emergency_exit": "market",
+    "force_exit": "market",
+    "force_entry": "market",
+    "stoploss": "market",
+    "stoploss_on_exchange": true,
+    "stoploss_on_exchange_interval": 60
+  },
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "ccxt_config": {},
+    "ccxt_async_config": {},
+    "pair_whitelist": [
+      "BTC/USDT:USDT", "ETH/USDT:USDT", "SOL/USDT:USDT", "BNB/USDT:USDT",
+      "XRP/USDT:USDT", "ADA/USDT:USDT", "DOGE/USDT:USDT", "LINK/USDT:USDT",
+      "AVAX/USDT:USDT", "NEAR/USDT:USDT", "SUI/USDT:USDT", "HBAR/USDT:USDT",
+      "LTC/USDT:USDT", "BCH/USDT:USDT", "TRX/USDT:USDT", "UNI/USDT:USDT",
+      "ARB/USDT:USDT", "ENA/USDT:USDT", "ZEC/USDT:USDT", "TAO/USDT:USDT",
+      "HYPE/USDT:USDT", "FARTCOIN/USDT:USDT", "PUMP/USDT:USDT", "FF/USDT:USDT"
+    ],
+    "pair_blacklist": [
+      ".*BULL/USDT", ".*BEAR/USDT", ".*UP/USDT", ".*DOWN/USDT",
+      "USDC/USDT.*", "BUSD/USDT.*", "DAI/USDT.*", "TUSD/USDT.*", "FDUSD/USDT.*",
+      "MNT/USDT.*"
+    ]
+  },
+  "pairlists": [{"method": "StaticPairList"}],
+  "bot_name": "InsidersScalpV1"
+}

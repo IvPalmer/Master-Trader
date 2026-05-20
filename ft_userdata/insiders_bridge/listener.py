@@ -204,7 +204,96 @@ async def _ingest(client, conn, config, msg, source: str) -> None:
         config.instance_id, source, d.get("id"), d.get("reply_to_msg_id"),
         (d.get("message") or d.get("text") or "")[:80],
     )
-    # TODO: forward to receiver via aiohttp POST (next PR — listener-receiver wiring)
+    # Forward to receiver. Build a small reply-chain context (last ~5 ancestors)
+    # so the receiver's classifier can resolve "close 30%" against context.
+    reply_chain = await _build_reply_chain(client, conn, config, d, depth=5)
+    payload = {
+        "msg_id": d.get("id"),
+        "text": d.get("message") or d.get("text") or "",
+        "posted_at": str(d.get("date")) if d.get("date") else None,
+        "edited_at": str(d.get("edit_date")) if d.get("edit_date") else None,
+        "reply_to_msg_id": d.get("reply_to_msg_id"),
+        "reply_chain_msg_ids": [m["id"] for m in reply_chain],
+        "reply_chain_msgs": {m["id"]: m for m in reply_chain},
+    }
+    await _post_to_receiver(conn, config, payload)
+
+
+async def _build_reply_chain(client, conn, config, msg_dict, depth=5):
+    """Walk up to `depth` reply-ancestors from local store; fetch from
+    Telegram if missing locally."""
+    chain = []
+    current = msg_dict
+    for _ in range(depth):
+        parent_id = current.get("reply_to_msg_id")
+        if not parent_id:
+            break
+        # Try local store first
+        row = conn.execute(
+            "SELECT msg_id, posted_at, reply_to_msg_id, text FROM raw_messages WHERE msg_id = ?",
+            (parent_id,),
+        ).fetchone()
+        if row:
+            current = {
+                "id": row[0],
+                "date": row[1],
+                "reply_to_msg_id": row[2],
+                "text": row[3] or "",
+            }
+        else:
+            # Fetch from Telegram once
+            try:
+                msg = await client.get_messages(config.channel_id, ids=parent_id)
+                if msg is None:
+                    break
+                d = msg.to_dict() if hasattr(msg, "to_dict") else dict(msg)
+                persist_raw(conn, d)
+                current = {
+                    "id": d.get("id"),
+                    "date": str(d.get("date")) if d.get("date") else None,
+                    "reply_to_msg_id": d.get("reply_to_msg_id"),
+                    "text": d.get("message") or d.get("text") or "",
+                }
+            except Exception as e:
+                logger.warning("reply chain fetch failed for msg %d: %s", parent_id, e)
+                break
+        chain.append(current)
+    return chain
+
+
+async def _post_to_receiver(conn, config, payload):
+    """POST event to receiver. Record attempt + response in forwards table."""
+    import aiohttp
+    attempt_num = 1
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(
+                config.receiver_url, json=payload,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as r:
+                body = await r.text()
+                conn.execute(
+                    "INSERT OR REPLACE INTO forwards (msg_id, attempt, attempted_at, status_code, response_text) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (payload["msg_id"], attempt_num,
+                     datetime.now(timezone.utc).isoformat(),
+                     r.status, body[:1000]),
+                )
+                if r.status >= 400:
+                    logger.error("receiver POST %d for msg %d: %s",
+                                 r.status, payload["msg_id"], body[:200])
+                else:
+                    logger.info("receiver ack msg %d: %s",
+                                payload["msg_id"], body[:200])
+        except Exception as e:
+            logger.exception("receiver POST exception for msg %d", payload["msg_id"])
+            conn.execute(
+                "INSERT OR REPLACE INTO forwards (msg_id, attempt, attempted_at, status_code, response_text) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (payload["msg_id"], attempt_num,
+                 datetime.now(timezone.utc).isoformat(),
+                 -1, str(e)[:1000]),
+            )
 
 
 def main() -> None:

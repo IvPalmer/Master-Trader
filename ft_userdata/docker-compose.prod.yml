@@ -218,6 +218,64 @@ services:
       resources:
         limits:
           memory: 256M
+    depends_on:
+      - insiders-receiver
+
+  insiders-receiver:
+    # FastAPI receiver: position graph + classifier dispatcher + freqtrade
+    # executor + reconciliation loop. Codex's "actual core product."
+    profiles:
+      - insiders
+    build: ../services/insiders-receiver
+    image: ft-insiders-receiver:latest
+    restart: unless-stopped
+    container_name: ft-insiders-receiver
+    environment:
+      INSIDERS_INSTANCE_ID: ${INSIDERS_INSTANCE_ID:-palmer-prod}
+      INSIDERS_DB: /var/lib/insiders/receiver.sqlite
+      INSIDERS_RECONCILE_SEC: "30"
+      INSIDERS_RISK_USD: "2.0"
+      INSIDERS_MARGIN_USD: "10.0"
+      INSIDERS_MAX_LEVERAGE: "30"
+      INSIDERS_FT_BASE_URL: http://insidersscalpv1:8080
+      INSIDERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
+      INSIDERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+    volumes:
+      - insiders_receiver_state:/var/lib/insiders
+      - ./insiders_bridge:/app/insiders_bridge:ro
+    ports:
+      - "127.0.0.1:8089:8089"
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    depends_on:
+      - insidersscalpv1
+
+  insidersscalpv1:
+    # Futures Freqtrade bot for the Insiders Scalp copy trader. Pass-through
+    # strategy — entries/exits all driven by the receiver via REST.
+    profiles:
+      - insiders
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-insiders-scalp
+    environment: *a1
+    volumes:
+      - ft_user_data:/freqtrade/user_data
+      - ./user_data/configs:/freqtrade/user_data/configs:ro
+      - ./user_data/strategies:/freqtrade/user_data/strategies
+    ports:
+      - 127.0.0.1:8098:8080
+    healthcheck: *a2
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    entrypoint:
+      - /bin/sh
+      - -c
+      - sleep 90 && exec freqtrade trade --logfile /freqtrade/user_data/logs/InsidersScalpV1.log --config /freqtrade/user_data/configs/InsidersScalpV1.json --strategy InsidersScalpV1
 
 networks:
   default: null
@@ -228,3 +286,4 @@ volumes:
   ft_user_data: null
   ft_exporter_state: null
   insiders_state: null
+  insiders_receiver_state: null
