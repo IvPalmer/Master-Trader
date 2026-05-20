@@ -18,6 +18,11 @@ services:
     environment:
       LOG_LEVEL: INFO
       TRADES_DIR: /srv/lake/raw/trades
+    # Bind to host loopback so VPS host-side scripts (e.g. run-health-report.sh
+    # cron) can POST to localhost:8088 without joining the docker network.
+    # Loopback-only — no external exposure.
+    ports:
+      - "127.0.0.1:8088:8088"
     volumes:
       - /srv/lake/raw/trades:/srv/lake/raw/trades
     networks:
