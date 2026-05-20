@@ -261,39 +261,68 @@ async def _build_reply_chain(client, conn, config, msg_dict, depth=5):
     return chain
 
 
+RETRY_BACKOFFS = (1, 3, 9)  # seconds; 3 attempts total
+
+
 async def _post_to_receiver(conn, config, payload):
-    """POST event to receiver. Record attempt + response in forwards table."""
+    """POST event to receiver. Retries with exponential backoff (1s, 3s, 9s).
+
+    Each attempt is logged in `forwards` (audit spine). On total failure,
+    the event is still in raw_messages — a future replay job can pick it
+    up. We never block the listener loop on a stuck receiver.
+    """
     import aiohttp
-    attempt_num = 1
+    msg_id = payload["msg_id"]
     async with aiohttp.ClientSession() as session:
-        try:
-            async with session.post(
-                config.receiver_url, json=payload,
-                timeout=aiohttp.ClientTimeout(total=10),
-            ) as r:
-                body = await r.text()
+        for attempt_num, backoff in enumerate(RETRY_BACKOFFS, start=1):
+            try:
+                async with session.post(
+                    config.receiver_url, json=payload,
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as r:
+                    body = await r.text()
+                    conn.execute(
+                        "INSERT OR REPLACE INTO forwards (msg_id, attempt, attempted_at, status_code, response_text) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (msg_id, attempt_num,
+                         datetime.now(timezone.utc).isoformat(),
+                         r.status, body[:1000]),
+                    )
+                    if 200 <= r.status < 300:
+                        logger.info("receiver ack msg %d (attempt %d): %s",
+                                    msg_id, attempt_num, body[:200])
+                        return
+                    # 4xx is generally NOT retryable — bad payload won't get better
+                    if 400 <= r.status < 500:
+                        logger.error(
+                            "receiver POST %d for msg %d (non-retryable): %s",
+                            r.status, msg_id, body[:200],
+                        )
+                        return
+                    logger.warning(
+                        "receiver POST %d for msg %d (attempt %d), retrying in %ds",
+                        r.status, msg_id, attempt_num, backoff,
+                    )
+            except Exception as e:
                 conn.execute(
                     "INSERT OR REPLACE INTO forwards (msg_id, attempt, attempted_at, status_code, response_text) "
                     "VALUES (?, ?, ?, ?, ?)",
-                    (payload["msg_id"], attempt_num,
+                    (msg_id, attempt_num,
                      datetime.now(timezone.utc).isoformat(),
-                     r.status, body[:1000]),
+                     -1, str(e)[:1000]),
                 )
-                if r.status >= 400:
-                    logger.error("receiver POST %d for msg %d: %s",
-                                 r.status, payload["msg_id"], body[:200])
-                else:
-                    logger.info("receiver ack msg %d: %s",
-                                payload["msg_id"], body[:200])
-        except Exception as e:
-            logger.exception("receiver POST exception for msg %d", payload["msg_id"])
-            conn.execute(
-                "INSERT OR REPLACE INTO forwards (msg_id, attempt, attempted_at, status_code, response_text) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (payload["msg_id"], attempt_num,
-                 datetime.now(timezone.utc).isoformat(),
-                 -1, str(e)[:1000]),
-            )
+                logger.warning(
+                    "receiver POST exception msg %d (attempt %d): %s, retrying in %ds",
+                    msg_id, attempt_num, e, backoff,
+                )
+
+            if attempt_num < len(RETRY_BACKOFFS):
+                await asyncio.sleep(backoff)
+
+        logger.error(
+            "receiver POST GIVING UP on msg %d after %d attempts. Event in raw_messages; replay manually.",
+            msg_id, len(RETRY_BACKOFFS),
+        )
 
 
 def main() -> None:

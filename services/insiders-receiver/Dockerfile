@@ -1,5 +1,13 @@
 FROM python:3.13-slim
 
+# System deps: Node.js (for the `claude` CLI npm package) + curl
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    npm install -g @anthropic-ai/claude-code && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 RUN pip install --no-cache-dir \
     fastapi==0.115.0 \
     uvicorn[standard]==0.32.0 \
@@ -16,8 +24,8 @@ COPY app/ /app/app/
 # bake another copy here.
 VOLUME ["/var/lib/insiders"]
 
-RUN useradd -u 1000 -m -s /sbin/nologin receiver
-USER receiver
+# Stay root so Claude can write to /root/.claude (the mounted auth volume).
+# elder-brain-bot uses the same pattern.
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app

@@ -21,6 +21,7 @@ import aiohttp
 from pydantic import BaseModel
 
 from .classifier_dispatcher import ClaudeAgentClassifier, classify
+from .claude_classifier import ClaudeCliClassifier
 from .executor import (
     FreqtradeClient, FreqtradeConfig, SizingConfig,
     get_mark_price, sanity_check_entry, size_position, pair_for_symbol,
@@ -45,6 +46,16 @@ class Config:
             max_leverage=float(os.getenv("INSIDERS_MAX_LEVERAGE", "30")),
         )
         self.ft = FreqtradeConfig.from_env()
+        # Claude classifier config
+        self.claude_enabled = os.getenv("INSIDERS_CLAUDE_ENABLED", "true").lower() == "true"
+        self.claude_timeout = float(os.getenv("INSIDERS_CLAUDE_TIMEOUT_SEC", "8.0"))
+        self.claude_binary = os.getenv("INSIDERS_CLAUDE_BINARY", "claude")
+        self.claude_model = os.getenv("INSIDERS_CLAUDE_MODEL") or None
+        # Stale-signal mechanical gate (codex hardening — disabled by default
+        # per user trust-the-signaler frame; toggle on if real-channel testing
+        # reveals stale-signal misfires)
+        self.stale_signal_max_sec = int(os.getenv("INSIDERS_STALE_SIGNAL_MAX_SEC", "0"))
+        # 0 = disabled. Set to e.g. 18 to reject opens older than 18s.
 
 
 # ── Lifespan: init state + background tasks ───────────────────────────────
@@ -55,7 +66,15 @@ async def lifespan(app: FastAPI):
     cfg = Config()
     graph = PositionGraph(cfg.db_path, cfg.instance_id)
     ft = FreqtradeClient(cfg.ft)
-    claude = ClaudeAgentClassifier()
+    # Use real Claude CLI classifier (Max subscription via subprocess).
+    # Falls back to None on timeout / missing binary / parse error; the
+    # dispatcher then degrades to the rule classifier.
+    claude = ClaudeCliClassifier(
+        timeout_sec=cfg.claude_timeout,
+        binary=cfg.claude_binary,
+        model=cfg.claude_model,
+        enabled=cfg.claude_enabled,
+    )
     app.state.cfg = cfg
     app.state.graph = graph
     app.state.ft = ft
@@ -187,6 +206,24 @@ async def _handle_open(graph, ft, cfg, event, cls, classifier_used):
 
     if symbol is None or direction is None or sl is None:
         return {"status": "rejected", "reason": "missing symbol/direction/sl"}
+
+    # Stale-signal mechanical gate (codex hardening — OFF by default per
+    # user trust-the-signaler frame). Set INSIDERS_STALE_SIGNAL_MAX_SEC > 0
+    # to enable. This is NOT a signal-quality veto; it's a clock-skew
+    # safety net for cases where the listener was dead and we're now
+    # replaying old messages.
+    if cfg.stale_signal_max_sec > 0 and event.posted_at:
+        try:
+            posted = datetime.fromisoformat(event.posted_at.replace("Z", "+00:00"))
+            age_sec = (datetime.now(timezone.utc) - posted).total_seconds()
+            if age_sec > cfg.stale_signal_max_sec:
+                logger.warning(
+                    "STALE signal: msg %d age %.1fs > threshold %ds — rejecting open",
+                    event.msg_id, age_sec, cfg.stale_signal_max_sec,
+                )
+                return {"status": "rejected", "reason": f"stale: age {age_sec:.1f}s"}
+        except (ValueError, TypeError) as e:
+            logger.warning("could not parse posted_at %r: %s", event.posted_at, e)
 
     # Resolve entry: explicit number, midpoint of range, or "market"
     if entry is None and entry_range:
@@ -339,6 +376,30 @@ async def session_status(s: SessionStatusIn):
 @app.post("/reconcile")
 async def reconcile_endpoint():
     return await reconcile_once(app.state.graph, app.state.ft)
+
+
+@app.get("/position/by_ft_id/{ft_trade_id}")
+async def get_position_by_ft_id(ft_trade_id: int):
+    """Strategy custom_stoploss endpoint. Returns live SL + state for a
+    Freqtrade trade_id. Strategy calls this on every candle and uses
+    `current_sl` as the active stop."""
+    graph: PositionGraph = app.state.graph
+    row = graph.conn.execute(
+        "SELECT * FROM positions WHERE freqtrade_trade_id = ? AND status = 'open'",
+        (ft_trade_id,),
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="not found")
+    return {
+        "position_id": row["position_id"],
+        "symbol": row["symbol"],
+        "direction": row["direction"],
+        "open_entry": row["open_entry"],
+        "current_sl": row["current_sl"],
+        "current_tp": row["current_tp"],
+        "pct_open": row["pct_open"],
+        "status": row["status"],
+    }
 
 
 @app.get("/positions")

@@ -240,9 +240,20 @@ services:
       INSIDERS_FT_BASE_URL: http://insidersscalpv1:8080
       INSIDERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       INSIDERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+      INSIDERS_CLAUDE_ENABLED: "true"
+      INSIDERS_CLAUDE_TIMEOUT_SEC: "8.0"
+      INSIDERS_CLAUDE_BINARY: claude
+      # Stale-signal gate (codex hardening, default OFF per trust-signaler frame).
+      # Set to seconds (e.g. 18) to enable mechanical age-based reject.
+      INSIDERS_STALE_SIGNAL_MAX_SEC: "0"
     volumes:
       - insiders_receiver_state:/var/lib/insiders
       - ./insiders_bridge:/app/insiders_bridge:ro
+      # Shared Claude auth — reuse same volume as elder-brain-bot, so
+      # /root/.claude in this container has the same Max-subscription
+      # credentials. external=true means the volume already exists from
+      # claude-assistant stack.
+      - claude_auth:/root/.claude
     ports:
       - "127.0.0.1:8089:8089"
     deploy:
@@ -260,7 +271,9 @@ services:
     image: freqtradeorg/freqtrade:stable
     restart: always
     container_name: ft-insiders-scalp
-    environment: *a1
+    environment:
+      <<: *a1
+      INSIDERS_RECEIVER_URL: http://insiders-receiver:8089
     volumes:
       - ft_user_data:/freqtrade/user_data
       - ./user_data/configs:/freqtrade/user_data/configs:ro
@@ -287,3 +300,6 @@ volumes:
   ft_exporter_state: null
   insiders_state: null
   insiders_receiver_state: null
+  claude_auth:
+    external: true
+    name: claude-assistant_claude_auth
