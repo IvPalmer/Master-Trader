@@ -55,6 +55,15 @@
     ]
   },
   "pairlists": [{"method": "StaticPairList"}],
+  "webhook": {
+    "enabled": true,
+    "url": "http://trade-webhook:8088/freqtrade/event",
+    "webhookentry": {"bot_name": "InsidersScalpV1", "type": "entry", "pair": "{pair}", "limit": "{limit}", "amount": "{amount}", "open_rate": "{open_rate}", "stake_amount": "{stake_amount}", "direction": "{direction}", "leverage": "{leverage}", "enter_tag": "{enter_tag}"},
+    "webhookentryfill": {"bot_name": "InsidersScalpV1", "type": "entry_fill", "pair": "{pair}", "open_rate": "{open_rate}", "amount": "{amount}", "stake_amount": "{stake_amount}", "direction": "{direction}", "leverage": "{leverage}", "enter_tag": "{enter_tag}"},
+    "webhookexit": {"bot_name": "InsidersScalpV1", "type": "exit", "pair": "{pair}", "limit": "{limit}", "amount": "{amount}", "open_rate": "{open_rate}", "close_rate": "{close_rate}", "profit_amount": "{profit_amount}", "profit_ratio": "{profit_ratio}", "direction": "{direction}", "exit_reason": "{exit_reason}"},
+    "webhookexitfill": {"bot_name": "InsidersScalpV1", "type": "exit_fill", "pair": "{pair}", "open_rate": "{open_rate}", "close_rate": "{close_rate}", "profit_amount": "{profit_amount}", "profit_ratio": "{profit_ratio}", "direction": "{direction}", "exit_reason": "{exit_reason}"},
+    "webhookstatus": {"bot_name": "InsidersScalpV1", "type": "status", "status": "{status}"}
+  },
   "api_server": {
     "_comment": "REQUIRED — receiver depends on this for forceenter/forceexit. Username/password overridden via env (FREQTRADE__API_SERVER__USERNAME/PASSWORD) at container boot.",
     "enabled": true,

@@ -329,7 +329,7 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
     # --- Compute Health Score ---
     score = _compute_health_score(metrics)
     metrics["health_score"] = score
-    metrics["health_label"] = _score_label(score)
+    metrics["health_label"] = _score_label(score, metrics.get("total_trades", 0))
 
     # --- Per-pair drift (last 30 days) ---
     metrics["pair_drift"] = _compute_pair_drift(closed, window_days=30)
@@ -513,7 +513,14 @@ def _compute_health_score(m: dict) -> int:
     return min(score, 100)
 
 
-def _score_label(score: int) -> str:
+def _score_label(score: int, total_trades: int = 0) -> str:
+    # Sample-size-aware: scores get heavily discounted below MIN_TRADES_RELIABLE,
+    # which made a healthy young bot (e.g. 3 trades all winners → effective
+    # score 27) look "CRITICAL" alongside actually-dying bots. Split that out.
+    if total_trades < MIN_TRADES_RELIABLE:
+        if total_trades == 0:
+            return "NO TRADES"
+        return "PRELIMINARY"
     if score >= 90:
         return "EXCELLENT"
     elif score >= 70:
@@ -643,7 +650,13 @@ def compute_portfolio_metrics(bot_metrics: list[dict]) -> dict:
         for pair, bots in overlapping_pairs.items():
             portfolio_flags.append(f"Correlated exposure: {pair} held by {', '.join(bots)}")
 
-    critical_bots = [m["strategy"] for m in online if m.get("health_score", 0) < 30]
+    # Only flag bots as "critical" if they have a RELIABLE sample size AND a low
+    # score. PRELIMINARY/NO TRADES bots aren't critical, they're just new.
+    critical_bots = [
+        m["strategy"] for m in online
+        if m.get("health_score", 0) < 30
+        and m.get("total_trades", 0) >= MIN_TRADES_RELIABLE
+    ]
     if critical_bots:
         portfolio_flags.append(f"Critical bots: {', '.join(critical_bots)}")
 

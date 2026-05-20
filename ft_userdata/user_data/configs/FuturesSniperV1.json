@@ -104,7 +104,7 @@
     ],
     "webhook": {
         "enabled": false,
-        "url": "http://host.docker.internal:8088/webhooks/freqtrade",
+        "url": "http://trade-webhook:8088/freqtrade/event",
         "webhookentry": {
             "type": "entry",
             "pair": "{pair}",
