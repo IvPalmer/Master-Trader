@@ -70,7 +70,10 @@ class Config:
         self.event_store = os.getenv(
             "INSIDERS_EVENT_STORE", "/var/lib/insiders/events.sqlite"
         )
-        self.heartbeat_sec = int(os.getenv("INSIDERS_HEARTBEAT_SEC", "60"))
+        # 45s default — keeps the "within a minute" revocation-detection
+        # promise in EDUARDO-ONBOARDING.md literally true even after one
+        # missed heartbeat + the get_me() 5s timeout.
+        self.heartbeat_sec = int(os.getenv("INSIDERS_HEARTBEAT_SEC", "45"))
         self.instance_id = os.getenv("INSIDERS_INSTANCE_ID", "unknown")
         self.dedupe_sql = os.getenv("INSIDERS_DEDUPE_SQL", self.event_store)
 

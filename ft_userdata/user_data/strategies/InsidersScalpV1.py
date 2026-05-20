@@ -74,13 +74,17 @@ class InsidersScalpV1(IStrategy):
     def custom_stoploss(self, pair, trade, current_time, current_rate,
                         current_profit, **kwargs):
         """Fetch the live SL from the receiver and convert to Freqtrade's
-        expected form (negative pct RELATIVE TO current_rate, not open_rate).
+        expected form (a POSITIVE fractional offset relative to current_rate;
+        Freqtrade internally applies abs() and the side via is_short).
 
-        Per Freqtrade docs (strategy-callbacks):
-          The returned value is a stoploss expressed as a NEGATIVE percentage
-          relative to current_rate. Use stoploss_from_absolute() to convert
-          an absolute price into this form properly accounting for leverage
-          and is_short.
+        Per Freqtrade docs (strategy-callbacks): use stoploss_from_absolute()
+        to convert an absolute SL price; it handles is_short + leverage.
+
+        We additionally validate that sl_price is on the CORRECT SIDE of
+        current_rate before conversion. A wrong-side stop (e.g. signal SL
+        above entry on a short) would convert to a value that triggers
+        immediately on the next tick. Fail-safe: return None and let the
+        static -10% safety stoploss + exchange-side SL handle protection.
 
         Hard 500ms timeout. Cache for 60s. Failures return None → Freqtrade
         uses static stoploss; exchange-side SL at entry still protects.
