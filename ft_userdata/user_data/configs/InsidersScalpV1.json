@@ -55,5 +55,23 @@
     ]
   },
   "pairlists": [{"method": "StaticPairList"}],
+  "api_server": {
+    "_comment": "REQUIRED — receiver depends on this for forceenter/forceexit. Username/password overridden via env (FREQTRADE__API_SERVER__USERNAME/PASSWORD) at container boot.",
+    "enabled": true,
+    "listen_ip_address": "0.0.0.0",
+    "listen_port": 8080,
+    "verbosity": "error",
+    "enable_openapi": true,
+    "jwt_secret_key": "master-trader-dev-key-change-for-prod",
+    "CORS_origins": [
+      "http://localhost:8080",
+      "http://localhost:8098"
+    ],
+    "username": "freqtrader",
+    "password": "mastertrader"
+  },
+  "initial_state": "running",
+  "force_entry_enable": true,
+  "_force_entry_enable_note": "REQUIRED — receiver places entries via /forceenter. Default config has this false.",
   "bot_name": "InsidersScalpV1"
 }

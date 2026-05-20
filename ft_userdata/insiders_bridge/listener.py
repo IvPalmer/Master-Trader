@@ -176,7 +176,27 @@ async def run(config: Config, conn: sqlite3.Connection) -> None:
     async def on_edited(event):
         await _ingest(client, conn, config, event.message, source="edited")
 
-    # Heartbeat task
+    # Track connection state for receiver notifications
+    _connection_state = {"connected": True, "last_sent": True}
+
+    async def _post_session_status(connected: bool, reason: str = ""):
+        import aiohttp
+        url = config.receiver_url.replace("/event", "/session-status")
+        body = {
+            "connected": connected,
+            "reason": reason,
+            "last_msg_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.post(url, json=body,
+                                  timeout=aiohttp.ClientTimeout(total=5)) as r:
+                    logger.info("session-status POST connected=%s → HTTP %d",
+                                connected, r.status)
+        except Exception as e:
+            logger.warning("session-status POST failed: %s", e)
+
+    # Heartbeat task — writes local sqlite AND notifies receiver every cycle
     async def heartbeat():
         while True:
             conn.execute(
@@ -184,6 +204,17 @@ async def run(config: Config, conn: sqlite3.Connection) -> None:
                 "VALUES (1, ?, ?)",
                 (datetime.now(timezone.utc).isoformat(), last_msg_id(conn)),
             )
+            # Notify receiver of current connection state
+            is_connected = client.is_connected()
+            if is_connected != _connection_state["last_sent"]:
+                await _post_session_status(
+                    is_connected,
+                    reason="reconnected" if is_connected else "disconnected",
+                )
+                _connection_state["last_sent"] = is_connected
+            else:
+                # Periodic keep-alive ping (every heartbeat tick when state stable)
+                await _post_session_status(is_connected, reason="heartbeat")
             await asyncio.sleep(config.heartbeat_sec)
 
     hb_task = asyncio.create_task(heartbeat())

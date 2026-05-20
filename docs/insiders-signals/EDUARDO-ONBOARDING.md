@@ -8,20 +8,46 @@ persists for months as long as the listener keeps receiving updates.
 
 **Time required: ~15 minutes**
 
-## What this does
+## What this does — and what it lets us do
 
 Your Telegram account is a member of the Insiders Scalp private group.
 Our bot needs to read messages from that group, but it can't be added as
 a member (private channel + the signaler doesn't add bots). So we use
 your user-account session to read on your behalf.
 
-This is a one-way read flow:
-- Your session reads messages from the group.
-- Our listener pulls those messages over Telegram's API using your session.
-- We never post messages, never DM anyone, never modify your account.
+**Important security context — read this carefully:**
 
-Your session file is the equivalent of being logged in on a device. Treat
-it like a password.
+A Telethon user session is **account-level access** — equivalent to being
+logged in on a device. The Telegram API technically lets a session holder:
+- Read messages in any chat your account is in (groups, DMs, channels)
+- Send messages as your account
+- Modify account settings
+- Read contact list
+
+**Our code does NONE of these things** beyond reading the one group ID
+you give us. The listener source is public: see
+[`ft_userdata/insiders_bridge/listener.py`](https://github.com/IvPalmer/Master-Trader/blob/main/ft_userdata/insiders_bridge/listener.py)
+and the channel filter is hard-coded via `INSIDERS_TG_CHANNEL_ID` env var.
+We never post. Never DM. Never touch other chats.
+
+But you should know the **capability is broader than our use of it** —
+this is true of any Telegram session, not specific to our setup. Treat
+the session file like a password.
+
+## How to revoke access if you ever want out
+
+You can kill our access AT ANY TIME from your own Telegram app:
+
+1. Open Telegram → Settings → **Devices** (or "Active Sessions")
+2. Find the session named **"MT-Listener"** (the one you renamed in Step 3)
+3. Tap it → **"Terminate Session"**
+
+That immediately invalidates our session file on our VPS. Our listener
+heartbeat will fail within a minute and Palmer will see the alert. He
+will then delete the session file from the VPS as a courtesy cleanup
+(but it's already useless at that point).
+
+You don't need to ask permission to revoke — just do it.
 
 ## Prerequisites
 
@@ -93,26 +119,43 @@ This way if you ever clean up sessions in the future, you'll see
 
 ## Step 4 — Hand over the session file
 
-The session file = full read access to your Telegram. Treat it carefully.
+The session file = account-level Telegram access (see security context
+above). Encrypt before sending.
 
-Encrypt it before sending:
+**Recommended (asymmetric, no password to share):**
+
+Palmer will give you a single age public key string (~62 chars).
 
 ```bash
-# macOS/Linux: install age (https://github.com/FiloSottile/age)
-brew install age      # or: apt install age
+brew install age           # macOS
+# or: apt install age      # Debian/Ubuntu
 
-# Encrypt with a one-time password Palmer will give you over a secure channel
+# Replace age1...palmer with the actual pubkey Palmer sent
+age -r age1...palmer mt-listener.session > mt-listener.session.age
+```
+
+Only Palmer's private key (which only he has, on the VPS) can decrypt.
+No shared password. No way for anyone intercepting the file to read it.
+
+**Alternative (symmetric, simpler but needs verbal password):**
+
+```bash
 age -p mt-listener.session > mt-listener.session.age
 ```
 
-Send `mt-listener.session.age` via:
-- Email is OK (it's encrypted)
-- Telegram self-DM is OK (encrypted-at-rest by Telegram for ~24h)
-- WhatsApp / Signal is OK
+You'll be prompted for a password. Share that password with Palmer over
+a separate channel (voice call, Signal, in person). NOT in the same
+email as the file.
 
-Palmer will decrypt on the receiving VPS and put it in the read-only
-secrets path of the listener container. He will NOT commit it to git,
-ever.
+**Send the encrypted `mt-listener.session.age` via any of:**
+- Email (it's encrypted, fine)
+- WhatsApp / Signal (also fine)
+- **NOT** Telegram self-DM — Telegram cloud DMs are not end-to-end encrypted
+  and a malicious Telegram employee or compromise could read it
+- **NOT** unencrypted Telegram chat to Palmer for the same reason
+
+Palmer will decrypt on the receiving VPS and put the file in the read-only
+secrets path of the listener container. He will NOT commit it to git, ever.
 
 ## Step 5 — Send the credentials too
 

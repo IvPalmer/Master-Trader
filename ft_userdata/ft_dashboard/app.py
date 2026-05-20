@@ -75,18 +75,18 @@ BOTS: list[dict[str, Any]] = [
         "name": "InsidersScalpV1",
         "label": "insiders-scalp",
         "url": "http://ft-insiders-scalp:8080",
-        # Baseline = 30-day replay of the leader's signals through Eduardo's
-        # prototype simulator + WEEX walker. Treat as REFERENCE, not promise —
-        # this is a copy-trader of an unknown external signaler, not a quant
-        # strategy whose edge we validated. See
-        # docs/insiders-signals/session-handoff.md for the full frame.
+        # Observational mode: gates skip baseline-deviation comparisons because
+        # this is a copy-trader of an UNKNOWN external signaler, not a quant
+        # strategy whose edge we validated. Running gate-2 against the 30-day
+        # replay number (228%/yr extrapolated) would produce false failures
+        # since real live return will be much smaller (latency drag, execution
+        # cost). See docs/insiders-signals/session-handoff.md.
+        #
+        # Reactivate baseline gates after 30-50 live trades have established
+        # a real reference. Until then dashboard shows raw P&L + trade stats
+        # without pass/fail gating.
+        "observational": True,
         "baseline": {
-            "annual_return_pct": 228.0,    # 18.81% / 30d ≈ 228%/yr; flag if reality undershoots
-            "profit_factor": 1.45,         # leader's regex-replay PF
-            "win_rate": 0.385,             # 38.5% WR (scalp signals, R:R 3.15 carries it)
-            "max_dd_pct": 12.0,            # estimate; tighten after first 30 live trades
-            "trades_per_year": 850,        # ~71 trades / 30d * 12 ≈ 852
-            "worst_trade_pct": -10.0,      # variable leverage; assume up to 2× SL gap
             "starting_equity_in_csv": 200.0,
         },
     },
@@ -421,9 +421,13 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "expectancy": _expectancy(closed_trades),
         "capital_at_risk": _capital_at_risk(open_trades),
         "concentration": _concentration(per_pair, closed_pnl),
-        "gate1": _gate1(all_trades, days_running),
-        "gate2": _gate2(profit or {}, starting_capital, days_running, bot["baseline"]),
-        "gate3": _gate3(all_trades, bot["baseline"]),
+        "observational": bot.get("observational", False),
+        "gate1": ({"status": "observational"} if bot.get("observational")
+                  else _gate1(all_trades, days_running)),
+        "gate2": ({"status": "observational"} if bot.get("observational")
+                  else _gate2(profit or {}, starting_capital, days_running, bot["baseline"])),
+        "gate3": ({"status": "observational"} if bot.get("observational")
+                  else _gate3(all_trades, bot["baseline"])),
         "baseline": bot["baseline"],
         "equity_live": live_equity,
         "drawdown_curve": drawdown_curve,

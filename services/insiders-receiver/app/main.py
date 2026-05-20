@@ -357,8 +357,13 @@ async def session_status(s: SessionStatusIn):
 
     Codex: on session loss, pause new entries. Don't auto-close. Existing
     positions stay protected by exchange-side SL/TP.
+
+    Reconnect does NOT auto-unpause — operator must explicitly call
+    POST /system/unpause after verifying state. Prevents flapping
+    listener from spamming entries during reconnect storms.
     """
     graph: PositionGraph = app.state.graph
+    prev_connected = app.state.session_state.get("connected", True)
     app.state.session_state["connected"] = s.connected
     app.state.session_state["last_msg_at"] = s.last_msg_at
 
@@ -366,11 +371,39 @@ async def session_status(s: SessionStatusIn):
         graph.set_entries_paused(True, reason=f"session-lost: {s.reason}")
         return {"status": "paused", "reason": s.reason}
 
-    # Reconnected — unpause if we were paused due to session loss
+    # Reconnected — record but stay paused if we were paused for session loss
     paused, reason = graph.is_entries_paused()
     if paused and reason.startswith("session-lost"):
-        graph.set_entries_paused(False, reason="session-restored")
+        if not prev_connected:
+            logger.warning(
+                "session reconnected (was disconnected). Entries REMAIN PAUSED. "
+                "Operator must POST /system/unpause to resume."
+            )
+        return {"status": "ok-but-paused-pending-manual-unpause",
+                "pause_reason": reason}
     return {"status": "ok"}
+
+
+@app.post("/system/unpause")
+async def manual_unpause(reason: str = "operator-confirmed"):
+    """Manually clear entries_paused. Required after session-loss event
+    to resume new entries. Existing positions are managed regardless of
+    pause state."""
+    graph: PositionGraph = app.state.graph
+    paused, prev_reason = graph.is_entries_paused()
+    if not paused:
+        return {"status": "already-unpaused"}
+    graph.set_entries_paused(False, reason=f"manual: {reason}")
+    logger.warning("entries UNPAUSED by operator. Previous pause reason: %s", prev_reason)
+    return {"status": "unpaused", "prev_reason": prev_reason}
+
+
+@app.post("/system/pause")
+async def manual_pause(reason: str = "operator-requested"):
+    """Manual pause endpoint — operator can stop new entries at any time."""
+    graph: PositionGraph = app.state.graph
+    graph.set_entries_paused(True, reason=f"manual: {reason}")
+    return {"status": "paused", "reason": reason}
 
 
 @app.post("/reconcile")
