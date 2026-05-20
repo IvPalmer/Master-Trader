@@ -122,30 +122,54 @@ This way if you ever clean up sessions in the future, you'll see
 The session file = account-level Telegram access (see security context
 above). Encrypt before sending.
 
-**Recommended (asymmetric, no password to share):**
+### What is `age`?
 
-Palmer will give you a single age public key string (~62 chars).
+`age` (https://github.com/FiloSottile/age) is a small modern file
+encryption tool. Single binary, no config, no openssl pain. It uses
+public/private keypairs — Palmer holds the private key; you encrypt
+TO his public key; only his private key can decrypt. Even if your email
+provider, ISP, or anyone intercepting the transfer gets the encrypted
+file, they can't read it.
+
+Palmer has already generated his keypair on the VPS where the file will
+be decrypted. The private key never leaves that machine.
+
+### Encrypt and send
+
+Install age:
 
 ```bash
 brew install age           # macOS
-# or: apt install age      # Debian/Ubuntu
-
-# Replace age1...palmer with the actual pubkey Palmer sent
-age -r age1...palmer mt-listener.session > mt-listener.session.age
+# or: apt install age      # Debian/Ubuntu / WSL
 ```
 
-Only Palmer's private key (which only he has, on the VPS) can decrypt.
-No shared password. No way for anyone intercepting the file to read it.
-
-**Alternative (symmetric, simpler but needs verbal password):**
+Encrypt the session file TO Palmer's public key:
 
 ```bash
-age -p mt-listener.session > mt-listener.session.age
+age -r age18yk2jtv2waqkhplzsq3637yqwug6yvxhm6j78c8q0fz8jd7zfs9q9900u3 \
+    mt-listener.session > mt-listener.session.age
 ```
 
-You'll be prompted for a password. Share that password with Palmer over
-a separate channel (voice call, Signal, in person). NOT in the same
-email as the file.
+That's the entire command. No password to remember, no separate channel
+to coordinate. Anyone can intercept `mt-listener.session.age` and it's
+useless without Palmer's private key.
+
+**Send `mt-listener.session.age` via any of:**
+- Email (it's encrypted, fine)
+- WhatsApp / Signal (also fine)
+- **NOT** Telegram — Telegram cloud chats are not end-to-end encrypted
+  and a malicious Telegram employee or compromise could read it
+
+Palmer will decrypt on the receiving VPS with:
+
+```bash
+# Palmer's side, for reference:
+age --decrypt -i ~/.age/insiders-handover.key \
+    < mt-listener.session.age > insiders.session
+```
+
+The decrypted session file goes in the read-only secrets path of the
+listener container. Palmer will NOT commit it to git, ever.
 
 **Send the encrypted `mt-listener.session.age` via any of:**
 - Email (it's encrypted, fine)
