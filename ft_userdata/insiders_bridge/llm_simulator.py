@@ -264,7 +264,9 @@ def fill_market_entries(trades):
 
 
 def sl_distance_pct(entry, sl):
-    if entry is None or sl is None or isinstance(sl, str) or entry <= 0:
+    # Guard against entry="market" sneaking past fill_market_entries (e.g.
+    # WEEX lookup failed). Prior version raised TypeError comparing str <= 0.
+    if entry is None or sl is None or isinstance(sl, str) or isinstance(entry, str) or entry <= 0:
         return None
     return abs(entry - sl) / entry
 

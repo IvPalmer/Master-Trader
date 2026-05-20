@@ -305,6 +305,43 @@ sensitivity curve. Tells us what to expect live vs MVP-1 backtest's +$230.
 - Don't reverse on LLM disagreement after fast-path — just exit.
 - Don't open on header-only two-part signals.
 
+## Classifier benchmark (2026-05-19) — codex-blessed architecture
+
+Ran `classifier.py` (467 lines of curated Python rules) against Claude's
+`classifications.jsonl` on the same 428 messages, identical simulator. Full
+writeup: [classifier-benchmark-2026-05-19.md](classifier-benchmark-2026-05-19.md).
+
+Headlines:
+- 90.2% agreement on `kind` (386/428).
+- On REALIZED closed trades, Claude beats rule by +$95 ($356 vs $261).
+- Rule's apparent +$360 PnL edge is phantom — comes from positions that
+  never closed in the window due to missed-close bugs + symbol-parse bugs
+  (e.g. ETH SHORT with entry=77100, a BTC price).
+
+**Production architecture** (codex-blessed 2026-05-19):
+
+```
+incoming Telegram message
+   │
+   ├── strict-rule open detector (single message, symbol+side+entry+SL+TP,
+   │   no ambiguity, no reply dependency, Binance-valid pair)
+   │      │ if match
+   │      ▼
+   │   FAST-PATH: place order at T+0.7s, LLM validates in parallel
+   │   if LLM disagrees on kind/symbol/side/price → forceexit
+   │
+   └── LLM primary for everything else:
+       close_full, close_partial, move_sl, increase, hedge management,
+       replies, breakeven, ambiguous operator chatter
+```
+
+Plus hard market sanity checks before EVERY execution: symbol-relative price
+band check (live mark price or recent kline range) — catches `entry=77100`
+bug class even if both classifiers miss it.
+
+Missed-close prevention is the dominant safety concern. Close/SL-move stays
+LLM-led until much stronger evidence.
+
 ## How to onboard yourself (new session, fresh clone)
 
 ```bash
