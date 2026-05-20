@@ -192,6 +192,32 @@ services:
     depends_on:
       - keltnerbouncev1
       - cascadefaderv1
+  insiders-listener:
+    # ft-insiders-listener — Telethon listener for the Insiders Scalp Telegram
+    # group. Phase 1: piggybacks on Eduardo's user session. Phase 2: switches
+    # to our own session via env var.
+    #
+    # SCAFFOLD ONLY (2026-05-19) — won't start until insiders-listener image
+    # is built AND .session secret is present. Guarded behind `insiders`
+    # profile so default `docker compose up` skips it.
+    profiles:
+      - insiders
+    build: ./insiders_bridge
+    image: ft-insiders-listener:latest
+    restart: unless-stopped
+    container_name: ft-insiders-listener
+    env_file:
+      - ./insiders_bridge/.env
+    volumes:
+      - insiders_state:/var/lib/insiders
+      # Session file mounted as read-only secret. Per-deployment.
+      # Path source must be configured in the deployment's docker-compose
+      # override; do NOT commit the actual session.
+      - ./insiders_bridge/secrets/insiders.session:/run/secrets/insiders.session:ro
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
 networks:
   default: null
@@ -201,3 +227,4 @@ volumes:
   prometheus_data: null
   ft_user_data: null
   ft_exporter_state: null
+  insiders_state: null
