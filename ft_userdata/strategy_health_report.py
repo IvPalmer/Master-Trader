@@ -848,8 +848,11 @@ def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dic
 
 def send_telegram(message: str) -> bool:
     try:
-        payload = {"type": "status", "status": message}
-        resp = requests.post(WEBHOOK_URL, data=payload, timeout=10)
+        # trade-webhook (FastAPI) expects JSON body; the old form-encoded
+        # `data=` path was a Mac claude-assistant convention from before
+        # the migration. Sending as JSON now → 200 OK + Telegram delivery.
+        payload = {"type": "status", "status": message, "bot_name": "health-report"}
+        resp = requests.post(WEBHOOK_URL, json=payload, timeout=10)
         if resp.status_code in (200, 201, 204):
             log.info("Report sent to Telegram")
             return True
