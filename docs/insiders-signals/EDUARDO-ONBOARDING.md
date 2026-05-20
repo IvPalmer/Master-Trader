@@ -239,6 +239,39 @@ you give us.
 If you want to verify this, the listener code is in our public-ish repo:
 https://github.com/IvPalmer/Master-Trader/blob/main/ft_userdata/insiders_bridge/listener.py
 
+## Bonus — dashboard access
+
+Once Palmer has the bot running, he can give you read access to the
+live dashboard at `https://master-trader.grooveops.dev`. It shows:
+
+- Open positions across all bots (Keltner, FundingFade, CascadeFader,
+  and our new InsidersScalpV1)
+- P&L per bot, per pair, per trade
+- Equity curves, drawdown, win rate
+- Recent classifications + receiver health
+
+You'll see the **InsidersScalpV1** card light up with the trades the bot
+places mirroring the leader's signals. Useful for both of us to spot any
+behavior we want to discuss.
+
+### How access works
+
+The dashboard is behind Cloudflare Access (zero-trust gateway). When
+Palmer adds your email to the policy:
+
+1. You visit `https://master-trader.grooveops.dev`
+2. Cloudflare redirects you to a login page
+3. Enter your email — Cloudflare sends a one-time magic link
+4. Click the link in your email → you're in
+5. The session lasts 24h; after that, magic-link again
+
+No password to create. No new account. Cloudflare just emails you a
+new code every day you want to log in.
+
+**Tell Palmer which email** you want associated with the access. It
+should be one you can reliably receive mail at within ~30 seconds (for
+the magic link). Gmail, Proton, etc. all work fine.
+
 ## Phase 2
 
 If this works for a few weeks, the plan is to:
