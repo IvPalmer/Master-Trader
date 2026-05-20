@@ -13,6 +13,7 @@
     "KeltnerBounceV1": {"port": 8095, "timeframe": "1h", "type": "mean-reversion", "active": true},
     "FundingFadeV1": {"port": 8096, "timeframe": "1h", "type": "funding-divergence", "active": true},
     "FundingShortV1": {"port": null, "timeframe": "1h", "type": "bear-short", "active": false, "trading_mode": "futures", "_note": "killed 2026-04-18, port 8097 reused by CascadeFaderV1"},
-    "CascadeFaderV1": {"port": 8097, "timeframe": "1h", "type": "cascade-fader", "active": true}
+    "CascadeFaderV1": {"port": 8097, "timeframe": "1h", "type": "cascade-fader", "active": true},
+    "InsidersScalpV1": {"port": 8098, "timeframe": "5m", "type": "copy-trader", "active": false, "trading_mode": "futures", "_note": "Copy-trader of Insiders Scalp Telegram group leader. Pass-through strategy controlled by insiders-receiver. Inactive until Eduardo's .session lands."}
   }
 }

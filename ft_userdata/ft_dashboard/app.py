@@ -70,6 +70,26 @@ BOTS: list[dict[str, Any]] = [
             "starting_equity_in_csv": 200.0,
         },
     },
+    {
+        "key": "insiders",
+        "name": "InsidersScalpV1",
+        "label": "insiders-scalp",
+        "url": "http://ft-insiders-scalp:8080",
+        # Baseline = 30-day replay of the leader's signals through Eduardo's
+        # prototype simulator + WEEX walker. Treat as REFERENCE, not promise —
+        # this is a copy-trader of an unknown external signaler, not a quant
+        # strategy whose edge we validated. See
+        # docs/insiders-signals/session-handoff.md for the full frame.
+        "baseline": {
+            "annual_return_pct": 228.0,    # 18.81% / 30d ≈ 228%/yr; flag if reality undershoots
+            "profit_factor": 1.45,         # leader's regex-replay PF
+            "win_rate": 0.385,             # 38.5% WR (scalp signals, R:R 3.15 carries it)
+            "max_dd_pct": 12.0,            # estimate; tighten after first 30 live trades
+            "trades_per_year": 850,        # ~71 trades / 30d * 12 ≈ 852
+            "worst_trade_pct": -10.0,      # variable leverage; assume up to 2× SL gap
+            "starting_equity_in_csv": 200.0,
+        },
+    },
 ]
 
 API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "")
