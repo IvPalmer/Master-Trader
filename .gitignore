@@ -54,3 +54,7 @@ ft_userdata/analysis/vpin_keltner_results/
 
 # Backtest expected-equity overlays consumed by ft-dashboard
 !ft_userdata/overlays/*.csv
+
+# Insiders Scalp prototype (Eduardo's session/credentials live here, never commit)
+ft_userdata/insiders_bridge/_local/
+ft_userdata/insiders_bridge/out/
