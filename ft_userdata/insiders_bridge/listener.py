@@ -196,7 +196,11 @@ async def run(config: Config, conn: sqlite3.Connection) -> None:
         except Exception as e:
             logger.warning("session-status POST failed: %s", e)
 
-    # Heartbeat task — writes local sqlite AND notifies receiver every cycle
+    # Heartbeat task — writes local sqlite AND notifies receiver every cycle.
+    # Uses get_me() as the auth-level health check (not just transport state),
+    # so when Eduardo (or any user) revokes our session via Telegram Settings →
+    # Devices → Terminate, get_me() raises AuthKeyError and we report disconnected
+    # within one heartbeat tick.
     async def heartbeat():
         while True:
             conn.execute(
@@ -204,17 +208,36 @@ async def run(config: Config, conn: sqlite3.Connection) -> None:
                 "VALUES (1, ?, ?)",
                 (datetime.now(timezone.utc).isoformat(), last_msg_id(conn)),
             )
-            # Notify receiver of current connection state
-            is_connected = client.is_connected()
-            if is_connected != _connection_state["last_sent"]:
+
+            # Auth health: actually call the API. Transport-level is_connected()
+            # can stay True after session revocation; only an API call will
+            # surface AuthKeyError / SessionRevoked.
+            is_healthy = False
+            failure_reason = ""
+            if client.is_connected():
+                try:
+                    await asyncio.wait_for(client.get_me(), timeout=5.0)
+                    is_healthy = True
+                except asyncio.TimeoutError:
+                    failure_reason = "get_me-timeout"
+                except Exception as e:
+                    # AuthKeyError, SessionRevokedError, FloodWait, etc.
+                    failure_reason = f"{type(e).__name__}: {e}"
+            else:
+                failure_reason = "transport-disconnected"
+
+            if is_healthy != _connection_state["last_sent"]:
                 await _post_session_status(
-                    is_connected,
-                    reason="reconnected" if is_connected else "disconnected",
+                    is_healthy,
+                    reason="reconnected" if is_healthy else f"session-lost: {failure_reason}",
                 )
-                _connection_state["last_sent"] = is_connected
+                _connection_state["last_sent"] = is_healthy
+                if not is_healthy:
+                    logger.error("session HEALTH LOST: %s", failure_reason)
             else:
                 # Periodic keep-alive ping (every heartbeat tick when state stable)
-                await _post_session_status(is_connected, reason="heartbeat")
+                await _post_session_status(is_healthy,
+                                           reason="heartbeat" if is_healthy else f"still-down: {failure_reason}")
             await asyncio.sleep(config.heartbeat_sec)
 
     hb_task = asyncio.create_task(heartbeat())

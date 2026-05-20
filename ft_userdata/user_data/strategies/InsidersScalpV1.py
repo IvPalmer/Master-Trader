@@ -102,22 +102,36 @@ class InsidersScalpV1(IStrategy):
             sl_price = data.get("current_sl")
             if sl_price is None or not isinstance(sl_price, (int, float)):
                 return None
+            sl_price = float(sl_price)
 
-            # stoploss_from_absolute returns NEGATIVE float (pct relative to
-            # current_rate) accounting for is_short + leverage automatically.
+            # Validate the SL is on the correct side of current_rate BEFORE
+            # conversion. If the receiver pushed a logically-invalid SL (e.g.
+            # signaled SL ABOVE entry on a short) the conversion would yield
+            # a stop that triggers immediately. Fail-safe: keep static SL.
+            #
+            # Per Freqtrade docs, custom_stoploss returns a POSITIVE value
+            # (Freqtrade takes abs(return) internally). stoploss_from_absolute
+            # handles the is_short + leverage math; we just hand it the price.
+            if not trade.is_short and sl_price >= current_rate:
+                logger.warning(
+                    "custom_stoploss long-side SL price %s >= current %s for trade %s — keeping static SL",
+                    sl_price, current_rate, trade_id,
+                )
+                return None
+            if trade.is_short and sl_price <= current_rate:
+                logger.warning(
+                    "custom_stoploss short-side SL price %s <= current %s for trade %s — keeping static SL",
+                    sl_price, current_rate, trade_id,
+                )
+                return None
+
             sl_rel = stoploss_from_absolute(
-                stop_rate=float(sl_price),
+                stop_rate=sl_price,
                 current_rate=current_rate,
                 is_short=trade.is_short,
                 leverage=trade.leverage or 1.0,
             )
-            # Sanity: must be negative (it's a STOP-loss). 0 means SL is at
-            # or beyond current price → emergency exit fires next.
-            if sl_rel is None or sl_rel > 0:
-                logger.warning(
-                    "custom_stoploss got non-negative SL for trade %s: sl_price=%s current=%s sl_rel=%s",
-                    trade_id, sl_price, current_rate, sl_rel,
-                )
+            if sl_rel is None:
                 return None
             self._sl_cache[trade_id] = (now, sl_rel)
             return sl_rel
