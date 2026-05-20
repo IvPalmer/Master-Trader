@@ -323,6 +323,98 @@ sensitivity curve. Tells us what to expect live vs MVP-1 backtest's +$230.
 - Don't reverse on LLM disagreement after fast-path — just exit.
 - Don't open on header-only two-part signals.
 
+## Codex architecture review v2 (2026-05-19) — corrected frame
+
+After the role correction (Eduardo = group member, signaler = unknown group
+leader) and user's policy frame ("trust the signaler, don't backtest"),
+codex re-reviewed. Verdict: plan is sound for $100-200 measurement, but
+three areas need work before MVP-3.
+
+### Trust frame: defensible as small-capital experiment, NOT proof of edge
+
+Gaps to flag explicitly:
+- Signaler is unknown to us (Eduardo vouches, that's it)
+- Survivorship bias unknown
+- Edited/deleted Telegram message behavior unknown
+- Fill/slippage at live speed unknown
+
+OK to start at $100-200. Not OK to scale aggressively before live evidence.
+
+### Hardening item 1 — Eduardo .session SPOF handling
+
+**Don't auto-close everything on session loss.** A transient listener
+outage shouldn't become guaranteed realized loss. Right approach:
+
+- On session loss: **pause new entries immediately**
+- Use **exchange-side SL/TP orders on Binance Futures** so positions stay
+  protected even when our listener is dead. (Memory note:
+  `feedback_stoploss_on_exchange_dryrun.md` warned against this in
+  Freqtrade dry-run mode — irrelevant for live futures.)
+- Alert aggressively
+- After N minutes no-recovery: optionally flatten positions WITHOUT
+  exchange-side protection, never the protected ones.
+
+### Hardening item 2 — Classifier latency determinism (split rule + agent)
+
+**Don't put a Claude agent loop on the critical entry hot path.** Agent
+runtime is less deterministic than a stateless API call. Better:
+
+- Rule fast-path (`classifier.py`, sub-50ms) for COMPLETE opens only
+  (symbol+side+entry+SL+TP in one message, no ambiguity, Binance-valid pair)
+- Claude agent runtime via Max subscription for management messages
+  (close, close_partial, move_sl, increase, multi-coin, replies, breakeven,
+  ambiguous chatter) — latency OK here, more complex semantics
+- Hard timeout with deterministic fallback
+- Persist raw message immediately, classify async where possible
+- Benchmark p50/p95/p99 before going live
+
+This actually USES the Max subscription correctly — agents on heavy lifting
+(reasoning over position state, ambiguous management), not on the
+milliseconds-matter open path.
+
+### Hardening item 3 — Credential isolation in shared image
+
+For the eventual multi-deployment world (ours + Eduardo's own bot from
+same image):
+- Never bake sessions, API keys, stake sizes, or account IDs into image
+  layers
+- Separate `.env`, volumes, logs, dbs, Telegram sessions per deployment
+- Binance keys: **no-withdrawal permission, IP-restricted**
+- Instance identity explicit in every log/alert/order tag (so the two
+  deployments' logs never get confused)
+
+### Codex's revised wiring rules
+
+| Item | Verdict |
+|---|---|
+| Strict-rule fast-path on complete opens | KEEP (latency win) |
+| Claude primary for non-open / ambiguous | KEEP (operational parser) |
+| Market sanity bands (symbol/price band) before exec | KEEP (mandatory bug catcher) |
+| Claude shadow on rule opens → forceexit on disagree | **CHANGE** → log/alert/quarantine only. Block before entry on parser-corruption signal, don't override a successful copy after entry. |
+
+### The biggest risk we're still under-thinking
+
+Codex flagged this as the dominant risk class — bigger than signal quality:
+
+> *"Message semantics drift under leverage: edits, replies, partial closes,
+> 'cancel previous,' multi-target changes, late corrections, and ambiguous
+> 'close half / move BE' instructions being applied to the wrong open
+> position. That is where copy-traders lose money despite good signalers."*
+
+**The actual core product** is not the classifier — it's the **position-link
+graph + idempotency**. Every classification action must reconcile against:
+- msg_id and reply chain
+- symbol, side, entry batch
+- current open position state
+- prior management history
+
+before executing. The LLM's role: given the graph + the message, reason about
+which specific position(s) the leader's action applies to. Execution against
+Freqtrade is deterministic afterward.
+
+The audit spine codex originally called for is not a log file — it's
+first-class state.
+
 ## Classifier benchmark (2026-05-19) — codex-blessed architecture
 
 Ran `classifier.py` (467 lines of curated Python rules) against Claude's
