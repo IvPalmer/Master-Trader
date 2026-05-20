@@ -193,20 +193,59 @@ final coin list.
 - $100-200 max for first deployment.
 - Same demotion rules as every other bot.
 
-## Open decisions
+## Resolved decisions (2026-05-19)
 
-These are the things the user said "we can decide" but haven't. Resolve
-before MVP-3:
+All 5 of the original open items resolved with the user in the post-travel
+review session.
 
-1. **Position sizing.** Fixed $ per trade, fixed % of free balance, or scale
-   by R:R? User said "not important right now" but MVP-3 needs an answer.
-2. **"By market" entries** (~25% of opens). Take immediate market order, or
-   skip? Recommendation: take, but only if signal includes SL.
-3. **Multi-coin updates** ("BTC and ETH, close 30%"). Fan out the action.
-   The LLM provides `applies_to`; the receiver needs to iterate.
-4. **VPS region** for the listener — Eduardo's country. (Marginal for v1.)
-5. **Re-verify Binance Futures coverage** from a non-blocked IP. PUMP/FF/MNT
-   absence on Binance Futures came from testnet; could be stale.
+### 1. Position sizing — RISK-BUDGET, SCALED 5× DOWN
+
+Replicate Eduardo's `stake = risk_$ / SL_distance_pct` model proportionally
+to our wallet:
+
+| Param | Eduardo's prototype | Ours (MVP-3) |
+|---|---|---|
+| Account size | $1,000 | $200 |
+| Risk per trade | $10 | **$2** |
+| Notional margin | $50 | **$10** |
+| Leverage formula | `risk / SL_distance_pct` | same |
+
+Preserves his R:R backtest math (median R:R 3.15, +18.81% in 30 days).
+Variable leverage by design — 0.5% SL trade gets 20×, 5% SL trade gets 2×.
+This is the same risk-equalization mechanic that worked in his replay.
+
+### 2. Market entries — TAKE, only if explicit SL present
+
+Market signals are where the LLM's edge over regex came from (+$42.73 / +4.27pp
+of the +$230 total). Wire it to take immediate market order at the signal
+timestamp **only if the signal carries an explicit SL**. No SL → skip (can't
+size safely under the risk-budget model).
+
+### 3. Multi-coin signals — FAN OUT per coin
+
+LLM provides `applies_to=["BTC", "ETH"]`. Receiver iterates: each action
+(close 30%, move SL, etc.) gets applied to every coin in the list. Loses
+0 signal coverage and matches Eduardo's intent.
+
+### 4. Listener VPS — EXISTING Elder Brain VPS
+
+Telegram delivery is region-agnostic. Binance Futures works from Oracle IPs
+(verified 24/25 USDT-M perps reachable from the VPS — see decision #5).
+No reason to spin up a separate region-matched box for v1.
+
+### 5. Binance Futures coverage — RE-VERIFIED FROM VPS (2026-05-19)
+
+Production Binance Futures USDT-M perps list (527 total): **24/25 Eduardo
+coins available**. Testnet number (18/23) was stale — production has HYPE,
+FARTCOIN, PUMP, FF.
+
+```
+Available: BTC ETH SOL BNB XRP ADA DOGE LINK AVAX NEAR SUI HBAR LTC BCH
+           TRX UNI ARB ENA ZEC TAO HYPE FARTCOIN PUMP FF
+MISSING:   MNT
+```
+
+Skip-list for v1: just `MNT`. <1% of signal volume.
 
 ## How to onboard yourself (new session, fresh clone)
 
