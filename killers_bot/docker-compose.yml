@@ -1,0 +1,25 @@
+services:
+  killers-bot:
+    build: .
+    image: killers-bot:latest
+    container_name: killers-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - killers_state:/var/lib/killers
+      # .session mounted as a "secret" (read-only). Owner uid=1000 (killers user).
+      # Place encrypted .session on host at ./secrets/killers.session before starting.
+      - ./secrets/killers.session:/run/secrets/killers.session:ro
+      # Mount the claude CLI from the host or include it in the image.
+      # On the VPS, claude-cli lives in the elder-brain-bot container; we'll
+      # need to either install it into THIS image or pivot the classifier to
+      # call a separate sidecar. TBD before deploy.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  killers_state:
