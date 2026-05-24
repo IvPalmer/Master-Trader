@@ -27,6 +27,7 @@ Market-entry policy:
   recovers the ~25% of "by market" trades that the regex skipped.
 """
 import json
+import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -46,9 +47,18 @@ MARGIN_PER_TRADE = 50.0
 OPEN_MERGE_WINDOW_SECONDS = 1800  # 30 minutes
 
 
+CLASSIFICATIONS_GLOB = os.environ.get(
+    "CLASSIFICATIONS_GLOB", "classifications_*.jsonl"
+)
+MESSAGES_PATH = os.environ.get(
+    "MESSAGES_PATH", str(LOCAL / "last_month_messages.json")
+)
+OUTPUT_PATH = os.environ.get("OUTPUT_PATH", str(OUT / "trades_llm.json"))
+
+
 def load_classifications():
     cls = {}
-    for path in sorted(OUT.glob("classifications_*.jsonl")):
+    for path in sorted(OUT.glob(CLASSIFICATIONS_GLOB)):
         for line in path.read_text().splitlines():
             line = line.strip()
             if not line:
@@ -59,7 +69,7 @@ def load_classifications():
 
 
 def load_messages():
-    content = (LOCAL / "last_month_messages.json").read_text()
+    content = Path(MESSAGES_PATH).read_text()
     msgs, _ = json.JSONDecoder().raw_decode(content)
     return msgs
 
@@ -349,7 +359,8 @@ def main():
         "trades": out_trades,
     }
 
-    op = OUT / "trades_llm.json"
+    op = Path(OUTPUT_PATH)
+    op.parent.mkdir(parents=True, exist_ok=True)
     op.write_text(json.dumps(out, indent=2, default=str))
     print(f"wrote {op}", flush=True)
     print(f"PnL: ${pnl_total:.2f}  ({pnl_total / ACCOUNT * 100:.2f}% on ${ACCOUNT:.0f})")
