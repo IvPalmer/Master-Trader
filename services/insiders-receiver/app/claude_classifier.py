@@ -33,6 +33,8 @@ logger = logging.getLogger(__name__)
 CLAUDE_PROMPT_TEMPLATE = """\
 You are classifying a Telegram message from a private trading signals group.
 The group leader posts trading instructions; we mirror them to a bot.
+Two channel formats are supported — VARIANT A (Insiders Scalp, manual-trader
+narration) and VARIANT B (Binance Killers VIP, structured #NNNN format).
 
 Return a SINGLE JSON OBJECT, nothing else (no prose, no markdown).
 Schema:
@@ -47,16 +49,29 @@ Schema:
   sl: optional number (or "breakeven" for move_sl)
   tp: optional number
   pct: required percent for close_partial (0-100)
+  signal_id: optional int (extract whenever #NNNN appears in text)
   confidence: 0.0-1.0
 
-Strict rules:
-  - Bare "stop" / "stopped" / "stop-loss" in narrative text → "chat", NOT close
+VARIANT A — Insiders Scalp (manual-trader vocabulary):
+  - Bare "stop" / "stopped" / "stop-loss" in narrative → "chat", NOT close
   - "Got stopped", "stopped out", "fully closed", "close all" → "close_full"
   - "Close 30%", "close half" → "close_partial" with pct
   - "Move SL to X", "stop at breakeven" → "move_sl"
-  - Multi-coin headers like "BTC and ETH Shorts" → "open" with applies_to=["BTC","ETH"]
+  - Multi-coin headers "BTC and ETH Shorts" → "open" with applies_to=["BTC","ETH"]
   - Reply messages with just numbers (entry/SL/TP) → "open" detail-fill
-    using parent symbol+direction; emit with the symbol/direction filled in
+    using parent symbol+direction
+
+VARIANT B — Binance Killers VIP (structured #NNNN format):
+  - Headers `📍SIGNAL ID: #NNNN📍 | COIN: $X/USDT | Direction: LONG📈`
+    with ENTRY range, TARGETS Short/Mid Term, STOP LOSS → "open"
+    (extract signal_id from #NNNN; symbol from $X strip /USDT)
+  - `📍SIGNAL ID: #NNNN📍 | Target N: X✅ | 🔥X% Profit (Yx)🔥` → "close_partial"
+    (extract signal_id; pct=null; realized % goes in notes)
+  - Bare `CLOSE` → "close_full" (resolve symbol from context if possible)
+  - "stop loss hit" / "Stop Loss Triggered" → "close_full"
+  - "VIP MARKET/TRADES UPDATE", "VIP UPDATE: $X" commentary → "chat"
+    EXCEPT explicit "move stop loss to breakeven" → "move_sl" sl="breakeven"
+  - "IMPORTANT" boilerplate, "$BTC.D" dominance commentary → "chat"
 
 Current OPEN POSITIONS in our book (for resolving management actions):
 {positions_json}
