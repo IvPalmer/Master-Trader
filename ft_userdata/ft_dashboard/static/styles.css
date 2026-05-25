@@ -194,6 +194,10 @@ button { font: inherit; cursor: pointer; }
   color: var(--text-3); border: 1px solid var(--border-soft);
 }
 .tab.on .badge { background: var(--accent-soft); color: var(--accent); border-color: rgba(34, 211, 238, 0.2); }
+.tab .badge.badge-live { background: var(--pos-soft); color: var(--pos); border-color: rgba(52,211,153,0.25); }
+.tab .badge.badge-dry  { background: var(--surface-2); color: var(--text-3); border-color: var(--border-soft); }
+.tab.on .badge.badge-live { background: var(--pos-soft); color: var(--pos); border-color: rgba(52,211,153,0.35); }
+.tab.on .badge.badge-dry  { background: var(--surface-3); color: var(--text-2); }
 
 /* bot sub-nav within a summary tab */
 .subnav {

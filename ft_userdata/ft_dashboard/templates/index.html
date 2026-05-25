@@ -60,7 +60,7 @@
   </header>
 
   <!-- ── nav ─────────────────────────────────────── -->
-  <!-- T4: 3 primary tabs; per-bot tabs inside via selector -->
+  <!-- one row: 3 aggregate tabs + one tab per bot, badge LIVE/DRY -->
   <nav class="tabs">
     <button class="tab" :class="tab==='live'?'on':''" @click="setTab('live')">
       live <span class="badge" x-text="liveBots.length">0</span>
@@ -71,15 +71,19 @@
     <button class="tab" :class="tab==='trades'?'on':''" @click="setTab('trades')">
       trades <span class="badge" x-text="closedTrades.length">0</span>
     </button>
-    <!-- per-bot detail tabs as subnav inside same bar -->
-    <div style="flex:1"></div>
     <template x-for="b in allBots" :key="b.key">
       <button class="tab"
               :class="tab===('bot:'+b.key)?'on':''"
-              @click="setTab('bot:'+b.key)"
-              x-text="b.label || b.name">—</button>
+              @click="setTab('bot:'+b.key)">
+        <span x-text="b.label || b.name">—</span>
+        <span class="badge"
+              :class="b.dry_run ? 'badge-dry' : 'badge-live'"
+              x-text="b.dry_run ? 'DRY' : 'LIVE'">DRY</span>
+      </button>
     </template>
-    <button class="tab" :class="tab==='killers'?'on':''" @click="setTab('killers')">killers</button>
+    <button class="tab" :class="tab==='killers'?'on':''" @click="setTab('killers')">
+      killers <span class="badge badge-dry">DRY</span>
+    </button>
   </nav>
 
   <!-- G1: delta strip — what changed since last visit -->
