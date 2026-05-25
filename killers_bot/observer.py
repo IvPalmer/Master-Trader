@@ -100,7 +100,7 @@ def persist_raw(conn: sqlite3.Connection, msg: dict) -> None:
             str(msg.get("date")) if msg.get("date") else None,
             str(msg.get("edit_date")) if msg.get("edit_date") else None,
             msg.get("reply_to_msg_id"),
-            msg.get("text"),
+            msg.get("message") or msg.get("text"),
             json.dumps(msg, default=str),
         ),
     )
@@ -177,6 +177,10 @@ async def build_reply_chain(client, channel_id, conn, msg_dict: dict, depth: int
 
 
 async def process_message(client, channel_id, conn, config, msg_dict: dict, source: str) -> None:
+    # Telethon's to_dict() puts message content in the 'message' key, not 'text'.
+    # Mirror it onto 'text' for downstream callers (classifier prompt, snippet).
+    if not msg_dict.get("text") and msg_dict.get("message"):
+        msg_dict["text"] = msg_dict["message"]
     persist_raw(conn, msg_dict)
     snippet = (msg_dict.get("text") or "")[:80].replace("\n", " ⏎ ")
     logger.info("[MSG %s] id=%d %r", source.upper(), msg_dict["id"], snippet)

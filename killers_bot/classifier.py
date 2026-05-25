@@ -90,7 +90,7 @@ def build_prompt(msg: dict, reply_chain: list[dict]) -> str:
         msg_id=msg.get("id"),
         posted_at=str(msg.get("date")) if msg.get("date") else None,
         reply_to_msg_id=msg.get("reply_to_msg_id"),
-        text=(msg.get("text") or "")[:2000],
+        text=(msg.get("text") or msg.get("message") or "")[:2000],
     )
 
 
