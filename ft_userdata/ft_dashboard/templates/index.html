@@ -57,6 +57,10 @@
       trades
       <span class="badge" x-text="closedTrades.length">0</span>
     </button>
+    <button class="tab" :class="tab === 'killers' ? 'on' : ''" @click="setTab('killers')">
+      killers
+      <span class="badge" x-text="killers && !killers.error ? (killers.msg_count || 0) : '·'">·</span>
+    </button>
   </nav>
 
   <!-- ══════════════ LIVE TAB ══════════════ -->
@@ -512,6 +516,163 @@
         no closed trades yet
       </div>
     </div>
+
+  </main>
+
+  <!-- ══════════════ KILLERS TAB ══════════════ -->
+  <main class="tab-panel" x-show="tab === 'killers'" x-cloak>
+
+    <!-- error state -->
+    <div x-show="killers && killers.error" x-cloak class="empty">
+      <div class="icon">⚠</div>
+      <div>
+        killers_bot state unavailable
+        <div style="font-size: 11px; color: var(--muted); margin-top: 6px;"
+             x-text="killers && (killers.error + (killers.expected_at ? (' · ' + killers.expected_at) : ''))"></div>
+        <div style="font-size: 11px; color: var(--muted); margin-top: 6px;">
+          observer logs: <code>ssh ubuntu@100.96.225.124 tail -f /home/ubuntu/killers-bot/observer.log</code>
+        </div>
+      </div>
+    </div>
+
+    <template x-if="killers && !killers.error">
+      <div>
+
+        <!-- headline tiles -->
+        <div class="metrics">
+          <div class="metric accent">
+            <div class="label">channel messages</div>
+            <div class="value num" x-text="killers.msg_count.toLocaleString()">0</div>
+            <div class="footnote">classified <span class="num" x-text="killers.classification_count.toLocaleString()"></span> · 100% coverage</div>
+          </div>
+          <div class="metric" :class="killers.positions.open > 0 ? 'accent' : ''">
+            <div class="label">paper positions open</div>
+            <div class="value num" x-text="killers.positions.open">0</div>
+            <div class="footnote">closed <span class="num" x-text="killers.positions.closed"></span></div>
+          </div>
+          <div class="metric" :class="(killers.positions.realized_pnl_total_usd || 0) >= 0 ? 'pos' : 'neg'">
+            <div class="label">paper p&l · realized</div>
+            <div class="value num" :class="(killers.positions.realized_pnl_total_usd || 0) >= 0 ? 'pos' : 'neg'"
+                 x-text="fmtUsdSigned(killers.positions.realized_pnl_total_usd || 0)">—</div>
+            <div class="footnote">on closed paper trades</div>
+          </div>
+          <div class="metric">
+            <div class="label">last channel msg</div>
+            <div class="value num" style="font-size: 16px;"
+                 x-text="killers.last_msg ? new Date(killers.last_msg.posted_at).toISOString().slice(11, 19) + ' utc' : '—'">—</div>
+            <div class="footnote" x-text="killers.last_msg ? ('msg ' + killers.last_msg.msg_id) : 'no messages yet'"></div>
+          </div>
+        </div>
+
+        <!-- classification kind distribution -->
+        <div class="grid">
+          <div class="card col-6">
+            <div class="card-head">
+              <div>
+                <div class="card-title">classification kinds</div>
+                <div class="card-sub">live distribution since observer start</div>
+              </div>
+            </div>
+            <div style="padding: 8px 4px;">
+              <template x-for="kind in ['open','close_full','close_partial','move_sl','increase','chat']" :key="kind">
+                <div style="display:flex; align-items:center; gap:10px; padding: 4px 0; font-size: 12px;">
+                  <div style="width: 96px;" x-text="kind"></div>
+                  <div style="flex:1; height: 6px; background: var(--panel-2, #1a1f2b); border-radius:3px; overflow:hidden;">
+                    <div :style="`width: ${(killers.kind_distribution[kind] || 0) * 100 / Math.max(1, killers.classification_count)}%; height: 100%; background: var(--accent);`"></div>
+                  </div>
+                  <div class="num" style="width: 60px; text-align: right;"
+                       x-text="(killers.kind_distribution[kind] || 0) + ''"></div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="card col-6">
+            <div class="card-head">
+              <div>
+                <div class="card-title">recent paper positions</div>
+                <div class="card-sub">20 most recent · key = (signal_id, symbol)</div>
+              </div>
+            </div>
+            <div style="overflow-x: auto;">
+              <table class="trades">
+                <thead>
+                  <tr>
+                    <th>state</th><th>signal</th><th>sym</th><th>side</th>
+                    <th class="r">entry</th><th class="r">sl</th><th class="r">lev</th>
+                    <th class="r">realized %</th><th class="r">$ pnl</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="p in killers.recent_positions" :key="p.pos_id">
+                    <tr>
+                      <td><span :class="p.state === 'open' ? 'pos' : (p.close_reason === 'sl_hit' ? 'neg' : 'muted')"
+                                x-text="p.state"></span></td>
+                      <td class="muted num" x-text="p.signal_id ? ('#' + p.signal_id) : '—'"></td>
+                      <td><b x-text="p.symbol || '—'"></b></td>
+                      <td :class="(p.direction || '').toLowerCase() === 'long' ? 'pos' : 'neg'"
+                          x-text="(p.direction || '—').toUpperCase()"></td>
+                      <td class="r num" x-text="p.entry_mid ? Number(p.entry_mid).toPrecision(5) : '—'"></td>
+                      <td class="r num muted" x-text="p.sl ? Number(p.sl).toPrecision(5) : '—'"></td>
+                      <td class="r num muted" x-text="p.leverage ? p.leverage.toFixed(1) + 'x' : '—'"></td>
+                      <td class="r num" :class="(p.realized_pct || 0) >= 0 ? 'pos' : 'neg'"
+                          x-text="p.realized_pct != null ? (Number(p.realized_pct).toFixed(2) + '%') : '—'"></td>
+                      <td class="r num" :class="(p.realized_pnl || 0) >= 0 ? 'pos' : 'neg'"
+                          x-text="p.realized_pnl != null ? fmtUsdSigned(p.realized_pnl) : '—'"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+              <div x-show="!killers.recent_positions.length" x-cloak class="empty" style="padding: 20px 0;">
+                no paper positions yet · waiting for next channel signal
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- recent classifications feed -->
+        <div class="card col-12" style="margin-top: 14px;">
+          <div class="card-head">
+            <div>
+              <div class="card-title">recent classifications</div>
+              <div class="card-sub">latest 20 messages from the channel · auto-refresh 15s</div>
+            </div>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="trades">
+              <thead>
+                <tr>
+                  <th>msg id</th><th>classified</th><th>kind</th>
+                  <th>signal</th><th>sym</th><th>dir</th><th class="r">conf</th>
+                  <th style="width: 50%;">text</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="c in killers.recent_classifications" :key="c.msg_id">
+                  <tr>
+                    <td class="muted num" x-text="c.msg_id"></td>
+                    <td class="muted num" x-text="c.classified_at ? c.classified_at.slice(11, 19) : '—'"></td>
+                    <td><span :class="c.kind === 'open' ? 'accent' : (c.kind === 'chat' ? 'muted' : 'pos')"
+                              x-text="c.kind"></span></td>
+                    <td class="muted num" x-text="c.signal_id ? ('#' + c.signal_id) : '—'"></td>
+                    <td><b x-text="c.symbol || '—'"></b></td>
+                    <td :class="(c.direction || '').toLowerCase() === 'long' ? 'pos' : ((c.direction || '').toLowerCase() === 'short' ? 'neg' : 'muted')"
+                        x-text="(c.direction || '—').toUpperCase()"></td>
+                    <td class="r num" x-text="c.confidence != null ? Number(c.confidence).toFixed(2) : '—'"></td>
+                    <td class="muted" style="font-size: 11px;"
+                        x-text="(c.text || '').replace(/\s+/g, ' ').slice(0, 160)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            <div x-show="!killers.recent_classifications.length" x-cloak class="empty" style="padding: 20px 0;">
+              channel idle — no messages classified yet since observer started
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </template>
 
   </main>
 

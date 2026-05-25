@@ -169,8 +169,12 @@ services:
       FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
       POLL_INTERVAL: "30"
       OVERLAYS_DIR: /overlays
+      KILLERS_DB: /var/lib/killers/state.sqlite
     volumes:
       - ./overlays:/overlays:ro
+      # killers_bot SQLite (read-only) so the dashboard can render the
+      # observer-bot's state alongside the Freqtrade fleet.
+      - /home/ubuntu/killers-bot/state.sqlite:/var/lib/killers/state.sqlite:ro
     deploy:
       resources:
         limits:

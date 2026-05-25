@@ -567,6 +567,82 @@ _ALLOWED_TIMEFRAMES = {"1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"}
 _PAIR_RE = re.compile(r"^[A-Z0-9]{2,15}/(USDT|USDC|BTC|ETH|BUSD)$")
 
 
+# ── killers_bot observer state ────────────────────────────────────────────
+# Observer-only bot listening to Binance Killers VIP channel. Not a
+# Freqtrade instance — has its own SQLite. Mounted read-only at KILLERS_DB.
+
+import sqlite3 as _sqlite
+
+KILLERS_DB = os.environ.get("KILLERS_DB", "/var/lib/killers/state.sqlite")
+
+
+@app.get("/api/killers/state")
+async def api_killers_state():
+    """Compact summary of the killers_bot observer + paper positions."""
+    db_path = Path(KILLERS_DB)
+    if not db_path.exists():
+        return JSONResponse({"error": "killers db not mounted",
+                             "expected_at": str(db_path)}, status_code=404)
+
+    try:
+        conn = _sqlite.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn.row_factory = _sqlite.Row
+    except _sqlite.Error as e:
+        return JSONResponse({"error": f"sqlite open: {e}"}, status_code=500)
+
+    try:
+        msg_count = conn.execute("SELECT COUNT(*) FROM raw_messages").fetchone()[0]
+        cls_count = conn.execute("SELECT COUNT(*) FROM classifications").fetchone()[0]
+        last_msg = conn.execute(
+            "SELECT msg_id, received_at, posted_at, text FROM raw_messages "
+            "ORDER BY msg_id DESC LIMIT 1"
+        ).fetchone()
+        kinds = {row["kind"]: row["n"] for row in conn.execute(
+            "SELECT kind, COUNT(*) AS n FROM classifications GROUP BY kind"
+        )}
+        positions_open = conn.execute(
+            "SELECT COUNT(*) FROM paper_positions WHERE state IN ('open','pending')"
+        ).fetchone()[0]
+        positions_closed = conn.execute(
+            "SELECT COUNT(*) FROM paper_positions WHERE state = 'closed'"
+        ).fetchone()[0]
+        realized_pnl_total = conn.execute(
+            "SELECT COALESCE(SUM(realized_pnl), 0) FROM paper_positions WHERE state = 'closed'"
+        ).fetchone()[0]
+        recent_classifications = [dict(r) for r in conn.execute(
+            "SELECT c.msg_id, c.classified_at, c.kind, c.signal_id, c.symbol, "
+            "       c.direction, c.confidence, "
+            "       substr(m.text, 1, 200) AS text "
+            "FROM classifications c "
+            "LEFT JOIN raw_messages m ON m.msg_id = c.msg_id "
+            "ORDER BY c.msg_id DESC LIMIT 20"
+        )]
+        recent_positions = [dict(r) for r in conn.execute(
+            "SELECT pos_id, signal_id, symbol, direction, state, "
+            "       open_msg_id, open_date, entry_mid, sl, leverage, "
+            "       position_notional, realized_pct, realized_pnl, "
+            "       close_reason, last_event_at "
+            "FROM paper_positions ORDER BY pos_id DESC LIMIT 20"
+        )]
+    finally:
+        conn.close()
+
+    return JSONResponse({
+        "ok": True,
+        "msg_count": msg_count,
+        "classification_count": cls_count,
+        "last_msg": dict(last_msg) if last_msg else None,
+        "kind_distribution": kinds,
+        "positions": {
+            "open": positions_open,
+            "closed": positions_closed,
+            "realized_pnl_total_usd": round(realized_pnl_total or 0, 2),
+        },
+        "recent_classifications": recent_classifications,
+        "recent_positions": recent_positions,
+    })
+
+
 @app.get("/api/closed_trades")
 async def api_closed_trades():
     """Aggregate closed trades across the fleet for the trades tab.

@@ -26,7 +26,9 @@ function dash() {
   return {
     raw: { bots: {}, errors: {}, last_poll: null },
     pollInterval: 30,
-    tab: ['#dryrun', '#trades'].includes(location.hash) ? location.hash.slice(1) : 'live',
+    tab: ['#dryrun', '#trades', '#killers'].includes(location.hash) ? location.hash.slice(1) : 'live',
+    killers: null,        // observer-bot state from /api/killers/state
+    _killersPollMs: 15000,
     clock: '—',
     equityBot: null,
     closedTrades: [],
@@ -50,9 +52,12 @@ function dash() {
         this.renderCharts();
       }), this.pollInterval * 1000);
       window.addEventListener('hashchange', () => {
-        this.tab = ['#dryrun', '#trades'].includes(location.hash) ? location.hash.slice(1) : 'live';
+        this.tab = ['#dryrun', '#trades', '#killers'].includes(location.hash) ? location.hash.slice(1) : 'live';
         this.$nextTick(() => this.renderCharts());
       });
+      // killers tab — independent poll loop (cheap)
+      this.fetchKillers();
+      setInterval(() => this.fetchKillers(), this._killersPollMs);
       window.addEventListener('resize', () => {
         // Charts can fail resize if a series is mid-update or has stale
         // state from a previous tab. Swallow per-chart errors so one bad
@@ -80,6 +85,14 @@ function dash() {
         const r = await fetch('/api/state', { cache: 'no-store' });
         if (r.ok) this.raw = await r.json();
       } catch (e) { console.warn('refresh', e); }
+    },
+
+    async fetchKillers() {
+      try {
+        const r = await fetch('/api/killers/state', { cache: 'no-store' });
+        if (r.ok) this.killers = await r.json();
+        else this.killers = { error: 'unreachable', status: r.status };
+      } catch (e) { this.killers = { error: String(e) }; }
     },
 
     // ─── derived ───
