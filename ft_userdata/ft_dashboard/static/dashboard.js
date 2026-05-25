@@ -26,7 +26,10 @@ function dash() {
   return {
     raw: { bots: {}, errors: {}, last_poll: null },
     pollInterval: 30,
-    tab: ['#dryrun', '#trades', '#killers'].includes(location.hash) ? location.hash.slice(1) : 'live',
+    // Tab values: live-summary | dry-summary | trades | bot
+    // For 'bot', _currentBotKey selects which bot to render.
+    tab: 'live-summary',
+    _currentBotKey: null,
     killers: null,        // observer-bot state from /api/killers/state
     _killersPollMs: 15000,
     clock: '—',
@@ -52,9 +55,11 @@ function dash() {
         this.renderCharts();
       }), this.pollInterval * 1000);
       window.addEventListener('hashchange', () => {
-        this.tab = ['#dryrun', '#trades', '#killers'].includes(location.hash) ? location.hash.slice(1) : 'live';
+        this._applyHash();
         this.$nextTick(() => this.renderCharts());
       });
+      // Apply initial hash now that boot is running
+      this._applyHash();
       // killers tab — independent poll loop (cheap)
       this.fetchKillers();
       setInterval(() => this.fetchKillers(), this._killersPollMs);
@@ -71,7 +76,32 @@ function dash() {
     },
     setTab(t) {
       this.tab = t;
-      location.hash = t === 'live' ? '' : '#' + t;
+      this._currentBotKey = null;
+      location.hash = (t === 'live-summary') ? '' : '#' + t;
+    },
+    selectBot(key) {
+      this.tab = 'bot';
+      this._currentBotKey = key;
+      location.hash = '#bot=' + key;
+      this.$nextTick(() => this.renderCharts());
+    },
+    _applyHash() {
+      const h = location.hash.slice(1);  // strip leading '#'
+      if (h.startsWith('bot=')) {
+        this.tab = 'bot';
+        this._currentBotKey = h.slice(4);
+        return;
+      }
+      if (['dry-summary', 'trades'].includes(h)) {
+        this.tab = h;
+        this._currentBotKey = null;
+        return;
+      }
+      // Backwards-compat with old hash values
+      if (h === 'dryrun') { this.tab = 'dry-summary'; this._currentBotKey = null; return; }
+      if (h === 'killers') { this.tab = 'bot'; this._currentBotKey = 'killers'; return; }
+      this.tab = 'live-summary';
+      this._currentBotKey = null;
     },
     setTradesFilter(f) { this.tradesFilter = f; this.$nextTick(() => this.renderCharts()); },
     tickClock() {
@@ -170,6 +200,69 @@ function dash() {
         }
       }
       return out;
+    },
+
+    // ─── per-bot helpers (for the per-bot tabs) ───
+    botByKey(key) { return this.bots.find(b => b.key === key); },
+    botBadge(bot) {
+      if (!bot) return { label: '?', cls: 'muted' };
+      if (bot.key === 'killers') return { label: 'OBS', cls: 'accent' };
+      return bot.dry_run ? { label: 'DRY', cls: 'muted' } : { label: 'LIVE', cls: 'pos' };
+    },
+    botHero(bot) {
+      if (!bot || !bot.wallet) return {
+        walletNow: 0, walletStart: 0, totalPnl: 0, totalPct: 0,
+        closedTrades: 0, winRate: 0, profitFactor: 0,
+        drawdownMaxPct: 0, drawdownCurrentPct: 0, drawdownBacktest: 0, drawdownCap: 0,
+        openCount: 0, openNotional: 0, capitalAtRisk: 0, capitalAtRiskPct: 0,
+        concentration: null,
+        avgWin: 0, avgLoss: 0, payoff: 0, expectancyPerTrade: 0, expectancySample: 0,
+      };
+      const start = bot.wallet.starting_capital;
+      const owned = bot.wallet.bot_owned;
+      const walletNow = owned > 0 ? owned : start;
+      const totalPnl = walletNow - start;
+      const wins = bot.stats?.winning_trades || 0;
+      const losses = bot.stats?.losing_trades || 0;
+      const winRate = (wins + losses) ? wins / (wins + losses) : 0;
+      const ddMax = (bot.stats?.max_drawdown || 0) * 100;
+      const dd = bot.drawdown_curve;
+      const ddCurrent = dd && dd.length ? dd[dd.length - 1][1] : 0;
+      const ddBacktest = bot.baseline?.max_dd_pct || 0;
+      const open = (bot.open_trades || []).length;
+      const openNotional = (bot.open_trades || []).reduce((a, t) => a + (t.stake_amount || 0), 0);
+      const car = bot.capital_at_risk?.abs_loss || 0;
+      return {
+        walletNow, walletStart: start, totalPnl,
+        totalPct: start ? (totalPnl / start * 100) : 0,
+        closedTrades: bot.stats?.closed_trade_count || 0,
+        winRate,
+        profitFactor: bot.stats?.profit_factor || 0,
+        drawdownMaxPct: ddMax, drawdownCurrentPct: ddCurrent,
+        drawdownBacktest: ddBacktest, drawdownCap: ddBacktest * 1.5,
+        openCount: open, openNotional,
+        capitalAtRisk: car, capitalAtRiskPct: start ? (car / start * 100) : 0,
+        concentration: bot.concentration,
+        avgWin: bot.expectancy?.avg_win || 0,
+        avgLoss: bot.expectancy?.avg_loss || 0,
+        payoff: bot.expectancy?.payoff || 0,
+        expectancyPerTrade: bot.expectancy?.expectancy || 0,
+        expectancySample: bot.expectancy?.sample || 0,
+      };
+    },
+    get currentBot() { return this.botByKey(this._currentBotKey); },
+    get currentBotHero() { return this.botHero(this.currentBot); },
+    get currentBotOpenPositions() {
+      const b = this.currentBot;
+      if (!b) return [];
+      return (b.open_trades || []).map(t => ({ ...t, _bot: b.key }));
+    },
+    get currentBotRecentTrades() {
+      const b = this.currentBot;
+      if (!b) return [];
+      return [...(b.recent_trades || [])]
+        .sort((a, b2) => (b2.close_timestamp || 0) - (a.close_timestamp || 0))
+        .slice(0, 30);
     },
     openPosKey: null,
     setOpenPos(p) {
