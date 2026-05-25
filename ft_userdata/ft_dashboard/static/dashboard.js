@@ -27,8 +27,6 @@ const ECHART_COMMON = {
 function dash() {
   return {
     raw: { bots: {}, errors: {}, last_poll: null },
-    killersRaw: null,
-    _killersPollMs: 15000,
     pollInterval: 30,
     tab: '',
     clock: '—',
@@ -52,15 +50,12 @@ function dash() {
       this.refresh().then(() => {
         this.equityBot = this.liveBots[0]?.key || null;
         this.fetchClosedTrades();
-        this.fetchKillers();
         this.$nextTick(() => this.renderCharts());
       });
       setInterval(() => this.refresh().then(() => {
         this.fetchClosedTrades();
-        this.fetchKillers();
         this.renderCharts();
       }), this.pollInterval * 1000);
-      setInterval(() => this.fetchKillers(), this._killersPollMs);
       window.addEventListener('hashchange', () => {
         this.tab = location.hash.slice(1) || 'live';
         this.$nextTick(() => this.renderCharts());
@@ -78,12 +73,6 @@ function dash() {
       location.hash = t === 'live' ? '' : t;
     },
 
-    async fetchKillers() {
-      try {
-        const r = await fetch('/api/killers/state', { cache: 'no-store' });
-        if (r.ok) this.killersRaw = await r.json();
-      } catch { /* killers endpoint optional */ }
-    },
     setTradesFilter(f) { this.tradesFilter = f; this.$nextTick(() => this.renderCharts()); },
     tickClock() {
       const d = new Date();
@@ -116,8 +105,6 @@ function dash() {
           return (a.label||'').localeCompare(b.label||'');
         });
     },
-    get killersData() { return this.killersRaw || null; },
-
     // ─── C1 fix: fleet-aggregated hero stats ───
     get hero() {
       const live = this.liveBots;
@@ -283,25 +270,7 @@ function dash() {
         }
       }
 
-      // 5. Newest live signal in last 30 minutes — BLUE
-      // Killers state is fetched separately into this.killersRaw, not raw.killers.
-      const killersRaw = this.killersRaw;
-      if (killersRaw?.recent_signals?.length) {
-        const sig = killersRaw.recent_signals[0];
-        const sigAge = now - (sig.ts || 0);
-        if (sigAge < 1800) {
-          items.push({
-            color: 'blue',
-            icon: '↗',
-            subject: `${sig.pair || '?'} ${sig.direction || 'signal'} · killers`,
-            reason: `${Math.round(sigAge / 60)}m ago`,
-            cta: 'view signals',
-            action: () => { this.setTab('dryrun'); },
-          });
-        }
-      }
-
-      // 6. Observational bots with no baseline — BLUE (low urgency)
+      // 5. Observational bots with no baseline — BLUE (low urgency)
       for (const b of this.dryRunBots) {
         if (b.observational && !b.baseline?.profit_factor) {
           items.push({
@@ -534,8 +503,6 @@ function dash() {
         this.dryRunBots.forEach(b => this.renderBotEquity(b.key));
       } else if (t === 'trades') {
         this.renderTradesCharts();
-      } else if (t === 'killers') {
-        this.renderKillersCharts();
       } else if (t.startsWith('bot:')) {
         const key = t.slice(4);
         this.renderDetailCharts(key);
@@ -1273,100 +1240,6 @@ function dash() {
           series: [{ type: 'bar', data: [...pnls].reverse(), itemStyle: { color: p => Number(p.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] }, label: { show: true, position: 'right', formatter: p => '$' + Number(p.value).toFixed(2), color: COLORS.text2, fontSize: 10, fontFamily: 'JetBrains Mono' }, barWidth: 12 }],
         }, true);
       }
-    },
-
-    // ─── killers tab charts ───
-    renderKillersCharts() {
-      this.renderKillersEquity();
-      this.renderKillersArrival();
-      this.renderKillersKinds();
-      this.renderKillersPairPnl();
-    },
-
-    renderKillersEquity() {
-      const kd = this.killersData;
-      if (!kd) return;
-      const chart = this._ensureChart('chart-killers-equity');
-      if (!chart) return;
-      const raw = (kd.paper_pnl_history || []).map(p => [new Date(p.ts || p[0]), p.equity ?? p[1]]);
-      if (!raw.length) { this._renderEmptyChart(chart, 'no paper trades yet'); return; }
-      const walletStart = kd.wallet_start ?? 1000;
-      const closedCount = kd.paper_trade_count ?? 0;
-      let yMin, yMax;
-      if (closedCount < 3) {
-        yMin = walletStart * 0.97; yMax = walletStart * 1.05;
-      } else {
-        const vals = raw.map(p => p[1]);
-        const spread = Math.max(...vals) - Math.min(...vals);
-        const pad = Math.max(spread * 0.08, walletStart * 0.01);
-        yMin = Math.min(...vals) - pad; yMax = Math.max(...vals) + pad;
-      }
-      chart.setOption({
-        ...ECHART_COMMON, animation: false,
-        tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: v => v != null ? '$' + Number(v).toFixed(2) : '—' },
-        grid: { left: 60, right: 18, top: 18, bottom: 30 },
-        xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { show: false } },
-        yAxis: { type: 'value', min: yMin, max: yMax, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.4 } } },
-        series: [{ type: 'line', data: raw, showSymbol: false, smooth: false, lineStyle: { color: COLORS.warn, width: 2 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(217,119,6,0.18)' }, { offset: 1, color: 'rgba(217,119,6,0)' }]) } }],
-      }, true);
-    },
-
-    renderKillersArrival() {
-      const kd = this.killersData;
-      if (!kd) return;
-      const chart = this._ensureChart('chart-killers-arrival');
-      if (!chart) return;
-      const data = (kd.arrival_rate_data || []);
-      if (data.length <= 1) return;
-      const interval = Math.max(0, Math.floor(data.length / 6) - 1);
-      const dates  = data.map(d => d.date || d[0]);
-      const counts = data.map(d => d.count ?? d[1]);
-      chart.setOption({
-        ...ECHART_COMMON, animation: false,
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface, borderColor: COLORS.border, textStyle: { color: COLORS.text, fontSize: 11 } },
-        grid: { left: 40, right: 18, top: 12, bottom: 40 },
-        xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 9, interval, rotate: dates.length > 10 ? 30 : 0 } },
-        yAxis: { type: 'value', axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.3 } } },
-        series: [{ type: 'bar', data: counts, itemStyle: { color: COLORS.accent, borderRadius: [2, 2, 0, 0] }, barWidth: '60%' }],
-      }, true);
-    },
-
-    renderKillersKinds() {
-      const kd = this.killersData;
-      if (!kd) return;
-      const chart = this._ensureChart('chart-killers-kinds');
-      if (!chart) return;
-      const kinds   = kd.classification_kinds || {};
-      const entries = Object.entries(kinds).sort((a, b) => b[1] - a[1]);
-      if (!entries.length) { this._renderEmptyChart(chart, 'no classifications yet'); return; }
-      const kindColors = { entry: COLORS.pos, exit: COLORS.neg, update: COLORS.info, noise: COLORS.text3 };
-      chart.setOption({
-        ...ECHART_COMMON, animation: false,
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface, borderColor: COLORS.border, textStyle: { color: COLORS.text, fontSize: 11 } },
-        grid: { left: 60, right: 18, top: 12, bottom: 24 },
-        xAxis: { type: 'value', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { lineStyle: { color: COLORS.border, opacity: 0.3 } } },
-        yAxis: { type: 'category', data: entries.map(e => e[0]).reverse(), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text2, fontSize: 11 } },
-        series: [{ type: 'bar', data: [...entries].reverse().map(e => e[1]), itemStyle: { color: p => kindColors[p.name] || COLORS.accent, borderRadius: [0, 3, 3, 0] }, barWidth: 14 }],
-      }, true);
-    },
-
-    renderKillersPairPnl() {
-      const kd = this.killersData;
-      if (!kd) return;
-      const chart = this._ensureChart('chart-killers-pairpnl');
-      if (!chart) return;
-      const rows  = (kd.paper_pnl_by_symbol || []).slice(0, 10);
-      if (!rows.length) { this._renderEmptyChart(chart, 'no paper trades yet'); return; }
-      const pairs = rows.map(r => r.symbol || r.pair);
-      const pnls  = rows.map(r => Number(r.pnl || r.pnl_usd || 0).toFixed(2));
-      chart.setOption({
-        ...ECHART_COMMON, animation: false,
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface, borderColor: COLORS.border, textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: v => '$' + Number(v).toFixed(2) },
-        grid: { left: 70, right: 50, top: 12, bottom: 24 },
-        xAxis: { type: 'value', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.border, opacity: 0.3 } } },
-        yAxis: { type: 'category', data: [...pairs].reverse(), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text2, fontSize: 11 } },
-        series: [{ type: 'bar', data: [...pnls].reverse(), itemStyle: { color: p => Number(p.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] }, label: { show: true, position: 'right', formatter: p => '$' + Number(p.value).toFixed(2), color: COLORS.text2, fontSize: 10, fontFamily: 'JetBrains Mono' }, barWidth: 12 }],
-      }, true);
     },
 
     _renderEmptyChart(chart, msg) {
