@@ -475,16 +475,16 @@
                 <div class="small-cap" style="margin-bottom: 0.85rem;">gate 1 · sample threshold</div>
                 <div class="gate-rings" style="padding: 0;">
                   <div class="ring-wrap">
-                    <div class="ring" x-html="renderRing(bot.gate1.trades.pct, bot.gate1.trades.ok)"></div>
-                    <div class="title">trades · <span class="num" x-text="bot.gate1.trades.actual + ' / ' + bot.gate1.trades.target"></span></div>
+                    <div class="ring" x-html="renderRing(bot.gate1?.trades?.pct ?? 0, bot.gate1?.trades?.ok)"></div>
+                    <div class="title">trades · <span class="num" x-text="(bot.gate1?.trades?.actual ?? 0) + ' / ' + (bot.gate1?.trades?.target ?? '—')"></span></div>
                   </div>
                   <div class="ring-wrap">
-                    <div class="ring" x-html="renderRing(bot.gate1.days.pct, bot.gate1.days.ok)"></div>
-                    <div class="title">days · <span class="num" x-text="bot.gate1.days.actual + ' / ' + bot.gate1.days.target"></span></div>
+                    <div class="ring" x-html="renderRing(bot.gate1?.days?.pct ?? 0, bot.gate1?.days?.ok)"></div>
+                    <div class="title">days · <span class="num" x-text="(bot.gate1?.days?.actual ?? 0) + ' / ' + (bot.gate1?.days?.target ?? '—')"></span></div>
                   </div>
                   <div class="ring-wrap">
-                    <div class="ring" x-html="renderRing(bot.gate1.pairs.pct, bot.gate1.pairs.ok)"></div>
-                    <div class="title">pairs · <span class="num" x-text="bot.gate1.pairs.actual + ' / ' + bot.gate1.pairs.target"></span></div>
+                    <div class="ring" x-html="renderRing(bot.gate1?.pairs?.pct ?? 0, bot.gate1?.pairs?.ok)"></div>
+                    <div class="title">pairs · <span class="num" x-text="(bot.gate1?.pairs?.actual ?? 0) + ' / ' + (bot.gate1?.pairs?.target ?? '—')"></span></div>
                   </div>
                 </div>
               </div>
@@ -494,26 +494,26 @@
                   <div class="bullet">
                     <div class="bullet-head">
                       <span class="name">profit pace · ±25%</span>
-                      <span class="delta" :class="g2DeltaClass(bot.gate2.profit.status)"
-                            x-text="bot.gate2.profit.actual_pct.toFixed(1) + '% · expected ' + bot.gate2.profit.expected_pct.toFixed(1) + '%'"></span>
+                      <span class="delta" :class="g2DeltaClass(bot.gate2?.profit?.status)"
+                            x-text="(bot.gate2?.profit?.actual_pct ?? 0).toFixed(1) + '% · expected ' + (bot.gate2?.profit?.expected_pct ?? 0).toFixed(1) + '%'"></span>
                     </div>
-                    <div class="bullet-track" x-html="renderBullet(bot.gate2.profit, 'pct')"></div>
+                    <div class="bullet-track" x-html="renderBullet(bot.gate2?.profit, 'pct')"></div>
                   </div>
                   <div class="bullet">
                     <div class="bullet-head">
                       <span class="name">profit factor · ±20%</span>
-                      <span class="delta" :class="g2DeltaClass(bot.gate2.pf.status)"
-                            x-text="(bot.gate2.pf.actual ?? '—') + ' · expected ' + bot.gate2.pf.expected"></span>
+                      <span class="delta" :class="g2DeltaClass(bot.gate2?.pf?.status)"
+                            x-text="(bot.gate2?.pf?.actual ?? '—') + ' · expected ' + (bot.gate2?.pf?.expected ?? '—')"></span>
                     </div>
-                    <div class="bullet-track" x-html="renderBullet(bot.gate2.pf, 'pf')"></div>
+                    <div class="bullet-track" x-html="renderBullet(bot.gate2?.pf, 'pf')"></div>
                   </div>
                   <div class="bullet">
                     <div class="bullet-head">
                       <span class="name">drawdown · ≤1.5×</span>
-                      <span class="delta" :class="g2DeltaClass(bot.gate2.dd.status)"
-                            x-text="bot.gate2.dd.actual_pct.toFixed(2) + '% · cap ' + bot.gate2.dd.cap_pct + '%'"></span>
+                      <span class="delta" :class="g2DeltaClass(bot.gate2?.dd?.status)"
+                            x-text="(bot.gate2?.dd?.actual_pct ?? 0).toFixed(2) + '% · cap ' + (bot.gate2?.dd?.cap_pct ?? '—') + '%'"></span>
                     </div>
-                    <div class="bullet-track" x-html="renderBullet(bot.gate2.dd, 'dd')"></div>
+                    <div class="bullet-track" x-html="renderBullet(bot.gate2?.dd, 'dd')"></div>
                   </div>
                 </div>
               </div>
@@ -523,27 +523,27 @@
                     <div class="small-cap" style="margin-bottom: 0.85rem;">gate 3 · risk anomalies</div>
                     <div class="kv" style="padding: 0;">
                       <span class="k">worst single trade</span>
-                        <span class="v" :class="bot.gate3.worst_trade_pct.ok ? 'pos' : 'neg'"
-                              x-text="bot.gate3.worst_trade_pct.actual + '% · cap ' + bot.gate3.worst_trade_pct.cap + '%'"></span>
+                        <span class="v" :class="bot.gate3?.worst_trade_pct?.ok ? 'pos' : 'neg'"
+                              x-text="(bot.gate3?.worst_trade_pct?.actual ?? 0) + '% · cap ' + (bot.gate3?.worst_trade_pct?.cap ?? '—') + '%'"></span>
                       <span class="k">consec losses</span>
-                        <span class="v" :class="bot.gate3.consec_losses.ok ? 'pos' : 'neg'"
-                              x-text="bot.gate3.consec_losses.actual + ' / ' + bot.gate3.consec_losses.cap"></span>
+                        <span class="v" :class="bot.gate3?.consec_losses?.ok ? 'pos' : 'neg'"
+                              x-text="(bot.gate3?.consec_losses?.actual ?? 0) + ' / ' + (bot.gate3?.consec_losses?.cap ?? '—')"></span>
                       <span class="k">force-exits</span>
-                        <span class="v" :class="bot.gate3.force_exits.ok ? 'pos' : 'neg'"
-                              x-text="bot.gate3.force_exits.actual + ' / ' + bot.gate3.force_exits.cap"></span>
+                        <span class="v" :class="bot.gate3?.force_exits?.ok ? 'pos' : 'neg'"
+                              x-text="(bot.gate3?.force_exits?.actual ?? 0) + ' / ' + (bot.gate3?.force_exits?.cap ?? '—')"></span>
                     </div>
                   </div>
                   <div class="col-6">
                     <div class="small-cap" style="margin-bottom: 0.85rem;">calibration · live vs lab</div>
                     <div class="kv" style="padding: 0;">
                       <span class="k">return %</span>
-                        <span class="v" x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '%  ·  expected ' + bot.gate2.profit.expected_pct.toFixed(2) + '%'"></span>
+                        <span class="v" x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '%  ·  expected ' + (bot.gate2?.profit?.expected_pct ?? 0).toFixed(2) + '%'"></span>
                       <span class="k">profit factor</span>
-                        <span class="v" x-text="(bot.stats?.profit_factor?.toFixed(2) ?? '—') + '  ·  lab ' + bot.baseline.profit_factor"></span>
+                        <span class="v" x-text="(bot.stats?.profit_factor?.toFixed(2) ?? '—') + '  ·  lab ' + (bot.baseline?.profit_factor ?? '—')"></span>
                       <span class="k">win rate</span>
                         <span class="v" x-text="((bot.stats?.winrate ?? 0) * 100).toFixed(1) + '%  ·  lab ' + ((bot.baseline?.win_rate ?? 0) * 100).toFixed(1) + '%'"></span>
                       <span class="k">trades / yr pace</span>
-                        <span class="v" x-text="bot.days_running > 0 ? ((bot.stats?.closed_trade_count ?? 0) / bot.days_running * 365).toFixed(0) + '  ·  lab ' + bot.baseline.trades_per_year : '—'"></span>
+                        <span class="v" x-text="bot.days_running > 0 ? ((bot.stats?.closed_trade_count ?? 0) / bot.days_running * 365).toFixed(0) + '  ·  lab ' + (bot.baseline?.trades_per_year ?? '—') : '—'"></span>
                     </div>
                   </div>
                 </div>
@@ -629,7 +629,7 @@
               <div class="card-sub">closed trades · n=<span x-text="bot.stats?.closed_trade_count ?? 0"></span></div>
             </div>
           </div>
-          <table class="ledger" x-show="bot.recent_trades.length" x-cloak>
+          <table class="ledger" x-show="bot.recent_trades?.length" x-cloak>
             <thead>
               <tr>
                 <th>closed</th><th>pair</th><th class="right">entry</th><th class="right">exit</th>
@@ -637,7 +637,7 @@
               </tr>
             </thead>
             <tbody>
-              <template x-for="t in bot.recent_trades.slice(0, 20)" :key="t.close_timestamp + t.pair">
+              <template x-for="t in (bot.recent_trades ?? []).slice(0, 20)" :key="t.close_timestamp + t.pair">
                 <tr>
                   <td x-text="fmtDate(t.close_date)"></td>
                   <td class="label" x-text="t.pair"></td>
@@ -650,7 +650,7 @@
               </template>
             </tbody>
           </table>
-          <div class="empty" x-show="!bot.recent_trades.length">
+          <div class="empty" x-show="!bot.recent_trades?.length">
             <div class="icon">—</div> signal hasn't fired enough yet · keep watching
           </div>
         </div>
@@ -701,7 +701,7 @@
             <div class="trade-card-meta">
               <span class="trade-pnl" :class="trade.is_win ? 'pos' : 'neg'">
                 <span x-text="(trade.profit_pct >= 0 ? '+' : '') + (trade.profit_pct||0).toFixed(2) + '%'">—</span>
-                <span class="abs" x-text="'(' + (trade.profit_abs >= 0 ? '+' : '') + fmtUsd(trade.profit_abs) + ')'">—</span>
+                <span class="abs" x-text="'(' + fmtUsdSigned(trade.profit_abs) + ')'">—</span>
               </span>
               <span class="trade-reason" :class="'reason-' + (trade.exit_reason||'unknown')" x-text="trade.exit_reason || '—'">—</span>
             </div>
@@ -788,9 +788,6 @@
                   <div class="ltt-row"><span class="ltt-k">exit reason</span><span class="ltt-v" x-text="lastClosedTrade(bot).exit_reason||'—'">—</span></div>
                   <div class="ltt-row"><span class="ltt-k">duration</span><span class="ltt-v" x-text="fmtMin(lastClosedTrade(bot).trade_duration)">—</span></div>
                 </div>
-              </div>
-              <div class="bot-detail-section" x-show="deviationSummary(bot)">
-                <div class="deviation-summary" x-text="deviationSummary(bot)"></div>
               </div>
             </div>
           </template>

@@ -463,11 +463,15 @@ function dash() {
     },
 
     // ─── verdict + ETA ───
+    // Defensive: observational bots (no_baseline) have null gates — caller
+    // hides this via x-show, but Alpine still evaluates the expression, so
+    // we need to short-circuit here too.
     readyVerdict(bot) {
-      const g1 = Object.values(bot.gate1).every(x => x.ok);
+      if (!bot?.gate1 || !bot?.gate2 || !bot?.gate3) return { text: 'observational', cls: '' };
+      const g1 = Object.values(bot.gate1).every(x => x?.ok);
       const g2 = ['profit', 'pf', 'dd'].every(k =>
-        bot.gate2[k].status === 'ok' || bot.gate2[k].status === 'n/a');
-      const g3 = Object.values(bot.gate3).every(x => x.ok);
+        bot.gate2[k]?.status === 'ok' || bot.gate2[k]?.status === 'n/a');
+      const g3 = Object.values(bot.gate3).every(x => x?.ok);
       if (g1 && g2 && g3) return { text: 'ready to flip', cls: 'ready' };
       if (g1) return { text: 'gate-1 cleared · band watch', cls: 'watch' };
       return { text: 'not ready', cls: '' };
@@ -814,14 +818,17 @@ function dash() {
       const liveByTs = new Map(live.map(([d, v]) => [d.getTime(), v]));
       const winMarks = [];
       const lossMarks = [];
+      // toMs() normalises s vs ms — marks otherwise land off-curve when
+      // close_timestamp is seconds but equity x-axis is ms.
       const sortedClosed = (bot?.recent_trades || [])
         .filter(t => !t.is_open && t.close_timestamp)
-        .sort((a, b) => a.close_timestamp - b.close_timestamp);
+        .sort((a, b) => toMs(a.close_timestamp) - toMs(b.close_timestamp));
       let runningEquity = startCap;
       for (const t of sortedClosed) {
         runningEquity += Number(t.profit_abs || 0);
-        const y = liveByTs.get(t.close_timestamp) ?? runningEquity;
-        const m = { coord: [t.close_timestamp, y], pair: t.pair, pct: t.profit_pct };
+        const tsMs = toMs(t.close_timestamp);
+        const y = liveByTs.get(tsMs) ?? runningEquity;
+        const m = { coord: [tsMs, y], pair: t.pair, pct: t.profit_pct };
         if ((t.profit_abs || 0) >= 0) winMarks.push(m);
         else lossMarks.push(m);
       }

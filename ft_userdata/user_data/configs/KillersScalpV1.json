@@ -74,6 +74,7 @@
     "webhook": {
         "enabled": true,
         "url": "http://trade-webhook:8088/freqtrade/event",
+        "format": "json",
         "webhookentry": {
             "type": "entry",
             "bot_name": "KillersScalpV1",
