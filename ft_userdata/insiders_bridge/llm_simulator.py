@@ -30,7 +30,7 @@ import json
 import os
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -44,7 +44,17 @@ from weex import get_price_at, resolve_exits  # noqa: E402
 ACCOUNT = 1000.0
 RISK_PER_TRADE = 10.0
 MARGIN_PER_TRADE = 50.0
-OPEN_MERGE_WINDOW_SECONDS = 1800  # 30 minutes
+OPEN_MERGE_WINDOW_SECONDS = 1800  # 30 minutes — for same-open detail merges
+SL_BACKFILL_WINDOW_HOURS = 24    # Issue 3: SL backfill window (was 30 min)
+
+
+CLASSIFICATIONS_GLOB = os.environ.get(
+    "CLASSIFICATIONS_GLOB", "classifications_*.jsonl"
+)
+MESSAGES_PATH = os.environ.get(
+    "MESSAGES_PATH", str(LOCAL / "last_month_messages.json")
+)
+OUTPUT_PATH = os.environ.get("OUTPUT_PATH", str(OUT / "trades_llm.json"))
 
 
 CLASSIFICATIONS_GLOB = os.environ.get(
@@ -172,7 +182,7 @@ def build_trades(classifications, messages):
                 msg_ms = ms(msg["date"])
                 if existing is not None:
                     existing_ms = ms(existing.date)
-                    # Merge if recent and existing lacks details
+                    # Merge if within 30-min window and existing lacks details
                     recent = (msg_ms - existing_ms) <= OPEN_MERGE_WINDOW_SECONDS * 1000
                     if recent:
                         # Fill missing fields on the existing trade
@@ -187,6 +197,20 @@ def build_trades(classifications, messages):
                             text=msg.get("text", ""),
                         ))
                         continue
+                    # Issue 3 Part A: SL backfill within 24h for pending_sl trades
+                    # A later "open" with SL on same symbol/direction fills the prior
+                    # open that had no SL (e.g. header msg then reply with numbers >30m)
+                    if (getattr(existing, "pending_sl", False)
+                            and sl is not None and isinstance(sl, (int, float))):
+                        age = parse_dt(msg["date"]) - parse_dt(existing.date)
+                        if timedelta(0) <= age <= timedelta(hours=SL_BACKFILL_WINDOW_HOURS):
+                            existing.sl = sl
+                            existing.pending_sl = False
+                            existing.events.append(TradeEvent(
+                                msg_id=msg["id"], date=msg["date"], kind="detail",
+                                text=msg.get("text", ""),
+                            ))
+                            continue
 
                 # New trade
                 t = Trade(
@@ -202,6 +226,8 @@ def build_trades(classifications, messages):
                 # Track market-entry flag via a custom attribute so we can
                 # fill the price later from WEEX.
                 t.market_entry = (entry_val == "market") or (entry_val is None and entry_range is None)
+                # Mark trade as awaiting SL so a later open event can backfill it
+                t.pending_sl = (t.sl is None)
                 # Sanity-check SL direction
                 if t.entry is not None and t.sl is not None:
                     if t.direction == "LONG" and t.sl >= t.entry:
@@ -222,8 +248,12 @@ def build_trades(classifications, messages):
                     target_coins = [resolved]
 
             for coin in target_coins:
-                # Try both directions — match the one with an active trade
-                for direction in ("LONG", "SHORT"):
+                # Issue 3 Part B: if the classification specifies direction, try
+                # that first; otherwise try both. This prevents a SHORT management
+                # event from matching a LONG trade of the same symbol.
+                cls_dir = cls.get("direction")
+                directions = ([cls_dir.upper()] if cls_dir else ["LONG", "SHORT"])
+                for direction in directions:
                     key = (coin, direction)
                     t = active.get(key)
                     if not t:
