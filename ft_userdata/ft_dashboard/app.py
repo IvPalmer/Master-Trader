@@ -71,6 +71,21 @@ BOTS: list[dict[str, Any]] = [
         },
     },
     {
+        "key": "killers-ft",
+        "name": "KillersScalpV1",
+        "label": "killers-scalp",
+        "url": "http://ft-killers-scalp:8080",
+        # Copy-trader of the Binance Killers VIP private channel.
+        # Observational mode: gates skip baseline comparisons since this
+        # mirrors an external signaler, not a quant strategy with
+        # backtested expectations. Real ground truth comes from live
+        # performance against the channel's published numbers.
+        "observational": True,
+        "baseline": {
+            "starting_equity_in_csv": 200.0,
+        },
+    },
+    {
         "key": "insiders",
         "name": "InsidersScalpV1",
         "label": "insiders-scalp",

@@ -59,6 +59,10 @@ class Config:
         self.claude_model = os.getenv("KILLERS_CLAUDE_MODEL") or None
         self.claude_timeout = float(os.getenv("KILLERS_CLAUDE_TIMEOUT_SEC", "12"))
         self.heartbeat_sec = int(os.getenv("KILLERS_HEARTBEAT_SEC", "60"))
+        # Receiver endpoint — when set, observer POSTs each classification.
+        # Receiver translates to Freqtrade Futures REST. Leave unset to run
+        # in pure observe-mode (Phase 1).
+        self.receiver_url = os.getenv("KILLERS_RECEIVER_URL", "")
 
 
 def _required(name: str) -> str:
@@ -196,7 +200,7 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     logger.info("[CLASSIFY] id=%d kind=%s signal=#%s sym=%s conf=%.2f",
                 msg_dict["id"], kind, sid, sym, conf)
 
-    # Route into paper simulator
+    # Route into paper simulator (local audit trail)
     if kind == "open":
         simulator.open_paper_position(conn, msg_dict, classification)
     elif kind in ("close_partial", "close_full", "move_sl"):
@@ -204,6 +208,28 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     elif kind == "increase":
         logger.info("[INCREASE] not modeled in paper sim yet")
     # else: chat — already logged via [CLASSIFY], nothing to do
+
+    # Forward to receiver for real Freqtrade Futures dry-run execution.
+    # Receiver is the source of truth for actual trades; paper sim stays
+    # for audit + offline comparison.
+    if config.receiver_url:
+        await _post_to_receiver(config.receiver_url, msg_dict, classification)
+
+
+async def _post_to_receiver(url: str, msg: dict, classification: dict) -> None:
+    """POST classified event to killers-receiver. Best-effort, never blocks."""
+    import aiohttp
+    payload = {"msg": msg, "classification": classification}
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.post(url, json=payload,
+                              timeout=aiohttp.ClientTimeout(total=8)) as r:
+                body = await r.text()
+                logger.info("[RECV] %d msg_id=%d kind=%s body=%s",
+                            r.status, msg.get("id"), classification.get("kind"),
+                            body[:200])
+    except Exception as e:
+        logger.warning("[RECV] post failed msg_id=%d: %s", msg.get("id"), e)
 
 
 # ── Main loop ──────────────────────────────────────────────────────────────

@@ -294,6 +294,62 @@ services:
       - -c
       - sleep 90 && exec freqtrade trade --logfile /freqtrade/user_data/logs/InsidersScalpV1.log --config /freqtrade/user_data/configs/InsidersScalpV1.json --strategy InsidersScalpV1
 
+  # ── killers (binance killers VIP copy-trader) ───────────────────────────
+  killers-receiver:
+    # FastAPI executor: receives classified channel events from killers_bot
+    # observer (running on host via systemd/nohup) → maps to Freqtrade REST
+    # /forceenter & /forceexit against ft-killers-scalp.
+    build: ../services/killers-receiver
+    image: killers-receiver:latest
+    restart: unless-stopped
+    container_name: killers-receiver
+    networks:
+      - default
+      - dokploy-network
+    environment:
+      KILLERS_FT_BASE_URL: http://ft-killers-scalp:8080
+      KILLERS_FT_USERNAME: freqtrader
+      KILLERS_FT_PASSWORD: mastertrader
+      KILLERS_DB: /var/lib/killers/receiver.sqlite
+      KILLERS_STAKE_USD: "20"
+      KILLERS_LEVERAGE: "5"
+      KILLERS_MAX_OPEN: "10"
+    volumes:
+      - killers_receiver_state:/var/lib/killers
+    ports:
+      - 127.0.0.1:8089:8089
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    depends_on:
+      - ft-killers-scalp
+
+  ft-killers-scalp:
+    # Freqtrade Futures dry-run bot. Pass-through strategy: all entries +
+    # exits driven by killers-receiver via REST. $200 dry wallet, max 10
+    # concurrent positions, leverage default 5x (matches channel's 3-5x).
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-killers-scalp
+    environment:
+      <<: *a1
+    volumes:
+      - ft_user_data:/freqtrade/user_data
+      - ./user_data/configs:/freqtrade/user_data/configs:ro
+      - ./user_data/strategies:/freqtrade/user_data/strategies
+    ports:
+      - 127.0.0.1:8099:8080
+    healthcheck: *a2
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    entrypoint:
+      - /bin/sh
+      - -c
+      - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KillersScalpV1.log --config /freqtrade/user_data/configs/KillersScalpV1.json --strategy KillersScalpV1
+
 networks:
   default: null
   dokploy-network:
@@ -303,6 +359,7 @@ volumes:
   ft_user_data: null
   ft_exporter_state: null
   insiders_state: null
+  killers_receiver_state: null
   insiders_receiver_state: null
   claude_auth:
     external: true
