@@ -4,16 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>master-trader</title>
-<meta name="theme-color" content="#0a0d14">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%2322d3ee'/><path d='M8 22 L13 14 L17 18 L24 8' stroke='%230a0d14' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<meta name="description" content="Live trading fleet · operational + pre-flight dashboard">
+<meta name="theme-color" content="#fafaf7">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230891b2'/><path d='M8 22 L13 14 L17 18 L24 8' stroke='%23ffffff' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/styles.css?v=16">
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
+<script defer
+        src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
         integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
         crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"
+<script defer
+        src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"
         integrity="sha384-Mx5lkUEQPM1pOJCwFtUICyX45KNojXbkWdYhkKUKsbv391mavbfoAmONbzkgYPzR"
         crossorigin="anonymous"></script>
 </head>
@@ -21,197 +24,124 @@
 
 <div class="shell">
 
-  <!-- ── topbar ──────────────────────────────────── -->
+  <!-- ── topbar ───────────────────────────────── -->
   <header class="topbar">
-    <div class="topbar-brand">
+    <div class="brand">
       <div class="brand-logo">M</div>
       <div class="brand-name">master-trader<span> · fleet ops</span></div>
     </div>
-
-    <div class="topbar-status">
-      <!-- B7: status pill with semantic levels + tooltip -->
-      <span class="status-pill"
-            :class="statusPillClass"
-            :title="statusTooltip">
-        <span class="dot"></span>
-        <span x-text="statusLabel">connecting</span>
-      </span>
-    </div>
-
+    <span class="status-pill" :class="staleClass">
+      <span class="dot"></span>
+      <span x-text="statusLabel">connecting</span>
+    </span>
     <div class="topbar-spacer"></div>
-
-    <!-- T8: vertical dividers group clock + meta -->
     <div class="topbar-meta">
-      <span class="meta-clock" x-text="clock">—</span>
-      <span>brasília</span>
-      <span x-text="lastPollLabel" :title="'last poll: ' + lastPollLabel">—</span>
+      <span x-text="clock">—</span>
+      <span>brasília · br</span>
+      <span>refresh <span x-text="pollInterval">30</span>s</span>
     </div>
-
-    <!-- T5: refresh as actual primary button, countdown as label -->
-    <div class="topbar-actions">
-      <span style="font-size:11px;color:var(--text-3)" x-text="'↻ ' + countdown + 's'">↻ 30s</span>
-      <button class="btn primary" @click="refresh()">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-        refresh
-      </button>
-    </div>
+    <button class="icon-btn" @click="refresh()">↻ refresh</button>
   </header>
 
-  <!-- ── nav ─────────────────────────────────────── -->
-  <!-- one row: 3 aggregate tabs + one tab per bot, badge LIVE/DRY -->
+  <!-- ── tabs ─────────────────────────────────── -->
   <nav class="tabs">
-    <button class="tab" :class="tab==='live'?'on':''" @click="setTab('live')">
-      live <span class="badge" x-text="liveBots.length">0</span>
+    <button class="tab" :class="tab === 'live' ? 'on' : ''" @click="setTab('live')">
+      live
+      <span class="badge" x-text="liveBots.length">0</span>
     </button>
-    <button class="tab" :class="tab==='dryrun'?'on':''" @click="setTab('dryrun')">
-      dry-run <span class="badge" x-text="dryRunBots.length">0</span>
+    <button class="tab" :class="tab === 'dryrun' ? 'on' : ''" @click="setTab('dryrun')">
+      dry-run
+      <span class="badge" x-text="dryRunBots.length">0</span>
     </button>
-    <button class="tab" :class="tab==='trades'?'on':''" @click="setTab('trades')">
-      trades <span class="badge" x-text="closedTrades.length">0</span>
-    </button>
-    <template x-for="b in allBots" :key="b.key">
-      <button class="tab"
-              :class="tab===('bot:'+b.key)?'on':''"
-              @click="setTab('bot:'+b.key)">
-        <span x-text="b.label || b.name">—</span>
-        <span class="badge"
-              :class="b.dry_run ? 'badge-dry' : 'badge-live'"
-              x-text="b.dry_run ? 'DRY' : 'LIVE'">DRY</span>
-      </button>
-    </template>
-    <button class="tab" :class="tab==='killers'?'on':''" @click="setTab('killers')">
-      killers <span class="badge badge-dry">DRY</span>
+    <button class="tab" :class="tab === 'trades' ? 'on' : ''" @click="setTab('trades')">
+      trades
+      <span class="badge" x-text="closedTrades.length">0</span>
     </button>
   </nav>
 
-  <!-- G1: delta strip — what changed since last visit -->
-  <div class="delta-strip" x-show="deltaStrip.show && (tab==='live'||tab==='dryrun')" x-cloak>
-    <span class="ds-item">
-      <span class="dim">since last visit</span>
-    </span>
-    <span class="ds-item">
-      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 7 4 4 7 7"/></svg>
-      <span class="ds-val" :class="deltaStrip.newTrades?'':''" x-text="deltaStrip.newTrades + ' new trades'"></span>
-    </span>
-    <span class="ds-sep">·</span>
-    <span class="ds-item">
-      <span class="ds-val" :class="deltaStrip.pnlDelta>=0?'pos':'neg'" x-text="(deltaStrip.pnlDelta>=0?'+$':'−$')+Math.abs(deltaStrip.pnlDelta).toFixed(2)+' p&l'"></span>
-    </span>
-    <template x-if="deltaStrip.signals!=null">
-      <span class="ds-sep">·</span>
-    </template>
-    <template x-if="deltaStrip.signals!=null">
-      <span class="ds-item">
-        <span class="ds-val" x-text="deltaStrip.signals + ' signals'"></span>
-      </span>
-    </template>
-  </div>
-
   <!-- ══════════════ LIVE TAB ══════════════ -->
-  <main class="tab-panel" x-show="tab==='live'" x-cloak>
+  <main class="tab-panel" x-show="tab === 'live'" x-cloak>
 
-    <!-- T2: dominant P&L hero + 5 stat tiles -->
-    <div class="hero-strip">
-      <div class="hero-tile dominant" :class="hero.totalPnl>=0?'pos':'neg'">
-        <div class="ht-label">total p&l · live bots</div>
-        <div class="ht-value num" :class="hero.totalPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalPnl)">—</div>
-        <div class="ht-sub">
-          <span class="num" :class="hero.totalPct>=0?'pos':'neg'" x-text="fmtPctSigned(hero.totalPct)"></span>
-          <span>·</span>
-          <span>wallet <span class="num" x-text="fmtUsd(hero.walletNow)"></span></span>
+    <!-- ── C4: Attention Stack ── -->
+    <div class="attention-stack">
+      <!-- all-clear empty state -->
+      <div class="attention-clear" x-show="attentionItems.length === 0">
+        all clear · no attention items
+      </div>
+      <!-- attention items -->
+      <template x-for="(item, i) in attentionVisible" :key="i">
+        <div class="attention-item" :class="item.color" @click="item.action()">
+          <span class="att-icon" x-text="item.icon"></span>
+          <div class="att-body">
+            <div class="att-subject" x-text="item.subject"></div>
+            <div class="att-reason" x-text="item.reason"></div>
+          </div>
+          <span class="att-cta" x-text="item.cta"></span>
         </div>
-      </div>
-      <div class="hero-tile" :class="hero.openCount>0?'accent':''">
-        <div class="ht-label">open positions</div>
-        <div class="ht-value num" x-text="hero.openCount">0</div>
-        <div class="ht-sub"><span x-show="hero.openCount>0" x-cloak x-text="fmtUsd(hero.openNotional)+' notional'"></span><span x-show="!hero.openCount">no exposure</span></div>
-      </div>
-      <div class="hero-tile warn">
-        <div class="ht-label">max drawdown</div>
-        <div class="ht-value num sm" x-text="fmtPct(hero.drawdownMaxPct,2)">—</div>
-        <div class="ht-sub">cap <span class="num" x-text="fmtPct(hero.drawdownCap,1)"></span></div>
-      </div>
-      <div class="hero-tile">
-        <div class="ht-label">at risk</div>
-        <div class="ht-value num sm neg" x-text="fmtUsdSigned(-hero.capitalAtRisk)">—</div>
-        <div class="ht-sub"><span x-text="fmtPct(hero.capitalAtRiskPct,1)+' wallet'"></span></div>
-      </div>
-      <div class="hero-tile">
-        <div class="ht-label">closed trades</div>
-        <div class="ht-value num" x-text="hero.closedTrades">—</div>
-        <div class="ht-sub">win <span class="num pos" x-text="fmtPct(hero.winRate*100,1)"></span></div>
-      </div>
-      <div class="hero-tile">
-        <div class="ht-label">profit factor</div>
-        <div class="ht-value num sm" x-text="fmtPF(hero.profitFactor)">—</div>
-        <div class="ht-sub">expectancy <span class="num" :class="(hero.expectancyPerTrade||0)>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.expectancyPerTrade)"></span></div>
+      </template>
+      <!-- expander when >3 items -->
+      <div class="attention-more"
+           x-show="attentionItems.length > 3 && !_attentionExpanded"
+           @click="_attentionExpanded = true"
+           x-text="(attentionItems.length - 3) + ' more · tap to expand'">
       </div>
     </div>
 
-    <!-- per-bot summary cards -->
-    <div class="grid grid-12"
-         :class="liveBots.length===1?'bot-cards-live-single':'bot-cards-live-multi'">
-      <template x-for="bot in liveBots" :key="bot.key">
-        <div class="bot-summary-card">
-          <div class="bot-card-head">
-            <div>
-              <div class="bot-card-name">
-                <span x-text="bot.label"></span>
-                <span class="tag live">live</span>
-              </div>
-              <div class="bot-card-sub">
-                <span x-text="bot.name"></span> ·
-                <span x-text="bot.days_running+' days'"></span> ·
-                <span x-text="(bot.whitelist_size||'?')+' pairs'"></span>
-              </div>
-            </div>
-            <!-- G2: deep links -->
-            <div class="deeplinks" style="border:0;padding:0;background:transparent">
-              <template x-if="bot.links?.freqtrade_ui">
-                <a class="dl-btn" :href="bot.links.freqtrade_ui" target="_blank" rel="noopener">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  freqtrade ui
-                </a>
-              </template>
-              <template x-if="bot.links?.tradingview_top_pair">
-                <a class="dl-btn" :href="bot.links.tradingview_top_pair" target="_blank" rel="noopener">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                  tradingview
-                </a>
-              </template>
-              <button class="dl-btn" @click="showLogs(bot)">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="14" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
-                logs
-              </button>
-            </div>
-          </div>
-          <!-- 4-stat strip: no card for each number, just border-divided cells -->
-          <div class="bot-card-stats">
-            <div class="bot-stat">
-              <div class="bs-label">p&l</div>
-              <div class="bs-val" :class="bot.pnl.all_coin>=0?'pos':'neg'" x-text="fmtUsdSigned(bot.pnl.all_coin)">—</div>
-            </div>
-            <div class="bot-stat">
-              <div class="bs-label">wallet</div>
-              <div class="bs-val" x-text="fmtUsd(bot.wallet.bot_owned)">—</div>
-            </div>
-            <div class="bot-stat">
-              <div class="bs-label">trades</div>
-              <div class="bs-val" x-text="bot.stats.closed_trade_count">—</div>
-            </div>
-            <div class="bot-stat">
-              <div class="bs-label">win rate</div>
-              <div class="bs-val" x-text="fmtPct(bot.stats.winrate*100,1)">—</div>
-            </div>
-          </div>
+    <!-- ── C1 fix: fleet-level metric tiles with explicit labels ── -->
+    <div class="metrics">
+      <div class="metric accent">
+        <div class="label">live wallet · all bots</div>
+        <div class="value num" x-text="fmtUsd(hero.walletNow)">—</div>
+        <div class="footnote">started at <span class="num" x-text="fmtUsd(hero.walletStart)"></span></div>
+      </div>
+      <div class="metric" :class="hero.totalPnl >= 0 ? 'pos' : 'neg'">
+        <div class="label">total p&l · fleet</div>
+        <div class="value num" :class="hero.totalPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalPnl)">—</div>
+        <div class="footnote">
+          <span class="num" :class="hero.totalPct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(hero.totalPct)"></span>
+          since launch
         </div>
-      </template>
-      <div class="empty col-12" x-show="!liveBots.length">
-        <div class="e-icon">○</div>
-        <span>no live bots reachable</span>
-        <span class="e-hint">check VPS · port 8096</span>
+      </div>
+      <div class="metric" :class="hero.openCount > 0 ? 'accent' : ''">
+        <div class="label">open positions · fleet</div>
+        <div class="value num" x-text="hero.openCount">0</div>
+        <div class="footnote">
+          <span x-show="hero.openCount > 0" x-cloak>
+            <span class="num" x-text="fmtUsd(hero.openNotional)"></span> notional
+          </span>
+          <span x-show="hero.openCount === 0">no exposure</span>
+        </div>
+      </div>
+      <div class="metric warn">
+        <div class="label">max drawdown · worst bot</div>
+        <div class="value num" x-text="fmtPct(hero.drawdownMaxPct, 2)">—</div>
+        <div class="footnote">
+          now <span class="num" x-text="fmtPct(hero.drawdownCurrentPct, 2)"></span> ·
+          cap <span class="num" x-text="fmtPct(-hero.drawdownCap, 1)"></span> ·
+          lab <span class="num" x-text="fmtPct(-hero.drawdownBacktest, 1)"></span>
+        </div>
+      </div>
+      <div class="metric">
+        <div class="label">at risk · open trades</div>
+        <div class="value num neg" x-text="fmtUsdSigned(-hero.capitalAtRisk)">—</div>
+        <div class="footnote">
+          <span x-show="hero.openCount > 0" x-cloak>
+            if <span class="num" x-text="hero.openCount"></span>
+            stop<span x-show="hero.openCount !== 1">s</span> hit ·
+            <span class="num" x-text="fmtPct(hero.capitalAtRiskPct, 1)"></span> wallet
+          </span>
+          <span x-show="hero.openCount === 0">no exposure</span>
+        </div>
+      </div>
+      <div class="metric">
+        <!-- C1: fleet-level closed trades + aggregated stats -->
+        <div class="label">closed trades · fleet</div>
+        <div class="value num" x-text="hero.closedTrades">—</div>
+        <div class="footnote">
+          win <span class="num pos" x-text="fmtPct(hero.winRate * 100, 1)"></span> ·
+          PF <span class="num" x-text="fmtPF(hero.profitFactor)"></span>
+          <span class="dim"> · fleet-aggregated</span>
+        </div>
       </div>
     </div>
 
@@ -220,13 +150,14 @@
       <div class="card col-8">
         <div class="card-head">
           <div>
-            <div class="card-title">equity curve <span class="tag live">live</span></div>
-            <div class="card-sub">cumulative p&l vs scaled backtest expected</div>
+            <div class="card-title">
+              equity curve
+              <span class="tag live">live</span>
+            </div>
+            <div class="card-sub">live cumulative p&l vs scaled backtest expected</div>
           </div>
-          <!-- G5: stacked/overlay/normalized toggle -->
-          <div class="eq-toggle">
-            <button :class="eqMode==='overlay'?'on':''" @click="setEqMode('overlay')">overlay</button>
-            <button :class="eqMode==='normalized'?'on':''" @click="setEqMode('normalized')">indexed</button>
+          <div class="row gap-sm" x-show="liveBots.length" x-cloak>
+            <button class="icon-btn" @click="equityBot = liveBots[0]?.key" :class="equityBot === liveBots[0]?.key ? 'on' : ''" x-text="liveBots[0]?.label || ''"></button>
           </div>
         </div>
         <div class="chart tall" id="chart-equity"></div>
@@ -236,17 +167,17 @@
         <div class="card-head">
           <div>
             <div class="card-title">
-              <span x-text="openPos?(openPos.pair+' — open'):'open positions'"></span>
+              <span x-text="openPos ? openPos.pair + '  open' : 'open positions'"></span>
               <span class="tag" x-show="openPos" x-cloak
-                    :class="openPos&&openPos.profit_pct>=0?'live':'imm'"
-                    x-text="openPos?fmtPctSigned(openPos.profit_pct):''"></span>
+                    :class="openPos && openPos.profit_pct >= 0 ? 'live' : 'imm'"
+                    x-text="openPos ? fmtPctSigned(openPos.profit_pct) : ''"></span>
             </div>
-            <div class="card-sub" x-text="openPos?('opened '+fmtAge(openPosAge)+' ago'):'no exposure'"></div>
+            <div class="card-sub" x-text="openPos ? 'opened ' + fmtAge(openPosAge) + ' ago' : 'no exposure'"></div>
           </div>
-          <div class="row gap-sm" x-show="openPositions.length>1" x-cloak>
-            <template x-for="p in openPositions" :key="p._bot+':'+p.pair">
+          <div class="row gap-sm" x-show="openPositions.length > 1" x-cloak>
+            <template x-for="p in openPositions" :key="p._bot + ':' + p.pair">
               <button class="filter-pill"
-                      :class="openPosKey===(p._bot+':'+p.pair)?'on':''"
+                      :class="openPosKey === (p._bot + ':' + p.pair) ? 'on' : ''"
                       @click="setOpenPos(p)"
                       x-text="p.pair.split('/')[0]">PAIR</button>
             </template>
@@ -254,97 +185,115 @@
         </div>
         <div class="chart tall" id="chart-candles" x-show="openPos" x-cloak></div>
         <div class="empty" x-show="!openPos">
-          <div class="e-icon">○</div>
-          <span>no open positions</span>
-          <span class="e-hint">waiting for next signal</span>
+          <div class="icon">○</div>
+          waiting for next signal
         </div>
       </div>
     </div>
 
-    <!-- drawdown + concentration + expectancy -->
+    <!-- drawdown + concentration -->
     <div class="grid grid-12">
       <div class="card col-8">
         <div class="card-head">
-          <div class="card-title">drawdown · underwater</div>
-          <div class="card-sub">% below running peak · cap line at 1.5× backtest</div>
+          <div>
+            <div class="card-title">drawdown · underwater</div>
+            <div class="card-sub">% below running peak · cap line at 1.5× backtest</div>
+          </div>
         </div>
         <div class="chart short" id="chart-drawdown"></div>
       </div>
 
-      <div class="col-4 col gap-md">
+      <div class="col-4 col">
         <div class="concentration" :class="hero.concentration?.warn">
-          <div class="c-icon" x-text="hero.concentration?.warn==='danger'?'!!':(hero.concentration?.warn==='warn'?'!':'◇')"></div>
-          <div class="c-body">
-            <div class="c-label">p&l concentration</div>
-            <div class="c-text" x-show="hero.concentration?.top_pair" x-cloak>
-              <strong x-text="hero.concentration?.top_pair"></strong>
-              <span class="num" :class="(hero.concentration?.top_pair_pnl||0)>=0?'pos':'neg'" x-text="' '+fmtUsdSigned(hero.concentration?.top_pair_pnl)"></span>
-              <span class="dim"> in <span x-text="hero.concentration?.top_pair_trades"></span> trades</span>
+          <div class="icon" x-text="hero.concentration?.warn === 'danger' ? '⚠' : (hero.concentration?.warn === 'warn' ? '!' : '◇')"></div>
+          <div class="body">
+            <div class="label">
+              p&l concentration · fleet closed trades
+              <span class="dim" style="text-transform: none; letter-spacing: 0;"
+                    x-show="hero.concentration?.top_pair_trades" x-cloak>
+                · n=<span x-text="hero.expectancySample"></span>
+              </span>
             </div>
-            <div class="c-text dim" x-show="!hero.concentration?.top_pair">no closed trades yet</div>
+            <div class="text" x-show="hero.concentration?.top_pair" x-cloak>
+              <strong x-text="hero.concentration?.top_pair"></strong>
+              <span class="num pos" x-text="fmtUsdSigned(hero.concentration?.top_pair_pnl)"></span>
+              <span class="dim">in <span class="num" x-text="hero.concentration?.top_pair_trades"></span> trade<span x-show="hero.concentration?.top_pair_trades !== 1">s</span></span>
+              <span class="dim">·</span>
+              <span class="dim">rest of fleet</span>
+              <span class="num" :class="(hero.concentration?.ex_top_pnl ?? 0) >= 0 ? 'pos' : 'neg'"
+                    x-text="fmtUsdSigned(hero.concentration?.ex_top_pnl)"></span>
+            </div>
+            <div class="text dim" x-show="!hero.concentration?.top_pair">no closed trades yet</div>
           </div>
-          <div class="c-pct" x-show="hero.concentration?.top_pair&&hero.concentration?.top_share>0" x-cloak
-               x-text="Math.min(100,Math.round((hero.concentration?.top_share||0)*100))+'%'"></div>
+          <div class="num-pill" x-show="hero.concentration?.top_pair && hero.concentration?.top_share > 0" x-cloak
+               x-text="Math.min(100, Math.round((hero.concentration?.top_share ?? 0) * 100)) + '%'"
+               title="share of GROSS positive p&l carried by top pair · fleet-aggregated"></div>
         </div>
 
+        <!-- C1: fleet-level expectancy -->
         <div class="card">
           <div class="card-head">
-            <div class="card-title">expectancy</div>
-            <div class="card-sub" x-text="hero.expectancySample+' trade sample'"></div>
+            <div class="card-title">expectancy · fleet</div>
+            <div class="card-sub" x-text="hero.expectancySample + ' trade sample · all live bots'">—</div>
           </div>
           <div class="kv">
-            <span class="k">avg win</span>   <span class="v pos"  x-text="fmtUsdSigned(hero.avgWin)"></span>
-            <span class="k">avg loss</span>  <span class="v neg"  x-text="fmtUsdSigned(hero.avgLoss)"></span>
-            <span class="k">payoff</span>    <span class="v"      x-text="hero.payoff!=null?hero.payoff.toFixed(2):'—'"></span>
-            <span class="k">per trade</span> <span class="v" :class="(hero.expectancyPerTrade||0)>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.expectancyPerTrade)"></span>
+            <span class="k">avg win · fleet</span>
+              <span class="v pos" x-text="fmtUsdSigned(hero.avgWin)"></span>
+            <span class="k">avg loss · fleet</span>
+              <span class="v neg" x-text="fmtUsdSigned(hero.avgLoss)"></span>
+            <span class="k">payoff ratio</span>
+              <span class="v" x-text="hero.payoff != null ? hero.payoff.toFixed(2) : '—'"></span>
+            <span class="k">expectancy / trade</span>
+              <span class="v" :class="(hero.expectancyPerTrade ?? 0) >= 0 ? 'pos' : 'neg'"
+                    x-text="fmtUsdSigned(hero.expectancyPerTrade)"></span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- p&l by pair + recent trades -->
+    <!-- per-pair + ledger -->
     <div class="grid grid-12">
       <div class="card col-5">
         <div class="card-head">
-          <div class="card-title">p&l by pair</div>
-          <div class="card-sub">closed trades</div>
+          <div>
+            <div class="card-title">p&l by pair · fleet</div>
+            <div class="card-sub">closed trades · aggregated across all live bots</div>
+          </div>
         </div>
         <div class="chart short" id="chart-perpair"></div>
       </div>
-      <div class="card col-7">
+
+      <div class="card col-7 card-body flush">
         <div class="card-head">
-          <div class="card-title">recent trades</div>
-          <div class="card-sub">last 30 closed</div>
+          <div>
+            <div class="card-title">recent trades · live bots</div>
+            <div class="card-sub">last 30 closed across all live bots</div>
+          </div>
         </div>
-        <div class="scroll-y max-380">
+        <div style="max-height: 380px; overflow-y: auto;">
           <table class="ledger">
             <thead>
               <tr>
-                <th>closed</th><th>pair</th>
-                <th class="right">entry</th><th class="right">exit</th>
-                <th class="right">p&l</th><th>reason</th>
+                <th>closed</th><th>pair</th><th class="right">entry</th><th class="right">exit</th>
+                <th class="right">p&l %</th><th class="right">p&l $</th><th>reason</th>
               </tr>
             </thead>
             <tbody>
-              <template x-for="t in recentLiveTrades" :key="t.close_timestamp+t.pair">
+              <template x-for="t in recentLiveTrades" :key="t.close_timestamp + t.pair">
                 <tr>
                   <td x-text="fmtDate(t.close_date)"></td>
                   <td class="label" x-text="t.pair"></td>
-                  <!-- B5: toPrecision(5) on rates -->
-                  <td class="right" x-text="fmtRate(t.open_rate)"></td>
-                  <td class="right" x-text="fmtRate(t.close_rate)"></td>
-                  <td class="right pnl-cell">
-                    <span class="pct" :class="t.profit_pct>=0?'pos':'neg'" x-text="fmtPctSigned(t.profit_pct)"></span>
-                    <span class="abs" x-text="fmtUsdSigned(t.profit_abs)"></span>
-                  </td>
+                  <td class="right" x-text="t.open_rate"></td>
+                  <td class="right" x-text="t.close_rate"></td>
+                  <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(t.profit_pct)"></td>
+                  <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(t.profit_abs)"></td>
                   <td><span class="reason-pill" :class="t.exit_reason" x-text="t.exit_reason"></span></td>
                 </tr>
               </template>
             </tbody>
           </table>
           <div class="empty" x-show="!recentLiveTrades.length">
-            <div class="e-icon">—</div>
-            <span>no closed trades yet</span>
+            <div class="icon">—</div> no closed trades yet
           </div>
         </div>
       </div>
@@ -353,174 +302,241 @@
   </main>
 
   <!-- ══════════════ DRY-RUN TAB ══════════════ -->
-  <main class="tab-panel" x-show="tab==='dryrun'" x-cloak>
+  <main class="tab-panel" x-show="tab === 'dryrun'" x-cloak>
 
     <template x-for="bot in dryRunBots" :key="bot.key">
       <div class="col gap-md">
 
-        <!-- header with verdict -->
+        <!-- header card with verdict -->
         <div class="card">
           <div class="card-head">
             <div>
               <div class="card-title">
                 <span x-text="bot.label"></span>
                 <span class="tag dry">dry-run</span>
-                <span class="tag futures" x-show="bot.name==='KillersScalpV1'" x-cloak>futures</span>
-                <span class="tag imm" x-show="bot.stats.closed_trade_count<30" x-cloak
-                      x-text="'n='+bot.stats.closed_trade_count"></span>
+                <span class="tag imm" x-show="bot.stats.closed_trade_count < 30" x-cloak
+                      x-text="'n=' + bot.stats.closed_trade_count"></span>
               </div>
               <div class="card-sub">
-                <span x-text="bot.name"></span> · <span x-text="bot.days_running+' days'"></span> ·
+                <span x-text="bot.name"></span> · <span x-text="bot.days_running + ' days'"></span> ·
                 eta to gate-1 → <span x-text="etaToGate1(bot)"></span>
               </div>
             </div>
-            <!-- G6: NOT READY with blocker text -->
             <div class="verdict" :class="readyVerdict(bot).cls" x-text="readyVerdict(bot).text"></div>
           </div>
 
-          <!-- B4: no-baseline empty state for observational bots -->
-          <template x-if="bot.observational || bot.baseline==null || Object.keys(bot.baseline).length<=1">
-            <div class="no-baseline-card">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              <span>no baseline configured · monitoring only · gates activate after 30–50 live trades establish a reference</span>
+          <div class="grid grid-12" style="padding: 1.1rem;">
+            <!-- gate 1 rings -->
+            <div class="col-6">
+              <div class="small-cap" style="margin-bottom: 0.85rem;">gate 1 · sample threshold</div>
+              <div class="gate-rings" style="padding: 0;">
+                <div class="ring-wrap">
+                  <div class="ring" :data-pct="bot.gate1.trades.pct"
+                       :data-ok="bot.gate1.trades.ok ? '1' : '0'"
+                       x-html="renderRing(bot.gate1.trades.pct, bot.gate1.trades.ok)"></div>
+                  <div class="title">trades · <span class="num" x-text="bot.gate1.trades.actual + ' / ' + bot.gate1.trades.target"></span></div>
+                </div>
+                <div class="ring-wrap">
+                  <div class="ring" x-html="renderRing(bot.gate1.days.pct, bot.gate1.days.ok)"></div>
+                  <div class="title">days · <span class="num" x-text="bot.gate1.days.actual + ' / ' + bot.gate1.days.target"></span></div>
+                </div>
+                <div class="ring-wrap">
+                  <div class="ring" x-html="renderRing(bot.gate1.pairs.pct, bot.gate1.pairs.ok)"></div>
+                  <div class="title">pairs · <span class="num" x-text="bot.gate1.pairs.actual + ' / ' + bot.gate1.pairs.target"></span></div>
+                </div>
+              </div>
             </div>
-          </template>
 
-          <template x-if="!bot.observational && bot.baseline!=null && Object.keys(bot.baseline).length>1 && bot.gate1 && bot.gate1.trades">
-            <div class="grid grid-12" style="padding:1rem">
-              <!-- gate 1 rings -->
-              <div class="col-6">
-                <div class="small-cap" style="margin-bottom:0.75rem">gate 1 · sample threshold</div>
-                <div class="gate-rings" style="padding:0">
-                  <div class="ring-wrap">
-                    <div class="ring" x-html="renderRing(bot.gate1.trades.pct,bot.gate1.trades.ok)"></div>
-                    <div class="title">trades · <span class="num" x-text="bot.gate1.trades.actual+' / '+bot.gate1.trades.target"></span></div>
+            <!-- gate 2 bullets -->
+            <div class="col-6">
+              <div class="small-cap" style="margin-bottom: 0.85rem;">gate 2 · live within backtest band</div>
+              <div class="bullet-list" style="padding: 0;">
+                <div class="bullet">
+                  <div class="bullet-head">
+                    <span class="name">profit pace · ±25%</span>
+                    <span class="delta" :class="g2DeltaClass(bot.gate2.profit.status)"
+                          x-text="bot.gate2.profit.actual_pct.toFixed(1) + '% · expected ' + bot.gate2.profit.expected_pct.toFixed(1) + '%'"></span>
                   </div>
-                  <div class="ring-wrap">
-                    <div class="ring" x-html="renderRing(bot.gate1.days.pct,bot.gate1.days.ok)"></div>
-                    <div class="title">days · <span class="num" x-text="bot.gate1.days.actual+' / '+bot.gate1.days.target"></span></div>
+                  <div class="bullet-track" x-html="renderBullet(bot.gate2.profit, 'pct')"></div>
+                </div>
+                <div class="bullet">
+                  <div class="bullet-head">
+                    <span class="name">profit factor · ±20%</span>
+                    <span class="delta" :class="g2DeltaClass(bot.gate2.pf.status)"
+                          x-text="(bot.gate2.pf.actual ?? '—') + ' · expected ' + bot.gate2.pf.expected"></span>
                   </div>
-                  <div class="ring-wrap">
-                    <div class="ring" x-html="renderRing(bot.gate1.pairs.pct,bot.gate1.pairs.ok)"></div>
-                    <div class="title">pairs · <span class="num" x-text="bot.gate1.pairs.actual+' / '+bot.gate1.pairs.target"></span></div>
+                  <div class="bullet-track" x-html="renderBullet(bot.gate2.pf, 'pf')"></div>
+                </div>
+                <div class="bullet">
+                  <div class="bullet-head">
+                    <span class="name">drawdown · ≤1.5×</span>
+                    <span class="delta" :class="g2DeltaClass(bot.gate2.dd.status)"
+                          x-text="bot.gate2.dd.actual_pct.toFixed(2) + '% · cap ' + bot.gate2.dd.cap_pct + '%'"></span>
                   </div>
+                  <div class="bullet-track" x-html="renderBullet(bot.gate2.dd, 'dd')"></div>
                 </div>
               </div>
+            </div>
 
-              <!-- gate 2 bullets -->
-              <div class="col-6">
-                <div class="small-cap" style="margin-bottom:0.75rem">gate 2 · live within backtest band</div>
-                <div class="bullet-list" style="padding:0">
-                  <div class="bullet">
-                    <div class="bullet-head">
-                      <span class="name">profit pace · ±25%</span>
-                      <span class="delta" :class="g2DeltaClass(bot.gate2.profit.status)"
-                            x-text="bot.gate2.profit.actual_pct.toFixed(1)+'% · expected '+bot.gate2.profit.expected_pct.toFixed(1)+'%'"></span>
-                    </div>
-                    <div class="bullet-track" x-html="renderBullet(bot.gate2.profit,'pct')"></div>
-                  </div>
-                  <div class="bullet">
-                    <div class="bullet-head">
-                      <span class="name">profit factor · ±20%</span>
-                      <span class="delta" :class="g2DeltaClass(bot.gate2.pf.status)"
-                            x-text="(bot.gate2.pf.actual??'—')+' · expected '+bot.gate2.pf.expected"></span>
-                    </div>
-                    <div class="bullet-track" x-html="renderBullet(bot.gate2.pf,'pf')"></div>
-                  </div>
-                  <div class="bullet">
-                    <div class="bullet-head">
-                      <span class="name">drawdown · ≤1.5×</span>
-                      <span class="delta" :class="g2DeltaClass(bot.gate2.dd.status)"
-                            x-text="bot.gate2.dd.actual_pct.toFixed(2)+'% · cap '+bot.gate2.dd.cap_pct+'%'"></span>
-                    </div>
-                    <div class="bullet-track" x-html="renderBullet(bot.gate2.dd,'dd')"></div>
+            <!-- gate 3 + calibration -->
+            <div class="col-12">
+              <div class="grid grid-12">
+                <div class="col-6">
+                  <div class="small-cap" style="margin-bottom: 0.85rem;">gate 3 · risk anomalies</div>
+                  <div class="kv" style="padding: 0;">
+                    <span class="k">worst single trade</span>
+                      <span class="v" :class="bot.gate3.worst_trade_pct.ok ? 'pos' : 'neg'"
+                            x-text="bot.gate3.worst_trade_pct.actual + '% · cap ' + bot.gate3.worst_trade_pct.cap + '%'"></span>
+                    <span class="k">consec losses</span>
+                      <span class="v" :class="bot.gate3.consec_losses.ok ? 'pos' : 'neg'"
+                            x-text="bot.gate3.consec_losses.actual + ' / ' + bot.gate3.consec_losses.cap"></span>
+                    <span class="k">force-exits</span>
+                      <span class="v" :class="bot.gate3.force_exits.ok ? 'pos' : 'neg'"
+                            x-text="bot.gate3.force_exits.actual + ' / ' + bot.gate3.force_exits.cap"></span>
                   </div>
                 </div>
-              </div>
-
-              <!-- gate 3 + calibration -->
-              <div class="col-12">
-                <div class="grid grid-12">
-                  <div class="col-6">
-                    <div class="small-cap" style="margin-bottom:0.75rem">gate 3 · risk anomalies</div>
-                    <div class="kv" style="padding:0">
-                      <span class="k">worst trade</span>
-                        <span class="v" :class="bot.gate3.worst_trade_pct.ok?'pos':'neg'"
-                              x-text="bot.gate3.worst_trade_pct.actual+'% · cap '+bot.gate3.worst_trade_pct.cap+'%'"></span>
-                      <span class="k">consec losses</span>
-                        <span class="v" :class="bot.gate3.consec_losses.ok?'pos':'neg'"
-                              x-text="bot.gate3.consec_losses.actual+' / '+bot.gate3.consec_losses.cap"></span>
-                      <span class="k">force-exits</span>
-                        <span class="v" :class="bot.gate3.force_exits.ok?'pos':'neg'"
-                              x-text="bot.gate3.force_exits.actual+' / '+bot.gate3.force_exits.cap"></span>
-                    </div>
-                  </div>
-                  <div class="col-6">
-                    <div class="small-cap" style="margin-bottom:0.75rem">calibration · live vs lab</div>
-                    <div class="kv" style="padding:0">
-                      <span class="k">return %</span>
-                        <span class="v" x-text="bot.pnl.all_pct.toFixed(2)+'%'"><span class="secondary" x-text="'expected '+bot.gate2.profit.expected_pct.toFixed(2)+'%'"></span></span>
-                      <span class="k">profit factor</span>
-                        <span class="v" x-text="(bot.stats.profit_factor?.toFixed(2)??'—')"><span class="secondary" x-text="'lab '+bot.baseline.profit_factor"></span></span>
-                      <span class="k">win rate</span>
-                        <span class="v" x-text="(bot.stats.winrate*100).toFixed(1)+'%'"><span class="secondary" x-text="'lab '+(bot.baseline.win_rate*100).toFixed(1)+'%'"></span></span>
-                      <span class="k">trades/yr pace</span>
-                        <span class="v" x-text="bot.days_running>0?(bot.stats.closed_trade_count/bot.days_running*365).toFixed(0):'—'"><span class="secondary" x-text="'lab '+bot.baseline.trades_per_year"></span></span>
-                    </div>
+                <div class="col-6">
+                  <div class="small-cap" style="margin-bottom: 0.85rem;">calibration · live vs lab</div>
+                  <div class="kv" style="padding: 0;">
+                    <span class="k">return %</span>
+                      <span class="v" x-text="bot.pnl.all_pct.toFixed(2) + '%  ·  expected ' + bot.gate2.profit.expected_pct.toFixed(2) + '%'"></span>
+                    <span class="k">profit factor</span>
+                      <span class="v" x-text="(bot.stats.profit_factor?.toFixed(2) ?? '—') + '  ·  lab ' + bot.baseline.profit_factor"></span>
+                    <span class="k">win rate</span>
+                      <span class="v" x-text="(bot.stats.winrate * 100).toFixed(1) + '%  ·  lab ' + (bot.baseline.win_rate * 100).toFixed(1) + '%'"></span>
+                    <span class="k">trades / yr pace</span>
+                      <span class="v" x-text="bot.days_running > 0 ? (bot.stats.closed_trade_count / bot.days_running * 365).toFixed(0) + '  ·  lab ' + bot.baseline.trades_per_year : '—'"></span>
                   </div>
                 </div>
               </div>
             </div>
-          </template>
+          </div>
         </div>
 
-        <!-- equity chart -->
+        <!-- C5: per-bot diagnostic pivot — equity + last trade trace + open trades + deviation -->
         <div class="card">
           <div class="card-head">
             <div>
               <div class="card-title">equity · live vs expected</div>
-              <div class="card-sub">scaled backtest curve overlaid on dry-run p&l</div>
+              <div class="card-sub">scaled backtest curve overlaid on dry-run cumulative p&l</div>
             </div>
           </div>
-          <div class="chart" :id="'chart-equity-'+bot.key"></div>
+          <div class="chart" :id="'chart-equity-' + bot.key"></div>
         </div>
 
-        <!-- ledger -->
+        <!-- C5: last trade trace -->
         <div class="card">
           <div class="card-head">
-            <div class="card-title">dry-run ledger</div>
-            <div class="card-sub">closed trades · n=<span x-text="bot.stats.closed_trade_count"></span></div>
+            <div class="card-title">last trade trace</div>
+            <div class="card-sub">most recent closed trade · entry → exit · deviation from expected</div>
           </div>
-          <div class="scroll-y max-380">
-            <table class="ledger" x-show="bot.recent_trades.length" x-cloak>
-              <thead>
-                <tr>
-                  <th>closed</th><th>pair</th><th class="right">entry</th><th class="right">exit</th>
-                  <th class="right">p&l</th><th>reason</th><th class="right">duration</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="t in bot.recent_trades.slice(0,20)" :key="t.close_timestamp+t.pair">
-                  <tr>
-                    <td x-text="fmtDate(t.close_date)"></td>
-                    <td class="label" x-text="t.pair"></td>
-                    <td class="right" x-text="fmtRate(t.open_rate)"></td>
-                    <td class="right" x-text="fmtRate(t.close_rate)"></td>
-                    <td class="right pnl-cell">
-                      <span class="pct" :class="t.profit_pct>=0?'pos':'neg'" x-text="fmtPctSigned(t.profit_pct)"></span>
-                      <span class="abs" x-text="fmtUsdSigned(t.profit_abs)"></span>
-                    </td>
-                    <td><span class="reason-pill" :class="t.exit_reason" x-text="t.exit_reason"></span></td>
-                    <td class="right" x-text="fmtMin(t.trade_duration)"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-            <div class="empty" x-show="!bot.recent_trades.length">
-              <div class="e-icon">—</div>
-              <span>signal hasn't fired enough yet</span>
-              <span class="e-hint">keep watching</span>
+          <template x-if="lastClosedTrade(bot)">
+            <div>
+              <div class="bot-detail-section">
+                <div class="last-trade-trace">
+                  <div class="ltt-row">
+                    <span class="ltt-k">pair</span>
+                    <span class="ltt-v" x-text="lastClosedTrade(bot).pair">—</span>
+                  </div>
+                  <div class="ltt-row">
+                    <span class="ltt-k">side</span>
+                    <span class="ltt-v" x-text="lastClosedTrade(bot).is_open ? 'open' : 'closed'">—</span>
+                  </div>
+                  <div class="ltt-row">
+                    <span class="ltt-k">entry</span>
+                    <span class="ltt-v" x-text="(lastClosedTrade(bot).open_rate || 0).toPrecision(5)">—</span>
+                  </div>
+                  <div class="ltt-row">
+                    <span class="ltt-k">exit</span>
+                    <span class="ltt-v" x-text="(lastClosedTrade(bot).close_rate || 0).toPrecision(5)">—</span>
+                  </div>
+                  <div class="ltt-row">
+                    <span class="ltt-k">p&l</span>
+                    <span class="ltt-v"
+                          :class="(lastClosedTrade(bot).profit_pct || 0) >= 0 ? 'pos' : 'neg'"
+                          x-text="fmtPctSigned(lastClosedTrade(bot).profit_pct) + ' · ' + fmtUsdSigned(lastClosedTrade(bot).profit_abs)">—</span>
+                  </div>
+                  <div class="ltt-row">
+                    <span class="ltt-k">exit reason</span>
+                    <span class="ltt-v" x-text="lastClosedTrade(bot).exit_reason || '—'">—</span>
+                  </div>
+                  <div class="ltt-row">
+                    <span class="ltt-k">duration</span>
+                    <span class="ltt-v" x-text="fmtMin(lastClosedTrade(bot).trade_duration)">—</span>
+                  </div>
+                  <div class="ltt-row">
+                    <span class="ltt-k">strategy signals</span>
+                    <span class="ltt-v dim" style="font-size:10px;">— data missing · pending backend support</span>
+                  </div>
+                </div>
+              </div>
+              <div class="bot-detail-section" x-show="deviationSummary(bot)">
+                <div class="section-title">live vs backtest deviation · last 14 days</div>
+                <div class="deviation-summary" x-text="deviationSummary(bot)"></div>
+              </div>
             </div>
+          </template>
+          <div class="empty" x-show="!lastClosedTrade(bot)">
+            <div class="icon">—</div> no closed trades yet
+          </div>
+        </div>
+
+        <!-- C5: open trade status for this bot -->
+        <div class="card" x-show="bot.open_trades && bot.open_trades.length > 0" x-cloak>
+          <div class="card-head">
+            <div class="card-title">open trade status</div>
+            <div class="card-sub">progress vs ROI target · time in trade · stop distance</div>
+          </div>
+          <div class="bot-detail-section">
+            <template x-for="ot in openTradesForBot(bot)" :key="ot.pair">
+              <div class="open-trade-row">
+                <span class="open-trade-pair" x-text="ot.pair">—</span>
+                <div class="open-trade-progress">
+                  <div class="open-trade-bar"
+                       :class="(ot.profit_pct || 0) < 0 ? 'neg' : ''"
+                       :style="'width:' + ot.progress + '%'"></div>
+                </div>
+                <span class="open-trade-meta">
+                  <span :class="(ot.profit_pct || 0) >= 0 ? 'pos' : 'neg'"
+                        x-text="fmtPctSigned(ot.profit_pct)"></span>
+                  · <span x-text="fmtMin(ot.ageMin)"></span>
+                </span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- ledger (C5: kept as-is — it's not redundant here, it's the raw per-bot audit trail) -->
+        <div class="card card-body flush">
+          <div class="card-head">
+            <div>
+              <div class="card-title">dry-run ledger</div>
+              <div class="card-sub">closed trades · n=<span x-text="bot.stats.closed_trade_count"></span></div>
+            </div>
+          </div>
+          <table class="ledger" x-show="bot.recent_trades.length" x-cloak>
+            <thead>
+              <tr>
+                <th>closed</th><th>pair</th><th class="right">entry</th><th class="right">exit</th>
+                <th class="right">p&l %</th><th>reason</th><th class="right">duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="t in bot.recent_trades.slice(0, 20)" :key="t.close_timestamp + t.pair">
+                <tr>
+                  <td x-text="fmtDate(t.close_date)"></td>
+                  <td class="label" x-text="t.pair"></td>
+                  <td class="right" x-text="t.open_rate"></td>
+                  <td class="right" x-text="t.close_rate"></td>
+                  <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(t.profit_pct)"></td>
+                  <td><span class="reason-pill" :class="t.exit_reason" x-text="t.exit_reason"></span></td>
+                  <td class="right" x-text="fmtMin(t.trade_duration)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div class="empty" x-show="!bot.recent_trades.length">
+            <div class="icon">—</div> signal hasn't fired enough yet · keep watching
           </div>
         </div>
 
@@ -528,484 +544,83 @@
     </template>
 
     <div class="empty" x-show="!dryRunBots.length">
-      <div class="e-icon">○</div>
-      <span>no dry-run bots reachable</span>
+      <div class="icon">○</div>
+      no dry-run bots configured
     </div>
 
   </main>
 
   <!-- ══════════════ TRADES TAB ══════════════ -->
-  <main class="tab-panel" x-show="tab==='trades'" x-cloak>
+  <main class="tab-panel" x-show="tab === 'trades'" x-cloak>
 
     <div class="trades-toolbar">
       <div class="trades-summary">
-        <span class="tc" x-text="filteredTrades.length+' trades'"></span>
-        <span class="ts">·</span>
-        <span>win <span class="num pos" x-text="tradesWinRate+'%'"></span></span>
-        <span class="ts">·</span>
-        <span class="num" :class="tradesTotalPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(tradesTotalPnl)"></span>
+        <span class="trades-count" x-text="closedTrades.length + ' closed trades'">0 closed trades</span>
+        <span class="trades-sep">·</span>
+        <span class="trades-wr">
+          win <span x-text="tradesWinRate">—</span>%
+        </span>
+        <span class="trades-sep">·</span>
+        <span class="trades-pnl" :class="tradesTotalPnl >= 0 ? 'pos' : 'neg'">
+          <span x-text="(tradesTotalPnl >= 0 ? '+' : '') + fmtUsd(tradesTotalPnl)">—</span>
+        </span>
       </div>
       <div class="trades-filter">
-        <template x-for="bot in allBots" :key="bot.key">
+        <template x-for="bot in liveBots.concat(dryRunBots)" :key="bot.key">
           <button class="filter-pill"
-                  :class="tradesFilter===bot.key?'on':''"
+                  :class="tradesFilter === bot.key ? 'on' : ''"
                   @click="setTradesFilter(bot.key)"
-                  x-text="bot.label||bot.name">bot</button>
+                  x-text="bot.label || bot.name">bot</button>
         </template>
         <button class="filter-pill"
-                :class="tradesFilter==='all'?'on':''"
+                :class="tradesFilter === 'all' ? 'on' : ''"
                 @click="setTradesFilter('all')">all</button>
       </div>
     </div>
 
     <div class="trades-grid">
-      <template x-for="trade in filteredTrades" :key="trade.bot_key+'-'+trade.open_ts+'-'+trade.pair">
-        <div class="trade-card" :class="trade.is_win?'win':'loss'">
+      <template x-for="trade in filteredTrades" :key="trade.bot_key + '-' + trade.open_ts + '-' + trade.pair">
+        <div class="trade-card" :class="trade.is_win ? 'win' : 'loss'">
           <div class="trade-card-head">
             <div class="trade-card-pair">
-              <span class="bot-glyph" :data-bot="trade.bot_key" x-text="(trade.bot_name||'?').charAt(0).toUpperCase()"></span>
-              <span class="pair-name" x-text="trade.pair"></span>
+              <span class="bot-glyph" :data-bot="trade.bot_key" x-text="(trade.bot_name||'?').charAt(0).toUpperCase()">·</span>
+              <span class="pair-name" x-text="trade.pair">PAIR</span>
             </div>
             <div class="trade-card-meta">
-              <span class="trade-pnl" :class="trade.is_win?'pos':'neg'">
-                <span x-text="(trade.profit_pct>=0?'+':'')+Number(trade.profit_pct||0).toFixed(2)+'%'"></span>
-                <span class="abs" x-text="'('+fmtUsdSigned(trade.profit_abs)+')'"></span>
+              <span class="trade-pnl" :class="trade.is_win ? 'pos' : 'neg'">
+                <span x-text="(trade.profit_pct >= 0 ? '+' : '') + (trade.profit_pct||0).toFixed(2) + '%'">—</span>
+                <span class="abs" x-text="'(' + (trade.profit_abs >= 0 ? '+' : '') + fmtUsd(trade.profit_abs) + ')'">—</span>
               </span>
-              <span class="trade-reason" :class="'reason-'+(trade.exit_reason||'unknown')" x-text="trade.exit_reason||'—'"></span>
+              <span class="trade-reason" :class="'reason-' + (trade.exit_reason||'unknown')" x-text="trade.exit_reason || '—'">—</span>
             </div>
           </div>
           <div class="trade-card-detail">
-            <span>entry <strong x-text="fmtRate(trade.open_rate)"></strong></span>
+            <span>entry <strong x-text="(trade.open_rate||0).toPrecision(5)">—</strong></span>
             <span class="sep">→</span>
-            <span>exit <strong x-text="fmtRate(trade.close_rate)"></strong></span>
+            <span>exit <strong x-text="(trade.close_rate||0).toPrecision(5)">—</strong></span>
             <span class="sep">·</span>
-            <span x-text="formatTradeWindow(trade)"></span>
+            <span x-text="formatTradeWindow(trade)">—</span>
             <span class="grow"></span>
             <div class="tf-pills">
               <template x-for="tf in ['5m','15m','1h','4h']" :key="tf">
                 <button class="tf-pill"
-                        :class="tradeTimeframe(trade)===tf?'on':''"
-                        @click="setTradeTimeframe(trade,tf)"
-                        x-text="tf"></button>
+                        :class="tradeTimeframe(trade) === tf ? 'on' : ''"
+                        @click="setTradeTimeframe(trade, tf)"
+                        x-text="tf">tf</button>
               </template>
             </div>
           </div>
-          <div class="trade-chart" :id="'trade-chart-'+trade.bot_key+'-'+trade.open_ts"></div>
+          <div class="trade-chart" :id="'trade-chart-' + trade.bot_key + '-' + trade.open_ts"></div>
         </div>
       </template>
+
       <div class="empty" x-show="!filteredTrades.length">
-        <div class="e-icon">∅</div>
-        <span>no closed trades yet</span>
+        <div class="icon">∅</div>
+        no closed trades yet
       </div>
     </div>
 
   </main>
-
-  <!-- ══════════════ PER-BOT DETAIL TAB ══════════════ -->
-  <!-- Shared template for fundingfade / keltner / cascade -->
-  <template x-for="bot in allBots" :key="'detail:'+bot.key">
-    <main class="tab-panel" x-show="tab===('bot:'+bot.key)" x-cloak>
-
-      <!-- 6-tile header strip -->
-      <div class="bot-detail-header">
-        <div class="bdh-strip">
-          <div>
-            <div class="bdh-name">
-              <span x-text="bot.label"></span>
-              <span class="tag" :class="bot.dry_run?'dry':'live'" x-text="bot.dry_run?'dry-run':'live'"></span>
-              <span class="tag futures" x-show="bot.name==='KillersScalpV1'" x-cloak>futures</span>
-            </div>
-            <div class="bdh-sub">
-              <span x-text="bot.name"></span> ·
-              <span x-text="bot.days_running+' days'"></span> ·
-              <span x-text="(bot.whitelist_size||'?')+' pairs'"></span>
-            </div>
-          </div>
-          <div class="bdh-spacer"></div>
-          <!-- G2: deep links -->
-          <div class="deeplinks" style="border:0;padding:0;background:transparent">
-            <template x-if="bot.links?.freqtrade_ui">
-              <a class="dl-btn" :href="bot.links.freqtrade_ui" target="_blank" rel="noopener">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                freqtrade
-              </a>
-            </template>
-            <template x-if="bot.links?.tradingview_top_pair">
-              <a class="dl-btn" :href="bot.links.tradingview_top_pair" target="_blank" rel="noopener">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                tradingview
-              </a>
-            </template>
-            <button class="dl-btn" @click="showLogs(bot)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="14" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
-              logs
-            </button>
-          </div>
-        </div>
-        <div class="bdh-tiles">
-          <div class="bdh-tile">
-            <div class="bt-label">total p&l</div>
-            <div class="bt-val" :class="bot.pnl.all_coin>=0?'pos':'neg'" x-text="fmtUsdSigned(bot.pnl.all_coin)">—</div>
-            <div class="bt-sub" x-text="fmtPctSigned(bot.pnl.all_pct)+'%'"></div>
-          </div>
-          <div class="bdh-tile">
-            <div class="bt-label">wallet</div>
-            <div class="bt-val" x-text="fmtUsd(bot.wallet.bot_owned)">—</div>
-            <div class="bt-sub" x-text="'started '+fmtUsd(bot.wallet.starting_capital)"></div>
-          </div>
-          <div class="bdh-tile">
-            <div class="bt-label">trades</div>
-            <div class="bt-val" x-text="bot.stats.closed_trade_count">0</div>
-            <div class="bt-sub" x-text="bot.stats.trade_count+' total incl open'"></div>
-          </div>
-          <div class="bdh-tile">
-            <div class="bt-label">win rate</div>
-            <div class="bt-val" x-text="fmtPct(bot.stats.winrate*100,1)">—</div>
-            <div class="bt-sub" x-text="'PF '+fmtPF(bot.stats.profit_factor)"></div>
-          </div>
-          <div class="bdh-tile">
-            <div class="bt-label">max drawdown</div>
-            <div class="bt-val" x-text="fmtPct(bot.stats.max_drawdown*100,2)">—</div>
-            <div class="bt-sub" x-show="bot.baseline?.max_dd_pct" x-cloak x-text="'cap '+fmtPct(bot.baseline.max_dd_pct*1.5,1)"></div>
-          </div>
-          <div class="bdh-tile">
-            <div class="bt-label">open trades</div>
-            <div class="bt-val" x-text="bot.open_trades?.length||0">0</div>
-            <div class="bt-sub" x-text="fmtUsd(bot.capital_at_risk?.abs_loss||0)+' at risk'"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- open positions (prominent for futures/killers-scalp) -->
-      <template x-if="bot.open_trades?.length">
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">open positions</div>
-            <div class="card-sub" x-text="bot.open_trades.length+' open'"></div>
-          </div>
-          <div class="scroll-y">
-            <table class="open-pos-table">
-              <thead>
-                <tr>
-                  <th>pair</th><th class="right">entry</th><th class="right">current</th>
-                  <th class="right">p&l</th><th class="right">stake</th><th class="right">opened</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="t in bot.open_trades" :key="t.pair">
-                  <tr>
-                    <td class="pair-col" x-text="t.pair"></td>
-                    <td class="right" x-text="fmtRate(t.open_rate)"></td>
-                    <td class="right" x-text="fmtRate(t.current_rate)"></td>
-                    <td class="right pnl-cell">
-                      <span class="pct" :class="(t.profit_pct||0)>=0?'pos':'neg'" x-text="fmtPctSigned(t.profit_pct)"></span>
-                      <span class="abs" x-text="fmtUsdSigned(t.profit_abs)"></span>
-                    </td>
-                    <td class="right" x-text="fmtUsd(t.stake_amount)"></td>
-                    <td class="right" x-text="fmtAge(Math.max(0,Math.floor((Date.now()-(t.open_timestamp||0))/1000)))+' ago'"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </template>
-
-      <!-- equity + drawdown -->
-      <div class="grid grid-12">
-        <div class="card col-8">
-          <div class="card-head">
-            <div class="card-title">equity curve</div>
-            <div class="card-sub">cumulative p&l vs backtest expected</div>
-          </div>
-          <!-- G3: equity annotations (markLines) rendered in JS when bot.equity_annotations present -->
-          <div class="chart tall" :id="'chart-detail-equity-'+bot.key"></div>
-        </div>
-        <div class="card col-4">
-          <div class="card-head">
-            <div class="card-title">drawdown</div>
-            <div class="card-sub">% below running peak</div>
-          </div>
-          <div class="chart short" :id="'chart-detail-dd-'+bot.key"></div>
-        </div>
-      </div>
-
-      <!-- p&l by pair + expectancy -->
-      <div class="grid grid-12">
-        <div class="card col-5">
-          <div class="card-head">
-            <div class="card-title">p&l by pair</div>
-          </div>
-          <div class="chart short" :id="'chart-detail-pair-'+bot.key"></div>
-        </div>
-        <div class="card col-7">
-          <div class="card-head">
-            <div class="card-title">expectancy</div>
-            <div class="card-sub" x-text="(bot.expectancy?.sample||0)+' trade sample'"></div>
-          </div>
-          <div class="kv">
-            <span class="k">avg win</span>   <span class="v pos" x-text="fmtUsdSigned(bot.expectancy?.avg_win)"></span>
-            <span class="k">avg loss</span>  <span class="v neg" x-text="fmtUsdSigned(bot.expectancy?.avg_loss)"></span>
-            <span class="k">payoff</span>    <span class="v" x-text="bot.expectancy?.payoff!=null?bot.expectancy.payoff.toFixed(2):'—'"></span>
-            <span class="k">per trade</span> <span class="v" :class="(bot.expectancy?.expectancy||0)>=0?'pos':'neg'" x-text="fmtUsdSigned(bot.expectancy?.expectancy)"></span>
-            <span class="k">profit factor</span> <span class="v" x-text="fmtPF(bot.stats?.profit_factor)"></span>
-            <span class="k">sharpe</span>    <span class="v dim" x-text="bot.stats?.sharpe?.toFixed(2)||'—'"></span>
-          </div>
-          <div class="concentration" :class="bot.concentration?.warn" style="margin:0 1.1rem 1.1rem">
-            <div class="c-icon" x-text="bot.concentration?.warn==='danger'?'!!':(bot.concentration?.warn==='warn'?'!':'◇')"></div>
-            <div class="c-body">
-              <div class="c-label">p&l concentration</div>
-              <div class="c-text" x-show="bot.concentration?.top_pair" x-cloak>
-                <strong x-text="bot.concentration?.top_pair"></strong>
-                <span class="num" :class="(bot.concentration?.top_pair_pnl||0)>=0?'pos':'neg'" x-text="' '+fmtUsdSigned(bot.concentration?.top_pair_pnl)"></span>
-              </div>
-              <div class="c-text dim" x-show="!bot.concentration?.top_pair">no closed trades yet</div>
-            </div>
-            <div class="c-pct" x-show="bot.concentration?.top_share>0" x-cloak
-                 x-text="Math.min(100,Math.round((bot.concentration?.top_share||0)*100))+'%'"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- recent trades -->
-      <div class="card">
-        <div class="card-head">
-          <div class="card-title">recent trades</div>
-          <div class="card-sub">last 20</div>
-        </div>
-        <div class="scroll-y max-380">
-          <table class="ledger" x-show="bot.recent_trades?.length" x-cloak>
-            <thead>
-              <tr>
-                <th>closed</th><th>pair</th><th class="right">entry</th><th class="right">exit</th>
-                <th class="right">p&l</th><th>reason</th><th class="right">duration</th>
-              </tr>
-            </thead>
-            <tbody>
-              <template x-for="t in (bot.recent_trades||[]).slice(0,20)" :key="t.close_timestamp+t.pair">
-                <tr>
-                  <td x-text="fmtDate(t.close_date)"></td>
-                  <td class="label" x-text="t.pair"></td>
-                  <td class="right" x-text="fmtRate(t.open_rate)"></td>
-                  <td class="right" x-text="fmtRate(t.close_rate)"></td>
-                  <td class="right pnl-cell">
-                    <span class="pct" :class="t.profit_pct>=0?'pos':'neg'" x-text="fmtPctSigned(t.profit_pct)"></span>
-                    <span class="abs" x-text="fmtUsdSigned(t.profit_abs)"></span>
-                  </td>
-                  <td><span class="reason-pill" :class="t.exit_reason" x-text="t.exit_reason"></span></td>
-                  <td class="right" x-text="fmtMin(t.trade_duration)"></td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-          <div class="empty" x-show="!bot.recent_trades?.length">
-            <div class="e-icon">—</div>
-            <span>no closed trades yet</span>
-          </div>
-        </div>
-      </div>
-
-    </main>
-  </template>
-
-  <!-- ══════════════ KILLERS TAB (bespoke) ══════════════ -->
-  <main class="tab-panel" x-show="tab==='killers'" x-cloak>
-
-    <template x-if="!killersData">
-      <div class="empty">
-        <div class="e-icon">○</div>
-        <span>killers data not available</span>
-        <span class="e-hint">check killers-receiver on port 8089</span>
-      </div>
-    </template>
-
-    <template x-if="killersData">
-      <div class="col gap-md">
-
-        <!-- hero tiles -->
-        <div class="k-hero-strip">
-          <div class="k-hero-tile">
-            <div class="kh-label">paper p&l</div>
-            <div class="kh-value num" :class="(killersData.paper_pnl||0)>=0?'pos':'neg'" x-text="fmtUsdSigned(killersData.paper_pnl||0)">—</div>
-            <div class="kh-sub" x-text="fmtPct((killersData.paper_pnl_pct||0),2)"></div>
-          </div>
-          <div class="k-hero-tile">
-            <div class="kh-label">signals received</div>
-            <div class="kh-value num" x-text="killersData.msg_count||0">0</div>
-            <div class="kh-sub" x-text="'last '+fmtAge(killersData.last_signal_age_s||0)+' ago'"></div>
-          </div>
-          <div class="k-hero-tile">
-            <div class="kh-label">classified entries</div>
-            <div class="kh-value num" x-text="killersData.entry_count||0">0</div>
-            <div class="kh-sub" x-text="'exits: '+(killersData.exit_count||0)"></div>
-          </div>
-          <div class="k-hero-tile">
-            <div class="kh-label">paper trades</div>
-            <div class="kh-value num" x-text="killersData.paper_trade_count||0">0</div>
-            <div class="kh-sub" x-text="'win rate '+(killersData.win_rate_pct||'—')+'%'"></div>
-          </div>
-          <div class="k-hero-tile">
-            <div class="kh-label">active channel</div>
-            <div class="kh-value" style="font-size:14px;font-weight:600" x-text="killersData.channel_name||'Binance Killers VIP'">—</div>
-            <div class="kh-sub" x-text="killersData.channel_id||'@binancekillervip'"></div>
-          </div>
-        </div>
-
-        <!-- G4: open positions as hero (second row, prominent) -->
-        <div class="k-open-hero">
-          <div class="card-head">
-            <div class="card-title">open positions <span class="tag killers">killers-scalp</span></div>
-            <div class="card-sub" x-text="(killersData.open_positions?.length||0)+' open'"></div>
-          </div>
-          <template x-if="killersData.open_positions?.length">
-            <div>
-              <template x-for="p in killersData.open_positions" :key="p.symbol">
-                <div class="k-open-item">
-                  <span class="k-side-badge" :class="(p.side||'LONG').toLowerCase()" x-text="p.side||'LONG'"></span>
-                  <span class="k-pair-name" x-text="p.symbol">PAIR</span>
-                  <span class="k-entry">entry <span class="num" x-text="fmtRate(p.entry)"></span></span>
-                  <span class="k-pnl" :class="(p.pnl_pct||0)>=0?'pos':'neg'" x-text="fmtPctSigned(p.pnl_pct)"></span>
-                  <span class="k-age" x-text="fmtAge((p.age_minutes||0)*60)+' old'"></span>
-                </div>
-              </template>
-            </div>
-          </template>
-          <div class="empty" x-show="!killersData.open_positions?.length">
-            <div class="e-icon">○</div>
-            <span>no open positions</span>
-            <span class="e-hint">waiting for next killers signal</span>
-          </div>
-        </div>
-
-        <!-- paper equity chart -->
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">paper equity</div>
-            <div class="card-sub">cumulative paper p&l since start</div>
-          </div>
-          <!-- B2: y-axis floor guard applied in renderKillersEquity -->
-          <div class="chart tall" id="chart-killers-equity"></div>
-        </div>
-
-        <!-- signal arrival chart or single-stat (T9) -->
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">signal arrival rate</div>
-            <div class="card-sub">signals per day</div>
-          </div>
-          <!-- T9: ≤1 bar → single stat -->
-          <template x-if="(killersData.arrival_rate_data?.length||0) > 1">
-            <div class="chart short" id="chart-killers-arrival"></div>
-          </template>
-          <template x-if="(killersData.arrival_rate_data?.length||0) <= 1">
-            <div class="signal-stat">
-              <span class="ss-num" x-text="killersData.arrival_rate_data?.[0]?.count||killersData.msg_count||0">0</span>
-              <span class="ss-label">signals in last 24h</span>
-            </div>
-          </template>
-        </div>
-
-        <!-- classification kinds -->
-        <div class="grid grid-12">
-          <div class="card col-6">
-            <div class="card-head">
-              <div class="card-title">classification kinds</div>
-            </div>
-            <div class="chart short" id="chart-killers-kinds"></div>
-          </div>
-
-          <!-- paper p&l by symbol -->
-          <div class="card col-6">
-            <div class="card-head">
-              <div class="card-title">paper p&l by symbol</div>
-            </div>
-            <div class="chart short" id="chart-killers-pairpnl"></div>
-          </div>
-        </div>
-
-        <!-- recent classifications feed -->
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">recent classifications</div>
-            <div class="card-sub">latest signals from channel</div>
-          </div>
-          <div class="clf-feed scroll-y max-380">
-            <template x-for="c in (killersData.recent_classifications||[])" :key="c.ts+(c.text||'')">
-              <div class="clf-item">
-                <span class="clf-ts" x-text="fmtDate(c.ts)"></span>
-                <span class="clf-kind" :class="c.kind||''" x-text="c.kind||'—'"></span>
-                <span class="clf-text" x-text="c.text||c.msg||'—'"></span>
-              </div>
-            </template>
-            <div class="empty" x-show="!killersData.recent_classifications?.length">
-              <div class="e-icon">—</div>
-              <span>no classifications yet</span>
-              <span class="e-hint">killers-receiver classifies incoming Telegram messages</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- paper positions history -->
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">paper positions history</div>
-          </div>
-          <div class="scroll-y max-380">
-            <table class="ledger" x-show="(killersData.paper_positions||[]).length" x-cloak>
-              <thead>
-                <tr>
-                  <th>opened</th><th>symbol</th><th>side</th><th class="right">entry</th>
-                  <th class="right">exit</th><th class="right">p&l</th><th>reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="p in (killersData.paper_positions||[])" :key="(p.opened||'')+(p.symbol||'')">
-                  <tr>
-                    <td x-text="fmtDate(p.opened)"></td>
-                    <td class="label" x-text="p.symbol"></td>
-                    <td><span class="k-side-badge" :class="(p.side||'LONG').toLowerCase()" x-text="p.side||'LONG'" style="margin:0"></span></td>
-                    <td class="right" x-text="fmtRate(p.entry)"></td>
-                    <td class="right" x-text="p.exit?fmtRate(p.exit):'open'"></td>
-                    <td class="right pnl-cell">
-                      <span class="pct" :class="(p.pnl_pct||0)>=0?'pos':'neg'" x-text="p.pnl_pct!=null?fmtPctSigned(p.pnl_pct):'open'"></span>
-                    </td>
-                    <td><span class="reason-pill" :class="p.reason||''" x-text="p.reason||'—'"></span></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-            <div class="empty" x-show="!(killersData.paper_positions||[]).length">
-              <div class="e-icon">—</div>
-              <span>no paper positions yet</span>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </template>
-
-  </main>
-
-  <!-- ── logs modal (G2) ──────────────────────── -->
-  <div class="modal-overlay" x-show="logsModal.open" x-cloak @click.self="logsModal.open=false">
-    <div class="modal">
-      <div class="modal-head">
-        <div class="modal-title" x-text="'logs · '+(logsModal.botLabel||'')">logs</div>
-        <button class="btn" @click="logsModal.open=false">close</button>
-      </div>
-      <div class="modal-body">
-        <template x-if="logsModal.hint">
-          <div>
-            <p style="font-size:11.5px;color:var(--text-3);margin-bottom:0.75rem">tail via SSH:</p>
-            <div class="modal-hint" x-text="logsModal.hint"></div>
-          </div>
-        </template>
-        <template x-if="logsModal.lines?.length">
-          <pre x-text="logsModal.lines.join('\n')"></pre>
-        </template>
-      </div>
-    </div>
-  </div>
 
   <footer class="foot">
     <span>last poll · <span x-text="lastPollLabel">—</span></span>
