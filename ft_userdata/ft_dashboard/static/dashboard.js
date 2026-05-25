@@ -423,15 +423,24 @@ function dash() {
     // ─── chart rendering ───
     renderCharts() {
       if (!window.echarts) { setTimeout(() => this.renderCharts(), 100); return; }
-      if (this.tab === 'live') {
+      if (this.tab === 'live-summary') {
         this.renderEquity();
         this.renderDrawdown();
         this.renderPerPair();
         this.renderCandles();
       } else if (this.tab === 'trades') {
         this.renderTradesCharts();
-      } else {
+      } else if (this.tab === 'dry-summary') {
         this.dryRunBots.forEach(b => this.renderBotEquity(b.key));
+      } else if (this.tab === 'bot' && this.currentBot && this._currentBotKey !== 'killers') {
+        // Per-bot detail tab — render the three charts inside this bot's
+        // panel using unique IDs so they don't collide with the summary
+        // tab's chart elements (both panels are kept in DOM, only display
+        // toggled).
+        const k = this._currentBotKey;
+        this.renderEquity(k, 'chart-equity-bot');
+        this.renderDrawdown(k, 'chart-drawdown-bot');
+        this.renderPerPair(k, 'chart-perpair-bot');
       }
     },
 
@@ -735,11 +744,11 @@ function dash() {
       } catch { return null; }
     },
 
-    async renderEquity() {
-      const key = this.equityBot || this.liveBots[0]?.key;
+    async renderEquity(botKey = null, chartId = 'chart-equity') {
+      const key = botKey || this.equityBot || this.liveBots[0]?.key;
       if (!key) return;
       const data = await this._fetchEquity(key);
-      const chart = this._ensureChart('chart-equity');
+      const chart = this._ensureChart(chartId);
       if (!chart) return;
       const bot = this.raw.bots[key];
       // Build a smooth projected expected curve from the backtest's annual
@@ -850,12 +859,12 @@ function dash() {
       }, true);
     },
 
-    async renderDrawdown() {
-      const key = this.equityBot || this.liveBots[0]?.key;
+    async renderDrawdown(botKey = null, chartId = 'chart-drawdown') {
+      const key = botKey || this.equityBot || this.liveBots[0]?.key;
       if (!key) return;
       let data = this._equityData[key];
       if (!data) data = await this._fetchEquity(key);
-      const chart = this._ensureChart('chart-drawdown');
+      const chart = this._ensureChart(chartId);
       if (!chart) return;
       const bot = this.raw.bots[key];
       const dd = (data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
@@ -926,11 +935,11 @@ function dash() {
       }, true);
     },
 
-    renderPerPair() {
-      const chart = this._ensureChart('chart-perpair');
+    renderPerPair(botKey = null, chartId = 'chart-perpair') {
+      const chart = this._ensureChart(chartId);
       if (!chart) return;
-      const live = this.liveBots[0];
-      const rows = (live?.per_pair || []).slice(0, 10);
+      const bot = botKey ? this.botByKey(botKey) : this.liveBots[0];
+      const rows = (bot?.per_pair || []).slice(0, 10);
       if (!rows.length) {
         chart.setOption({ ...ECHART_COMMON, series: [], xAxis: { type: 'value' }, yAxis: { type: 'category', data: [] } }, true);
         return;

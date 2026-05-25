@@ -137,158 +137,81 @@
       </div>
     </div>
 
-    <!-- equity + open position -->
-    <div class="grid grid-12">
-      <div class="card col-8">
-        <div class="card-head">
-          <div>
-            <div class="card-title">
-              equity curve
-              <span class="tag live">live</span>
-            </div>
-            <div class="card-sub">live cumulative p&l vs scaled backtest expected</div>
-          </div>
-          <div class="row gap-sm" x-show="liveBots.length" x-cloak>
-            <button class="icon-btn" @click="equityBot = liveBots[0]?.key" :class="equityBot === liveBots[0]?.key ? 'on' : ''" x-text="liveBots[0]?.label || ''"></button>
-          </div>
-        </div>
-        <div class="chart tall" id="chart-equity"></div>
-      </div>
-
-      <div class="card col-4">
-        <div class="card-head">
-          <div>
-            <div class="card-title">
-              <span x-text="openPos ? openPos.pair + '  open' : 'open positions'"></span>
-              <span class="tag" x-show="openPos" x-cloak
-                    :class="openPos && openPos.profit_pct >= 0 ? 'live' : 'imm'"
-                    x-text="openPos ? fmtPctSigned(openPos.profit_pct) : ''"></span>
-            </div>
-            <div class="card-sub" x-text="openPos ? 'opened ' + fmtAge(openPosAge) + ' ago' : 'no exposure'"></div>
-          </div>
-          <!-- Pair selector when more than one open trade. Key on the unique
-               (bot + pair) tuple since open_trade payloads don't include
-               trade_id; using undefined keys collapses to one rendered pill. -->
-          <div class="row gap-sm" x-show="openPositions.length > 1" x-cloak>
-            <template x-for="p in openPositions" :key="p._bot + ':' + p.pair">
-              <button class="filter-pill"
-                      :class="openPosKey === (p._bot + ':' + p.pair) ? 'on' : ''"
-                      @click="setOpenPos(p)"
-                      x-text="p.pair.split('/')[0]">PAIR</button>
-            </template>
-          </div>
-        </div>
-        <div class="chart tall" id="chart-candles" x-show="openPos" x-cloak></div>
-        <div class="empty" x-show="!openPos">
-          <div class="icon">○</div>
-          waiting for next signal
-        </div>
-      </div>
-    </div>
-
-    <!-- drawdown + concentration -->
-    <div class="grid grid-12">
-      <div class="card col-8">
-        <div class="card-head">
-          <div>
-            <div class="card-title">drawdown · underwater</div>
-            <div class="card-sub">% below running peak · cap line at 1.5× backtest</div>
-          </div>
-        </div>
-        <div class="chart short" id="chart-drawdown"></div>
-      </div>
-
-      <div class="col-4 col">
-        <div class="concentration" :class="hero.concentration?.warn">
-          <div class="icon" x-text="hero.concentration?.warn === 'danger' ? '⚠' : (hero.concentration?.warn === 'warn' ? '!' : '◇')"></div>
-          <div class="body">
-            <div class="label">
-              p&l concentration · closed trades
-              <span class="dim" style="text-transform: none; letter-spacing: 0;"
-                    x-show="hero.concentration?.top_pair_trades" x-cloak>
-                · n=<span x-text="hero.expectancySample"></span>
-              </span>
-            </div>
-            <div class="text" x-show="hero.concentration?.top_pair" x-cloak>
-              <strong x-text="hero.concentration?.top_pair"></strong>
-              <span class="num pos" x-text="fmtUsdSigned(hero.concentration?.top_pair_pnl)"></span>
-              <span class="dim">in <span class="num" x-text="hero.concentration?.top_pair_trades"></span> trade<span x-show="hero.concentration?.top_pair_trades !== 1">s</span></span>
-              <span class="dim">·</span>
-              <span class="dim">rest of fleet</span>
-              <span class="num" :class="(hero.concentration?.ex_top_pnl ?? 0) >= 0 ? 'pos' : 'neg'"
-                    x-text="fmtUsdSigned(hero.concentration?.ex_top_pnl)"></span>
-            </div>
-            <div class="text dim" x-show="!hero.concentration?.top_pair">no closed trades yet</div>
-          </div>
-          <div class="num-pill" x-show="hero.concentration?.top_pair && hero.concentration?.top_share > 0" x-cloak
-               x-text="Math.min(100, Math.round((hero.concentration?.top_share ?? 0) * 100)) + '%'"
-               title="share of GROSS positive p&l carried by top pair"></div>
-        </div>
-
-        <div class="card">
+    <!-- per-bot breakdown — same shape as Dry Summary, charts live in
+         the per-bot detail tabs -->
+    <div class="grid grid-12" style="margin-top: 14px;">
+      <template x-for="bot in liveBots" :key="bot.key">
+        <div class="card col-6">
           <div class="card-head">
-            <div class="card-title">expectancy</div>
-            <div class="card-sub" x-text="hero.expectancySample + ' trade sample'">—</div>
+            <div>
+              <div class="card-title" style="display:flex; align-items:center; gap:10px;">
+                <span x-text="bot.name || bot.label"></span>
+                <span class="badge"
+                      :style="botBadge(bot).cls === 'pos' ? 'background:rgba(74,222,128,0.18);color:var(--good);' : 'background:rgba(122,131,152,0.18);color:var(--muted);'"
+                      x-text="botBadge(bot).label"></span>
+              </div>
+              <div class="card-sub">
+                running <span class="num" x-text="bot.days_running"></span>d ·
+                <span class="num" x-text="bot.stats?.closed_trade_count || 0"></span> closed ·
+                <span class="num" x-text="(bot.open_trades || []).length"></span> open
+              </div>
+            </div>
+            <button class="icon-btn" @click="selectBot(bot.key)">open detail →</button>
           </div>
-          <div class="kv">
-            <span class="k">avg win</span>
-              <span class="v pos" x-text="fmtUsdSigned(hero.avgWin)"></span>
-            <span class="k">avg loss</span>
-              <span class="v neg" x-text="fmtUsdSigned(hero.avgLoss)"></span>
-            <span class="k">payoff</span>
-              <span class="v" x-text="hero.payoff != null ? hero.payoff.toFixed(2) : '—'"></span>
-            <span class="k">expectancy / trade</span>
-              <span class="v" :class="hero.expectancyPerTrade >= 0 ? 'pos' : 'neg'"
-                    x-text="fmtUsdSigned(hero.expectancyPerTrade)"></span>
+          <div class="kv" style="padding: 0.8rem 1.1rem;">
+            <span class="k">wallet</span>
+              <span class="v num" x-text="fmtUsd(botHero(bot).walletNow)"></span>
+            <span class="k">p&l</span>
+              <span class="v num" :class="botHero(bot).totalPnl >= 0 ? 'pos' : 'neg'"
+                    x-text="fmtUsdSigned(botHero(bot).totalPnl) + ' · ' + fmtPctSigned(botHero(bot).totalPct)"></span>
+            <span class="k">win / PF</span>
+              <span class="v num"
+                    x-text="fmtPct(botHero(bot).winRate * 100, 1) + ' · PF ' + fmtPF(botHero(bot).profitFactor)"></span>
+            <span class="k">max DD</span>
+              <span class="v num" x-text="fmtPct(botHero(bot).drawdownMaxPct, 2) + '  ·  lab ' + fmtPct(-botHero(bot).drawdownBacktest, 1)"></span>
+            <span class="k">at risk</span>
+              <span class="v num neg" x-text="fmtUsdSigned(-botHero(bot).capitalAtRisk)"></span>
           </div>
         </div>
+      </template>
+
+      <div class="empty col-12" x-show="!liveBots.length">
+        <div class="icon">○</div> no live bots reachable
       </div>
     </div>
 
-    <!-- per-pair + ledger -->
-    <div class="grid grid-12">
-      <div class="card col-5">
-        <div class="card-head">
-          <div>
-            <div class="card-title">p&l by pair</div>
-            <div class="card-sub">closed trades · sorted by contribution</div>
-          </div>
+    <!-- fleet ledger -->
+    <div class="card col-12 card-body flush" style="margin-top: 14px;">
+      <div class="card-head">
+        <div>
+          <div class="card-title">fleet recent trades</div>
+          <div class="card-sub">last 30 closed across live bots</div>
         </div>
-        <div class="chart short" id="chart-perpair"></div>
       </div>
-
-      <div class="card col-7 card-body flush">
-        <div class="card-head">
-          <div>
-            <div class="card-title">recent trades</div>
-            <div class="card-sub">last 30 closed</div>
-          </div>
-        </div>
-        <div style="max-height: 380px; overflow-y: auto;">
-          <table class="ledger">
-            <thead>
+      <div style="max-height: 380px; overflow-y: auto;">
+        <table class="ledger">
+          <thead>
+            <tr>
+              <th>closed</th><th>pair</th><th class="right">entry</th><th class="right">exit</th>
+              <th class="right">p&l %</th><th class="right">p&l $</th><th>reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="t in recentLiveTrades" :key="t.close_timestamp + t.pair">
               <tr>
-                <th>closed</th><th>pair</th><th class="right">entry</th><th class="right">exit</th>
-                <th class="right">p&l %</th><th class="right">p&l $</th><th>reason</th>
+                <td x-text="fmtDate(t.close_date)"></td>
+                <td class="label" x-text="t.pair"></td>
+                <td class="right" x-text="t.open_rate"></td>
+                <td class="right" x-text="t.close_rate"></td>
+                <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(t.profit_pct)"></td>
+                <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(t.profit_abs)"></td>
+                <td><span class="reason-pill" :class="t.exit_reason" x-text="t.exit_reason"></span></td>
               </tr>
-            </thead>
-            <tbody>
-              <template x-for="t in recentLiveTrades" :key="t.close_timestamp + t.pair">
-                <tr>
-                  <td x-text="fmtDate(t.close_date)"></td>
-                  <td class="label" x-text="t.pair"></td>
-                  <td class="right" x-text="t.open_rate"></td>
-                  <td class="right" x-text="t.close_rate"></td>
-                  <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(t.profit_pct)"></td>
-                  <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(t.profit_abs)"></td>
-                  <td><span class="reason-pill" :class="t.exit_reason" x-text="t.exit_reason"></span></td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-          <div class="empty" x-show="!recentLiveTrades.length">
-            <div class="icon">—</div> no closed trades yet
-          </div>
+            </template>
+          </tbody>
+        </table>
+        <div class="empty" x-show="!recentLiveTrades.length">
+          <div class="icon">—</div> no closed trades yet
         </div>
       </div>
     </div>
@@ -620,27 +543,63 @@
           </div>
         </div>
 
-        <!-- expectancy + concentration -->
+        <!-- equity + drawdown charts (per bot) -->
+        <div class="grid grid-12">
+          <div class="card col-8">
+            <div class="card-head">
+              <div>
+                <div class="card-title">
+                  equity curve
+                  <span class="tag" :class="botBadge(currentBot).cls === 'pos' ? 'live' : 'dry'"
+                        x-text="botBadge(currentBot).label.toLowerCase()"></span>
+                </div>
+                <div class="card-sub">live cumulative p&l vs scaled backtest expected</div>
+              </div>
+            </div>
+            <div class="chart tall" id="chart-equity-bot"></div>
+          </div>
+          <div class="card col-4">
+            <div class="card-head">
+              <div>
+                <div class="card-title">drawdown · underwater</div>
+                <div class="card-sub">% below running peak · cap = 1.5× backtest</div>
+              </div>
+            </div>
+            <div class="chart tall" id="chart-drawdown-bot"></div>
+          </div>
+        </div>
+
+        <!-- p&l by pair + expectancy column -->
         <div class="grid grid-12">
           <div class="card col-6">
             <div class="card-head">
-              <div class="card-title">expectancy</div>
-              <div class="card-sub" x-text="currentBotHero.expectancySample + ' trade sample'">—</div>
+              <div>
+                <div class="card-title">p&l by pair</div>
+                <div class="card-sub">closed trades · sorted by contribution</div>
+              </div>
             </div>
-            <div class="kv">
-              <span class="k">avg win</span>
-                <span class="v pos" x-text="fmtUsdSigned(currentBotHero.avgWin)"></span>
-              <span class="k">avg loss</span>
-                <span class="v neg" x-text="fmtUsdSigned(currentBotHero.avgLoss)"></span>
-              <span class="k">payoff</span>
-                <span class="v" x-text="currentBotHero.payoff != null ? currentBotHero.payoff.toFixed(2) : '—'"></span>
-              <span class="k">expectancy / trade</span>
-                <span class="v" :class="currentBotHero.expectancyPerTrade >= 0 ? 'pos' : 'neg'"
-                      x-text="fmtUsdSigned(currentBotHero.expectancyPerTrade)"></span>
-            </div>
+            <div class="chart short" id="chart-perpair-bot"></div>
           </div>
 
           <div class="col-6 col">
+            <div class="card">
+              <div class="card-head">
+                <div class="card-title">expectancy</div>
+                <div class="card-sub" x-text="currentBotHero.expectancySample + ' trade sample'">—</div>
+              </div>
+              <div class="kv">
+                <span class="k">avg win</span>
+                  <span class="v pos" x-text="fmtUsdSigned(currentBotHero.avgWin)"></span>
+                <span class="k">avg loss</span>
+                  <span class="v neg" x-text="fmtUsdSigned(currentBotHero.avgLoss)"></span>
+                <span class="k">payoff</span>
+                  <span class="v" x-text="currentBotHero.payoff != null ? currentBotHero.payoff.toFixed(2) : '—'"></span>
+                <span class="k">expectancy / trade</span>
+                  <span class="v" :class="currentBotHero.expectancyPerTrade >= 0 ? 'pos' : 'neg'"
+                        x-text="fmtUsdSigned(currentBotHero.expectancyPerTrade)"></span>
+              </div>
+            </div>
+
             <div class="concentration" :class="currentBotHero.concentration?.warn">
               <div class="icon" x-text="currentBotHero.concentration?.warn === 'danger' ? '⚠' : (currentBotHero.concentration?.warn === 'warn' ? '!' : '◇')"></div>
               <div class="body">
