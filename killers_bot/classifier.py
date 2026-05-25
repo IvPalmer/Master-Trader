@@ -104,11 +104,16 @@ async def classify(
 ) -> Optional[dict]:
     """Spawn `claude -p PROMPT --output-format json --print` subprocess.
 
+    `binary` may be a single executable name OR a multi-word command
+    prefix (e.g. "docker exec elder-brain-bot claude"). It is split on
+    whitespace so we can sandwich the call through `docker exec` without
+    shell injection.
+
     Returns parsed classification dict, or None on timeout / parse failure.
     Caller should treat None as "couldn't classify; log + skip".
     """
     prompt = build_prompt(msg, reply_chain)
-    cmd = [binary, "-p", prompt, "--output-format", "json", "--print"]
+    cmd = binary.split() + ["-p", prompt, "--output-format", "json", "--print"]
     if model:
         cmd += ["--model", model]
 
