@@ -65,13 +65,15 @@ class Config:
 # ── Symbol mapping ─────────────────────────────────────────────────────────
 
 # Channel uses bare symbols (BTC, ETH). Freqtrade futures uses BTC/USDT:USDT.
-# A few symbols need manual mapping (1000PEPE for PEPE-multiplied perp pair).
+# Aliases are reserved for non-1:1 mappings only — leave plain SYM → SYM as
+# identity (no entry). 1000-prefixed alts on Binance Futures are the actual
+# perp pair, so we map small-denom names to them.
 SYMBOL_ALIASES = {
-    "1000PEPE": "1000PEPE",
-    "PEPE": "1000PEPE",     # channel says PEPE, futures pair is 1000PEPE
-    "1000SHIB": "1000SHIB",
-    "SHIB": "1000SHIB",
-    "GOLD": "XAUT",         # channel typo correction
+    "PEPE":   "1000PEPE",
+    "SHIB":   "1000SHIB",
+    "FLOKI":  "1000FLOKI",
+    "BONK":   "1000BONK",
+    "GOLD":   "XAUT",        # channel typo correction
 }
 
 
@@ -93,7 +95,7 @@ CREATE TABLE IF NOT EXISTS positions (
     pair            TEXT NOT NULL,
     direction       TEXT NOT NULL,
     state           TEXT NOT NULL,           -- requested / open / closed / failed
-    open_msg_id     INTEGER NOT NULL,
+    open_msg_id     INTEGER NOT NULL UNIQUE, -- idempotency: same channel msg = same trade attempt
     open_date       TEXT NOT NULL,
     stake_usd       REAL,
     leverage        REAL,
@@ -128,8 +130,18 @@ def init_db(path: str) -> sqlite3.Connection:
 
 def find_active_position(
     conn: sqlite3.Connection, signal_id: Optional[int], symbol: str
-) -> Optional[dict]:
-    """Look up the most-recent OPEN/REQUESTED position for this (signal_id, symbol)."""
+) -> tuple[Optional[dict], str]:
+    """Look up the active position for this (signal_id, symbol).
+
+    Returns (position_dict_or_None, reason). `reason` is one of:
+      'matched_by_signal_id' — exact signal_id + symbol match
+      'matched_by_symbol_unique' — fallback succeeded because only one
+                                   active position for this symbol exists
+      'no_match' — no active position for this symbol at all
+      'ambiguous' — multiple active positions for this symbol; refuse
+                    to close blindly (closing the wrong trade is worse
+                    than missing the close).
+    """
     if signal_id is not None:
         row = conn.execute(
             "SELECT * FROM positions "
@@ -138,15 +150,21 @@ def find_active_position(
             (signal_id, symbol),
         ).fetchone()
         if row:
-            return dict(row)
-    # Fallback: most recent by symbol alone (handles classifier symbol-only close events)
-    row = conn.execute(
+            return dict(row), "matched_by_signal_id"
+
+    # Fallback by symbol — ONLY if exactly one active position exists.
+    # Otherwise we'd risk closing the wrong trade (codex review finding #3).
+    rows = conn.execute(
         "SELECT * FROM positions "
         "WHERE symbol = ? AND state IN ('open', 'requested') "
-        "ORDER BY open_date DESC LIMIT 1",
+        "ORDER BY open_date DESC",
         (symbol,),
-    ).fetchone()
-    return dict(row) if row else None
+    ).fetchall()
+    if len(rows) == 1:
+        return dict(rows[0]), "matched_by_symbol_unique"
+    if len(rows) > 1:
+        return None, "ambiguous"
+    return None, "no_match"
 
 
 # ── Sizing ─────────────────────────────────────────────────────────────────
@@ -273,8 +291,66 @@ class EventPayload(BaseModel):
     classification: dict
 
 
+async def reconcile_loop(cfg: Config, conn: sqlite3.Connection) -> None:
+    """Repair orphans: positions stuck in 'requested' with no ft_trade_id,
+    and positions whose Freqtrade trade has closed without our seeing it.
+
+    Two failure modes addressed:
+      1. Receiver crashed between /forceenter and writing trade_id back.
+         → Look up open trades on Freqtrade by pair+direction+open_date
+         and back-fill ft_trade_id.
+      2. Freqtrade closed a trade (e.g. liquidation, manual close) without
+         our /forceexit. → Mark position closed locally.
+    """
+    import asyncio
+    while True:
+        try:
+            ft_open = await ft_open_trades(cfg)
+            ft_by_pair: dict[tuple, dict] = {}
+            for t in ft_open:
+                key = (t.get("pair"), bool(t.get("is_short")))
+                ft_by_pair[key] = t
+
+            # (1) link orphans
+            orphans = conn.execute(
+                "SELECT * FROM positions WHERE state = 'requested' AND ft_trade_id IS NULL "
+                "ORDER BY open_date DESC LIMIT 50"
+            ).fetchall()
+            for pos in orphans:
+                key = (pos["pair"], pos["direction"] == "short")
+                ft = ft_by_pair.get(key)
+                if ft and ft.get("trade_id"):
+                    conn.execute(
+                        "UPDATE positions SET state = 'open', ft_trade_id = ?, last_event_at = ? "
+                        "WHERE pos_id = ?",
+                        (ft["trade_id"], datetime.now(timezone.utc).isoformat(), pos["pos_id"]),
+                    )
+                    logger.info("[RECONCILE] orphan pos_id=%d linked to ft_trade_id=%d",
+                                pos["pos_id"], ft["trade_id"])
+
+            # (2) detect closes we missed
+            our_open_ids = {row["ft_trade_id"] for row in conn.execute(
+                "SELECT ft_trade_id FROM positions WHERE state = 'open' AND ft_trade_id IS NOT NULL"
+            )}
+            ft_open_ids = {t["trade_id"] for t in ft_open}
+            missed = our_open_ids - ft_open_ids
+            for tid in missed:
+                conn.execute(
+                    "UPDATE positions SET state = 'closed', close_reason = 'reconciled_missing', "
+                    "close_date = ?, last_event_at = ? WHERE ft_trade_id = ? AND state = 'open'",
+                    (datetime.now(timezone.utc).isoformat(),
+                     datetime.now(timezone.utc).isoformat(), tid),
+                )
+                logger.info("[RECONCILE] ft_trade_id=%d no longer open in freqtrade; marked closed",
+                            tid)
+        except Exception as e:
+            logger.warning("reconcile loop error: %s", e)
+        await asyncio.sleep(60)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
     cfg = Config()
     conn = init_db(cfg.db_path)
     app.state.cfg = cfg
@@ -283,7 +359,11 @@ async def lifespan(app: FastAPI):
         "receiver up ft=%s db=%s stake=$%.0f lev=%.1fx max_open=%d",
         cfg.ft_base, cfg.db_path, cfg.stake_usd, cfg.leverage, cfg.max_open,
     )
-    yield
+    recon = asyncio.create_task(reconcile_loop(cfg, conn))
+    try:
+        yield
+    finally:
+        recon.cancel()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -337,15 +417,26 @@ async def handle_event(payload: EventPayload):
             return {"action": "skipped", "reason": "bad_direction"}
 
         # Insert tentative position record BEFORE the REST call so we have audit
-        # spine even if the call fails.
-        cur = conn.execute(
-            "INSERT INTO positions (signal_id, symbol, pair, direction, state, "
-            " open_msg_id, open_date, stake_usd, leverage, sl_distance_pct, last_event_at) "
-            "VALUES (?, ?, ?, ?, 'requested', ?, ?, ?, ?, ?, ?)",
-            (signal_id, symbol, pair, direction, msg_id, str(msg.get("date")),
-             stake, leverage, sl_dist, datetime.now(timezone.utc).isoformat()),
-        )
-        pos_id = cur.lastrowid
+        # spine even if the call fails. UNIQUE constraint on open_msg_id makes
+        # this idempotent — duplicate event delivery returns the existing row.
+        try:
+            cur = conn.execute(
+                "INSERT INTO positions (signal_id, symbol, pair, direction, state, "
+                " open_msg_id, open_date, stake_usd, leverage, sl_distance_pct, last_event_at) "
+                "VALUES (?, ?, ?, ?, 'requested', ?, ?, ?, ?, ?, ?)",
+                (signal_id, symbol, pair, direction, msg_id, str(msg.get("date")),
+                 stake, leverage, sl_dist, datetime.now(timezone.utc).isoformat()),
+            )
+            pos_id = cur.lastrowid
+        except sqlite3.IntegrityError:
+            existing = conn.execute(
+                "SELECT pos_id, state, ft_trade_id FROM positions WHERE open_msg_id = ?",
+                (msg_id,),
+            ).fetchone()
+            logger.info("[OPEN DUPE] msg_id=%d already processed pos_id=%d state=%s ft_trade_id=%s",
+                        msg_id, existing["pos_id"], existing["state"], existing["ft_trade_id"])
+            return {"action": "deduped", "pos_id": existing["pos_id"],
+                    "state": existing["state"], "ft_trade_id": existing["ft_trade_id"]}
 
         # Fire the order
         resp = await ft_force_enter(cfg, pair, direction, stake, leverage)
@@ -381,9 +472,13 @@ async def handle_event(payload: EventPayload):
     if kind in ("close_full", "close_partial"):
         if not symbol:
             return {"action": "skipped", "reason": "missing symbol on close"}
-        pos = find_active_position(conn, signal_id, symbol)
+        pos, match_reason = find_active_position(conn, signal_id, symbol)
+        if match_reason == "ambiguous":
+            logger.warning("[CLOSE AMBIG] msg_id=%d signal=#%s sym=%s — refusing to close",
+                           msg_id, signal_id, symbol)
+            return {"action": "skipped", "reason": "ambiguous_close"}
         if not pos or not pos.get("ft_trade_id"):
-            return {"action": "skipped", "reason": "no_active_position"}
+            return {"action": "skipped", "reason": f"no_active_position ({match_reason})"}
 
         resp = await ft_force_exit(cfg, pos["ft_trade_id"])
         conn.execute(

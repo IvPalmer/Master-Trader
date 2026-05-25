@@ -36,6 +36,8 @@ class KillersScalpV1(IStrategy):
     stoploss = -0.99                # -99% stoploss (never hit)
     trailing_stop = False
     use_custom_stoploss = False
+    use_exit_signal = False         # explicit: REST drives all exits
+    exit_profit_only = False
 
     # Default leverage. Receiver may override per-trade via force_enter.
     leverage_amount = 5.0

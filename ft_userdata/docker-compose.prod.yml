@@ -308,8 +308,11 @@ services:
       - dokploy-network
     environment:
       KILLERS_FT_BASE_URL: http://ft-killers-scalp:8080
-      KILLERS_FT_USERNAME: freqtrader
-      KILLERS_FT_PASSWORD: mastertrader
+      # Read from the shared anchor — sibling Freqtrade containers inherit
+      # *a1 which sets FREQTRADE__API_SERVER__USERNAME/PASSWORD. Hardcoding
+      # would 401 against rotated creds.
+      KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
+      KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
       KILLERS_DB: /var/lib/killers/receiver.sqlite
       KILLERS_STAKE_USD: "20"
       KILLERS_LEVERAGE: "5"
