@@ -206,7 +206,9 @@ function dash() {
     botByKey(key) { return this.bots.find(b => b.key === key); },
     botBadge(bot) {
       if (!bot) return { label: '?', cls: 'muted' };
-      if (bot.key === 'killers') return { label: 'OBS', cls: 'accent' };
+      // Killers is a SQLite-based paper-trader (no exchange execution).
+      // For badge purposes it counts as DRY — no real capital at risk.
+      if (bot.key === 'killers') return { label: 'DRY', cls: 'muted' };
       return bot.dry_run ? { label: 'DRY', cls: 'muted' } : { label: 'LIVE', cls: 'pos' };
     },
     botHero(bot) {
@@ -263,6 +265,39 @@ function dash() {
       return [...(b.recent_trades || [])]
         .sort((a, b2) => (b2.close_timestamp || 0) - (a.close_timestamp || 0))
         .slice(0, 30);
+    },
+
+    // ─── aggregate hero across a list of bots (used for live/dry summary) ───
+    aggregateHero(bots, killersData = null) {
+      const start = bots.reduce((s, b) => s + (b.wallet?.starting_capital || 0), 0)
+                  + (killersData ? 1000 : 0);  // Killers uses a virtual $1k account
+      const owned = bots.reduce((s, b) => s + (b.wallet?.bot_owned || 0), 0)
+                  + (killersData ? (1000 + (killersData.positions?.realized_pnl_total_usd || 0)) : 0);
+      const walletNow = (bots.length || killersData) && owned > 0 ? owned : start;
+      const totalPnl = walletNow - start;
+      const closedTrades = bots.reduce((s, b) => s + (b.stats?.closed_trade_count || 0), 0)
+                         + (killersData ? (killersData.positions?.closed || 0) : 0);
+      const totalWins = bots.reduce((s, b) => s + (b.stats?.winning_trades || 0), 0);
+      const totalLosses = bots.reduce((s, b) => s + (b.stats?.losing_trades || 0), 0);
+      const winRate = (totalWins + totalLosses) ? totalWins / (totalWins + totalLosses) : 0;
+      const open = bots.reduce((s, b) => s + ((b.open_trades || []).length), 0)
+                 + (killersData ? (killersData.positions?.open || 0) : 0);
+      const openNotional = bots.reduce(
+        (s, b) => s + (b.open_trades || []).reduce((a, t) => a + (t.stake_amount || 0), 0), 0);
+      const ddMax = bots.length ? Math.max(...bots.map(b => (b.stats?.max_drawdown || 0) * 100)) : 0;
+      const car = bots.reduce((s, b) => s + (b.capital_at_risk?.abs_loss || 0), 0);
+      return {
+        walletNow, walletStart: start, totalPnl,
+        totalPct: start ? (totalPnl / start * 100) : 0,
+        closedTrades, winRate, openCount: open, openNotional,
+        drawdownMaxPct: ddMax, capitalAtRisk: car,
+        capitalAtRiskPct: start ? (car / start * 100) : 0,
+      };
+    },
+    get liveAggregate() { return this.aggregateHero(this.liveBots); },
+    get dryAggregate() {
+      const killers = (this.killers && !this.killers.error) ? this.killers : null;
+      return this.aggregateHero(this.dryRunBots, killers);
     },
     openPosKey: null,
     setOpenPos(p) {
@@ -424,13 +459,12 @@ function dash() {
     renderCharts() {
       if (!window.echarts) { setTimeout(() => this.renderCharts(), 100); return; }
       if (this.tab === 'live-summary') {
-        this.renderEquity();
-        this.renderDrawdown();
-        this.renderPerPair();
+        this.renderFleetEquity(this.liveBots, 'chart-fleet-live');
         this.renderCandles();
       } else if (this.tab === 'trades') {
         this.renderTradesCharts();
       } else if (this.tab === 'dry-summary') {
+        this.renderFleetEquity(this.dryRunBots, 'chart-fleet-dry');
         this.dryRunBots.forEach(b => this.renderBotEquity(b.key));
       } else if (this.tab === 'bot' && this.currentBot && this._currentBotKey !== 'killers') {
         // Per-bot detail tab — render the three charts inside this bot's
@@ -742,6 +776,52 @@ function dash() {
         this._equityData[botKey] = data;
         return data;
       } catch { return null; }
+    },
+
+    // ── fleet equity: multi-series chart, one line per bot ──────────────
+    // Fetches each bot's equity curve and renders as overlaid line series
+    // so the user can compare bot trajectories visually.
+    async renderFleetEquity(bots, chartId) {
+      const chart = this._ensureChart(chartId);
+      if (!chart) return;
+      const series = [];
+      const colors = ['#5cc8ff', '#4ade80', '#fbbf24', '#f87171', '#a78bfa', '#ec4899'];
+      for (let i = 0; i < bots.length; i++) {
+        const bot = bots[i];
+        const data = await this._fetchEquity(bot.key);
+        const points = (data?.live || []).map(p => [new Date(p[0]).getTime(), p[1]]);
+        series.push({
+          name: bot.label || bot.key,
+          type: 'line', data: points, showSymbol: false, smooth: false,
+          lineStyle: { color: colors[i % colors.length], width: 2 },
+          itemStyle: { color: colors[i % colors.length] },
+        });
+      }
+      if (!series.length) {
+        chart.setOption({ ...ECHART_COMMON, series: [],
+          xAxis: { type: 'time' }, yAxis: { type: 'value' } }, true);
+        return;
+      }
+      chart.setOption({
+        ...ECHART_COMMON, animation: false,
+        tooltip: { trigger: 'axis',
+          backgroundColor: COLORS.surface2, borderColor: COLORS.border, borderWidth: 1,
+          textStyle: { color: COLORS.text, fontSize: 11 },
+          valueFormatter: v => v != null ? '$' + Number(v).toFixed(2) : '—' },
+        legend: { data: series.map(s => s.name), top: 0, right: 8,
+          textStyle: { color: COLORS.text3, fontSize: 11 },
+          icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
+        grid: { left: 60, right: 18, top: 32, bottom: 30 },
+        xAxis: { type: 'time',
+          axisLine: { lineStyle: { color: COLORS.border } },
+          axisLabel: { color: COLORS.text3, fontSize: 10 },
+          splitLine: { show: false } },
+        yAxis: { type: 'value', scale: true,
+          axisLine: { show: false }, axisTick: { show: false },
+          axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' },
+          splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.4 } } },
+        series,
+      }, true);
     },
 
     async renderEquity(botKey = null, chartId = 'chart-equity') {

@@ -67,11 +67,12 @@
               x-text="botBadge(bot).label"></span>
       </button>
     </template>
-    <!-- killers is not a Freqtrade bot but lives in the same per-bot tab system -->
+    <!-- killers is not a Freqtrade bot but lives in the same per-bot tab system.
+         Badge is DRY because it's paper-trading (no exchange execution). -->
     <button class="tab" :class="tab === 'bot' && _currentBotKey === 'killers' ? 'on' : ''"
             @click="selectBot('killers')">
       killers
-      <span class="badge" style="background:rgba(92,200,255,0.18);color:var(--accent);">OBS</span>
+      <span class="badge" style="background:rgba(122,131,152,0.18);color:var(--muted);">DRY</span>
     </button>
   </nav>
 
@@ -81,60 +82,64 @@
        bots come online, the hero tiles already sum across them. -->
   <main class="tab-panel" x-show="tab === 'live-summary'" x-cloak>
 
-    <!-- metric tiles -->
+    <!-- fleet aggregate hero -->
     <div class="metrics">
       <div class="metric accent">
-        <div class="label">live wallet</div>
-        <div class="value num" x-text="fmtUsd(hero.walletNow)">—</div>
-        <div class="footnote">started at <span class="num" x-text="fmtUsd(hero.walletStart)"></span></div>
+        <div class="label">fleet wallet · live</div>
+        <div class="value num" x-text="fmtUsd(liveAggregate.walletNow)">—</div>
+        <div class="footnote">started at <span class="num" x-text="fmtUsd(liveAggregate.walletStart)"></span></div>
       </div>
-      <div class="metric" :class="hero.totalPnl >= 0 ? 'pos' : 'neg'">
+      <div class="metric" :class="liveAggregate.totalPnl >= 0 ? 'pos' : 'neg'">
         <div class="label">total p&l</div>
-        <div class="value num" :class="hero.totalPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalPnl)">—</div>
+        <div class="value num" :class="liveAggregate.totalPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(liveAggregate.totalPnl)">—</div>
         <div class="footnote">
-          <span class="num" :class="hero.totalPct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(hero.totalPct)"></span>
+          <span class="num" :class="liveAggregate.totalPct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(liveAggregate.totalPct)"></span>
           since launch
         </div>
       </div>
-      <div class="metric" :class="hero.openCount > 0 ? 'accent' : ''">
+      <div class="metric" :class="liveAggregate.openCount > 0 ? 'accent' : ''">
         <div class="label">open positions</div>
-        <div class="value num" x-text="hero.openCount">0</div>
+        <div class="value num" x-text="liveAggregate.openCount">0</div>
         <div class="footnote">
-          <span x-show="hero.openCount > 0" x-cloak>
-            <span class="num" x-text="fmtUsd(hero.openNotional)"></span> notional
+          <span x-show="liveAggregate.openCount > 0" x-cloak>
+            <span class="num" x-text="fmtUsd(liveAggregate.openNotional)"></span> notional
           </span>
-          <span x-show="hero.openCount === 0">no exposure</span>
+          <span x-show="liveAggregate.openCount === 0">no exposure</span>
         </div>
       </div>
       <div class="metric warn">
         <div class="label">max drawdown</div>
-        <div class="value num" x-text="fmtPct(hero.drawdownMaxPct, 2)">—</div>
-        <div class="footnote">
-          now <span class="num" x-text="fmtPct(hero.drawdownCurrentPct, 2)"></span> ·
-          cap <span class="num" x-text="fmtPct(-hero.drawdownCap, 1)"></span> ·
-          lab <span class="num" x-text="fmtPct(-hero.drawdownBacktest, 1)"></span>
-        </div>
+        <div class="value num" x-text="fmtPct(liveAggregate.drawdownMaxPct, 2)">—</div>
+        <div class="footnote">across all live bots</div>
       </div>
       <div class="metric">
         <div class="label">at risk · open trades</div>
-        <div class="value num neg" x-text="fmtUsdSigned(-hero.capitalAtRisk)">—</div>
+        <div class="value num neg" x-text="fmtUsdSigned(-liveAggregate.capitalAtRisk)">—</div>
         <div class="footnote">
-          <span x-show="hero.openCount > 0" x-cloak>
-            if <span class="num" x-text="hero.openCount"></span>
-            stop<span x-show="hero.openCount !== 1">s</span> hit ·
-            <span class="num" x-text="fmtPct(hero.capitalAtRiskPct, 1)"></span> wallet
+          <span x-show="liveAggregate.openCount > 0" x-cloak>
+            <span class="num" x-text="fmtPct(liveAggregate.capitalAtRiskPct, 1)"></span> wallet
           </span>
-          <span x-show="hero.openCount === 0">no exposure</span>
+          <span x-show="liveAggregate.openCount === 0">no exposure</span>
         </div>
       </div>
       <div class="metric">
-        <div class="label">closed trades</div>
-        <div class="value num" x-text="hero.closedTrades">—</div>
+        <div class="label">closed trades · fleet</div>
+        <div class="value num" x-text="liveAggregate.closedTrades">—</div>
         <div class="footnote">
-          win <span class="num pos" x-text="fmtPct(hero.winRate * 100, 1)"></span> ·
-          PF <span class="num" x-text="fmtPF(hero.profitFactor)"></span>
+          win <span class="num pos" x-text="fmtPct(liveAggregate.winRate * 100, 1)"></span>
         </div>
       </div>
+    </div>
+
+    <!-- fleet equity chart -->
+    <div class="card col-12" style="margin-top: 14px;">
+      <div class="card-head">
+        <div>
+          <div class="card-title">fleet equity · live</div>
+          <div class="card-sub">one line per bot · click a card below for per-bot detail</div>
+        </div>
+      </div>
+      <div class="chart tall" id="chart-fleet-live"></div>
     </div>
 
     <!-- per-bot breakdown — same shape as Dry Summary, charts live in
@@ -220,6 +225,66 @@
 
   <!-- ══════════════ DRY SUMMARY TAB ══════════════ -->
   <main class="tab-panel" x-show="tab === 'dry-summary'" x-cloak>
+
+    <!-- fleet aggregate hero (includes killers paper sim) -->
+    <div class="metrics">
+      <div class="metric accent">
+        <div class="label">fleet wallet · dry</div>
+        <div class="value num" x-text="fmtUsd(dryAggregate.walletNow)">—</div>
+        <div class="footnote">started at <span class="num" x-text="fmtUsd(dryAggregate.walletStart)"></span> · incl. killers $1k</div>
+      </div>
+      <div class="metric" :class="dryAggregate.totalPnl >= 0 ? 'pos' : 'neg'">
+        <div class="label">total p&l</div>
+        <div class="value num" :class="dryAggregate.totalPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(dryAggregate.totalPnl)">—</div>
+        <div class="footnote">
+          <span class="num" :class="dryAggregate.totalPct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(dryAggregate.totalPct)"></span>
+          across all dry bots
+        </div>
+      </div>
+      <div class="metric" :class="dryAggregate.openCount > 0 ? 'accent' : ''">
+        <div class="label">open positions</div>
+        <div class="value num" x-text="dryAggregate.openCount">0</div>
+        <div class="footnote">
+          <span x-show="dryAggregate.openCount > 0" x-cloak>
+            <span class="num" x-text="fmtUsd(dryAggregate.openNotional)"></span> notional
+          </span>
+          <span x-show="dryAggregate.openCount === 0">no exposure</span>
+        </div>
+      </div>
+      <div class="metric warn">
+        <div class="label">max drawdown</div>
+        <div class="value num" x-text="fmtPct(dryAggregate.drawdownMaxPct, 2)">—</div>
+        <div class="footnote">worst across dry bots</div>
+      </div>
+      <div class="metric">
+        <div class="label">closed trades · fleet</div>
+        <div class="value num" x-text="dryAggregate.closedTrades">—</div>
+        <div class="footnote">
+          win <span class="num pos" x-text="fmtPct(dryAggregate.winRate * 100, 1)"></span>
+        </div>
+      </div>
+      <div class="metric">
+        <div class="label">at risk · open trades</div>
+        <div class="value num neg" x-text="fmtUsdSigned(-dryAggregate.capitalAtRisk)">—</div>
+        <div class="footnote">
+          <span x-show="dryAggregate.openCount > 0" x-cloak>
+            <span class="num" x-text="fmtPct(dryAggregate.capitalAtRiskPct, 1)"></span> wallet
+          </span>
+          <span x-show="dryAggregate.openCount === 0">no exposure</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- fleet equity chart -->
+    <div class="card col-12" style="margin-top: 14px;">
+      <div class="card-head">
+        <div>
+          <div class="card-title">fleet equity · dry-run</div>
+          <div class="card-sub">one line per bot · killers paper sim charted separately when available</div>
+        </div>
+      </div>
+      <div class="chart tall" id="chart-fleet-dry"></div>
+    </div>
 
     <template x-for="bot in dryRunBots" :key="bot.key">
       <div class="col gap-md">
@@ -378,9 +443,97 @@
       </div>
     </template>
 
-    <div class="empty" x-show="!dryRunBots.length">
+    <div class="empty" x-show="!dryRunBots.length && (!killers || killers.error)">
       <div class="icon">○</div>
       no dry-run bots configured
+    </div>
+
+    <!-- killers paper-trader card (SQLite-based, lives alongside Freqtrade
+         dry bots since it's also paper trading — no exchange execution) -->
+    <div class="col gap-md" x-show="killers && !killers.error" x-cloak>
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title" style="display:flex; align-items:center; gap:10px;">
+              <span>killers (binance killers VIP signal copy)</span>
+              <span class="tag dry">dry-run</span>
+              <span class="tag imm" x-text="(killers && killers.msg_count) + ' msgs'"></span>
+            </div>
+            <div class="card-sub">
+              telethon listener · same classifier proven on 3,378 offline msgs · paper sim
+            </div>
+          </div>
+          <button class="icon-btn" @click="selectBot('killers')">open detail →</button>
+        </div>
+
+        <div class="grid grid-12" style="padding: 1.1rem;">
+          <div class="col-6">
+            <div class="small-cap" style="margin-bottom: 0.85rem;">classifier coverage</div>
+            <div class="kv" style="padding: 0;">
+              <span class="k">messages received</span>
+                <span class="v num" x-text="killers ? killers.msg_count : 0"></span>
+              <span class="k">classified</span>
+                <span class="v num" x-text="killers ? killers.classification_count : 0"></span>
+              <span class="k">opens / closes / chat</span>
+                <span class="v num"
+                      x-text="(killers && killers.kind_distribution ? (killers.kind_distribution.open || 0) : 0) + ' / ' + ((killers && killers.kind_distribution ? ((killers.kind_distribution.close_full || 0) + (killers.kind_distribution.close_partial || 0)) : 0)) + ' / ' + (killers && killers.kind_distribution ? (killers.kind_distribution.chat || 0) : 0)"></span>
+              <span class="k">last channel msg</span>
+                <span class="v num" x-text="killers && killers.last_msg ? killers.last_msg.posted_at?.slice(11, 19) + ' utc' : '—'"></span>
+            </div>
+          </div>
+
+          <div class="col-6">
+            <div class="small-cap" style="margin-bottom: 0.85rem;">paper positions</div>
+            <div class="kv" style="padding: 0;">
+              <span class="k">open</span>
+                <span class="v num" x-text="killers ? killers.positions.open : 0"></span>
+              <span class="k">closed</span>
+                <span class="v num" x-text="killers ? killers.positions.closed : 0"></span>
+              <span class="k">realized p&l (paper)</span>
+                <span class="v num" :class="(killers && (killers.positions.realized_pnl_total_usd || 0) >= 0) ? 'pos' : 'neg'"
+                      x-text="fmtUsdSigned(killers ? killers.positions.realized_pnl_total_usd : 0)"></span>
+              <span class="k">virtual account</span>
+                <span class="v num">$1,000.00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- recent classifications mini-feed (last 10) -->
+      <div class="card card-body flush">
+        <div class="card-head">
+          <div>
+            <div class="card-title">recent classifications</div>
+            <div class="card-sub">latest 10 messages · click 'open detail' for the full feed</div>
+          </div>
+        </div>
+        <div style="max-height: 280px; overflow-y: auto;">
+          <table class="ledger" x-show="killers && killers.recent_classifications && killers.recent_classifications.length" x-cloak>
+            <thead>
+              <tr>
+                <th>at</th><th>kind</th><th>signal</th><th>sym</th>
+                <th class="right">conf</th><th>text</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="c in (killers ? killers.recent_classifications.slice(0, 10) : [])" :key="c.msg_id">
+                <tr>
+                  <td class="muted num" x-text="c.classified_at ? c.classified_at.slice(11, 19) : '—'"></td>
+                  <td><span :class="c.kind === 'open' ? 'accent' : (c.kind === 'chat' ? 'muted' : 'pos')" x-text="c.kind"></span></td>
+                  <td class="muted num" x-text="c.signal_id ? ('#' + c.signal_id) : '—'"></td>
+                  <td><b x-text="c.symbol || '—'"></b></td>
+                  <td class="right num" x-text="c.confidence != null ? Number(c.confidence).toFixed(2) : '—'"></td>
+                  <td class="muted" style="font-size: 11px;"
+                      x-text="(c.text || '').replace(/\s+/g, ' ').slice(0, 100)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div class="empty" x-show="!killers || !killers.recent_classifications || !killers.recent_classifications.length">
+            <div class="icon">○</div> channel idle since observer started · waiting for next signal
+          </div>
+        </div>
+      </div>
     </div>
 
   </main>
