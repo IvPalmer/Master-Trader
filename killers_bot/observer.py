@@ -23,8 +23,30 @@ logger = logging.getLogger(__name__)
 # ── Config ─────────────────────────────────────────────────────────────────
 
 
+def _load_dotenv():
+    """Load killers_bot/.env into os.environ if present.
+
+    Hand-rolled (no python-dotenv dep) to keep the image minimal. Strips
+    surrounding double-quotes so multi-word values like
+    `KILLERS_CLAUDE_BINARY="docker exec elder-brain-bot claude"` round-trip.
+    """
+    env_path = Path(__file__).parent / ".env"
+    if not env_path.exists():
+        return
+    for raw in env_path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        v = v.strip()
+        if len(v) >= 2 and ((v[0] == v[-1] == '"') or (v[0] == v[-1] == "'")):
+            v = v[1:-1]
+        os.environ.setdefault(k.strip(), v)
+
+
 class Config:
     def __init__(self):
+        _load_dotenv()
         self.api_id = int(_required("KILLERS_TG_API_ID"))
         self.api_hash = _required("KILLERS_TG_API_HASH")
         self.session_path = _required("KILLERS_TG_SESSION")
