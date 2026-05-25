@@ -44,6 +44,9 @@ function dash() {
     tab: '',
     clock: '—',
     equityBot: null,
+    // Dry-run drawer: which bot's inline dossier shows under the grad table.
+    // Single selection so the table controls the view rather than stacking dossiers.
+    selectedDryBot: null,
     closedTrades: [],
     tradesFilter: 'all',
     _tradeTfOverride: {},
@@ -65,6 +68,9 @@ function dash() {
       setInterval(() => this.tickClock(), 1000);
       this.refresh().then(() => {
         this.equityBot = this.liveBots[0]?.key || null;
+        // Default the dry-run drawer to whichever bot is closest to graduation.
+        // Falls back to first dry bot if no closest-to-gate ranking is available.
+        this.selectedDryBot = this.closestToGate?.key || this.dryRunBots[0]?.key || null;
         this.fetchClosedTrades();
         this.$nextTick(() => this.renderCharts());
       });
@@ -425,6 +431,10 @@ function dash() {
       if (!nonObs.length) return null;
       // Sort by gate-1 trades pct descending
       return [...nonObs].sort((a, b) => (b.gate1?.trades?.pct ?? 0) - (a.gate1?.trades?.pct ?? 0))[0];
+    },
+    get selectedDryBotObj() {
+      if (!this.selectedDryBot) return null;
+      return this.dryRunBots.find(b => b.key === this.selectedDryBot) || null;
     },
 
     // ─── formatters ───

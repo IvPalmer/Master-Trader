@@ -371,7 +371,7 @@
         </thead>
         <tbody>
           <template x-for="bot in dryRunBots" :key="bot.key">
-            <tr class="grad-row" @click="setTab('bot:' + bot.key)" style="cursor:pointer;">
+            <tr class="grad-row" :class="selectedDryBot === bot.key ? 'on' : ''" @click="selectedDryBot = bot.key" style="cursor:pointer;">
               <td>
                 <div class="grad-bot-name" x-text="bot.label">—</div>
                 <span class="grad-verdict" :class="dryBotVerdict(bot).cls" x-text="dryBotVerdict(bot).text">—</span>
@@ -443,8 +443,17 @@
       </table>
     </div>
 
-    <!-- Per-bot dossiers stacked below the table (gate rings + bullets + equity) -->
-    <template x-for="bot in dryRunBots" :key="bot.key">
+    <!-- Drawer header: which bot the inline dossier is showing -->
+    <div class="drawer-head" x-show="selectedDryBotObj" x-cloak>
+      <span class="drawer-label">
+        detail · <span x-text="selectedDryBotObj?.label"></span>
+        <span class="dim"> · click another row to switch</span>
+      </span>
+      <button class="cmd-btn" @click="setTab('bot:' + selectedDryBot)">open in own tab →</button>
+    </div>
+
+    <!-- Inline drawer: dossier for the SELECTED dry bot only -->
+    <template x-for="bot in dryRunBots.filter(b => b.key === selectedDryBot)" :key="bot.key">
       <div class="col gap-md">
 
         <!-- header card with verdict -->

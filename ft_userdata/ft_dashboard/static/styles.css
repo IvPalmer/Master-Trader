@@ -342,6 +342,22 @@ button { font: inherit; }
 }
 .grad-table .grad-row:last-child td { border-bottom: none; }
 .grad-table .grad-row:hover td { background: rgba(8, 145, 178, 0.03); }
+.grad-table .grad-row.on td {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.grad-table .grad-row.on:hover td { background: var(--accent-soft); }
+
+/* Dry-run inline drawer header */
+.drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.6rem 0.2rem 0.2rem;
+  font-size: 12px;
+  border-bottom: 1px solid var(--hairline);
+  margin-top: 0.5rem;
+}
+.drawer-label { color: var(--text); font-weight: 500; }
+.drawer-label .dim { font-weight: 400; }
 
 .grad-bot-name {
   font-weight: 600; font-size: 13px; color: var(--text);
