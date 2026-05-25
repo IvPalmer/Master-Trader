@@ -624,6 +624,27 @@ async def api_killers_state():
             "       close_reason, last_event_at "
             "FROM paper_positions ORDER BY pos_id DESC LIMIT 20"
         )]
+        # Equity timeline: each closed position contributes its realized_pnl
+        # to a cumulative virtual-account equity series starting at $1000.
+        equity_rows = [dict(r) for r in conn.execute(
+            "SELECT close_date, realized_pnl FROM paper_positions "
+            "WHERE state = 'closed' AND close_date IS NOT NULL "
+            "ORDER BY close_date ASC"
+        )]
+        # Per-symbol P&L for the top-symbol bar chart.
+        per_symbol = [dict(r) for r in conn.execute(
+            "SELECT symbol, COUNT(*) AS n, "
+            "       COALESCE(SUM(realized_pnl), 0) AS pnl "
+            "FROM paper_positions "
+            "WHERE symbol IS NOT NULL "
+            "GROUP BY symbol "
+            "ORDER BY ABS(pnl) DESC LIMIT 15"
+        )]
+        # Classification arrival rate — bucket by hour for an activity chart.
+        rate_rows = [dict(r) for r in conn.execute(
+            "SELECT substr(classified_at, 1, 13) AS hour, COUNT(*) AS n "
+            "FROM classifications GROUP BY hour ORDER BY hour ASC"
+        )]
     finally:
         conn.close()
 
@@ -638,6 +659,9 @@ async def api_killers_state():
             "closed": positions_closed,
             "realized_pnl_total_usd": round(realized_pnl_total or 0, 2),
         },
+        "equity_timeline": equity_rows,
+        "per_symbol": per_symbol,
+        "rate_by_hour": rate_rows,
         "recent_classifications": recent_classifications,
         "recent_positions": recent_positions,
     })

@@ -123,6 +123,14 @@ function dash() {
         if (r.ok) this.killers = await r.json();
         else this.killers = { error: 'unreachable', status: r.status };
       } catch (e) { this.killers = { error: String(e) }; }
+      // Re-render killers charts if currently visible
+      if (this.tab === 'bot' && this._currentBotKey === 'killers') {
+        this.$nextTick(() => {
+          this.renderKillersEquity();
+          this.renderKillersPerSymbol();
+          this.renderKillersRate();
+        });
+      }
     },
 
     // ─── derived ───
@@ -475,6 +483,13 @@ function dash() {
         this.renderEquity(k, 'chart-equity-bot');
         this.renderDrawdown(k, 'chart-drawdown-bot');
         this.renderPerPair(k, 'chart-perpair-bot');
+      } else if (this.tab === 'bot' && this._currentBotKey === 'killers') {
+        // Killers detail tab — paper-sim equity, per-symbol breakdown,
+        // signal arrival rate. Data already in this.killers (refreshed
+        // independently every 15s).
+        this.renderKillersEquity();
+        this.renderKillersPerSymbol();
+        this.renderKillersRate();
       }
     },
 
@@ -776,6 +791,123 @@ function dash() {
         this._equityData[botKey] = data;
         return data;
       } catch { return null; }
+    },
+
+    // ── killers paper-trading charts ────────────────────────────────────
+    renderKillersEquity() {
+      const chart = this._ensureChart('chart-killers-equity');
+      if (!chart) return;
+      const tl = (this.killers?.equity_timeline) || [];
+      const ACCOUNT_START = 1000;
+      let cum = ACCOUNT_START;
+      const series = tl.map(row => {
+        cum += Number(row.realized_pnl || 0);
+        return [new Date(row.close_date).getTime(), Number(cum.toFixed(2))];
+      });
+      // Always seed with starting capital so the curve isn't empty before
+      // the first close.
+      if (this.killers?.last_msg?.posted_at && !series.length) {
+        series.push([new Date(this.killers.last_msg.posted_at).getTime(), ACCOUNT_START]);
+      } else if (!series.length) {
+        series.push([Date.now() - 3600_000, ACCOUNT_START]);
+      } else {
+        series.unshift([series[0][0] - 60_000, ACCOUNT_START]);
+      }
+      chart.setOption({
+        ...ECHART_COMMON, animation: false,
+        tooltip: { trigger: 'axis',
+          backgroundColor: COLORS.surface2, borderColor: COLORS.border, borderWidth: 1,
+          textStyle: { color: COLORS.text, fontSize: 11 },
+          valueFormatter: v => v != null ? '$' + Number(v).toFixed(2) : '—' },
+        grid: { left: 60, right: 18, top: 20, bottom: 30 },
+        xAxis: { type: 'time',
+          axisLine: { lineStyle: { color: COLORS.border } },
+          axisLabel: { color: COLORS.text3, fontSize: 10 } },
+        yAxis: { type: 'value', scale: true,
+          axisLine: { show: false }, axisTick: { show: false },
+          axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' },
+          splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.4 } } },
+        series: [{
+          type: 'line', data: series, showSymbol: false, smooth: false,
+          lineStyle: { color: COLORS.accent, width: 2 },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(92,200,255,0.30)' },
+              { offset: 1, color: 'rgba(92,200,255,0.00)' },
+            ]),
+          },
+          markLine: { silent: true, symbol: 'none', data: [
+            { yAxis: ACCOUNT_START,
+              lineStyle: { color: COLORS.text3, type: 'dashed', width: 1 },
+              label: { show: true, position: 'insideEndTop',
+                formatter: '$1,000 start', color: COLORS.text3, fontSize: 10 } },
+          ]},
+        }],
+      }, true);
+    },
+
+    renderKillersPerSymbol() {
+      const chart = this._ensureChart('chart-killers-symbols');
+      if (!chart) return;
+      const rows = (this.killers?.per_symbol) || [];
+      if (!rows.length) {
+        chart.setOption({ ...ECHART_COMMON, series: [],
+          xAxis: { type: 'value' }, yAxis: { type: 'category', data: [] } }, true);
+        return;
+      }
+      const syms = rows.map(r => r.symbol);
+      const pnls = rows.map(r => Number(r.pnl || 0).toFixed(2));
+      chart.setOption({
+        ...ECHART_COMMON, animation: false,
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' },
+          backgroundColor: COLORS.surface2, borderColor: COLORS.border, borderWidth: 1,
+          textStyle: { color: COLORS.text, fontSize: 11 },
+          valueFormatter: v => '$' + Number(v).toFixed(2) },
+        grid: { left: 70, right: 50, top: 12, bottom: 24 },
+        xAxis: { type: 'value',
+          axisLine: { lineStyle: { color: COLORS.border } },
+          axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' },
+          splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.3 } } },
+        yAxis: { type: 'category', data: [...syms].reverse(),
+          axisLine: { show: false }, axisTick: { show: false },
+          axisLabel: { color: COLORS.text2, fontSize: 11 } },
+        series: [{ type: 'bar', data: [...pnls].reverse(),
+          itemStyle: { color: p => Number(p.value) >= 0 ? COLORS.pos : COLORS.neg,
+                       borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: 'right',
+            formatter: p => '$' + Number(p.value).toFixed(2),
+            color: COLORS.text2, fontSize: 10, fontFamily: 'JetBrains Mono' } }],
+      }, true);
+    },
+
+    renderKillersRate() {
+      const chart = this._ensureChart('chart-killers-rate');
+      if (!chart) return;
+      const rows = (this.killers?.rate_by_hour) || [];
+      if (!rows.length) {
+        chart.setOption({ ...ECHART_COMMON, series: [],
+          xAxis: { type: 'category', data: [] }, yAxis: { type: 'value' } }, true);
+        return;
+      }
+      // Convert hour string "2026-05-25T00" → ISO date for x-axis
+      const data = rows.map(r => [new Date(r.hour + ':00:00Z').getTime(), r.n]);
+      chart.setOption({
+        ...ECHART_COMMON, animation: false,
+        tooltip: { trigger: 'axis',
+          backgroundColor: COLORS.surface2, borderColor: COLORS.border, borderWidth: 1,
+          textStyle: { color: COLORS.text, fontSize: 11 },
+          valueFormatter: v => v + ' msgs' },
+        grid: { left: 50, right: 18, top: 12, bottom: 30 },
+        xAxis: { type: 'time',
+          axisLine: { lineStyle: { color: COLORS.border } },
+          axisLabel: { color: COLORS.text3, fontSize: 10 } },
+        yAxis: { type: 'value',
+          axisLine: { show: false }, axisTick: { show: false },
+          axisLabel: { color: COLORS.text3, fontSize: 10 },
+          splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.4 } } },
+        series: [{ type: 'bar', data,
+          itemStyle: { color: COLORS.accent, borderRadius: [3, 3, 0, 0] } }],
+      }, true);
     },
 
     // ── fleet equity: multi-series chart, one line per bot ──────────────

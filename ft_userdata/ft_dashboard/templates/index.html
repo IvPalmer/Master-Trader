@@ -899,6 +899,54 @@
           </div>
         </div>
 
+        <!-- execution-mode disclaimer -->
+        <div class="note" style="margin-top: 14px; background: rgba(92,200,255,0.06); border: 1px solid rgba(92,200,255,0.25); color: #bfdbfe; border-radius: 8px; padding: 10px 14px; font-size: 12px;">
+          <b style="color: var(--accent);">paper-sim only.</b>
+          this bot is NOT plugged into binance futures. each opened signal
+          is virtually filled at the entry-range midpoint on a $1,000
+          virtual account, sized via eduardo's risk-budget rule
+          ($10 risk / SL_distance%). close events use the channel's
+          published profit% (not WEEX-replayed).
+          to test real execution: wire to a freqtrade futures dry-run
+          container (~45 min of work, ask the operator).
+        </div>
+
+        <!-- equity curve (paper) -->
+        <div class="card col-12" style="margin-top: 14px;">
+          <div class="card-head">
+            <div>
+              <div class="card-title">
+                paper equity curve
+                <span class="tag dry">dry</span>
+              </div>
+              <div class="card-sub">virtual $1,000 account · cumulative realized p&l from closed paper positions</div>
+            </div>
+          </div>
+          <div class="chart tall" id="chart-killers-equity"></div>
+        </div>
+
+        <!-- per-symbol + signal arrival rate -->
+        <div class="grid grid-12" style="margin-top: 14px;">
+          <div class="card col-7">
+            <div class="card-head">
+              <div>
+                <div class="card-title">paper p&l by symbol</div>
+                <div class="card-sub">top 15 · sorted by absolute pnl contribution</div>
+              </div>
+            </div>
+            <div class="chart short" id="chart-killers-symbols"></div>
+          </div>
+          <div class="card col-5">
+            <div class="card-head">
+              <div>
+                <div class="card-title">signal arrival rate</div>
+                <div class="card-sub">classifications per hour · activity histogram</div>
+              </div>
+            </div>
+            <div class="chart short" id="chart-killers-rate"></div>
+          </div>
+        </div>
+
         <!-- classification kind distribution -->
         <div class="grid">
           <div class="card col-6">
