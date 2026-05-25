@@ -1,0 +1,51 @@
+# Fleet event log — append new events here; the dashboard hot-reloads on file
+# modtime change (no restart required).
+#
+# kind values:
+#   deploy    — bot first deployed (live or dry)
+#   pause     — bot manually halted
+#   resume    — bot resumed after a pause
+#   gate      — gate / strategy config change (e.g. gate v2 cutover)
+#   milestone — fleet-level milestone (new bot added, graduation, etc.)
+#
+# Fields:
+#   bot   — bot key as in BOTS (fundingfade | keltner | cascade | killers |
+#            insiders) or "fleet" for global events
+#   ts    — ISO 8601 UTC timestamp (use 00:00:00Z when exact time is unknown)
+#   label — short human string shown in the UI (≤40 chars)
+#   kind  — one of the kind values above
+
+- bot: keltner
+  ts: "2026-04-16T00:00:00Z"
+  label: "dry deploy — phase 3 validated"
+  kind: deploy
+
+- bot: fundingfade
+  ts: "2026-04-21T00:00:00Z"
+  label: "live deploy"
+  kind: deploy
+
+- bot: cascade
+  ts: "2026-05-09T00:00:00Z"
+  label: "dry deploy — 84% WR"
+  kind: deploy
+
+- bot: fundingfade
+  ts: "2026-05-17T00:00:00Z"
+  label: "paused — 5-SL streak"
+  kind: pause
+
+- bot: fundingfade
+  ts: "2026-05-19T00:00:00Z"
+  label: "gate v2 cutover (slope+regime)"
+  kind: gate
+
+- bot: fundingfade
+  ts: "2026-05-19T00:00:00Z"
+  label: "resumed after gate v2"
+  kind: resume
+
+- bot: killers
+  ts: "2026-05-25T00:00:00Z"
+  label: "killers-scalp added (copy-trader)"
+  kind: milestone

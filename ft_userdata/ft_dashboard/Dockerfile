@@ -3,6 +3,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py /app/app.py
+COPY events.yml /app/events.yml
 COPY static /app/static
 COPY templates /app/templates
 EXPOSE 8000
