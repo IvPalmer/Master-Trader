@@ -297,8 +297,8 @@
                 <tr>
                   <td x-text="fmtDate(t.close_date)"></td>
                   <td class="label" x-text="t.pair"></td>
-                  <td class="right" x-text="t.open_rate"></td>
-                  <td class="right" x-text="t.close_rate"></td>
+                  <td class="right" x-text="fmtRate(t.open_rate)"></td>
+                  <td class="right" x-text="fmtRate(t.close_rate)"></td>
                   <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(t.profit_pct)"></td>
                   <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(t.profit_abs)"></td>
                   <td><span class="reason-pill" :class="t.exit_reason" x-text="t.exit_reason"></span></td>
@@ -454,7 +454,8 @@
                   </div>
                   <div class="ltt-row">
                     <span class="ltt-k">side</span>
-                    <span class="ltt-v" x-text="lastClosedTrade(bot).is_open ? 'open' : 'closed'">—</span>
+                    <span class="ltt-v" :class="lastClosedTrade(bot).is_short ? 'neg' : 'pos'"
+                          x-text="lastClosedTrade(bot).is_short ? 'short' : 'long'">—</span>
                   </div>
                   <div class="ltt-row">
                     <span class="ltt-k">entry</span>
@@ -485,7 +486,7 @@
                 </div>
               </div>
               <div class="bot-detail-section" x-show="deviationSummary(bot)">
-                <div class="section-title">live vs backtest deviation · last 14 days</div>
+                <div class="section-title">live vs backtest deviation · all-time</div>
                 <div class="deviation-summary" x-text="deviationSummary(bot)"></div>
               </div>
             </div>
@@ -540,8 +541,8 @@
                 <tr>
                   <td x-text="fmtDate(t.close_date)"></td>
                   <td class="label" x-text="t.pair"></td>
-                  <td class="right" x-text="t.open_rate"></td>
-                  <td class="right" x-text="t.close_rate"></td>
+                  <td class="right" x-text="fmtRate(t.open_rate)"></td>
+                  <td class="right" x-text="fmtRate(t.close_rate)"></td>
                   <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(t.profit_pct)"></td>
                   <td><span class="reason-pill" :class="t.exit_reason" x-text="t.exit_reason"></span></td>
                   <td class="right" x-text="fmtMin(t.trade_duration)"></td>
@@ -846,7 +847,7 @@
               </div>
             </div>
             <div class="bot-detail-section" x-show="deviationSummary(bot)">
-              <div class="section-title">live vs backtest deviation · last 14 days</div>
+              <div class="section-title">live vs backtest deviation · all-time</div>
               <div class="deviation-summary" x-text="deviationSummary(bot)"></div>
             </div>
           </div>

@@ -146,7 +146,10 @@ function dash() {
         return dd && dd.length ? dd[dd.length - 1][1] : 0;
       });
       const ddCurrent = ddCurrentPerBot.length ? Math.min(...ddCurrentPerBot) : 0;
-      const ddBacktest = live.length ? live[0].baseline.max_dd_pct : 0;
+      // C1: max backtest DD across the fleet (worst bot's lab cap)
+      const ddBacktest = live.length
+        ? Math.max(...live.map(b => b.baseline?.max_dd_pct || 0))
+        : 0;
       const ddCap = ddBacktest * 1.5;
       const open = live.reduce((s, b) => s + b.open_trades.length, 0);
       const openNotional = live.reduce((s, b) => s + b.open_trades.reduce((a, t) => a + (t.stake_amount || 0), 0), 0);
@@ -232,15 +235,21 @@ function dash() {
       }
 
       // 2. Stale bots — RED
+      // status.stale_bots may be a list of strings (bot keys) or objects.
+      // Resolve label across naming variants: raw.bots[key].label / .name / key fallback.
       const staleBots = this.raw.status?.stale_bots || [];
       for (const s of staleBots) {
+        const key   = typeof s === 'string' ? s : (s.key || s.bot_key || '');
+        const meta  = key ? this.raw.bots?.[key] : null;
+        const label = (typeof s === 'object' && s.label) || meta?.label || meta?.name || key || 'unknown';
+        const stale = (typeof s === 'object' && s.stale_hours) ? s.stale_hours + 'h ago' : 'unknown';
         items.push({
           color: 'red',
           icon: '!',
-          subject: `${s.label || s.key} bot stale`,
-          reason: `last seen ${s.stale_hours ? s.stale_hours + 'h ago' : 'unknown'} · check container`,
+          subject: `${label} bot stale`,
+          reason: `last seen ${stale} · check container`,
           cta: 'check logs',
-          action: () => {},
+          action: () => { if (key && this.allBots.find(b => b.key === key)) this.setTab('bot:' + key); },
         });
       }
 
@@ -275,7 +284,8 @@ function dash() {
       }
 
       // 5. Newest live signal in last 30 minutes — BLUE
-      const killersRaw = this.raw.killers;
+      // Killers state is fetched separately into this.killersRaw, not raw.killers.
+      const killersRaw = this.killersRaw;
       if (killersRaw?.recent_signals?.length) {
         const sig = killersRaw.recent_signals[0];
         const sigAge = now - (sig.ts || 0);
@@ -369,10 +379,11 @@ function dash() {
     },
 
     // ─── C5: last closed trade for a bot ───
+    // Don't mutate bot.recent_trades — sort a shallow copy.
     lastClosedTrade(bot) {
       const trades = (bot.recent_trades || []).filter(t => !t.is_open);
       if (!trades.length) return null;
-      return trades.sort((a, b) => (b.close_timestamp || 0) - (a.close_timestamp || 0))[0];
+      return [...trades].sort((a, b) => (b.close_timestamp || 0) - (a.close_timestamp || 0))[0];
     },
 
     // C5: deviation summary sentence
