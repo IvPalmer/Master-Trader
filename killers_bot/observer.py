@@ -221,12 +221,19 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
 
 
 async def _post_to_receiver(url: str, msg: dict, classification: dict) -> None:
-    """POST classified event to killers-receiver. Best-effort, never blocks."""
+    """POST classified event to killers-receiver. Best-effort, never blocks.
+
+    Telethon's to_dict() leaves datetime objects + bytes inline; pre-serialize
+    via json.dumps(default=str) and post as raw data so aiohttp doesn't trip
+    on its own json encoder.
+    """
     import aiohttp
     payload = {"msg": msg, "classification": classification}
     try:
+        body_json = json.dumps(payload, default=str)
         async with aiohttp.ClientSession() as s:
-            async with s.post(url, json=payload,
+            async with s.post(url, data=body_json,
+                              headers={"Content-Type": "application/json"},
                               timeout=aiohttp.ClientTimeout(total=8)) as r:
                 body = await r.text()
                 logger.info("[RECV] %d msg_id=%d kind=%s body=%s",
