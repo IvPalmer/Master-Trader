@@ -1,0 +1,5153 @@
+{
+  "source": "llm",
+  "n_messages": 1087,
+  "n_classifications": 1087,
+  "n_trades_parsed": 147,
+  "n_trades_sized": 99,
+  "n_skipped": 48,
+  "account_usd": 1000.0,
+  "risk_per_trade_usd": 10.0,
+  "margin_per_trade_usd": 50.0,
+  "total_pnl_usd": 763.96,
+  "account_return_pct": 76.4,
+  "avg_leverage": 8.9,
+  "trades": [
+    {
+      "msg_id": 6,
+      "date": "2026-01-30T19:05:32+00:00",
+      "symbol": "ETH",
+      "direction": "LONG",
+      "entry": 2739.56,
+      "sl": 2632.84,
+      "tp": 2825.47,
+      "exit_price": 2632.84,
+      "exit_reason": "sl",
+      "pnl": -0.04,
+      "events": [],
+      "position_notional": 256.7053973013498,
+      "leverage": 5.1341079460269965,
+      "sl_distance_pct": 0.0389551606827373,
+      "scaled_pnl": -10.27,
+      "market_entry": false
+    },
+    {
+      "msg_id": 7,
+      "date": "2026-02-01T10:23:48+00:00",
+      "symbol": "ETH",
+      "direction": "LONG",
+      "entry": 2427.09,
+      "sl": 2350.75,
+      "tp": 2488.51,
+      "exit_price": 2350.75,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [],
+      "position_notional": 317.931621692428,
+      "leverage": 6.35863243384856,
+      "sl_distance_pct": 0.03145330416259807,
+      "scaled_pnl": -9.54,
+      "market_entry": false
+    },
+    {
+      "msg_id": 8,
+      "date": "2026-02-01T10:24:24+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 78964.2,
+      "sl": 77032.2,
+      "tp": 80522.8,
+      "exit_price": 77032.2,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [],
+      "position_notional": 408.7173913043478,
+      "leverage": 8.174347826086956,
+      "sl_distance_pct": 0.02446678368171906,
+      "scaled_pnl": -8.17,
+      "market_entry": false
+    },
+    {
+      "msg_id": 9,
+      "date": "2026-02-02T12:06:52+00:00",
+      "symbol": "XAUT",
+      "direction": "SHORT",
+      "entry": 4800.0,
+      "sl": 4880,
+      "tp": 4600,
+      "exit_price": 4600,
+      "exit_reason": "tp",
+      "pnl": 0.04,
+      "events": [],
+      "position_notional": 600.0,
+      "leverage": 12.0,
+      "sl_distance_pct": 0.016666666666666666,
+      "scaled_pnl": 24.0,
+      "market_entry": false
+    },
+    {
+      "msg_id": 12,
+      "date": "2026-02-02T15:43:57+00:00",
+      "symbol": "XAG",
+      "direction": "SHORT",
+      "entry": 79.5,
+      "sl": 83,
+      "tp": 73,
+      "exit_price": 76.16,
+      "exit_reason": "open",
+      "pnl": 0.04,
+      "events": [],
+      "position_notional": 227.14285714285717,
+      "leverage": 4.542857142857144,
+      "sl_distance_pct": 0.0440251572327044,
+      "scaled_pnl": 9.09,
+      "market_entry": false
+    },
+    {
+      "msg_id": 14,
+      "date": "2026-02-03T13:24:56+00:00",
+      "symbol": "XAUT",
+      "direction": "LONG",
+      "entry": 4850.0,
+      "sl": 4695,
+      "tp": 5205,
+      "exit_price": 4695,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [
+        {
+          "msg_id": 28,
+          "date": "2026-02-04T01:21:49+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL to breakeven if desired"
+        }
+      ],
+      "position_notional": 312.90322580645164,
+      "leverage": 6.258064516129033,
+      "sl_distance_pct": 0.031958762886597936,
+      "scaled_pnl": -9.39,
+      "market_entry": false
+    },
+    {
+      "msg_id": 20,
+      "date": "2026-02-03T14:22:21+00:00",
+      "symbol": "HBAR",
+      "direction": "SHORT",
+      "entry": 0.093,
+      "sl": 0.0965,
+      "tp": 0.0875,
+      "exit_price": 0.0875,
+      "exit_reason": "tp",
+      "pnl": 0.06,
+      "events": [
+        {
+          "msg_id": 23,
+          "date": "2026-02-03T17:47:01+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL to breakeven if desired"
+        }
+      ],
+      "position_notional": 265.71428571428544,
+      "leverage": 5.314285714285709,
+      "sl_distance_pct": 0.037634408602150574,
+      "scaled_pnl": 15.94,
+      "market_entry": false
+    },
+    {
+      "msg_id": 25,
+      "date": "2026-02-03T19:19:40+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 74456.2,
+      "sl": 72889.1,
+      "tp": 75744.3,
+      "exit_price": 75744.3,
+      "exit_reason": "tp",
+      "pnl": 0.02,
+      "events": [],
+      "position_notional": 475.1209239997474,
+      "leverage": 9.502418479994947,
+      "sl_distance_pct": 0.021047273430553685,
+      "scaled_pnl": 9.5,
+      "market_entry": false
+    },
+    {
+      "msg_id": 26,
+      "date": "2026-02-03T19:20:38+00:00",
+      "symbol": "BNB",
+      "direction": "LONG",
+      "entry": 750.7,
+      "sl": 736.1,
+      "tp": 762.4,
+      "exit_price": 736.1,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [],
+      "position_notional": 514.17808219178,
+      "leverage": 10.2835616438356,
+      "sl_distance_pct": 0.019448514719595075,
+      "scaled_pnl": -10.28,
+      "market_entry": false
+    },
+    {
+      "msg_id": 30,
+      "date": "2026-02-04T09:14:37+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 73500.0,
+      "sl": 69000,
+      "tp": 82250,
+      "exit_price": 76084.0,
+      "exit_reason": "open",
+      "pnl": 0.04,
+      "events": [],
+      "position_notional": 163.33333333333334,
+      "leverage": 3.266666666666667,
+      "sl_distance_pct": 0.061224489795918366,
+      "scaled_pnl": 6.53,
+      "market_entry": false
+    },
+    {
+      "msg_id": 33,
+      "date": "2026-02-04T13:04:36+00:00",
+      "symbol": "ATOM",
+      "direction": "SHORT",
+      "entry": 2.08,
+      "sl": 2.15,
+      "tp": 1.92,
+      "exit_price": 2.15,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [
+        {
+          "msg_id": 39,
+          "date": "2026-02-04T23:24:29+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL to breakeven if desired"
+        }
+      ],
+      "position_notional": 297.14285714285785,
+      "leverage": 5.942857142857157,
+      "sl_distance_pct": 0.033653846153846076,
+      "scaled_pnl": -8.91,
+      "market_entry": false
+    },
+    {
+      "msg_id": 38,
+      "date": "2026-02-04T20:06:08+00:00",
+      "symbol": "XAG",
+      "direction": "LONG",
+      "entry": 86.45,
+      "sl": 83.5,
+      "tp": 89.0,
+      "exit_price": 83.5,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [],
+      "position_notional": 293.05084745762684,
+      "leverage": 5.861016949152537,
+      "sl_distance_pct": 0.03412377096587626,
+      "scaled_pnl": -8.79,
+      "market_entry": false
+    },
+    {
+      "msg_id": 41,
+      "date": "2026-02-05T11:28:48+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": 2060.5,
+      "sl": 2195.0,
+      "tp": 1932.92,
+      "exit_price": 2074.99,
+      "exit_reason": "open",
+      "pnl": -0.01,
+      "events": [],
+      "position_notional": 153.19702602230484,
+      "leverage": 3.063940520446097,
+      "sl_distance_pct": 0.06527541858772143,
+      "scaled_pnl": -1.53,
+      "market_entry": false
+    },
+    {
+      "msg_id": 42,
+      "date": "2026-02-05T15:03:24+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 69075.8,
+      "sl": 71944.4,
+      "tp": 66265.9,
+      "exit_price": 71944.4,
+      "exit_reason": "sl",
+      "pnl": -0.04,
+      "events": [],
+      "position_notional": 240.79969323014785,
+      "leverage": 4.815993864602957,
+      "sl_distance_pct": 0.04152829210808982,
+      "scaled_pnl": -9.63,
+      "market_entry": false
+    },
+    {
+      "msg_id": 53,
+      "date": "2026-02-06T00:20:31+00:00",
+      "symbol": "LTC",
+      "direction": "SHORT",
+      "entry": 81.0,
+      "sl": null,
+      "tp": 48.6,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": false
+    },
+    {
+      "msg_id": 57,
+      "date": "2026-02-07T07:00:33+00:00",
+      "symbol": "ASTER",
+      "direction": "SHORT",
+      "entry": 0.5442,
+      "sl": 0.5589,
+      "tp": 0.5305,
+      "exit_price": 0.5589,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [],
+      "position_notional": 370.2040816326547,
+      "leverage": 7.404081632653094,
+      "sl_distance_pct": 0.02701212789415644,
+      "scaled_pnl": -11.11,
+      "market_entry": false
+    },
+    {
+      "msg_id": 58,
+      "date": "2026-02-08T07:17:43+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 69432.1,
+      "sl": 68928.0,
+      "tp": 69814.0,
+      "exit_price": 69814.0,
+      "exit_reason": "tp",
+      "pnl": 0.01,
+      "events": [],
+      "position_notional": 1377.347748462591,
+      "leverage": 27.546954969251818,
+      "sl_distance_pct": 0.007260330596366893,
+      "scaled_pnl": 13.77,
+      "market_entry": false
+    },
+    {
+      "msg_id": 61,
+      "date": "2026-02-08T11:37:29+00:00",
+      "symbol": "ETH",
+      "direction": "LONG",
+      "entry": 2128.84,
+      "sl": 2067.16,
+      "tp": 2173.97,
+      "exit_price": 2067.16,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [
+        {
+          "msg_id": 66,
+          "date": "2026-02-09T07:20:33+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "The ETH trade closed at stop-loss. BTC is still in position"
+        }
+      ],
+      "position_notional": 345.1426718547325,
+      "leverage": 6.90285343709465,
+      "sl_distance_pct": 0.02897352548805936,
+      "scaled_pnl": -10.35,
+      "market_entry": false
+    },
+    {
+      "msg_id": 62,
+      "date": "2026-02-08T11:37:38+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 70847.2,
+      "sl": 69055.0,
+      "tp": 72646.3,
+      "exit_price": 72646.3,
+      "exit_reason": "tp",
+      "pnl": 0.03,
+      "events": [],
+      "position_notional": 395.30855931257736,
+      "leverage": 7.906171186251547,
+      "sl_distance_pct": 0.025296694858794662,
+      "scaled_pnl": 11.86,
+      "market_entry": false
+    },
+    {
+      "msg_id": 68,
+      "date": "2026-02-09T16:35:50+00:00",
+      "symbol": "ASTER",
+      "direction": "SHORT",
+      "entry": 0.5934,
+      "sl": 0.6151,
+      "tp": 0.5738,
+      "exit_price": 0.6151,
+      "exit_reason": "sl",
+      "pnl": -0.04,
+      "events": [
+        {
+          "msg_id": 69,
+          "date": "2026-02-09T19:15:32+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "SL"
+        }
+      ],
+      "position_notional": 273.45622119815744,
+      "leverage": 5.469124423963149,
+      "sl_distance_pct": 0.03656892483990553,
+      "scaled_pnl": -10.94,
+      "market_entry": false
+    },
+    {
+      "msg_id": 70,
+      "date": "2026-02-10T06:24:34+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 69113.7,
+      "sl": 70499.9,
+      "tp": 67711.3,
+      "exit_price": 70499.9,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [],
+      "position_notional": 498.58389842735636,
+      "leverage": 9.971677968547127,
+      "sl_distance_pct": 0.020056804946052623,
+      "scaled_pnl": -9.97,
+      "market_entry": false
+    },
+    {
+      "msg_id": 73,
+      "date": "2026-02-10T07:55:36+00:00",
+      "symbol": "ASTER",
+      "direction": "LONG",
+      "entry": 0.633,
+      "sl": 0.598,
+      "tp": 0.6605,
+      "exit_price": 0.6605,
+      "exit_reason": "tp",
+      "pnl": 0.04,
+      "events": [
+        {
+          "msg_id": 76,
+          "date": "2026-02-10T09:37:47+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Closed completely"
+        }
+      ],
+      "position_notional": 180.8571428571427,
+      "leverage": 3.617142857142854,
+      "sl_distance_pct": 0.055292259083728326,
+      "scaled_pnl": 7.23,
+      "market_entry": false
+    },
+    {
+      "msg_id": 79,
+      "date": "2026-02-11T08:39:48+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 66500.0,
+      "sl": 65300,
+      "tp": null,
+      "exit_price": 76095.6,
+      "exit_reason": "manual",
+      "pnl": 0.14,
+      "events": [
+        {
+          "msg_id": 85,
+          "date": "2026-02-11T14:07:57+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "1TP\u2705\n\nFix 30%"
+        },
+        {
+          "msg_id": 86,
+          "date": "2026-02-11T14:08:57+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL to breakeven"
+        },
+        {
+          "msg_id": 89,
+          "date": "2026-02-11T14:12:06+00:00",
+          "kind": "close_partial",
+          "pct": null,
+          "sl": null,
+          "text": "BTC Second fix here"
+        },
+        {
+          "msg_id": 91,
+          "date": "2026-02-11T14:19:59+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 67500,
+          "text": "I\u2019ve got 25% of the position left. Stop at 67,500 (locked in some profit). Let\u2019s see if we can reach the final take-profit 70,400"
+        },
+        {
+          "msg_id": 99,
+          "date": "2026-02-12T11:32:18+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 68500,
+          "text": "Move SL to 68500"
+        },
+        {
+          "msg_id": 105,
+          "date": "2026-02-12T14:21:04+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 69200,
+          "text": "\u203c\ufe0fGuys, moving SL one more time, now it will be at 69200\n\nI think we might get a spike up at the US open"
+        },
+        {
+          "msg_id": 108,
+          "date": "2026-02-12T15:06:57+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "20% fix here"
+        },
+        {
+          "msg_id": 109,
+          "date": "2026-02-12T15:16:13+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Fixing another 20% of the position here - we might get a bounce before moving lower"
+        },
+        {
+          "msg_id": 111,
+          "date": "2026-02-12T16:08:38+00:00",
+          "kind": "close_partial",
+          "pct": 15,
+          "sl": null,
+          "text": "66,500 - fix 15%"
+        },
+        {
+          "msg_id": 114,
+          "date": "2026-02-12T16:31:13+00:00",
+          "kind": "close_partial",
+          "pct": 12,
+          "sl": null,
+          "text": "Let\u2019s close another 10-15%"
+        },
+        {
+          "msg_id": 118,
+          "date": "2026-02-13T00:58:56+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "I was sure I\u2019d posted about a full close at 65,200.\n\nI mentioned it in the video note and showed it on the screenshots, but I just checked the messages - and it\u2019s not there("
+        }
+      ],
+      "position_notional": 554.1666666666666,
+      "leverage": 11.083333333333332,
+      "sl_distance_pct": 0.01804511278195489,
+      "scaled_pnl": 77.58,
+      "market_entry": false
+    },
+    {
+      "msg_id": 84,
+      "date": "2026-02-11T13:38:12+00:00",
+      "symbol": "ETH",
+      "direction": "LONG",
+      "entry": 1966.65,
+      "sl": 1930.39,
+      "tp": 1999.92,
+      "exit_price": 1999.92,
+      "exit_reason": "tp",
+      "pnl": 0.02,
+      "events": [
+        {
+          "msg_id": 88,
+          "date": "2026-02-11T14:11:21+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "ETH Full fix"
+        }
+      ],
+      "position_notional": 542.3745173745175,
+      "leverage": 10.84749034749035,
+      "sl_distance_pct": 0.018437444385121904,
+      "scaled_pnl": 10.85,
+      "market_entry": false
+    },
+    {
+      "msg_id": 95,
+      "date": "2026-02-12T10:08:06+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 67750.0,
+      "sl": 68300,
+      "tp": null,
+      "exit_price": 68300,
+      "exit_reason": "sl",
+      "pnl": -0.01,
+      "events": [],
+      "position_notional": 1231.818181818182,
+      "leverage": 24.63636363636364,
+      "sl_distance_pct": 0.008118081180811807,
+      "scaled_pnl": -12.32,
+      "market_entry": false
+    },
+    {
+      "msg_id": 103,
+      "date": "2026-02-12T13:29:27+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 67690.6,
+      "sl": 68265.5,
+      "tp": 67041.3,
+      "exit_price": 68265.5,
+      "exit_reason": "sl",
+      "pnl": -0.01,
+      "events": [
+        {
+          "msg_id": 119,
+          "date": "2026-02-13T00:59:09+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Full fix guys"
+        }
+      ],
+      "position_notional": 1177.4325969733989,
+      "leverage": 23.548651939467977,
+      "sl_distance_pct": 0.008493055165709775,
+      "scaled_pnl": -11.77,
+      "market_entry": false
+    },
+    {
+      "msg_id": 117,
+      "date": "2026-02-12T20:12:02+00:00",
+      "symbol": "ZEC",
+      "direction": "LONG",
+      "entry": 226.44,
+      "sl": 220.6,
+      "tp": 254.81,
+      "exit_price": 254.81,
+      "exit_reason": "tp",
+      "pnl": 0.13,
+      "events": [
+        {
+          "msg_id": 133,
+          "date": "2026-02-13T15:24:45+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": "breakeven",
+          "text": "Let\u2019s close 50%. Stoploss to entry price"
+        },
+        {
+          "msg_id": 141,
+          "date": "2026-02-13T16:47:47+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "ZEC let\u2019s close full now"
+        }
+      ],
+      "position_notional": 387.739726027397,
+      "leverage": 7.75479452054794,
+      "sl_distance_pct": 0.025790496378731688,
+      "scaled_pnl": 50.41,
+      "market_entry": false
+    },
+    {
+      "msg_id": 122,
+      "date": "2026-02-13T03:20:02+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 65800.0,
+      "sl": 63900,
+      "tp": 70400,
+      "exit_price": 70400,
+      "exit_reason": "tp",
+      "pnl": 0.07,
+      "events": [
+        {
+          "msg_id": 128,
+          "date": "2026-02-13T12:22:07+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 65400,
+          "text": "\u203c\ufe0fImportant! I\u2019m moving the stop to the 65,400. Accordingly, the orders placed earlier are no longer valid.\n\nThere\u2019s a chance we may dip lower \u2014 in that case, we\u2019ll look for longs around 63\u201364K."
+        },
+        {
+          "msg_id": 131,
+          "date": "2026-02-13T15:02:18+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": null,
+          "text": "Fix 25% here"
+        },
+        {
+          "msg_id": 134,
+          "date": "2026-02-13T15:36:32+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": "breakeven",
+          "text": "Another 25% hit the take-profit. Congratulations to everyone on a successful trade.\n\nStop moved to breakeven. And if you\u2019d like to show some appreciation - feel free to share your PnL in the channel chat"
+        },
+        {
+          "msg_id": 135,
+          "date": "2026-02-13T16:12:53+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Full fix!"
+        }
+      ],
+      "position_notional": 346.3157894736842,
+      "leverage": 6.926315789473684,
+      "sl_distance_pct": 0.028875379939209727,
+      "scaled_pnl": 24.24,
+      "market_entry": false
+    },
+    {
+      "msg_id": 137,
+      "date": "2026-02-13T16:19:09+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 69150.0,
+      "sl": 70200,
+      "tp": null,
+      "exit_price": 70200,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [
+        {
+          "msg_id": 143,
+          "date": "2026-02-13T17:24:52+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 69700,
+          "text": "As for the current setup, \n\nWe\u2019re moving the stop to 69,700.\n\nSet the full take-profit at 67,500."
+        }
+      ],
+      "position_notional": 658.5714285714286,
+      "leverage": 13.17142857142857,
+      "sl_distance_pct": 0.015184381778741865,
+      "scaled_pnl": -13.17,
+      "market_entry": false
+    },
+    {
+      "msg_id": 144,
+      "date": "2026-02-13T17:31:40+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 71900.0,
+      "sl": 74500,
+      "tp": null,
+      "exit_price": 74500,
+      "exit_reason": "sl",
+      "pnl": -0.04,
+      "events": [
+        {
+          "msg_id": 146,
+          "date": "2026-02-14T08:09:29+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Stopped out.\n\nWe could\u2019ve tried to manage the position - move the stop, add to it - but since many of you aren\u2019t online right now, I decided not to make any adjustments\n\nThe second plan is now active: short from the 70\u201373K zone"
+        }
+      ],
+      "position_notional": 276.5384615384615,
+      "leverage": 5.53076923076923,
+      "sl_distance_pct": 0.03616133518776078,
+      "scaled_pnl": -11.06,
+      "market_entry": false
+    },
+    {
+      "msg_id": 148,
+      "date": "2026-02-14T10:29:11+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 76738.6,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 154,
+          "date": "2026-02-14T11:16:42+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 71100,
+          "text": "Stop to 71,100!"
+        },
+        {
+          "msg_id": 155,
+          "date": "2026-02-14T11:19:06+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "Added at current levels +50% to the position, average - 69,700"
+        },
+        {
+          "msg_id": 161,
+          "date": "2026-02-15T07:32:33+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": 71800,
+          "text": "\u203c\ufe0fAdding 50% more and moving stop to 71800"
+        },
+        {
+          "msg_id": 163,
+          "date": "2026-02-15T13:42:04+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": null,
+          "text": "25% fix"
+        },
+        {
+          "msg_id": 165,
+          "date": "2026-02-15T16:48:28+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": null,
+          "text": "Fix 25% more here"
+        },
+        {
+          "msg_id": 167,
+          "date": "2026-02-15T17:14:51+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": "breakeven",
+          "text": "Closing another 25% and leaving 1 BTC with the stop moved to breakeven"
+        },
+        {
+          "msg_id": 174,
+          "date": "2026-02-16T13:05:40+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "BTC stopped out at breakeven, that\u2019s why I closed 75% of positions earlier"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 173,
+      "date": "2026-02-16T12:31:19+00:00",
+      "symbol": "ETH",
+      "direction": "LONG",
+      "entry": 1966.15,
+      "sl": 1926.83,
+      "tp": 2061.87,
+      "exit_price": 2061.87,
+      "exit_reason": "tp",
+      "pnl": 0.05,
+      "events": [
+        {
+          "msg_id": 191,
+          "date": "2026-02-18T10:10:12+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "You can close ETH and ASTER by around 30% - we\u2019re a bit heavy on longs right now"
+        },
+        {
+          "msg_id": 205,
+          "date": "2026-02-18T19:39:17+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "ETH long closed by SL"
+        }
+      ],
+      "position_notional": 500.0381485249216,
+      "leverage": 10.000762970498432,
+      "sl_distance_pct": 0.01999847417541905,
+      "scaled_pnl": 25.0,
+      "market_entry": false
+    },
+    {
+      "msg_id": 176,
+      "date": "2026-02-17T01:04:50+00:00",
+      "symbol": "ASTER",
+      "direction": "LONG",
+      "entry": 0.7077500000000001,
+      "sl": 0.6951,
+      "tp": 0.73,
+      "exit_price": 0.6951,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [
+        {
+          "msg_id": 191,
+          "date": "2026-02-18T10:10:12+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "You can close ETH and ASTER by around 30% - we\u2019re a bit heavy on longs right now"
+        }
+      ],
+      "position_notional": 559.4861660079031,
+      "leverage": 11.18972332015806,
+      "sl_distance_pct": 0.017873542917696994,
+      "scaled_pnl": -11.19,
+      "market_entry": false
+    },
+    {
+      "msg_id": 179,
+      "date": "2026-02-17T10:16:50+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 67850.0,
+      "sl": 67200,
+      "tp": 68800,
+      "exit_price": 68800,
+      "exit_reason": "tp",
+      "pnl": 0.01,
+      "events": [
+        {
+          "msg_id": 180,
+          "date": "2026-02-17T10:17:55+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 67200,
+          "text": "SL 67,200!!!"
+        },
+        {
+          "msg_id": 181,
+          "date": "2026-02-17T15:21:12+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Stopped out"
+        }
+      ],
+      "position_notional": 1043.8461538461538,
+      "leverage": 20.876923076923077,
+      "sl_distance_pct": 0.009579955784819455,
+      "scaled_pnl": 10.44,
+      "market_entry": false
+    },
+    {
+      "msg_id": 182,
+      "date": "2026-02-17T15:21:21+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 66800.0,
+      "sl": 65300,
+      "tp": null,
+      "exit_price": 76085.1,
+      "exit_reason": "manual",
+      "pnl": 0.14,
+      "events": [
+        {
+          "msg_id": 189,
+          "date": "2026-02-18T01:31:29+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Right on plan - price tapped the accumulation zone. I\u2019ll be adding to the position around 66,300\u201366,600."
+        },
+        {
+          "msg_id": 190,
+          "date": "2026-02-18T08:31:06+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": null,
+          "text": "Take 25% here"
+        },
+        {
+          "msg_id": 196,
+          "date": "2026-02-18T11:09:11+00:00",
+          "kind": "increase",
+          "pct": 25,
+          "sl": null,
+          "text": "Putting the locked 25% back into the position"
+        },
+        {
+          "msg_id": 206,
+          "date": "2026-02-19T01:03:13+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC\n\nAdding 50% more here"
+        },
+        {
+          "msg_id": 212,
+          "date": "2026-02-19T12:07:34+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Hedge short closed, rolling the profit into the long at the current price"
+        }
+      ],
+      "position_notional": 445.3333333333333,
+      "leverage": 8.906666666666666,
+      "sl_distance_pct": 0.02245508982035928,
+      "scaled_pnl": 62.35,
+      "market_entry": false
+    },
+    {
+      "msg_id": 193,
+      "date": "2026-02-18T10:32:18+00:00",
+      "symbol": "XRP",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 197,
+          "date": "2026-02-18T11:09:47+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": "breakeven",
+          "text": "Take 50% of XRP, SL to breakeven"
+        },
+        {
+          "msg_id": 201,
+          "date": "2026-02-18T14:41:15+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "XRP\n\nFull close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 203,
+      "date": "2026-02-18T18:44:10+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": 1946.9,
+      "sl": 2038.29,
+      "tp": 1872.16,
+      "exit_price": 2038.29,
+      "exit_reason": "sl",
+      "pnl": -0.05,
+      "events": [
+        {
+          "msg_id": 215,
+          "date": "2026-02-19T13:36:41+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "ETH\n\nSL to breakeven"
+        },
+        {
+          "msg_id": 218,
+          "date": "2026-02-19T13:45:42+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "ETH\n\nI\u2019m taking 50% here"
+        },
+        {
+          "msg_id": 219,
+          "date": "2026-02-19T15:04:13+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "ETH hit the stop at breakeven"
+        }
+      ],
+      "position_notional": 213.03206040048175,
+      "leverage": 4.260641208009635,
+      "sl_distance_pct": 0.046941291283578955,
+      "scaled_pnl": -10.65,
+      "market_entry": false
+    },
+    {
+      "msg_id": 208,
+      "date": "2026-02-19T09:49:34+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 66741.9,
+      "sl": 67299.4,
+      "tp": 66315.6,
+      "exit_price": 67299.4,
+      "exit_reason": "sl",
+      "pnl": -0.01,
+      "events": [
+        {
+          "msg_id": 216,
+          "date": "2026-02-19T13:37:59+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 64700,
+          "text": "BTC\n\nMoving SL to 64,700"
+        },
+        {
+          "msg_id": 228,
+          "date": "2026-02-20T09:47:27+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "I\u2019m closing 20% here\n\nIf you\u2019re in this trade with too much risk, this is a good opportunity to trim your position, lock in some profit, reduce stress, and calmly hold for the final take profits\n\nYou can set them in advance:\n\n1. 68,800\n2. 69,300\n3. 70,100\n4. 70,900"
+        },
+        {
+          "msg_id": 242,
+          "date": "2026-02-22T16:56:56+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 66400,
+          "text": "Stoploss to 66,400"
+        },
+        {
+          "msg_id": 243,
+          "date": "2026-02-22T18:00:40+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 66200,
+          "text": "66,200."
+        },
+        {
+          "msg_id": 244,
+          "date": "2026-02-23T01:45:43+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Stopped out. If we break 65, the next stop is 55."
+        }
+      ],
+      "position_notional": 1197.1641255605382,
+      "leverage": 23.943282511210764,
+      "sl_distance_pct": 0.0083530735564915,
+      "scaled_pnl": -11.97,
+      "market_entry": false
+    },
+    {
+      "msg_id": 222,
+      "date": "2026-02-19T16:07:35+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": 1907.8,
+      "sl": 1986.91,
+      "tp": 1823.51,
+      "exit_price": 1986.91,
+      "exit_reason": "sl",
+      "pnl": -0.04,
+      "events": [
+        {
+          "msg_id": 229,
+          "date": "2026-02-20T12:01:11+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "ETH\n\nClosing 50% of the position here"
+        }
+      ],
+      "position_notional": 241.15788143091856,
+      "leverage": 4.823157628618372,
+      "sl_distance_pct": 0.0414666107558445,
+      "scaled_pnl": -9.65,
+      "market_entry": false
+    },
+    {
+      "msg_id": 232,
+      "date": "2026-02-21T14:01:05+00:00",
+      "symbol": "EGLD",
+      "direction": "LONG",
+      "entry": 4.18,
+      "sl": 3.654,
+      "tp": 4.745,
+      "exit_price": 3.824,
+      "exit_reason": "open",
+      "pnl": -0.09,
+      "events": [
+        {
+          "msg_id": 248,
+          "date": "2026-02-23T16:30:03+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL to entry price"
+        }
+      ],
+      "position_notional": 79.46768060836504,
+      "leverage": 1.5893536121673009,
+      "sl_distance_pct": 0.12583732057416264,
+      "scaled_pnl": -7.15,
+      "market_entry": false
+    },
+    {
+      "msg_id": 233,
+      "date": "2026-02-21T14:18:13+00:00",
+      "symbol": "ETC",
+      "direction": "LONG",
+      "entry": 7.577500000000001,
+      "sl": 7.126,
+      "tp": 8.85,
+      "exit_price": 8.85,
+      "exit_reason": "tp",
+      "pnl": 0.17,
+      "events": [],
+      "position_notional": 167.829457364341,
+      "leverage": 3.35658914728682,
+      "sl_distance_pct": 0.059584295612009265,
+      "scaled_pnl": 28.53,
+      "market_entry": false
+    },
+    {
+      "msg_id": 235,
+      "date": "2026-02-21T14:22:36+00:00",
+      "symbol": "ETH",
+      "direction": "LONG",
+      "entry": 1990.0,
+      "sl": 1959.0,
+      "tp": 2015.56,
+      "exit_price": 2015.56,
+      "exit_reason": "tp",
+      "pnl": 0.01,
+      "events": [
+        {
+          "msg_id": 237,
+          "date": "2026-02-21T14:28:08+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": null,
+          "text": "Let\u2019s take 25% here"
+        }
+      ],
+      "position_notional": 641.9354838709677,
+      "leverage": 12.838709677419354,
+      "sl_distance_pct": 0.015577889447236181,
+      "scaled_pnl": 6.42,
+      "market_entry": false
+    },
+    {
+      "msg_id": 246,
+      "date": "2026-02-23T15:23:02+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 76738.6,
+      "sl": 64950,
+      "tp": 72222,
+      "exit_price": 72222,
+      "exit_reason": "tp",
+      "pnl": -0.06,
+      "events": [
+        {
+          "msg_id": 249,
+          "date": "2026-02-23T17:13:53+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 64700,
+          "text": "Move SL to 64700"
+        },
+        {
+          "msg_id": 250,
+          "date": "2026-02-23T17:19:18+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 63600,
+          "text": "SL 63600"
+        },
+        {
+          "msg_id": 307,
+          "date": "2026-02-26T14:48:30+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": "breakeven",
+          "text": "BTC ETH\n\nClose 30% of both positions and SL to breakeven"
+        },
+        {
+          "msg_id": 309,
+          "date": "2026-02-26T15:24:55+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC ETH \n\nLets close 50% of remaining positions \n\nCongratulations with nice trade, share your results"
+        },
+        {
+          "msg_id": 328,
+          "date": "2026-02-27T09:48:03+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "Lets close 30% here"
+        },
+        {
+          "msg_id": 329,
+          "date": "2026-02-27T10:02:30+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "Lets move SL to breakeven"
+        },
+        {
+          "msg_id": 330,
+          "date": "2026-02-27T10:12:33+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Lets close 20% more here"
+        },
+        {
+          "msg_id": 334,
+          "date": "2026-02-27T11:54:24+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "BTC Full close"
+        }
+      ],
+      "position_notional": 65.09560083470468,
+      "leverage": 1.3019120166940936,
+      "sl_distance_pct": 0.15362021199240025,
+      "scaled_pnl": -3.91,
+      "market_entry": true
+    },
+    {
+      "msg_id": 251,
+      "date": "2026-02-24T02:18:12+00:00",
+      "symbol": "ETH",
+      "direction": "LONG",
+      "entry": 1845.0,
+      "sl": 1780,
+      "tp": 1940,
+      "exit_price": 1940,
+      "exit_reason": "tp",
+      "pnl": 0.05,
+      "events": [
+        {
+          "msg_id": 256,
+          "date": "2026-02-24T03:58:05+00:00",
+          "kind": "increase",
+          "pct": 30,
+          "sl": null,
+          "text": "Added 30% more"
+        },
+        {
+          "msg_id": 280,
+          "date": "2026-02-25T12:27:54+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "ETH Close 20% here"
+        },
+        {
+          "msg_id": 281,
+          "date": "2026-02-25T12:35:21+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": "breakeven",
+          "text": "ETH\n\nLets close 30% more and SL to breakeven"
+        },
+        {
+          "msg_id": 285,
+          "date": "2026-02-25T15:06:51+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "ETH\n\nLets close 50% of the rest here"
+        },
+        {
+          "msg_id": 287,
+          "date": "2026-02-25T15:11:17+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Was driving and accidentally closed the entire eth position. Oh well)\n\nYou can hold the remaining 20% up to 2050.\n\nCongrats to everyone on the successful trade\n\nShare your results @dennisbtc"
+        }
+      ],
+      "position_notional": 283.84615384615387,
+      "leverage": 5.676923076923077,
+      "sl_distance_pct": 0.03523035230352303,
+      "scaled_pnl": 14.19,
+      "market_entry": false
+    },
+    {
+      "msg_id": 258,
+      "date": "2026-02-24T07:24:44+00:00",
+      "symbol": "PUMP",
+      "direction": "LONG",
+      "entry": 0.00175,
+      "sl": 0.00164,
+      "tp": 0.0021,
+      "exit_price": 0.001795,
+      "exit_reason": "manual",
+      "pnl": 0.03,
+      "events": [
+        {
+          "msg_id": 269,
+          "date": "2026-02-24T15:33:18+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": "breakeven",
+          "text": "PUMPUSDT \n\n50% close\n\nSL to breakeven"
+        },
+        {
+          "msg_id": 276,
+          "date": "2026-02-25T04:28:48+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "GM, pump got stopped. For now, that's my only position"
+        }
+      ],
+      "position_notional": 159.09090909090898,
+      "leverage": 3.1818181818181794,
+      "sl_distance_pct": 0.0628571428571429,
+      "scaled_pnl": 4.77,
+      "market_entry": false
+    },
+    {
+      "msg_id": 259,
+      "date": "2026-02-24T07:27:21+00:00",
+      "symbol": "FF",
+      "direction": "LONG",
+      "entry": 0.07565,
+      "sl": 0.074,
+      "tp": 0.081,
+      "exit_price": 0.081,
+      "exit_reason": "tp",
+      "pnl": 0.07,
+      "events": [
+        {
+          "msg_id": 266,
+          "date": "2026-02-24T11:59:13+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "FFUSDT\n\n50% take here"
+        },
+        {
+          "msg_id": 267,
+          "date": "2026-02-24T11:59:56+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "FFUSDT \n\nSL to breakeven"
+        },
+        {
+          "msg_id": 268,
+          "date": "2026-02-24T15:31:58+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "FFUSDT \n\nFull close"
+        }
+      ],
+      "position_notional": 458.4848484848488,
+      "leverage": 9.169696969696975,
+      "sl_distance_pct": 0.02181097157964308,
+      "scaled_pnl": 32.09,
+      "market_entry": false
+    },
+    {
+      "msg_id": 260,
+      "date": "2026-02-24T07:30:19+00:00",
+      "symbol": "ASTER",
+      "direction": "LONG",
+      "entry": 0.6842,
+      "sl": 0.66,
+      "tp": 0.81,
+      "exit_price": 0.6819,
+      "exit_reason": "manual",
+      "pnl": -0.0,
+      "events": [
+        {
+          "msg_id": 274,
+          "date": "2026-02-24T19:12:50+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Let\u2019s close ASTER at small loss / breakeven"
+        }
+      ],
+      "position_notional": 282.72727272727275,
+      "leverage": 5.654545454545455,
+      "sl_distance_pct": 0.03536977491961415,
+      "scaled_pnl": 0.0,
+      "market_entry": true
+    },
+    {
+      "msg_id": 277,
+      "date": "2026-02-25T11:51:42+00:00",
+      "symbol": "FF",
+      "direction": "LONG",
+      "entry": 0.0766,
+      "sl": 0.075,
+      "tp": 0.081,
+      "exit_price": 0.081,
+      "exit_reason": "tp",
+      "pnl": 0.06,
+      "events": [
+        {
+          "msg_id": 286,
+          "date": "2026-02-25T15:08:08+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": "breakeven",
+          "text": "FF\n\nClose 20% and stop to breakeven"
+        },
+        {
+          "msg_id": 288,
+          "date": "2026-02-25T15:42:47+00:00",
+          "kind": "close_partial",
+          "pct": 70,
+          "sl": 0.078,
+          "text": "FF\n\nClosing 70% of the remaining positions. Moving the stop into profit at 0.078.\nLeaving 30% running - either we push higher toward 0.09, or we get stopped out with gains. Congrats on another solid trade.\n\nI don\u2019t want to stay in longs for too long today. If you\u2019re still holding, shift your stop into profit and you can try to ride it - the bounce may extend.\nWe might be getting exactly the reaction I was looking for: a move toward 72k."
+        }
+      ],
+      "position_notional": 478.74999999999875,
+      "leverage": 9.574999999999974,
+      "sl_distance_pct": 0.020887728459530082,
+      "scaled_pnl": 28.72,
+      "market_entry": false
+    },
+    {
+      "msg_id": 295,
+      "date": "2026-02-26T05:37:58+00:00",
+      "symbol": "PUMP",
+      "direction": "LONG",
+      "entry": 0.018125000000000002,
+      "sl": 0.0173,
+      "tp": 0.021,
+      "exit_price": 0.0173,
+      "exit_reason": "sl",
+      "pnl": -0.05,
+      "events": [
+        {
+          "msg_id": 305,
+          "date": "2026-02-26T13:54:04+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "PUMP\n\nLets close 50% here"
+        },
+        {
+          "msg_id": 312,
+          "date": "2026-02-27T01:50:14+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "PUMP and Fartcoin - both stopped out"
+        }
+      ],
+      "position_notional": 219.69696969696898,
+      "leverage": 4.393939393939379,
+      "sl_distance_pct": 0.04551724137931049,
+      "scaled_pnl": -10.98,
+      "market_entry": false
+    },
+    {
+      "msg_id": 296,
+      "date": "2026-02-26T05:41:00+00:00",
+      "symbol": "FARTCOIN",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 312,
+          "date": "2026-02-27T01:50:14+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "PUMP and Fartcoin - both stopped out"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 301,
+      "date": "2026-02-26T12:56:08+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 302,
+      "date": "2026-02-26T12:56:18+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 307,
+          "date": "2026-02-26T14:48:30+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": "breakeven",
+          "text": "BTC ETH\n\nClose 30% of both positions and SL to breakeven"
+        },
+        {
+          "msg_id": 309,
+          "date": "2026-02-26T15:24:55+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC ETH \n\nLets close 50% of remaining positions \n\nCongratulations with nice trade, share your results"
+        },
+        {
+          "msg_id": 332,
+          "date": "2026-02-27T10:19:00+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Lets fully close rest of ETH position that didnt get stopped"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 322,
+      "date": "2026-02-27T09:05:21+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 337,
+      "date": "2026-02-28T04:10:22+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 342,
+          "date": "2026-02-28T06:48:22+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Full close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 344,
+      "date": "2026-02-28T06:53:05+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 350,
+          "date": "2026-02-28T07:39:43+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Full close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 352,
+      "date": "2026-02-28T13:54:53+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 356,
+          "date": "2026-02-28T14:00:48+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 66100,
+          "text": "BTC Stop to 66100"
+        },
+        {
+          "msg_id": 359,
+          "date": "2026-02-28T14:13:11+00:00",
+          "kind": "close_partial",
+          "pct": 40,
+          "sl": null,
+          "text": "While BTC is still near my entry, \n\nI\u2019m cutting about 40% of the position. If needed, I\u2019ll add back a bit higher.\n\nThe risk ended up slightly higher than I planned, so I\u2019m reducing exposure while we\u2019re around entry."
+        },
+        {
+          "msg_id": 362,
+          "date": "2026-02-28T15:24:36+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Lets close full here, it might go higher"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 353,
+      "date": "2026-02-28T13:54:57+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 357,
+          "date": "2026-02-28T14:00:58+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 1955,
+          "text": "ETH stop to 1955"
+        },
+        {
+          "msg_id": 363,
+          "date": "2026-02-28T15:24:56+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Both positions"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 365,
+      "date": "2026-02-28T20:49:17+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 376,
+          "date": "2026-02-28T22:38:11+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "Adding 50% more here"
+        },
+        {
+          "msg_id": 379,
+          "date": "2026-03-01T02:07:25+00:00",
+          "kind": "increase",
+          "pct": 30,
+          "sl": null,
+          "text": "Very risky, but I added another 30% to the position"
+        },
+        {
+          "msg_id": 383,
+          "date": "2026-03-01T23:37:48+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": "breakeven",
+          "text": "Close 25% here and sl to breakeven"
+        },
+        {
+          "msg_id": 384,
+          "date": "2026-03-02T00:05:09+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": null,
+          "text": "Close 25% more here"
+        },
+        {
+          "msg_id": 388,
+          "date": "2026-03-02T01:07:17+00:00",
+          "kind": "increase",
+          "pct": 25,
+          "sl": 67600,
+          "text": "Adding back 25% to BTC ar current price, stop to 67600"
+        },
+        {
+          "msg_id": 394,
+          "date": "2026-03-02T03:55:38+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Adding BTC Short here"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 366,
+      "date": "2026-02-28T20:49:30+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 376,
+          "date": "2026-02-28T22:38:11+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "Adding 50% more here"
+        },
+        {
+          "msg_id": 378,
+          "date": "2026-03-01T02:03:15+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "ETH got stopped, BTC still active"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 385,
+      "date": "2026-03-02T00:34:01+00:00",
+      "symbol": "XAUT",
+      "direction": "LONG",
+      "entry": 5250.0,
+      "sl": 5080,
+      "tp": 5600,
+      "exit_price": 5080,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [
+        {
+          "msg_id": 454,
+          "date": "2026-03-03T15:00:14+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "XAUT got stopped"
+        }
+      ],
+      "position_notional": 308.82352941176475,
+      "leverage": 6.176470588235295,
+      "sl_distance_pct": 0.03238095238095238,
+      "scaled_pnl": -9.26,
+      "market_entry": false
+    },
+    {
+      "msg_id": 390,
+      "date": "2026-03-02T03:38:25+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 405,
+          "date": "2026-03-02T07:13:14+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "ETH Close 50% of position"
+        },
+        {
+          "msg_id": 409,
+          "date": "2026-03-02T13:13:06+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "ETH Full close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 395,
+      "date": "2026-03-02T03:55:46+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 398,
+          "date": "2026-03-02T03:56:46+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 67600,
+          "text": "Tight stop at 67600"
+        },
+        {
+          "msg_id": 399,
+          "date": "2026-03-02T05:11:13+00:00",
+          "kind": "close_partial",
+          "pct": 40,
+          "sl": null,
+          "text": "Closing 40% of BTC position, ill add more higher"
+        },
+        {
+          "msg_id": 410,
+          "date": "2026-03-02T14:10:18+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "BTC Full close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 413,
+      "date": "2026-03-02T14:35:16+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": "market",
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 415,
+          "date": "2026-03-02T14:38:34+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Back in the position. Stop stays the same. Reduce your risk - they can easily push it to 70k."
+        },
+        {
+          "msg_id": 416,
+          "date": "2026-03-02T14:51:50+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 67650,
+          "text": "Stop to 67650"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 420,
+      "date": "2026-03-02T15:58:31+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 70250.0,
+      "sl": 72200,
+      "tp": 62000,
+      "exit_price": 72200,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [
+        {
+          "msg_id": 427,
+          "date": "2026-03-03T04:23:13+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "If you're online, close 50%. We will reopen it higher"
+        }
+      ],
+      "position_notional": 360.2564102564102,
+      "leverage": 7.205128205128204,
+      "sl_distance_pct": 0.027758007117437724,
+      "scaled_pnl": -10.81,
+      "market_entry": false
+    },
+    {
+      "msg_id": 430,
+      "date": "2026-03-03T06:44:17+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 67950.0,
+      "sl": 67550,
+      "tp": 69500,
+      "exit_price": 69500,
+      "exit_reason": "tp",
+      "pnl": 0.02,
+      "events": [
+        {
+          "msg_id": 431,
+          "date": "2026-03-03T06:45:13+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry 67800-68100\n\nSL 67550\n\nTarget 69500"
+        },
+        {
+          "msg_id": 437,
+          "date": "2026-03-03T11:51:16+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Alright guys. I currently have 2 active positions \u2014 btc and Gold. I\u2019m closing both, since today we start trading from scratch as part of our marathon.\n\nFor those who are still long on Gold - you have your stops in place. It\u2019s still within the entry zone, and I\u2019ll give an update on that trade if needed.\n\nYou can close the BTC trade with me, or keep holding it -your choice"
+        }
+      ],
+      "position_notional": 1698.75,
+      "leverage": 33.975,
+      "sl_distance_pct": 0.005886681383370125,
+      "scaled_pnl": 33.98,
+      "market_entry": true
+    },
+    {
+      "msg_id": 443,
+      "date": "2026-03-03T12:34:59+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 68700.0,
+      "sl": 70250,
+      "tp": null,
+      "exit_price": 70250,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [
+        {
+          "msg_id": 448,
+          "date": "2026-03-03T12:40:56+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "BTC \n\nEntry 67400-70000\n\nSl 70250"
+        },
+        {
+          "msg_id": 467,
+          "date": "2026-03-03T16:27:00+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "Adding 50% to shorts here"
+        },
+        {
+          "msg_id": 472,
+          "date": "2026-03-03T16:51:02+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Adding another 0.1 BTC to my position"
+        },
+        {
+          "msg_id": 480,
+          "date": "2026-03-04T07:51:04+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "So, I'm adding 50% more to BTC and ETH here"
+        },
+        {
+          "msg_id": 481,
+          "date": "2026-03-04T07:52:26+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": null,
+          "text": "BTC \n\nMoving SL to 71500\n\nETH \n\nMoving SL to 2090"
+        },
+        {
+          "msg_id": 486,
+          "date": "2026-03-04T08:47:05+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Adding another 0.2 BTC and 3 ETH"
+        },
+        {
+          "msg_id": 487,
+          "date": "2026-03-04T08:51:02+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 72200,
+          "text": "BTC SL to 72200"
+        },
+        {
+          "msg_id": 488,
+          "date": "2026-03-04T08:52:51+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Adding 0.2 BTC and 2 more ETH"
+        },
+        {
+          "msg_id": 498,
+          "date": "2026-03-04T13:03:18+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 72600,
+          "text": "I\u2019m going to make a very risky move. I\u2019m moving the stop from 72,200 to 72,600, and around 72,200 I might add another 0.5 to the position if additional arguments for a reversal appear"
+        },
+        {
+          "msg_id": 499,
+          "date": "2026-03-04T13:06:03+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 72600,
+          "text": "Not sure about adding yet - for now just move the stop to 72,600"
+        },
+        {
+          "msg_id": 501,
+          "date": "2026-03-04T14:30:17+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Adding 0.5 BTC here"
+        },
+        {
+          "msg_id": 502,
+          "date": "2026-03-04T14:31:41+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 73200,
+          "text": "SL to 73200"
+        }
+      ],
+      "position_notional": 443.22580645161287,
+      "leverage": 8.864516129032257,
+      "sl_distance_pct": 0.022561863173216887,
+      "scaled_pnl": -8.86,
+      "market_entry": true
+    },
+    {
+      "msg_id": 445,
+      "date": "2026-03-03T12:36:19+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": 1995.0,
+      "sl": 2060,
+      "tp": null,
+      "exit_price": 2060,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [
+        {
+          "msg_id": 449,
+          "date": "2026-03-03T12:41:48+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "ETH\n\nEntry 1960-2030\n\nSL 2060"
+        },
+        {
+          "msg_id": 467,
+          "date": "2026-03-03T16:27:00+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "Adding 50% to shorts here"
+        },
+        {
+          "msg_id": 480,
+          "date": "2026-03-04T07:51:04+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "So, I'm adding 50% more to BTC and ETH here"
+        },
+        {
+          "msg_id": 481,
+          "date": "2026-03-04T07:52:26+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": null,
+          "text": "BTC \n\nMoving SL to 71500\n\nETH \n\nMoving SL to 2090"
+        },
+        {
+          "msg_id": 486,
+          "date": "2026-03-04T08:47:05+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Adding another 0.2 BTC and 3 ETH"
+        },
+        {
+          "msg_id": 488,
+          "date": "2026-03-04T08:52:51+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Adding 0.2 BTC and 2 more ETH"
+        },
+        {
+          "msg_id": 492,
+          "date": "2026-03-04T08:59:59+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 2120,
+          "text": "ETH SL to 2120, just in case"
+        }
+      ],
+      "position_notional": 306.92307692307696,
+      "leverage": 6.138461538461539,
+      "sl_distance_pct": 0.03258145363408521,
+      "scaled_pnl": -9.21,
+      "market_entry": true
+    },
+    {
+      "msg_id": 457,
+      "date": "2026-03-03T15:28:22+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 460,
+          "date": "2026-03-03T15:31:40+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "BTC Long \n\nSL 66200\n\nETH Long \n\nSL 1925"
+        },
+        {
+          "msg_id": 466,
+          "date": "2026-03-03T16:26:18+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Full close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 457,
+      "date": "2026-03-03T15:28:22+00:00",
+      "symbol": "ETH",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 460,
+          "date": "2026-03-03T15:31:40+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "BTC Long \n\nSL 66200\n\nETH Long \n\nSL 1925"
+        },
+        {
+          "msg_id": 466,
+          "date": "2026-03-03T16:26:18+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Full close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 476,
+      "date": "2026-03-04T06:36:41+00:00",
+      "symbol": "FF",
+      "direction": "LONG",
+      "entry": 0.073,
+      "sl": 0.072,
+      "tp": 0.078,
+      "exit_price": 0.078,
+      "exit_reason": "tp",
+      "pnl": 0.07,
+      "events": [
+        {
+          "msg_id": 478,
+          "date": "2026-03-04T06:38:34+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry 0.0725-0.0735\n\nSL 0.072\n\nTarget 0.078"
+        },
+        {
+          "msg_id": 485,
+          "date": "2026-03-04T08:18:52+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Closing FF with a small loss. The setup will most likely still play out, but I don\u2019t have time right now to manage positions across three assets. So I\u2019m focusing on BTC and ETH - taking a small loss on FF"
+        }
+      ],
+      "position_notional": 729.9999999999993,
+      "leverage": 14.599999999999987,
+      "sl_distance_pct": 0.013698630136986314,
+      "scaled_pnl": 51.1,
+      "market_entry": true
+    },
+    {
+      "msg_id": 512,
+      "date": "2026-03-06T14:12:09+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 67463.5,
+      "sl": 66080,
+      "tp": 69750,
+      "exit_price": 69750,
+      "exit_reason": "tp",
+      "pnl": 0.03,
+      "events": [
+        {
+          "msg_id": 513,
+          "date": "2026-03-06T14:41:54+00:00",
+          "kind": "increase",
+          "pct": 20,
+          "sl": null,
+          "text": "Lets take 20% from planning position here"
+        },
+        {
+          "msg_id": 532,
+          "date": "2026-03-08T19:47:14+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 66000,
+          "text": "BTC stop-loss to 66k"
+        },
+        {
+          "msg_id": 571,
+          "date": "2026-03-11T10:26:41+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": "breakeven",
+          "text": "BTC \n\nClose 30% \n\nSL to breakeven"
+        },
+        {
+          "msg_id": 575,
+          "date": "2026-03-11T13:11:14+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC Close 50% of the remaining position"
+        },
+        {
+          "msg_id": 584,
+          "date": "2026-03-12T05:27:22+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "Let\u2019s close 50% BTC here"
+        },
+        {
+          "msg_id": 585,
+          "date": "2026-03-12T05:51:50+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Add back what you closed at 70,100"
+        },
+        {
+          "msg_id": 591,
+          "date": "2026-03-12T09:53:46+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "For BTC, if you didn\u2019t place the limit order at 70,100, add back half of the position you closed at the current price."
+        },
+        {
+          "msg_id": 595,
+          "date": "2026-03-12T11:41:36+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Just added back everything I closed at 69,200"
+        },
+        {
+          "msg_id": 596,
+          "date": "2026-03-12T11:42:35+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC \n\nAdd 50% to the current short position at 70800"
+        },
+        {
+          "msg_id": 617,
+          "date": "2026-03-13T05:48:47+00:00",
+          "kind": "increase",
+          "pct": 30,
+          "sl": null,
+          "text": "BTC \n\nAdding to our position:\n\n71,700 +30%\n72,200 +30%\n\nMy position is currently 1 BTC. At 72,200 it will be 1.6 BTC. Stop remains at 73,500."
+        },
+        {
+          "msg_id": 631,
+          "date": "2026-03-13T07:51:44+00:00",
+          "kind": "increase",
+          "pct": 30,
+          "sl": null,
+          "text": "BTC Adding 30% here"
+        },
+        {
+          "msg_id": 638,
+          "date": "2026-03-13T13:01:49+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 74200,
+          "text": "BTC \n\nLets move SL to 74200"
+        },
+        {
+          "msg_id": 640,
+          "date": "2026-03-13T15:28:51+00:00",
+          "kind": "close_partial",
+          "pct": 40,
+          "sl": 75300,
+          "text": "Alright guys, I\u2019m reducing 40% of the Bitcoin position here. There\u2019s a chance they push us up to 75,000 again, so we\u2019re moving the stop to 75,300.\n\nAnd at 74,800 I\u2019ll add back what I\u2019m closing here"
+        },
+        {
+          "msg_id": 674,
+          "date": "2026-03-17T01:27:41+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Stopped out. We\u2019re moving along the second scenario"
+        }
+      ],
+      "position_notional": 487.6292013010481,
+      "leverage": 9.752584026020962,
+      "sl_distance_pct": 0.02050738547510876,
+      "scaled_pnl": 14.63,
+      "market_entry": false
+    },
+    {
+      "msg_id": 520,
+      "date": "2026-03-07T05:40:23+00:00",
+      "symbol": "PUMP",
+      "direction": "LONG",
+      "entry": 0.001865,
+      "sl": 0.00181,
+      "tp": 0.002049,
+      "exit_price": 0.00181,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [
+        {
+          "msg_id": 521,
+          "date": "2026-03-07T05:43:28+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry: 0.00185-0.00188\n\nSL 0.00181\n\nTake 0.002049"
+        },
+        {
+          "msg_id": 526,
+          "date": "2026-03-07T11:22:57+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": "breakeven",
+          "text": "PUMP\n\nClose 20%, sl to breakeven"
+        },
+        {
+          "msg_id": 528,
+          "date": "2026-03-07T12:41:23+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": "breakeven",
+          "text": "PUMP Close 50%, rest should be at breakeven"
+        },
+        {
+          "msg_id": 557,
+          "date": "2026-03-10T15:01:49+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 0.00213,
+          "text": "PUMP\n\nLet\u2019s move stop to 0.00213"
+        },
+        {
+          "msg_id": 562,
+          "date": "2026-03-10T22:24:39+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Alright, in about 2\u20133 hours I want to close part of the shorts.\n\nFor those who won\u2019t be online:\n\nPUMP \u2014 move stop to breakeven, close 20%\nHYPE \u2014 close 20%"
+        },
+        {
+          "msg_id": 565,
+          "date": "2026-03-11T10:20:04+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "PUMP Full close"
+        }
+      ],
+      "position_notional": 339.0909090909095,
+      "leverage": 6.78181818181819,
+      "sl_distance_pct": 0.02949061662198388,
+      "scaled_pnl": -10.17,
+      "market_entry": true
+    },
+    {
+      "msg_id": 529,
+      "date": "2026-03-07T12:41:28+00:00",
+      "symbol": "XMR",
+      "direction": "LONG",
+      "entry": 350.0,
+      "sl": 344,
+      "tp": 381,
+      "exit_price": 381,
+      "exit_reason": "tp",
+      "pnl": 0.09,
+      "events": [
+        {
+          "msg_id": 530,
+          "date": "2026-03-07T12:43:52+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry: 348-352\n\nSL: 344\n\nTP: 381"
+        }
+      ],
+      "position_notional": 583.3333333333333,
+      "leverage": 11.666666666666664,
+      "sl_distance_pct": 0.017142857142857144,
+      "scaled_pnl": 52.5,
+      "market_entry": true
+    },
+    {
+      "msg_id": 533,
+      "date": "2026-03-09T00:37:58+00:00",
+      "symbol": "FF",
+      "direction": "LONG",
+      "entry": 0.0721,
+      "sl": 0.0702,
+      "tp": 0.076,
+      "exit_price": 0.076,
+      "exit_reason": "tp",
+      "pnl": 0.05,
+      "events": [
+        {
+          "msg_id": 535,
+          "date": "2026-03-09T00:40:26+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry 0.0724-0.0718\n\nSL 0.0702\n\nTarget 0.076\n\nSmall size"
+        },
+        {
+          "msg_id": 537,
+          "date": "2026-03-09T08:55:45+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "FF\n\nClose 50%"
+        },
+        {
+          "msg_id": 538,
+          "date": "2026-03-09T08:55:50+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL to Breakeven"
+        },
+        {
+          "msg_id": 539,
+          "date": "2026-03-09T11:19:46+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "Close 50%"
+        }
+      ],
+      "position_notional": 379.4736842105265,
+      "leverage": 7.589473684210531,
+      "sl_distance_pct": 0.026352288488210803,
+      "scaled_pnl": 18.97,
+      "market_entry": true
+    },
+    {
+      "msg_id": 541,
+      "date": "2026-03-09T14:03:54+00:00",
+      "symbol": "APT",
+      "direction": "SHORT",
+      "entry": 0.98,
+      "sl": 1.04,
+      "tp": 0.87,
+      "exit_price": 0.9747,
+      "exit_reason": "manual",
+      "pnl": 0.01,
+      "events": [
+        {
+          "msg_id": 559,
+          "date": "2026-03-10T21:53:39+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "APT \n\nClose 30%"
+        },
+        {
+          "msg_id": 566,
+          "date": "2026-03-11T10:21:17+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": "breakeven",
+          "text": "APT Close 50%, sl should at breakeven"
+        },
+        {
+          "msg_id": 574,
+          "date": "2026-03-11T13:10:48+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "APT Full close"
+        }
+      ],
+      "position_notional": 163.3333333333332,
+      "leverage": 3.266666666666664,
+      "sl_distance_pct": 0.06122448979591842,
+      "scaled_pnl": 1.63,
+      "market_entry": false
+    },
+    {
+      "msg_id": 542,
+      "date": "2026-03-10T02:47:05+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 71000.0,
+      "sl": 73500,
+      "tp": 58000,
+      "exit_price": 73500,
+      "exit_reason": "sl",
+      "pnl": -0.04,
+      "events": [],
+      "position_notional": 284.0,
+      "leverage": 5.68,
+      "sl_distance_pct": 0.035211267605633804,
+      "scaled_pnl": -11.36,
+      "market_entry": false
+    },
+    {
+      "msg_id": 547,
+      "date": "2026-03-10T08:20:41+00:00",
+      "symbol": "HYPE",
+      "direction": "SHORT",
+      "entry": 35.25,
+      "sl": 36.3,
+      "tp": 32,
+      "exit_price": 36.3,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [
+        {
+          "msg_id": 548,
+          "date": "2026-03-10T08:22:22+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry: 34.9-35.6 \n\nSL: 36.3 \n\nTarget: 32"
+        },
+        {
+          "msg_id": 562,
+          "date": "2026-03-10T22:24:39+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Alright, in about 2\u20133 hours I want to close part of the shorts.\n\nFor those who won\u2019t be online:\n\nPUMP \u2014 move stop to breakeven, close 20%\nHYPE \u2014 close 20%"
+        },
+        {
+          "msg_id": 573,
+          "date": "2026-03-11T13:10:24+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "HYPE hit SL"
+        }
+      ],
+      "position_notional": 335.71428571428663,
+      "leverage": 6.714285714285733,
+      "sl_distance_pct": 0.02978723404255311,
+      "scaled_pnl": -10.07,
+      "market_entry": true
+    },
+    {
+      "msg_id": 549,
+      "date": "2026-03-10T09:13:41+00:00",
+      "symbol": "PUMP",
+      "direction": "SHORT",
+      "entry": 0.00205,
+      "sl": 0.0021,
+      "tp": 0.00198,
+      "exit_price": 0.00198,
+      "exit_reason": "tp",
+      "pnl": 0.03,
+      "events": [
+        {
+          "msg_id": 550,
+          "date": "2026-03-10T09:16:16+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry: 0.002040-0.002060 \n\nStop: 0.0021 \n\n1TP: 0.00198"
+        }
+      ],
+      "position_notional": 410.0000000000025,
+      "leverage": 8.20000000000005,
+      "sl_distance_pct": 0.024390243902438876,
+      "scaled_pnl": 12.3,
+      "market_entry": true
+    },
+    {
+      "msg_id": 564,
+      "date": "2026-03-11T01:53:58+00:00",
+      "symbol": "XTIU",
+      "direction": "LONG",
+      "entry": null,
+      "sl": 74,
+      "tp": 120,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 663,
+          "date": "2026-03-16T06:00:41+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Lets fully close oil here \n\n15% move, thats enough"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 577,
+      "date": "2026-03-11T13:40:53+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 71750.0,
+      "sl": 73500,
+      "tp": null,
+      "exit_price": 73500,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [],
+      "position_notional": 410.0,
+      "leverage": 8.2,
+      "sl_distance_pct": 0.024390243902439025,
+      "scaled_pnl": -8.2,
+      "market_entry": false
+    },
+    {
+      "msg_id": 579,
+      "date": "2026-03-11T14:45:34+00:00",
+      "symbol": "TRUMP",
+      "direction": "LONG",
+      "entry": 2.047,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 599,
+          "date": "2026-03-12T13:40:35+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "TRUMP got stopped btw \n\nDidn\u2019t played out"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 587,
+      "date": "2026-03-12T06:29:14+00:00",
+      "symbol": "AAVE",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 589,
+          "date": "2026-03-12T09:48:56+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "AAVE Close 30%"
+        },
+        {
+          "msg_id": 590,
+          "date": "2026-03-12T09:49:04+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL to Breakeven"
+        },
+        {
+          "msg_id": 597,
+          "date": "2026-03-12T11:51:18+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": "breakeven",
+          "text": "AAVE\n\nClose 30% more, sl should be at breakeven"
+        },
+        {
+          "msg_id": 598,
+          "date": "2026-03-12T13:39:08+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "AAVE \n\nFull close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 594,
+      "date": "2026-03-12T09:57:17+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 607,
+      "date": "2026-03-13T01:07:27+00:00",
+      "symbol": "HYPE",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 611,
+          "date": "2026-03-13T01:45:48+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 38.7,
+          "text": "Another bad idea - let\u2019s move stop to 38.7"
+        },
+        {
+          "msg_id": 618,
+          "date": "2026-03-13T07:09:51+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Lets close HYPE in small profit"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 620,
+      "date": "2026-03-13T07:15:23+00:00",
+      "symbol": "FARTCOIN",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 639,
+          "date": "2026-03-13T13:32:40+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "FARTCOIN \n\nGot stopped"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 622,
+      "date": "2026-03-13T07:19:03+00:00",
+      "symbol": "RENDER",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 626,
+          "date": "2026-03-13T07:26:46+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "You can close here 20%"
+        },
+        {
+          "msg_id": 629,
+          "date": "2026-03-13T07:50:03+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "Close half"
+        },
+        {
+          "msg_id": 630,
+          "date": "2026-03-13T07:50:30+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL to breakeven"
+        },
+        {
+          "msg_id": 634,
+          "date": "2026-03-13T08:20:22+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Full close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 645,
+      "date": "2026-03-14T09:06:24+00:00",
+      "symbol": "PUMP",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 648,
+          "date": "2026-03-15T02:21:41+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "PUMP Full close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 651,
+      "date": "2026-03-15T02:46:44+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 653,
+          "date": "2026-03-15T05:28:34+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 2153,
+          "text": "SL at 2153 \n\n(Just in case of squeeze spikes)"
+        },
+        {
+          "msg_id": 660,
+          "date": "2026-03-16T03:38:07+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "ETH and SOL hit SL"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 654,
+      "date": "2026-03-15T05:53:37+00:00",
+      "symbol": "SOL",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 660,
+          "date": "2026-03-16T03:38:07+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "ETH and SOL hit SL"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 664,
+      "date": "2026-03-16T06:40:22+00:00",
+      "symbol": "1000PEPE",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 669,
+          "date": "2026-03-16T07:35:12+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 0.00415,
+          "text": "SL to 0.00415"
+        },
+        {
+          "msg_id": 671,
+          "date": "2026-03-16T09:01:08+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Not bad, you can close 20% here"
+        },
+        {
+          "msg_id": 672,
+          "date": "2026-03-16T10:55:47+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Lets close at breakeven, BTC might go little higher. So the PEPE trade a bit too risky at the moment"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 676,
+      "date": "2026-03-17T01:31:13+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 76300.0,
+      "sl": 77400,
+      "tp": 69500,
+      "exit_price": 77400,
+      "exit_reason": "sl",
+      "pnl": -0.01,
+      "events": [
+        {
+          "msg_id": 682,
+          "date": "2026-03-17T04:11:07+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": "breakeven",
+          "text": "Adding 50% more here, SL to breakeven"
+        },
+        {
+          "msg_id": 683,
+          "date": "2026-03-17T04:17:49+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 75350,
+          "text": "SL at 75350"
+        },
+        {
+          "msg_id": 686,
+          "date": "2026-03-17T14:20:27+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC \n\nClose here 50%"
+        },
+        {
+          "msg_id": 697,
+          "date": "2026-03-18T12:06:17+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "BTC\n\nClose 30% more here"
+        },
+        {
+          "msg_id": 708,
+          "date": "2026-03-18T15:15:05+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Full close"
+        }
+      ],
+      "position_notional": 693.6363636363636,
+      "leverage": 13.872727272727273,
+      "sl_distance_pct": 0.014416775884665793,
+      "scaled_pnl": -6.94,
+      "market_entry": false
+    },
+    {
+      "msg_id": 684,
+      "date": "2026-03-17T14:14:14+00:00",
+      "symbol": "PUMP",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 692,
+          "date": "2026-03-18T02:42:01+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": "breakeven",
+          "text": "PUMP \nClose 50%, sl to breakeven"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 687,
+      "date": "2026-03-17T16:13:33+00:00",
+      "symbol": "ASTER",
+      "direction": "LONG",
+      "entry": 0.7554000000000001,
+      "sl": 0.7435,
+      "tp": 0.7914,
+      "exit_price": 0.7435,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [
+        {
+          "msg_id": 691,
+          "date": "2026-03-17T17:44:58+00:00",
+          "kind": "close_partial",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "Over 2% clear move on ASTER  \n\nYou can take partial profits and move your stop to breakeven if you want"
+        }
+      ],
+      "position_notional": 634.7899159663855,
+      "leverage": 12.695798319327709,
+      "sl_distance_pct": 0.015753243314800134,
+      "scaled_pnl": -12.7,
+      "market_entry": false
+    },
+    {
+      "msg_id": 695,
+      "date": "2026-03-18T12:02:25+00:00",
+      "symbol": "FF",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 718,
+          "date": "2026-03-19T06:38:05+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 0.0695,
+          "text": "FF\n\nMoving SL to 0.0695 and ill add more at 0.07 zone"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 698,
+      "date": "2026-03-18T12:09:14+00:00",
+      "symbol": "XPL",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 700,
+          "date": "2026-03-18T13:48:52+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "XPL hit the stop"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 703,
+      "date": "2026-03-18T14:08:08+00:00",
+      "symbol": "ASTER",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 734,
+          "date": "2026-03-20T08:16:09+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "ASTER \n\nFull close at breakeven"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 713,
+      "date": "2026-03-19T03:10:06+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 716,
+          "date": "2026-03-19T03:20:00+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Good start, close 20%"
+        },
+        {
+          "msg_id": 717,
+          "date": "2026-03-19T04:00:21+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Lets close at breakeven, I dont like this pa"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 719,
+      "date": "2026-03-19T07:34:25+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 69600.0,
+      "sl": 68700,
+      "tp": null,
+      "exit_price": 76092.5,
+      "exit_reason": "manual",
+      "pnl": 0.09,
+      "events": [
+        {
+          "msg_id": 721,
+          "date": "2026-03-19T12:59:52+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 68600,
+          "text": "SL to 68600"
+        },
+        {
+          "msg_id": 724,
+          "date": "2026-03-19T20:37:36+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL to entry price"
+        },
+        {
+          "msg_id": 725,
+          "date": "2026-03-19T20:48:46+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "Close 30% here"
+        },
+        {
+          "msg_id": 729,
+          "date": "2026-03-20T07:42:04+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "BTC \n\nFull close"
+        }
+      ],
+      "position_notional": 773.3333333333334,
+      "leverage": 15.466666666666667,
+      "sl_distance_pct": 0.01293103448275862,
+      "scaled_pnl": 69.6,
+      "market_entry": false
+    },
+    {
+      "msg_id": 722,
+      "date": "2026-03-19T17:46:07+00:00",
+      "symbol": "UAI",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 726,
+          "date": "2026-03-20T00:56:06+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "I\u2019ll add a bit more at 0.632\n\nJust manipulation, they\u2019re pushing it through Binance"
+        },
+        {
+          "msg_id": 728,
+          "date": "2026-03-20T05:51:02+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Added a bit more at the top, crime soon"
+        },
+        {
+          "msg_id": 744,
+          "date": "2026-03-20T13:56:41+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Full closed\ud83e\udd69\ud83d\udd2a"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 730,
+      "date": "2026-03-20T07:43:50+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 748,
+          "date": "2026-03-22T00:07:16+00:00",
+          "kind": "close_partial",
+          "pct": 70,
+          "sl": null,
+          "text": "BTC \n\nClose 70%"
+        },
+        {
+          "msg_id": 754,
+          "date": "2026-03-22T00:22:49+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 67600,
+          "text": "SL to 67600"
+        },
+        {
+          "msg_id": 756,
+          "date": "2026-03-22T02:55:10+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "BTC \n\nLets close 30% here\n\nI think we\u2019ll see one more spike into the 67,500\u201368,000 zone, and from there we should get a local bounce"
+        },
+        {
+          "msg_id": 763,
+          "date": "2026-03-22T08:05:15+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": 67100,
+          "text": "Adding to long at \n\n-68600 (+10%)\n-68000 (+20%)\n-67600 (+30%)\n\nSL moving at 67100!"
+        },
+        {
+          "msg_id": 774,
+          "date": "2026-03-22T23:50:52+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 66900,
+          "text": "BTC\n\nMove SL to 66900"
+        },
+        {
+          "msg_id": 775,
+          "date": "2026-03-23T00:18:13+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": 66000,
+          "text": "Alright. I wasn\u2019t planning to do this, but:\n\nI\u2019m placing a limit order at 67,000 and will double the position there.\n\nMove the stop to 66,000!!!\n\nAs soon as the position (after adding) goes into profit, close half of it there."
+        },
+        {
+          "msg_id": 785,
+          "date": "2026-03-23T11:10:29+00:00",
+          "kind": "close_partial",
+          "pct": 70,
+          "sl": null,
+          "text": "BTC Close 70%"
+        },
+        {
+          "msg_id": 790,
+          "date": "2026-03-23T11:12:06+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "BTC Full close!!!"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 749,
+      "date": "2026-03-22T00:07:33+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 751,
+          "date": "2026-03-22T00:08:58+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Perfect trade) You can close it fully"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 764,
+      "date": "2026-03-22T09:09:21+00:00",
+      "symbol": "BANANAS31",
+      "direction": "SHORT",
+      "entry": 0.0135726,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 770,
+          "date": "2026-03-22T13:33:26+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": "breakeven",
+          "text": "If you in position you can close 50% and put stop to breakeven"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": false
+    },
+    {
+      "msg_id": 766,
+      "date": "2026-03-22T12:13:02+00:00",
+      "symbol": "SIREN",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 768,
+          "date": "2026-03-22T12:45:17+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Added 1.926"
+        },
+        {
+          "msg_id": 771,
+          "date": "2026-03-22T13:36:07+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": "breakeven",
+          "text": "Here the same situation, you can close 50% \u0430nd put sl to breakeven"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 781,
+      "date": "2026-03-23T09:01:33+00:00",
+      "symbol": "PUMP",
+      "direction": "LONG",
+      "entry": 0.00172,
+      "sl": 0.00166,
+      "tp": 0.00184,
+      "exit_price": 0.00184,
+      "exit_reason": "tp",
+      "pnl": 0.07,
+      "events": [
+        {
+          "msg_id": 782,
+          "date": "2026-03-23T09:29:41+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry: 0.001700-0.001740\n\nSL: 0.001660 \n\nTarget: 0.001840"
+        },
+        {
+          "msg_id": 784,
+          "date": "2026-03-23T11:10:23+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "PUMP Close full"
+        }
+      ],
+      "position_notional": 286.66666666666697,
+      "leverage": 5.73333333333334,
+      "sl_distance_pct": 0.03488372093023252,
+      "scaled_pnl": 20.07,
+      "market_entry": true
+    },
+    {
+      "msg_id": 791,
+      "date": "2026-03-23T11:13:59+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 76738.6,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 792,
+          "date": "2026-03-23T11:14:06+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "SL 72500"
+        },
+        {
+          "msg_id": 799,
+          "date": "2026-03-23T17:58:08+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": "breakeven",
+          "text": "if we touch 71300 close 50% of the position and add 50% to the position at 71700\u201372000"
+        },
+        {
+          "msg_id": 803,
+          "date": "2026-03-24T14:17:31+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": null,
+          "text": "BTC \nClose 25% here"
+        },
+        {
+          "msg_id": 804,
+          "date": "2026-03-24T15:59:47+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL to Breakeven"
+        },
+        {
+          "msg_id": 810,
+          "date": "2026-03-24T16:50:19+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 71400,
+          "text": "Most likely they\u2019ll keep us stuck in a range until Thursday, and only then we\u2019ll get the move down\n\nYour SL should be around 71400"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 812,
+      "date": "2026-03-24T17:13:24+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": "market",
+      "sl": 2215,
+      "tp": 2000,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 813,
+          "date": "2026-03-24T17:14:16+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Opened an ETH short at market\n\nWill add two more entries higher check the levels on the screenshots.\n\nTP1: $2000  close 50% and move stop to breakeven\n\nTP2: $1900  close the rest\n\nSL: $2215"
+        },
+        {
+          "msg_id": 830,
+          "date": "2026-03-25T16:50:44+00:00",
+          "kind": "increase",
+          "pct": 30,
+          "sl": null,
+          "text": "add 30% more to eth position"
+        },
+        {
+          "msg_id": 834,
+          "date": "2026-03-26T03:52:09+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "ETH \n\nClose 50%"
+        },
+        {
+          "msg_id": 837,
+          "date": "2026-03-26T04:47:06+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "Full close ETH short"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 819,
+      "date": "2026-03-25T15:57:35+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 821,
+          "date": "2026-03-25T15:59:00+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "30% of your planned position\n\nSL later."
+        },
+        {
+          "msg_id": 823,
+          "date": "2026-03-25T16:16:24+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 69850,
+          "text": "SL 69850"
+        },
+        {
+          "msg_id": 827,
+          "date": "2026-03-25T16:44:33+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "close 50% long here"
+        },
+        {
+          "msg_id": 828,
+          "date": "2026-03-25T16:45:25+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "add 50% to short (71600)"
+        },
+        {
+          "msg_id": 831,
+          "date": "2026-03-25T17:19:18+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": 72700,
+          "text": "LONG FULL CLOSE \n\nSHORT set a stop-loss on the short position at 72,700"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 826,
+      "date": "2026-03-25T16:41:26+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 833,
+          "date": "2026-03-26T03:51:58+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "BTC \n\nFull close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 835,
+      "date": "2026-03-26T03:55:01+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 70750.0,
+      "sl": 70000,
+      "tp": 73000,
+      "exit_price": 73000,
+      "exit_reason": "tp",
+      "pnl": 0.03,
+      "events": [
+        {
+          "msg_id": 836,
+          "date": "2026-03-26T03:55:24+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry 70500-71000\n\nSL 70000\n\nTarget 73000"
+        },
+        {
+          "msg_id": 841,
+          "date": "2026-03-26T05:09:16+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 69500,
+          "text": "BTC move SL to 69500"
+        },
+        {
+          "msg_id": 873,
+          "date": "2026-03-30T14:25:02+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "Close 50% here, will add more higher"
+        },
+        {
+          "msg_id": 878,
+          "date": "2026-03-30T15:02:27+00:00",
+          "kind": "increase",
+          "pct": null,
+          "sl": null,
+          "text": "Alright, I\u2019m adding back what I closed earlier."
+        },
+        {
+          "msg_id": 884,
+          "date": "2026-03-31T09:41:46+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "Close 30% here"
+        },
+        {
+          "msg_id": 886,
+          "date": "2026-03-31T10:07:39+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Close 20% more here"
+        },
+        {
+          "msg_id": 901,
+          "date": "2026-03-31T12:38:04+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC \n\n+50% here"
+        },
+        {
+          "msg_id": 906,
+          "date": "2026-04-01T01:59:18+00:00",
+          "kind": "increase",
+          "pct": 30,
+          "sl": null,
+          "text": "BTC \n\nAdding +30% more here"
+        },
+        {
+          "msg_id": 911,
+          "date": "2026-04-01T09:24:56+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "Closing 30% of the position here around breakeven - just to keep flexibility in case we get another move toward 69,000 and I can add in again"
+        },
+        {
+          "msg_id": 920,
+          "date": "2026-04-02T02:20:07+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": null,
+          "text": "BTC\n\nClose 25%"
+        },
+        {
+          "msg_id": 925,
+          "date": "2026-04-02T04:43:52+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Close another 20% of all positions"
+        }
+      ],
+      "position_notional": 943.3333333333333,
+      "leverage": 18.866666666666664,
+      "sl_distance_pct": 0.01060070671378092,
+      "scaled_pnl": 28.3,
+      "market_entry": true
+    },
+    {
+      "msg_id": 838,
+      "date": "2026-03-26T04:51:13+00:00",
+      "symbol": "ETH",
+      "direction": "LONG",
+      "entry": 2147.5,
+      "sl": 2100,
+      "tp": null,
+      "exit_price": 2100,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [
+        {
+          "msg_id": 921,
+          "date": "2026-04-02T02:22:32+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "ETH\n\nClose 30%"
+        },
+        {
+          "msg_id": 925,
+          "date": "2026-04-02T04:43:52+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Close another 20% of all positions"
+        },
+        {
+          "msg_id": 952,
+          "date": "2026-04-05T15:32:35+00:00",
+          "kind": "increase",
+          "pct": 30,
+          "sl": null,
+          "text": "ETH short\n\n\nAdd +30%"
+        },
+        {
+          "msg_id": 968,
+          "date": "2026-04-07T21:13:10+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": 71300,
+          "text": "Adding another +50% to the BTC and ETH positions here.\n\nMoving the BTC stop\u2014 now to 71,300."
+        },
+        {
+          "msg_id": 1028,
+          "date": "2026-04-15T16:37:01+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": null,
+          "text": "Alright,\n1.Cancel the limit orders I mentioned earlier\n2. BTC stop at 74,300\n3. ETH stop at 2,362"
+        },
+        {
+          "msg_id": 1041,
+          "date": "2026-04-16T11:50:48+00:00",
+          "kind": "close_partial",
+          "pct": 40,
+          "sl": "breakeven",
+          "text": "BTC, ETH\n\nClose 40% in both trades and move SL to breakeven"
+        },
+        {
+          "msg_id": 1045,
+          "date": "2026-04-16T14:02:34+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "Full close"
+        }
+      ],
+      "position_notional": 452.10526315789474,
+      "leverage": 9.042105263157895,
+      "sl_distance_pct": 0.02211874272409779,
+      "scaled_pnl": -9.04,
+      "market_entry": false
+    },
+    {
+      "msg_id": 848,
+      "date": "2026-03-26T14:38:58+00:00",
+      "symbol": "XAUT",
+      "direction": "SHORT",
+      "entry": 4475.0,
+      "sl": 4550,
+      "tp": 4270,
+      "exit_price": 4486.9,
+      "exit_reason": "manual",
+      "pnl": -0.0,
+      "events": [
+        {
+          "msg_id": 866,
+          "date": "2026-03-30T11:44:24+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 4607,
+          "text": "Move SL 4607"
+        },
+        {
+          "msg_id": 868,
+          "date": "2026-03-30T11:45:36+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "Got stopped"
+        }
+      ],
+      "position_notional": 596.6666666666666,
+      "leverage": 11.933333333333332,
+      "sl_distance_pct": 0.01675977653631285,
+      "scaled_pnl": 0.0,
+      "market_entry": false
+    },
+    {
+      "msg_id": 851,
+      "date": "2026-03-27T07:19:56+00:00",
+      "symbol": "PUMP",
+      "direction": "LONG",
+      "entry": 0.009689999999999999,
+      "sl": null,
+      "tp": 0.01914,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": false
+    },
+    {
+      "msg_id": 852,
+      "date": "2026-03-27T09:55:27+00:00",
+      "symbol": "FF",
+      "direction": "LONG",
+      "entry": 0.0696,
+      "sl": 0.06725,
+      "tp": 0.076,
+      "exit_price": 0.076,
+      "exit_reason": "tp",
+      "pnl": 0.09,
+      "events": [
+        {
+          "msg_id": 853,
+          "date": "2026-03-27T09:57:17+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry 0.0685-0.0707\n\nSL 0.06725\n\nTarget: 0.076"
+        }
+      ],
+      "position_notional": 296.1702127659585,
+      "leverage": 5.923404255319171,
+      "sl_distance_pct": 0.03376436781609183,
+      "scaled_pnl": 26.66,
+      "market_entry": true
+    },
+    {
+      "msg_id": 858,
+      "date": "2026-03-29T08:17:34+00:00",
+      "symbol": "VIRTUAL",
+      "direction": "SHORT",
+      "entry": 0.7568,
+      "sl": null,
+      "tp": 0.6459,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 927,
+          "date": "2026-04-02T09:03:51+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "VIRTUAL\n\nFull close"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 860,
+      "date": "2026-03-29T09:00:13+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": 2093.91,
+      "sl": 2250,
+      "tp": 1880,
+      "exit_price": 2075.37,
+      "exit_reason": "open",
+      "pnl": 0.01,
+      "events": [],
+      "position_notional": 134.14760714972118,
+      "leverage": 2.6829521429944236,
+      "sl_distance_pct": 0.07454475120707202,
+      "scaled_pnl": 1.34,
+      "market_entry": true
+    },
+    {
+      "msg_id": 869,
+      "date": "2026-03-30T12:49:36+00:00",
+      "symbol": "LTC",
+      "direction": "SHORT",
+      "entry": 55.375,
+      "sl": 57.14,
+      "tp": 53.73,
+      "exit_price": 53.73,
+      "exit_reason": "tp",
+      "pnl": 0.03,
+      "events": [
+        {
+          "msg_id": 974,
+          "date": "2026-04-09T09:31:52+00:00",
+          "kind": "close_partial",
+          "pct": 70,
+          "sl": null,
+          "text": "LTC hit the limit orders perfectly - I\u2019ve closed around 70% at current levels"
+        }
+      ],
+      "position_notional": 313.7393767705382,
+      "leverage": 6.274787535410764,
+      "sl_distance_pct": 0.03187358916478556,
+      "scaled_pnl": 9.41,
+      "market_entry": false
+    },
+    {
+      "msg_id": 871,
+      "date": "2026-03-30T13:24:34+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 68600.0,
+      "sl": 70500,
+      "tp": 65000,
+      "exit_price": 70500,
+      "exit_reason": "sl",
+      "pnl": -0.03,
+      "events": [
+        {
+          "msg_id": 934,
+          "date": "2026-04-02T14:52:49+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC \n\nAdding to short +50%"
+        },
+        {
+          "msg_id": 950,
+          "date": "2026-04-04T16:35:27+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "btc long closed"
+        }
+      ],
+      "position_notional": 361.05263157894734,
+      "leverage": 7.221052631578947,
+      "sl_distance_pct": 0.027696793002915453,
+      "scaled_pnl": -10.83,
+      "market_entry": false
+    },
+    {
+      "msg_id": 888,
+      "date": "2026-03-31T10:15:32+00:00",
+      "symbol": "ZEC",
+      "direction": "LONG",
+      "entry": 228.5,
+      "sl": 215,
+      "tp": 280,
+      "exit_price": 280,
+      "exit_reason": "tp",
+      "pnl": 0.23,
+      "events": [
+        {
+          "msg_id": 889,
+          "date": "2026-03-31T10:17:40+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "Entry 222-235\n\nSL 215\n\nTarget 280"
+        },
+        {
+          "msg_id": 892,
+          "date": "2026-03-31T10:33:39+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "Close 30% here"
+        },
+        {
+          "msg_id": 898,
+          "date": "2026-03-31T11:39:27+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Close 20% here"
+        },
+        {
+          "msg_id": 899,
+          "date": "2026-03-31T11:41:12+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL at breakeven"
+        },
+        {
+          "msg_id": 912,
+          "date": "2026-04-01T10:08:48+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "ZEC \n\nFull close"
+        }
+      ],
+      "position_notional": 169.25925925925924,
+      "leverage": 3.385185185185185,
+      "sl_distance_pct": 0.05908096280087528,
+      "scaled_pnl": 38.93,
+      "market_entry": true
+    },
+    {
+      "msg_id": 893,
+      "date": "2026-03-31T10:45:01+00:00",
+      "symbol": "SOL",
+      "direction": "SHORT",
+      "entry": 84.1,
+      "sl": 100,
+      "tp": 70,
+      "exit_price": 83.88,
+      "exit_reason": "manual",
+      "pnl": 0.0,
+      "events": [
+        {
+          "msg_id": 922,
+          "date": "2026-04-02T02:23:51+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "SOL \n\nClose 30% here. We will add more higher"
+        },
+        {
+          "msg_id": 925,
+          "date": "2026-04-02T04:43:52+00:00",
+          "kind": "close_partial",
+          "pct": 20,
+          "sl": null,
+          "text": "Close another 20% of all positions"
+        },
+        {
+          "msg_id": 926,
+          "date": "2026-04-02T09:03:41+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "SOL \n\nFull close"
+        }
+      ],
+      "position_notional": 52.893081761006265,
+      "leverage": 1.0578616352201253,
+      "sl_distance_pct": 0.1890606420927468,
+      "scaled_pnl": 0.0,
+      "market_entry": true
+    },
+    {
+      "msg_id": 930,
+      "date": "2026-04-02T13:58:44+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 66000.0,
+      "sl": 65300,
+      "tp": 67500,
+      "exit_price": 67500,
+      "exit_reason": "tp",
+      "pnl": 0.02,
+      "events": [
+        {
+          "msg_id": 932,
+          "date": "2026-04-02T14:40:36+00:00",
+          "kind": "close_partial",
+          "pct": 40,
+          "sl": "breakeven",
+          "text": "Close 40% sl to breakeven"
+        },
+        {
+          "msg_id": 933,
+          "date": "2026-04-02T14:44:03+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "67500 Full close"
+        }
+      ],
+      "position_notional": 942.8571428571428,
+      "leverage": 18.857142857142854,
+      "sl_distance_pct": 0.010606060606060607,
+      "scaled_pnl": 18.86,
+      "market_entry": false
+    },
+    {
+      "msg_id": 940,
+      "date": "2026-04-02T16:23:43+00:00",
+      "symbol": "ZEC",
+      "direction": "SHORT",
+      "entry": 240.0,
+      "sl": 260,
+      "tp": 221,
+      "exit_price": 260,
+      "exit_reason": "sl",
+      "pnl": -0.08,
+      "events": [
+        {
+          "msg_id": 941,
+          "date": "2026-04-02T16:30:46+00:00",
+          "kind": "detail",
+          "pct": null,
+          "sl": null,
+          "text": "ZEC SHORT \n\nEntry: \n50% of your position - 230-250\n50% of your position - limit order 250\n\nTP1 221 50% + move stop to entry \nTP2 207 full close\n\nSL 260"
+        },
+        {
+          "msg_id": 962,
+          "date": "2026-04-06T10:30:13+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "ZEC stopped out"
+        }
+      ],
+      "position_notional": 120.0,
+      "leverage": 2.4,
+      "sl_distance_pct": 0.08333333333333333,
+      "scaled_pnl": -9.6,
+      "market_entry": true
+    },
+    {
+      "msg_id": 944,
+      "date": "2026-04-03T15:42:47+00:00",
+      "symbol": "XAUT",
+      "direction": "SHORT",
+      "entry": 4517.2,
+      "sl": 4810,
+      "tp": 4485,
+      "exit_price": 4485,
+      "exit_reason": "tp",
+      "pnl": 0.01,
+      "events": [],
+      "position_notional": 154.2759562841529,
+      "leverage": 3.085519125683058,
+      "sl_distance_pct": 0.06481891437173475,
+      "scaled_pnl": 1.54,
+      "market_entry": true
+    },
+    {
+      "msg_id": 971,
+      "date": "2026-04-07T22:59:34+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 71800.0,
+      "sl": 73000,
+      "tp": null,
+      "exit_price": 73000,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [
+        {
+          "msg_id": 973,
+          "date": "2026-04-09T09:27:41+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC \n\nClose 50% here\n\nMy view on BTC hasn\u2019t changed - I still expect this whole carnival to go down.\n\nThere\u2019s a chance we get a spike to 75\u201376k, so I\u2019m closing half of the current short into a small profit"
+        }
+      ],
+      "position_notional": 598.3333333333333,
+      "leverage": 11.966666666666665,
+      "sl_distance_pct": 0.016713091922005572,
+      "scaled_pnl": -11.97,
+      "market_entry": false
+    },
+    {
+      "msg_id": 980,
+      "date": "2026-04-09T22:58:14+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": 2235.0,
+      "sl": 2320,
+      "tp": 1900,
+      "exit_price": 2075.37,
+      "exit_reason": "open",
+      "pnl": 0.07,
+      "events": [],
+      "position_notional": 262.94117647058823,
+      "leverage": 5.258823529411765,
+      "sl_distance_pct": 0.03803131991051454,
+      "scaled_pnl": 18.41,
+      "market_entry": false
+    },
+    {
+      "msg_id": 982,
+      "date": "2026-04-09T23:01:29+00:00",
+      "symbol": "ARB",
+      "direction": "SHORT",
+      "entry": 0.11,
+      "sl": 0.118,
+      "tp": 0.095,
+      "exit_price": 0.1084,
+      "exit_reason": "open",
+      "pnl": 0.01,
+      "events": [],
+      "position_notional": 137.5000000000001,
+      "leverage": 2.750000000000002,
+      "sl_distance_pct": 0.07272727272727267,
+      "scaled_pnl": 1.38,
+      "market_entry": false
+    },
+    {
+      "msg_id": 990,
+      "date": "2026-04-11T03:13:01+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 73550.0,
+      "sl": 75100,
+      "tp": 61000,
+      "exit_price": 75100,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [],
+      "position_notional": 474.51612903225805,
+      "leverage": 9.490322580645161,
+      "sl_distance_pct": 0.02107409925220938,
+      "scaled_pnl": -9.49,
+      "market_entry": false
+    },
+    {
+      "msg_id": 995,
+      "date": "2026-04-12T03:20:22+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 76738.6,
+      "sl": 71350,
+      "tp": 73500,
+      "exit_price": 73500,
+      "exit_reason": "tp",
+      "pnl": -0.04,
+      "events": [
+        {
+          "msg_id": 1003,
+          "date": "2026-04-13T16:38:49+00:00",
+          "kind": "increase",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC \n\nAdding +50% \n\n(If you don\u2019t have position - good entry)"
+        },
+        {
+          "msg_id": 1028,
+          "date": "2026-04-15T16:37:01+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": null,
+          "text": "Alright,\n1.Cancel the limit orders I mentioned earlier\n2. BTC stop at 74,300\n3. ETH stop at 2,362"
+        },
+        {
+          "msg_id": 1041,
+          "date": "2026-04-16T11:50:48+00:00",
+          "kind": "close_partial",
+          "pct": 40,
+          "sl": "breakeven",
+          "text": "BTC, ETH\n\nClose 40% in both trades and move SL to breakeven"
+        },
+        {
+          "msg_id": 1045,
+          "date": "2026-04-16T14:02:34+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "Full close"
+        }
+      ],
+      "position_notional": 142.4091600786845,
+      "leverage": 2.84818320157369,
+      "sl_distance_pct": 0.07022020208864907,
+      "scaled_pnl": -5.7,
+      "market_entry": true
+    },
+    {
+      "msg_id": 1008,
+      "date": "2026-04-14T09:12:03+00:00",
+      "symbol": "PLTR",
+      "direction": "LONG",
+      "entry": 134.0,
+      "sl": 124.16,
+      "tp": 141,
+      "exit_price": 137.33,
+      "exit_reason": "open",
+      "pnl": 0.02,
+      "events": [
+        {
+          "msg_id": 1010,
+          "date": "2026-04-14T15:15:15+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "Already in a bit of profit, moved the stop to breakeven"
+        }
+      ],
+      "position_notional": 136.17886178861784,
+      "leverage": 2.723577235772357,
+      "sl_distance_pct": 0.07343283582089555,
+      "scaled_pnl": 2.72,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1018,
+      "date": "2026-04-15T11:53:21+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 74700.0,
+      "sl": 75800,
+      "tp": 69000,
+      "exit_price": 75800,
+      "exit_reason": "sl",
+      "pnl": -0.01,
+      "events": [],
+      "position_notional": 679.0909090909091,
+      "leverage": 13.581818181818182,
+      "sl_distance_pct": 0.014725568942436412,
+      "scaled_pnl": -6.79,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1019,
+      "date": "2026-04-15T11:57:46+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": 2348.5,
+      "sl": 2380,
+      "tp": 2100,
+      "exit_price": 2100,
+      "exit_reason": "tp",
+      "pnl": 0.11,
+      "events": [],
+      "position_notional": 745.5555555555555,
+      "leverage": 14.911111111111111,
+      "sl_distance_pct": 0.013412816691505217,
+      "scaled_pnl": 82.01,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1033,
+      "date": "2026-04-15T22:43:10+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 75350.0,
+      "sl": 76200,
+      "tp": null,
+      "exit_price": 76200,
+      "exit_reason": "sl",
+      "pnl": -0.01,
+      "events": [],
+      "position_notional": 886.4705882352941,
+      "leverage": 17.729411764705883,
+      "sl_distance_pct": 0.0112806901128069,
+      "scaled_pnl": -8.86,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1034,
+      "date": "2026-04-15T22:43:28+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": 2376.5,
+      "sl": 2410,
+      "tp": null,
+      "exit_price": 2075.37,
+      "exit_reason": "open",
+      "pnl": 0.13,
+      "events": [],
+      "position_notional": 709.4029850746269,
+      "leverage": 14.18805970149254,
+      "sl_distance_pct": 0.01409636019356196,
+      "scaled_pnl": 92.22,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1038,
+      "date": "2026-04-16T09:57:14+00:00",
+      "symbol": "LYN",
+      "direction": "LONG",
+      "entry": 0.08199999999999999,
+      "sl": 0.07,
+      "tp": null,
+      "exit_price": 0.07,
+      "exit_reason": "sl",
+      "pnl": -0.15,
+      "events": [],
+      "position_notional": 68.33333333333343,
+      "leverage": 1.3666666666666685,
+      "sl_distance_pct": 0.14634146341463394,
+      "scaled_pnl": -10.25,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1058,
+      "date": "2026-04-17T09:34:31+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 76200.0,
+      "sl": 77300,
+      "tp": 71000,
+      "exit_price": 77300,
+      "exit_reason": "sl",
+      "pnl": -0.01,
+      "events": [
+        {
+          "msg_id": 1066,
+          "date": "2026-04-17T13:14:52+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 77900,
+          "text": "SL to 77900"
+        },
+        {
+          "msg_id": 1068,
+          "date": "2026-04-17T14:00:47+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 78200,
+          "text": "SL to 78200 \n\nThe impulse is pretty strong \u2014 they might push it a bit higher.\n\nIf you\u2019ve over-risked, cut it down to a comfortable level here. You can add back around 77,800 if needed.\n\nMy average is 76,300."
+        }
+      ],
+      "position_notional": 692.7272727272727,
+      "leverage": 13.854545454545455,
+      "sl_distance_pct": 0.014435695538057743,
+      "scaled_pnl": -6.93,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1059,
+      "date": "2026-04-17T09:35:41+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": 2390.0,
+      "sl": 2480,
+      "tp": 2100,
+      "exit_price": 2100,
+      "exit_reason": "tp",
+      "pnl": 0.12,
+      "events": [],
+      "position_notional": 265.55555555555554,
+      "leverage": 5.311111111111111,
+      "sl_distance_pct": 0.03765690376569038,
+      "scaled_pnl": 31.87,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1065,
+      "date": "2026-04-17T11:39:00+00:00",
+      "symbol": "TST",
+      "direction": "LONG",
+      "entry": 0.01717,
+      "sl": 0.012,
+      "tp": null,
+      "exit_price": 0.017198,
+      "exit_reason": "open",
+      "pnl": 0.0,
+      "events": [],
+      "position_notional": 33.210831721470015,
+      "leverage": 0.6642166344294003,
+      "sl_distance_pct": 0.30110658124635997,
+      "scaled_pnl": 0.0,
+      "market_entry": true
+    },
+    {
+      "msg_id": 1071,
+      "date": "2026-04-17T19:19:14+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 1074,
+          "date": "2026-04-18T09:34:41+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "BTC & ETH\n\nClose 30% in both trades"
+        },
+        {
+          "msg_id": 1076,
+          "date": "2026-04-18T10:16:26+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "Close 30% more"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 1071,
+      "date": "2026-04-17T19:19:14+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 1074,
+          "date": "2026-04-18T09:34:41+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "BTC & ETH\n\nClose 30% in both trades"
+        },
+        {
+          "msg_id": 1076,
+          "date": "2026-04-18T10:16:26+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "Close 30% more"
+        },
+        {
+          "msg_id": 1101,
+          "date": "2026-04-19T14:41:47+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC and ETH Shorts\n\nClosing 50% of current positions here"
+        },
+        {
+          "msg_id": 1109,
+          "date": "2026-04-20T12:42:19+00:00",
+          "kind": "increase",
+          "pct": 20,
+          "sl": null,
+          "text": "Alright, I\u2019m starting to add to the shorts at current levels.\n\nOn ETH I have 10% of the planned position, adding another 20% here"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 1073,
+      "date": "2026-04-18T09:08:22+00:00",
+      "symbol": "XTIU",
+      "direction": "LONG",
+      "entry": 82.0,
+      "sl": 73.5,
+      "tp": 98,
+      "exit_price": null,
+      "exit_reason": null,
+      "pnl": null,
+      "events": [],
+      "position_notional": 96.47058823529412,
+      "leverage": 1.9294117647058824,
+      "sl_distance_pct": 0.10365853658536585,
+      "scaled_pnl": 0.0,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1078,
+      "date": "2026-04-18T11:19:20+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": null,
+      "sl": null,
+      "tp": null,
+      "exit_price": null,
+      "exit_reason": "manual",
+      "pnl": null,
+      "events": [
+        {
+          "msg_id": 1101,
+          "date": "2026-04-19T14:41:47+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "BTC and ETH Shorts\n\nClosing 50% of current positions here"
+        },
+        {
+          "msg_id": 1103,
+          "date": "2026-04-19T17:15:03+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 73000,
+          "text": "On BTC Long\n\nSet the stop at 73,000.\n\nPlace a limit order at 74,000 and add +50% to the position"
+        },
+        {
+          "msg_id": 1105,
+          "date": "2026-04-20T12:22:36+00:00",
+          "kind": "close_partial",
+          "pct": 30,
+          "sl": null,
+          "text": "Update \n\nBTC Long\n\nClose 30% here"
+        },
+        {
+          "msg_id": 1114,
+          "date": "2026-04-20T17:56:55+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "Full close at 76190"
+        }
+      ],
+      "position_notional": null,
+      "leverage": null,
+      "sl_distance_pct": null,
+      "scaled_pnl": null,
+      "market_entry": true
+    },
+    {
+      "msg_id": 1088,
+      "date": "2026-04-19T05:21:39+00:00",
+      "symbol": "HYPE",
+      "direction": "SHORT",
+      "entry": 44.25,
+      "sl": 46.181,
+      "tp": 36.4,
+      "exit_price": 46.181,
+      "exit_reason": "sl",
+      "pnl": -0.04,
+      "events": [
+        {
+          "msg_id": 1091,
+          "date": "2026-04-19T08:36:19+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "HYPE  \n\nSL to breakeven"
+        },
+        {
+          "msg_id": 1093,
+          "date": "2026-04-19T13:05:40+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "HYPE\n\nClosed at breakeven"
+        }
+      ],
+      "position_notional": 229.15587778353216,
+      "leverage": 4.583117555670643,
+      "sl_distance_pct": 0.043638418079095985,
+      "scaled_pnl": -9.17,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1089,
+      "date": "2026-04-19T05:30:38+00:00",
+      "symbol": "PUMP",
+      "direction": "LONG",
+      "entry": 0.00184,
+      "sl": 0.001795,
+      "tp": 0.00203,
+      "exit_price": 0.001795,
+      "exit_reason": "sl",
+      "pnl": -0.02,
+      "events": [
+        {
+          "msg_id": 1102,
+          "date": "2026-04-19T17:12:15+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": 0.00178,
+          "text": "PUMP\n\nMove SL to 0.00178\n\nIt might get wicked out"
+        },
+        {
+          "msg_id": 1132,
+          "date": "2026-04-21T14:19:10+00:00",
+          "kind": "close_full",
+          "pct": 100,
+          "sl": null,
+          "text": "Close PUMP"
+        }
+      ],
+      "position_notional": 408.88888888888783,
+      "leverage": 8.177777777777756,
+      "sl_distance_pct": 0.0244565217391305,
+      "scaled_pnl": -8.18,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1118,
+      "date": "2026-04-20T18:37:30+00:00",
+      "symbol": "BTC",
+      "direction": "SHORT",
+      "entry": 77650.0,
+      "sl": 79800,
+      "tp": null,
+      "exit_price": 76089.0,
+      "exit_reason": "open",
+      "pnl": 0.02,
+      "events": [],
+      "position_notional": 361.1627906976744,
+      "leverage": 7.223255813953488,
+      "sl_distance_pct": 0.027688345138441726,
+      "scaled_pnl": 7.22,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1119,
+      "date": "2026-04-20T18:42:52+00:00",
+      "symbol": "ETH",
+      "direction": "SHORT",
+      "entry": 2400.0,
+      "sl": 2480,
+      "tp": null,
+      "exit_price": 2075.37,
+      "exit_reason": "open",
+      "pnl": 0.14,
+      "events": [],
+      "position_notional": 300.0,
+      "leverage": 6.0,
+      "sl_distance_pct": 0.03333333333333333,
+      "scaled_pnl": 42.0,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1122,
+      "date": "2026-04-21T04:04:10+00:00",
+      "symbol": "BTC",
+      "direction": "LONG",
+      "entry": 75600.0,
+      "sl": 75000,
+      "tp": 79000,
+      "exit_price": 76089.0,
+      "exit_reason": "open",
+      "pnl": 0.01,
+      "events": [
+        {
+          "msg_id": 1124,
+          "date": "2026-04-21T08:48:15+00:00",
+          "kind": "close_partial",
+          "pct": 50,
+          "sl": null,
+          "text": "Close 50%"
+        },
+        {
+          "msg_id": 1126,
+          "date": "2026-04-21T08:50:55+00:00",
+          "kind": "move_sl",
+          "pct": null,
+          "sl": "breakeven",
+          "text": "SL for hedge long to breakeven"
+        },
+        {
+          "msg_id": 1128,
+          "date": "2026-04-21T09:06:14+00:00",
+          "kind": "close_partial",
+          "pct": 25,
+          "sl": null,
+          "text": "Closing 25% of my BTC short position here"
+        }
+      ],
+      "position_notional": 1260.0,
+      "leverage": 25.2,
+      "sl_distance_pct": 0.007936507936507936,
+      "scaled_pnl": 12.6,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1129,
+      "date": "2026-04-21T12:04:17+00:00",
+      "symbol": "PUMP",
+      "direction": "SHORT",
+      "entry": 0.001865,
+      "sl": 0.0019,
+      "tp": 0.00176,
+      "exit_price": 0.00176,
+      "exit_reason": "tp",
+      "pnl": 0.06,
+      "events": [
+        {
+          "msg_id": 1133,
+          "date": "2026-04-21T14:19:55+00:00",
+          "kind": "close_full",
+          "pct": null,
+          "sl": null,
+          "text": "Closing in small profit"
+        }
+      ],
+      "position_notional": 532.8571428571414,
+      "leverage": 10.657142857142828,
+      "sl_distance_pct": 0.018766756032171632,
+      "scaled_pnl": 31.97,
+      "market_entry": false
+    },
+    {
+      "msg_id": 1130,
+      "date": "2026-04-21T12:09:42+00:00",
+      "symbol": "ASTER",
+      "direction": "SHORT",
+      "entry": 0.692,
+      "sl": 0.705,
+      "tp": 0.666,
+      "exit_price": 0.6817,
+      "exit_reason": "open",
+      "pnl": 0.01,
+      "events": [],
+      "position_notional": 532.3076923076918,
+      "leverage": 10.646153846153837,
+      "sl_distance_pct": 0.018786127167630076,
+      "scaled_pnl": 5.32,
+      "market_entry": false
+    }
+  ]
+}
