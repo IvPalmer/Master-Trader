@@ -139,10 +139,13 @@ trade ainda estava aberta no momento do snapshot).
 
 ## Pendência única pra ir ao vivo
 
-Teu `.session` file. Quando dropar em
-`insiders_bridge/_local/eduardo.session`, o listener subscreve no canal e
-cada msg nova entra na pipeline que acabou de processar os 1.087 sem
-erros. Todos os outros estágios estão verdes.
+Teu `.session` file. Vai dropar (encriptado com age, conforme onboarding
+que mandei dia 19/05) e a gente coloca em
+`ft_userdata/insiders_bridge/secrets/insiders.session` na VPS — o compose
+monta read-only dentro do container como `/run/secrets/insiders.session`.
+Aí o listener subscreve no canal e cada msg nova entra na pipeline que
+acabou de processar os 1.087 sem erros. Todos os outros estágios estão
+verdes.
 
 ---
 

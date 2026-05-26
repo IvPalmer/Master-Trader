@@ -259,7 +259,10 @@ services:
       # claude-assistant stack.
       - claude_auth:/root/.claude
     ports:
-      - "127.0.0.1:8089:8089"
+      # Host port 8090 (8089 is already taken by killers-receiver). Strategy
+      # talks to receiver via internal Docker DNS (`http://insiders-receiver:8089`)
+      # so the host mapping is just for ops curl access.
+      - "127.0.0.1:8090:8089"
     deploy:
       resources:
         limits:
