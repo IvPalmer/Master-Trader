@@ -18,7 +18,10 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-import aiohttp
+# aiohttp is imported lazily inside the network methods so that pure-helper
+# users (sizing, builders, sanity checks) can import this module in
+# environments without aiohttp installed (e.g. CI test runs without the
+# Docker image layer).
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +77,13 @@ def size_position(entry: float, sl: float, cfg: SizingConfig) -> tuple[float, fl
 # ── Market sanity bands ──────────────────────────────────────────────────
 
 
-async def get_mark_price(session: aiohttp.ClientSession, symbol: str) -> Optional[float]:
-    """Fetch current mark price from Binance Futures public API."""
+async def get_mark_price(session, symbol: str) -> Optional[float]:
+    """Fetch current mark price from Binance Futures public API.
+
+    `session` is an aiohttp.ClientSession — typed loosely so this module
+    can be imported in test environments without aiohttp installed.
+    """
+    import aiohttp
     url = "https://fapi.binance.com/fapi/v1/premiumIndex"
     params = {"symbol": f"{symbol.upper()}USDT"}
     try:
@@ -129,30 +137,39 @@ class FreqtradeConfig:
 class FreqtradeClient:
     def __init__(self, cfg: FreqtradeConfig):
         self.cfg = cfg
-        self._auth = aiohttp.BasicAuth(cfg.username, cfg.password) if cfg.username else None
+        # Defer aiohttp import + auth construction so this class can be
+        # imported (and statically inspected) without aiohttp installed.
+        # _auth is built on first use.
+        self._auth = None
+        self._auth_built = False
+
+    def _ensure_auth(self):
+        if self._auth_built:
+            return
+        import aiohttp
+        if self.cfg.username:
+            self._auth = aiohttp.BasicAuth(self.cfg.username, self.cfg.password)
+        self._auth_built = True
 
     async def ping(self) -> bool:
+        import aiohttp
+        self._ensure_auth()
         async with aiohttp.ClientSession(auth=self._auth) as s:
             async with s.get(f"{self.cfg.base_url}/api/v1/ping",
                              timeout=aiohttp.ClientTimeout(total=3)) as r:
                 return r.status == 200
 
-    async def force_enter(self, pair: str, side: str, price: Optional[float],
+    async def force_enter(self, pair: str, side: str,
                           stake_amount: float, leverage: float) -> dict:
-        """Place a forced entry. Side = 'long' or 'short' for futures."""
-        body = {
-            "pair": pair,
-            "side": side,
-            "stake_amount": stake_amount,
-            "leverage": leverage,
-        }
-        if price is not None:
-            body["price"] = price
-            body["entry_tag"] = "insiders-limit"
-            body["order_type"] = "limit"
-        else:
-            body["entry_tag"] = "insiders-market"
-            body["order_type"] = "market"
+        """Place a forced MARKET entry. Side = 'long' or 'short' for futures.
+
+        Copy-trader fires market — no limit price. Freqtrade payload field
+        names are flat (no underscores): `stakeamount`, `ordertype`. The
+        working Killers receiver uses this same shape.
+        """
+        import aiohttp
+        self._ensure_auth()
+        body = build_forceenter_body(pair, side, stake_amount, leverage)
         async with aiohttp.ClientSession(auth=self._auth) as s:
             async with s.post(f"{self.cfg.base_url}/api/v1/forceenter", json=body,
                               timeout=aiohttp.ClientTimeout(total=10)) as r:
@@ -161,10 +178,27 @@ class FreqtradeClient:
                 return data
 
     async def force_exit(self, trade_id: int, amount_pct: Optional[float] = None) -> dict:
-        """Force exit a trade. amount_pct = None means full exit. amount_pct in 0-100."""
-        body = {"tradeid": str(trade_id)}
+        """Force exit a trade. amount_pct = None means full exit. amount_pct in 0-100.
+
+        Freqtrade's `amount` field is base-currency amount, NOT a percentage.
+        For partial closes we must look up the trade's current amount and
+        compute `current_amount * pct / 100`. Without the lookup the value
+        passed as percent would be treated as base coins (e.g. amount_pct=50
+        → "amount": 0.5 BTC instead of 50% of the position).
+        """
+        import aiohttp
+        self._ensure_auth()
+        current_amount: Optional[float] = None
         if amount_pct is not None and amount_pct < 100:
-            body["amount"] = amount_pct / 100.0
+            trade = await self.get_trade(trade_id)
+            if trade is None:
+                return {"_http_status": 0,
+                        "error": f"cannot fetch trade {trade_id} for partial exit"}
+            current_amount = trade.get("amount")
+            if current_amount is None or current_amount <= 0:
+                return {"_http_status": 0,
+                        "error": f"trade {trade_id} has no usable amount: {current_amount}"}
+        body = build_forceexit_body(trade_id, amount_pct, current_amount)
         async with aiohttp.ClientSession(auth=self._auth) as s:
             async with s.post(f"{self.cfg.base_url}/api/v1/forceexit", json=body,
                               timeout=aiohttp.ClientTimeout(total=10)) as r:
@@ -173,6 +207,8 @@ class FreqtradeClient:
                 return data
 
     async def get_open_trades(self) -> list[dict]:
+        import aiohttp
+        self._ensure_auth()
         async with aiohttp.ClientSession(auth=self._auth) as s:
             async with s.get(f"{self.cfg.base_url}/api/v1/status",
                              timeout=aiohttp.ClientTimeout(total=5)) as r:
@@ -181,6 +217,23 @@ class FreqtradeClient:
                     return []
                 return await r.json()
 
+    async def get_trade(self, trade_id: int) -> Optional[dict]:
+        """Fetch a single trade by ID. Returns None on miss / HTTP error."""
+        import aiohttp
+        self._ensure_auth()
+        async with aiohttp.ClientSession(auth=self._auth) as s:
+            try:
+                async with s.get(f"{self.cfg.base_url}/api/v1/trade/{trade_id}",
+                                 timeout=aiohttp.ClientTimeout(total=5)) as r:
+                    if r.status != 200:
+                        logger.warning("freqtrade /trade/%d returned %d",
+                                       trade_id, r.status)
+                        return None
+                    return await r.json()
+            except Exception as e:
+                logger.warning("get_trade(%d) failed: %s", trade_id, e)
+                return None
+
 
 # ── Execution orchestration ──────────────────────────────────────────────
 
@@ -188,3 +241,41 @@ class FreqtradeClient:
 def pair_for_symbol(symbol: str) -> str:
     """Convert classifier symbol → Freqtrade pair string (USDT-M perp)."""
     return f"{symbol.upper()}/USDT:USDT"
+
+
+# ── Pure body builders (testable without aiohttp) ────────────────────────
+
+
+def build_forceenter_body(pair: str, side: str, stake_amount: float,
+                          leverage: float) -> dict:
+    """Construct the JSON body for POST /api/v1/forceenter.
+
+    Pure function — separated from the HTTP call so tests can verify the
+    payload shape without mocking aiohttp. Field names match the working
+    Killers receiver and Freqtrade's REST contract: flat keys (no
+    underscores) for `stakeamount` and `ordertype`.
+    """
+    return {
+        "pair": pair,
+        "side": side,
+        "stakeamount": round(stake_amount, 2),
+        "leverage": leverage,
+        "ordertype": "market",
+        "entry_tag": "insiders",
+    }
+
+
+def build_forceexit_body(trade_id: int, amount_pct: Optional[float],
+                         current_amount: Optional[float]) -> dict:
+    """Construct the JSON body for POST /api/v1/forceexit.
+
+    `amount_pct` is the percentage of the position to close (0-100).
+    `current_amount` is the trade's current base-currency size, only
+    used when `amount_pct < 100`. When omitted or amount_pct is None or
+    >= 100, the body omits `amount` and Freqtrade closes the full position.
+    """
+    body: dict = {"tradeid": str(trade_id), "ordertype": "market"}
+    if (amount_pct is not None and amount_pct < 100
+            and current_amount is not None and current_amount > 0):
+        body["amount"] = round(current_amount * amount_pct / 100.0, 8)
+    return body

@@ -30,28 +30,65 @@ STRICT_OPEN_REQUIRED = {"symbol", "direction", "sl"}
 STRICT_OPEN_FORBIDDEN_FLAGS = {"applies_to"}  # multi-coin headers excluded
 
 
+_VALID_DIRECTIONS = {"long", "short", "LONG", "SHORT"}
+
+
 def is_strict_open(classification: dict) -> bool:
     """True if classification looks like a clean single-coin open with all
-    the fields needed to fast-path."""
+    the fields needed to fast-path.
+
+    Tight: type + value checks on every actionable field. A bug-shaped
+    classification (e.g. rule mis-parse `entry=77100` for ETH SHORT) MUST
+    fall through to Claude rather than fast-path into sizing.
+    """
     if classification.get("kind") != "open":
         return False
     if any(f in classification for f in STRICT_OPEN_FORBIDDEN_FLAGS):
         return False
     if not all(k in classification for k in STRICT_OPEN_REQUIRED):
         return False
-    # Either entry (single price), entry_range (range), or market
-    has_entry = (
-        classification.get("entry") is not None
-        or classification.get("entry_range") is not None
-    )
-    if not has_entry:
-        return False
-    # Must have a Binance-valid symbol; checked by sanity bands later but
-    # also defensively here.
-    sym = classification.get("symbol", "")
+
+    # symbol must be a non-empty string, not a known classifier-bug sentinel
+    sym = classification.get("symbol")
     if not sym or not isinstance(sym, str) or sym in {"CLOSE", "MNT"}:
-        # MNT not on Binance Futures; CLOSE is a classifier bug we saw.
         return False
+
+    # direction must be one of the canonical strings
+    direction = classification.get("direction")
+    if direction not in _VALID_DIRECTIONS:
+        return False
+
+    # sl must be a positive number
+    sl = classification.get("sl")
+    if not isinstance(sl, (int, float)) or isinstance(sl, bool) or sl <= 0:
+        return False
+
+    # entry: either single positive number, or entry_range of two positive numbers
+    entry = classification.get("entry")
+    entry_range = classification.get("entry_range")
+    if entry is not None:
+        if not isinstance(entry, (int, float)) or isinstance(entry, bool) or entry <= 0:
+            return False
+        ref_entry = float(entry)
+    elif entry_range is not None:
+        if (not isinstance(entry_range, (list, tuple))
+                or len(entry_range) != 2):
+            return False
+        e0, e1 = entry_range
+        if not all(isinstance(x, (int, float)) and not isinstance(x, bool) and x > 0
+                   for x in (e0, e1)):
+            return False
+        ref_entry = (float(e0) + float(e1)) / 2.0
+    else:
+        return False
+
+    # SL must be on the correct side of entry for the direction
+    direction_lc = direction.lower()
+    if direction_lc == "long" and sl >= ref_entry:
+        return False
+    if direction_lc == "short" and sl <= ref_entry:
+        return False
+
     return True
 
 
