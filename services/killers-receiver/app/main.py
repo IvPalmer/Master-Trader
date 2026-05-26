@@ -60,6 +60,12 @@ class Config:
         self.stake_usd = float(os.environ.get("KILLERS_STAKE_USD", "20"))
         self.leverage = float(os.environ.get("KILLERS_LEVERAGE", "5"))
         self.max_open = int(os.environ.get("KILLERS_MAX_OPEN", "10"))
+        # Where to ping for human-readable Telegram alerts. trade-webhook
+        # already proxies to @elder_brain_bot; reusing its /test/notify keeps
+        # one Telegram code path for the whole fleet. Empty string disables.
+        self.notify_url = os.environ.get(
+            "KILLERS_NOTIFY_URL", "http://trade-webhook:8088/test/notify"
+        )
 
 
 # ── Symbol mapping ─────────────────────────────────────────────────────────
@@ -383,8 +389,69 @@ async def list_positions():
     return {"count": len(rows), "positions": rows}
 
 
+async def _notify_telegram(cfg: Config, text: str) -> None:
+    """Best-effort POST to trade-webhook /test/notify → @elder_brain_bot.
+    Silent on failure; observability shouldn't block the signal pipeline."""
+    if not cfg.notify_url:
+        return
+    try:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=5)
+        ) as session:
+            await session.post(cfg.notify_url, json={"text": text})
+    except Exception as e:
+        logger.warning("telegram notify failed: %s", e)
+
+
+def _format_event_summary(payload: EventPayload, result: dict) -> Optional[str]:
+    """Compose a single-line Telegram-friendly summary, or None to skip.
+
+    Keep it tight — feed reader will see this in @elder_brain_bot.
+    """
+    cls    = payload.classification
+    kind   = cls.get("kind", "?")
+    sym    = cls.get("symbol") or "?"
+    direc  = (cls.get("direction") or "").upper()
+    sig    = cls.get("signal_id") or "?"
+    action = result.get("action", "?")
+    reason = result.get("reason", "")
+
+    # Chat is 60% of the corpus — filter to keep Telegram readable.
+    if kind == "chat" or action == "ignored":
+        return None
+    # Duplicate observer redelivery: already alerted on the first pass.
+    if action == "deduped":
+        return None
+
+    head = "[killers-scalp]"
+    if action == "force_enter":
+        pos = result.get("pos_id", "?")
+        ft  = (result.get("ft") or {}).get("status", "?")
+        return f"📈 {head} OPEN  · #{sig} {sym} {direc}  · pos={pos} ft_status={ft}"
+    if action == "force_exit":
+        pos = result.get("pos_id", "?")
+        ft  = (result.get("ft") or {}).get("status", "?")
+        verb = "CLOSE_PARTIAL" if kind == "close_partial" else "CLOSE_FULL"
+        return f"📉 {head} {verb} · #{sig} {sym}  · pos={pos} ft_status={ft}"
+    if action == "skipped":
+        return f"⏭ {head} OBSERVED · #{sig} {kind} {sym} {direc}  · skipped: {reason}"
+    if action == "logged":
+        return f"📝 {head} OBSERVED · #{sig} {kind} {sym} {direc}  · {reason}"
+    return f"🔔 {head} {kind} {sym} · action={action} reason={reason}"
+
+
 @app.post("/event")
 async def handle_event(payload: EventPayload):
+    result = await _process_event(payload)
+    cfg: Config = app.state.cfg
+    text = _format_event_summary(payload, result)
+    if text:
+        # Fire-and-forget Telegram alert; never block the response on it.
+        await _notify_telegram(cfg, text)
+    return result
+
+
+async def _process_event(payload: EventPayload):
     cfg: Config = app.state.cfg
     conn: sqlite3.Connection = app.state.conn
     msg = payload.msg
