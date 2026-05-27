@@ -34,13 +34,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
-# aiohttp imported lazily inside the methods that use it so the module can
-# load in test environments without aiohttp installed (the pure-helper tests
-# import this file). Functions that need it do `import aiohttp` locally.
-try:
-    import aiohttp  # noqa: F401 — kept for typing/runtime parity; lazy import inside fns
-except ImportError:
-    aiohttp = None  # type: ignore
+import aiohttp
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -286,6 +280,27 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_pos_signal_symbol ON positions(signal_id, symbol);
 CREATE INDEX IF NOT EXISTS idx_pos_state ON positions(state);
+
+CREATE TABLE IF NOT EXISTS ingress_events (
+    -- Audit row inserted at the TOP of handle_event before ANY processing.
+    -- Even if the handler crashes (500), there's a permanent trail of what
+    -- arrived. Codex bug 2026-05-27 19:38 lost msg 3471 with no audit row.
+    ingress_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    msg_id       INTEGER NOT NULL UNIQUE,    -- channel msg id, idempotent
+    received_at  TEXT NOT NULL,
+    msg_date     TEXT,                       -- channel-side timestamp
+    kind         TEXT,                       -- classification kind, if available
+    symbol       TEXT,
+    signal_id    INTEGER,
+    raw_payload  TEXT NOT NULL,              -- full {msg, classification} json
+    final_action TEXT,                       -- handler outcome (force_enter,
+                                              -- skipped, audit_only, ignored,
+                                              -- error, or NULL if crashed)
+    final_status INTEGER,                    -- HTTP status returned to observer
+    completed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ingress_kind ON ingress_events(kind);
+CREATE INDEX IF NOT EXISTS idx_ingress_action ON ingress_events(final_action);
 
 CREATE TABLE IF NOT EXISTS target_orders (
     -- Phase 2: active limit-order placement at each signal TP.
@@ -965,7 +980,6 @@ async def lifespan(app: FastAPI):
     # `ft_session` carries BasicAuth so every call to FT REST reuses it
     # without rebuilding the credential. `public_session` is for unauthed
     # endpoints (Binance public API, trade-webhook notify).
-    import aiohttp
     ft_auth = aiohttp.BasicAuth(cfg.ft_user, cfg.ft_pass)
     app.state.ft_session = aiohttp.ClientSession(auth=ft_auth)
     app.state.public_session = aiohttp.ClientSession()
@@ -1040,6 +1054,25 @@ async def list_target_orders(pos_id: Optional[int] = None,
     params.append(limit)
     rows = [dict(r) for r in conn.execute(sql, params)]
     return {"count": len(rows), "target_orders": rows}
+
+
+@app.get("/ingress")
+async def list_ingress(limit: int = 50, kind: Optional[str] = None,
+                        action: Optional[str] = None):
+    """Audit trail of recent /event arrivals. Shows whatever the handler
+    decided + the raw classification. Use this when investigating a
+    "where did that signal go?" — even crashes leave a row."""
+    conn: sqlite3.Connection = app.state.conn
+    sql = "SELECT ingress_id, msg_id, received_at, msg_date, kind, symbol, signal_id, final_action, final_status, completed_at FROM ingress_events WHERE 1=1"
+    params: list = []
+    if kind is not None:
+        sql += " AND kind=?"; params.append(kind)
+    if action is not None:
+        sql += " AND final_action=?"; params.append(action)
+    sql += " ORDER BY ingress_id DESC LIMIT ?"
+    params.append(limit)
+    rows = [dict(r) for r in conn.execute(sql, params)]
+    return {"count": len(rows), "ingress": rows}
 
 
 @app.post("/target_orders/reconcile")
@@ -1377,14 +1410,40 @@ def _format_event_summary(payload: EventPayload, result: dict) -> Optional[str]:
 
 @app.post("/event")
 async def handle_event(payload: EventPayload):
-    result = await _process_event(payload)
     cfg: Config = app.state.cfg
+    conn: sqlite3.Connection = app.state.conn
+
+    # INGRESS AUDIT: insert row FIRST, before any processing. Even if the
+    # handler crashes (500), we have a permanent trail of what arrived.
+    # UNIQUE constraint on msg_id makes redeliveries idempotent. Codex
+    # 2026-05-27 bug: msg 3471 hit a NameError and left zero audit because
+    # the only event-recording code path ran AFTER processing decisions.
+    ingress_id = _ingress_log_start(conn, payload)
+
+    try:
+        result = await _process_event(payload)
+    except Exception as e:
+        # Catch-all: log + persist + return structured 500. Without this,
+        # FastAPI bubbles the exception to its generic handler which says
+        # "Internal Server Error" with zero msg_id context — exactly how
+        # msg 3471 got lost silently.
+        msg_id = payload.msg.get("id") if isinstance(payload.msg, dict) else None
+        kind = payload.classification.get("kind") if isinstance(payload.classification, dict) else None
+        logger.exception("[HANDLER CRASH] msg_id=%s kind=%s err=%s",
+                         msg_id, kind, e)
+        _ingress_log_finish(conn, ingress_id,
+                             {"action": "error", "reason": str(e)}, 500)
+        raise HTTPException(status_code=500,
+                            detail={"error": str(e), "msg_id": msg_id,
+                                    "kind": kind})
+
+    _ingress_log_finish(conn, ingress_id, result, 200)
+
     text = _format_event_summary(payload, result)
     if text:
         # TRUE fire-and-forget: spawn the notify as a background task so
         # the observer's POST gets a response immediately rather than
-        # blocking on the trade-webhook round-trip. Codex flagged the
-        # previous `await` as misleading vs the comment. Task is registered
+        # blocking on the trade-webhook round-trip. Task is registered
         # on app.state.notify_tasks so we can drain on shutdown.
         task = asyncio.create_task(
             _notify_telegram(cfg, text,
@@ -1395,6 +1454,59 @@ async def handle_event(payload: EventPayload):
             notify_tasks.add(task)
             task.add_done_callback(notify_tasks.discard)
     return result
+
+
+def _ingress_log_start(conn: sqlite3.Connection,
+                       payload: EventPayload) -> Optional[int]:
+    """Persist arrival of an /event before any processing. Returns the
+    ingress_id for the row, or None if the msg_id was already audited
+    (idempotent redelivery)."""
+    try:
+        msg = payload.msg if isinstance(payload.msg, dict) else {}
+        cls = payload.classification if isinstance(payload.classification, dict) else {}
+        msg_id = msg.get("id")
+        if msg_id is None:
+            return None  # malformed payload, can't audit
+        raw_payload = json.dumps({"msg": msg, "classification": cls}, default=str)
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO ingress_events "
+            "(msg_id, received_at, msg_date, kind, symbol, signal_id, raw_payload) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (msg_id,
+             datetime.now(timezone.utc).isoformat(),
+             str(msg.get("date")) if msg.get("date") is not None else None,
+             cls.get("kind"),
+             cls.get("symbol"),
+             cls.get("signal_id"),
+             raw_payload),
+        )
+        if cur.rowcount == 0:
+            # Already audited (redelivery)
+            row = conn.execute(
+                "SELECT ingress_id FROM ingress_events WHERE msg_id=?", (msg_id,),
+            ).fetchone()
+            return row["ingress_id"] if row else None
+        return cur.lastrowid
+    except Exception as e:
+        # Never let audit failure break the handler — log + continue.
+        logger.exception("ingress_log_start failed: %s", e)
+        return None
+
+
+def _ingress_log_finish(conn: sqlite3.Connection, ingress_id: Optional[int],
+                        result: dict, status: int) -> None:
+    """Stamp the handler outcome onto the ingress row."""
+    if ingress_id is None:
+        return
+    try:
+        action = result.get("action") if isinstance(result, dict) else None
+        conn.execute(
+            "UPDATE ingress_events SET final_action=?, final_status=?, completed_at=? "
+            "WHERE ingress_id=?",
+            (action, status, datetime.now(timezone.utc).isoformat(), ingress_id),
+        )
+    except Exception as e:
+        logger.warning("ingress_log_finish failed: %s", e)
 
 
 async def _process_event(payload: EventPayload):

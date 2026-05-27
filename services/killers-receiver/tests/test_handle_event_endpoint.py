@@ -140,6 +140,141 @@ def test_system_endpoint():
     assert body["active_positions_count"] == 0
 
 
+def test_notify_task_actually_scheduled_and_called():
+    """Codex's specific concern: `asyncio.create_task` ran without crash
+    isn't proof that the notify actually fired. Patch _notify_telegram
+    with a flag-setting fake, post an event that triggers a formatted
+    alert, then verify the fake was invoked at least once. The test
+    enables KILLERS_NOTIFY_URL specifically so the format helper returns
+    a non-None string (notify is skipped when url is empty)."""
+    import asyncio as _aio
+    tf = tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False)
+    os.environ["KILLERS_DB"] = tf.name
+    os.environ["KILLERS_ACTIVE_TP_LIMITS"] = "true"
+    os.environ["KILLERS_NOTIFY_URL"] = "http://notify.test/api"
+    from importlib import reload
+    import app.main as m
+    reload(m)
+    from fastapi.testclient import TestClient
+
+    notify_calls = []
+    original = m._notify_telegram
+
+    async def spy_notify(cfg, text, session=None):
+        notify_calls.append(text)
+        # Don't actually hit the URL — just record.
+
+    with patch.object(m, "_notify_telegram", side_effect=spy_notify):
+        with TestClient(m.app) as client:
+            r = client.post("/event", json={
+                "msg": {"id": 88888,
+                        "date": "2026-05-27T20:00:00+00:00",
+                        "text": "📍SIGNAL ID: #999📍\nrandom mgmt msg"},
+                "classification": {
+                    "id": 88888, "kind": "close_partial",
+                    "signal_id": 999, "symbol": "BTC",
+                    "direction": "long", "pct": 50,
+                    "entry": None, "entry_range": None,
+                    "sl": None, "tp": None,
+                    "confidence": 0.9, "notes": "stub",
+                },
+            })
+            # Give the background task a tick to run
+            import time
+            time.sleep(0.1)
+    assert r.status_code == 200
+    # Even though the action is "skipped no_active_position", the formatter
+    # emits an ⏭ OBSERVED alert. Verify spy was called.
+    assert len(notify_calls) >= 1, (
+        f"_notify_telegram should have been invoked; calls={notify_calls}, "
+        f"response={r.text}"
+    )
+    assert "OBSERVED" in notify_calls[0] or "SKIPPED" in notify_calls[0]
+
+
+def test_ingress_audit_persists_on_success():
+    """Every /event POST writes an ingress_events row. Verify the row
+    contains msg_id, kind, and final_action."""
+    with _client() as (client, m):
+        r = client.post("/event", json={
+            "msg": {"id": 77777, "date": "2026-05-27T20:00:00+00:00",
+                    "text": "GM"},
+            "classification": {"id": 77777, "kind": "chat",
+                                "signal_id": None, "symbol": None,
+                                "direction": None, "pct": None,
+                                "entry": None, "entry_range": None,
+                                "sl": None, "tp": None,
+                                "confidence": 0.99, "notes": ""},
+        })
+        assert r.status_code == 200
+        # Inspect the audit table directly
+        import sqlite3
+        conn = sqlite3.connect(os.environ["KILLERS_DB"])
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM ingress_events WHERE msg_id=?", (77777,)
+        ).fetchone()
+    assert row is not None
+    assert row["kind"] == "chat"
+    assert row["final_action"] == "ignored"
+    assert row["final_status"] == 200
+    assert row["completed_at"] is not None
+
+
+def test_ingress_audit_on_handler_crash():
+    """Handler crash → 500 → ingress row still has final_action='error'
+    and final_status=500. Pre-fix the asyncio NameError gave us NO row."""
+    with _client() as (client, m):
+        # Force a crash by patching _process_event to raise
+        async def crash(*args, **kwargs):
+            raise RuntimeError("simulated handler crash")
+        with patch.object(m, "_process_event", side_effect=crash):
+            r = client.post("/event", json={
+                "msg": {"id": 66666, "date": "2026-05-27T20:00:00+00:00",
+                        "text": "boom"},
+                "classification": {"id": 66666, "kind": "chat",
+                                    "signal_id": None, "symbol": None,
+                                    "direction": None, "pct": None,
+                                    "entry": None, "entry_range": None,
+                                    "sl": None, "tp": None,
+                                    "confidence": 0.5, "notes": ""},
+            })
+        assert r.status_code == 500
+        # Audit row still present despite crash
+        import sqlite3
+        conn = sqlite3.connect(os.environ["KILLERS_DB"])
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM ingress_events WHERE msg_id=?", (66666,)
+        ).fetchone()
+    assert row is not None
+    assert row["final_action"] == "error"
+    assert row["final_status"] == 500
+
+
+def test_ingress_endpoint_lists_recent():
+    """/ingress endpoint returns recent rows for ops visibility."""
+    with _client() as (client, m):
+        # Seed two events
+        for mid in (44441, 44442):
+            client.post("/event", json={
+                "msg": {"id": mid, "date": "2026-05-27T20:00:00+00:00",
+                        "text": f"msg-{mid}"},
+                "classification": {"id": mid, "kind": "chat",
+                                    "signal_id": None, "symbol": None,
+                                    "direction": None, "pct": None,
+                                    "entry": None, "entry_range": None,
+                                    "sl": None, "tp": None,
+                                    "confidence": 0.99, "notes": ""},
+            })
+        r = client.get("/ingress?limit=10")
+    assert r.status_code == 200
+    body = r.json()
+    msg_ids = {row["msg_id"] for row in body["ingress"]}
+    assert 44441 in msg_ids
+    assert 44442 in msg_ids
+
+
 if __name__ == "__main__":
     funcs = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     failed = []

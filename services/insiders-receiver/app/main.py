@@ -16,10 +16,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Optional
 
+import aiohttp
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-# aiohttp is imported lazily inside the open-handler so this module can be
-# imported in test environments without aiohttp installed.
 
 from .classifier_dispatcher import ClaudeAgentClassifier, classify
 from .claude_classifier import ClaudeCliClassifier
@@ -248,7 +247,6 @@ async def _handle_open(graph, ft, cfg, event, cls, classifier_used):
             logger.warning("could not parse posted_at %r: %s", event.posted_at, e)
 
     # Resolve entry + fetch mark price in a single session.
-    import aiohttp
     async with aiohttp.ClientSession() as sess:
         mark = await get_mark_price(sess, symbol)
     if entry is None and entry_range:

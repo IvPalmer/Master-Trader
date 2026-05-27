@@ -282,26 +282,83 @@ async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
 
 
 async def _post_to_receiver(url: str, msg: dict, classification: dict) -> None:
-    """POST classified event to killers-receiver. Best-effort, never blocks.
+    """POST classified event to killers-receiver with bounded retry.
+
+    Bug discovered 2026-05-27 19:38: receiver crashed 500 on a real signal,
+    observer logged and moved on, msg lost silently. Retry policy:
+      - 3 attempts total
+      - Retry on: any exception (network drop, timeout), 5xx, 429 (rate-limit)
+      - Do NOT retry on: 4xx (client error — payload is broken, retrying
+        won't help)
+      - Backoff: 0s, 2s + jitter, 5s + jitter (jitter = ±20%)
+    Final failure logs at ERROR level with msg_id so it's loud enough to
+    notice in log review.
 
     Telethon's to_dict() leaves datetime objects + bytes inline; pre-serialize
     via json.dumps(default=str) and post as raw data so aiohttp doesn't trip
     on its own json encoder.
     """
     import aiohttp
+    import random
     payload = {"msg": msg, "classification": classification}
     try:
         body_json = json.dumps(payload, default=str)
-        async with aiohttp.ClientSession() as s:
-            async with s.post(url, data=body_json,
-                              headers={"Content-Type": "application/json"},
-                              timeout=aiohttp.ClientTimeout(total=8)) as r:
-                body = await r.text()
-                logger.info("[RECV] %d msg_id=%d kind=%s body=%s",
-                            r.status, msg.get("id"), classification.get("kind"),
-                            body[:200])
     except Exception as e:
-        logger.warning("[RECV] post failed msg_id=%d: %s", msg.get("id"), e)
+        logger.error("[RECV] payload serialize failed msg_id=%s: %s",
+                     msg.get("id"), e)
+        return
+
+    backoffs = [0.0, 2.0, 5.0]
+    last_err: Optional[str] = None
+    for attempt, base_delay in enumerate(backoffs, start=1):
+        if base_delay > 0:
+            # ±20% jitter on the base
+            delay = base_delay * random.uniform(0.8, 1.2)
+            await asyncio.sleep(delay)
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.post(
+                    url, data=body_json,
+                    headers={"Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as r:
+                    body = await r.text()
+                    if 200 <= r.status < 300:
+                        logger.info("[RECV] %d msg_id=%s kind=%s body=%s "
+                                    "(attempt %d)",
+                                    r.status, msg.get("id"),
+                                    classification.get("kind"),
+                                    body[:200], attempt)
+                        return
+                    if 400 <= r.status < 500 and r.status != 429:
+                        # Client error — payload broken, retrying won't help
+                        logger.error(
+                            "[RECV] %d msg_id=%s kind=%s body=%s — "
+                            "4xx, NOT retrying",
+                            r.status, msg.get("id"),
+                            classification.get("kind"), body[:200],
+                        )
+                        return
+                    # 5xx or 429 — retry
+                    last_err = f"HTTP {r.status}: {body[:200]}"
+                    logger.warning(
+                        "[RECV] %d msg_id=%s attempt %d/%d — will retry: %s",
+                        r.status, msg.get("id"), attempt, len(backoffs),
+                        body[:200],
+                    )
+        except Exception as e:
+            last_err = f"exception: {e}"
+            logger.warning(
+                "[RECV] post raised msg_id=%s attempt %d/%d: %s",
+                msg.get("id"), attempt, len(backoffs), e,
+            )
+
+    # Exhausted retries
+    logger.error(
+        "[RECV] EXHAUSTED %d retries for msg_id=%s kind=%s — message LOST. "
+        "Last error: %s",
+        len(backoffs), msg.get("id"), classification.get("kind"), last_err,
+    )
 
 
 # ── Main loop ──────────────────────────────────────────────────────────────

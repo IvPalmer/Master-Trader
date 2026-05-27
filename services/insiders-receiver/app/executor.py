@@ -18,10 +18,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-# aiohttp is imported lazily inside the network methods so that pure-helper
-# users (sizing, builders, sanity checks) can import this module in
-# environments without aiohttp installed (e.g. CI test runs without the
-# Docker image layer).
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -77,13 +74,9 @@ def size_position(entry: float, sl: float, cfg: SizingConfig) -> tuple[float, fl
 # ── Market sanity bands ──────────────────────────────────────────────────
 
 
-async def get_mark_price(session, symbol: str) -> Optional[float]:
-    """Fetch current mark price from Binance Futures public API.
-
-    `session` is an aiohttp.ClientSession — typed loosely so this module
-    can be imported in test environments without aiohttp installed.
-    """
-    import aiohttp
+async def get_mark_price(session: "aiohttp.ClientSession",
+                          symbol: str) -> Optional[float]:
+    """Fetch current mark price from Binance Futures public API."""
     url = "https://fapi.binance.com/fapi/v1/premiumIndex"
     params = {"symbol": f"{symbol.upper()}USDT"}
     try:
@@ -137,23 +130,10 @@ class FreqtradeConfig:
 class FreqtradeClient:
     def __init__(self, cfg: FreqtradeConfig):
         self.cfg = cfg
-        # Defer aiohttp import + auth construction so this class can be
-        # imported (and statically inspected) without aiohttp installed.
-        # _auth is built on first use.
-        self._auth = None
-        self._auth_built = False
-
-    def _ensure_auth(self):
-        if self._auth_built:
-            return
-        import aiohttp
-        if self.cfg.username:
-            self._auth = aiohttp.BasicAuth(self.cfg.username, self.cfg.password)
-        self._auth_built = True
+        self._auth = (aiohttp.BasicAuth(cfg.username, cfg.password)
+                      if cfg.username else None)
 
     async def ping(self) -> bool:
-        import aiohttp
-        self._ensure_auth()
         async with aiohttp.ClientSession(auth=self._auth) as s:
             async with s.get(f"{self.cfg.base_url}/api/v1/ping",
                              timeout=aiohttp.ClientTimeout(total=3)) as r:
@@ -167,8 +147,6 @@ class FreqtradeClient:
         names are flat (no underscores): `stakeamount`, `ordertype`. The
         working Killers receiver uses this same shape.
         """
-        import aiohttp
-        self._ensure_auth()
         body = build_forceenter_body(pair, side, stake_amount, leverage)
         async with aiohttp.ClientSession(auth=self._auth) as s:
             async with s.post(f"{self.cfg.base_url}/api/v1/forceenter", json=body,
@@ -186,8 +164,6 @@ class FreqtradeClient:
         passed as percent would be treated as base coins (e.g. amount_pct=50
         → "amount": 0.5 BTC instead of 50% of the position).
         """
-        import aiohttp
-        self._ensure_auth()
         current_amount: Optional[float] = None
         if amount_pct is not None and amount_pct < 100:
             trade = await self.get_trade(trade_id)
@@ -207,8 +183,6 @@ class FreqtradeClient:
                 return data
 
     async def get_open_trades(self) -> list[dict]:
-        import aiohttp
-        self._ensure_auth()
         async with aiohttp.ClientSession(auth=self._auth) as s:
             async with s.get(f"{self.cfg.base_url}/api/v1/status",
                              timeout=aiohttp.ClientTimeout(total=5)) as r:
@@ -219,8 +193,6 @@ class FreqtradeClient:
 
     async def get_trade(self, trade_id: int) -> Optional[dict]:
         """Fetch a single trade by ID. Returns None on miss / HTTP error."""
-        import aiohttp
-        self._ensure_auth()
         async with aiohttp.ClientSession(auth=self._auth) as s:
             try:
                 async with s.get(f"{self.cfg.base_url}/api/v1/trade/{trade_id}",
