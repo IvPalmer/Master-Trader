@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import classifier, simulator
+from . import classifier, simulator, strict_open
 
 logger = logging.getLogger(__name__)
 
@@ -186,12 +186,26 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     logger.info("[MSG %s] id=%d %r", source.upper(), msg_dict["id"], snippet)
 
     chain = await build_reply_chain(client, channel_id, conn, msg_dict)
-    classification = await classifier.classify(
-        msg_dict, chain,
-        binary=config.claude_binary,
-        model=config.claude_model,
-        timeout_sec=config.claude_timeout,
-    )
+
+    # FAST-PATH: try the rule parser first. Saves ~7s of Claude latency on
+    # clean OPEN signals. Strict checks inside the parser reject anything
+    # that isn't a complete single-coin open. Claude still runs in shadow
+    # after the receiver POST so any disagreement is visible.
+    text = msg_dict.get("text") or msg_dict.get("message") or ""
+    classification = strict_open.is_strict_killers_open(text, msg_dict["id"])
+    used_fast_path = classification is not None
+    if used_fast_path:
+        logger.info(
+            "[FAST-PATH] id=%d kind=open signal=#%s sym=%s — bypassing Claude",
+            msg_dict["id"], classification["signal_id"], classification["symbol"],
+        )
+    else:
+        classification = await classifier.classify(
+            msg_dict, chain,
+            binary=config.claude_binary,
+            model=config.claude_model,
+            timeout_sec=config.claude_timeout,
+        )
     if classification is None:
         logger.warning("[CLASSIFY FAIL] id=%d skipping downstream", msg_dict["id"])
         return
@@ -201,8 +215,9 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     sym = classification.get("symbol")
     sid = classification.get("signal_id")
     conf = classification.get("confidence", 0)
-    logger.info("[CLASSIFY] id=%d kind=%s signal=#%s sym=%s conf=%.2f",
-                msg_dict["id"], kind, sid, sym, conf)
+    logger.info("[CLASSIFY] id=%d kind=%s signal=#%s sym=%s conf=%.2f source=%s",
+                msg_dict["id"], kind, sid, sym, conf,
+                "rule" if used_fast_path else "claude")
 
     # Route into paper simulator (local audit trail)
     if kind == "open":
@@ -218,6 +233,52 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     # for audit + offline comparison.
     if config.receiver_url:
         await _post_to_receiver(config.receiver_url, msg_dict, classification)
+
+    # Shadow Claude after the fast-path decision is already in flight. Logs
+    # disagreement but never blocks the receiver POST. Skip if Claude was
+    # already the primary classifier (no shadow needed).
+    if used_fast_path:
+        asyncio.create_task(
+            _shadow_classify(msg_dict, chain, classification, config),
+            name=f"shadow-classify-{msg_dict['id']}",
+        )
+
+
+async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
+                           config) -> None:
+    """Run Claude in the background after a fast-path open, log any
+    disagreement. Best-effort — never raises out of the task."""
+    try:
+        cls = await classifier.classify(
+            msg_dict, chain,
+            binary=config.claude_binary,
+            model=config.claude_model,
+            timeout_sec=config.claude_timeout,
+        )
+        if cls is None:
+            return
+        # Compare critical fields. Disagreement = different kind, symbol,
+        # direction, or sl off by >0.5%.
+        disagree_fields: list[str] = []
+        for f in ("kind", "symbol", "direction"):
+            if cls.get(f) != fast_path.get(f):
+                disagree_fields.append(f)
+        fp_sl = fast_path.get("sl")
+        cl_sl = cls.get("sl")
+        if (isinstance(fp_sl, (int, float)) and isinstance(cl_sl, (int, float))
+                and fp_sl > 0 and abs(fp_sl - cl_sl) / fp_sl > 0.005):
+            disagree_fields.append("sl")
+        if disagree_fields:
+            logger.warning(
+                "[FAST-PATH DISAGREE] id=%d fields=%s rule=%s claude=%s — "
+                "fast-path already committed (audit only)",
+                msg_dict.get("id"), disagree_fields,
+                {f: fast_path.get(f) for f in disagree_fields},
+                {f: cls.get(f) for f in disagree_fields},
+            )
+    except Exception as e:
+        logger.warning("shadow classify failed id=%d: %s",
+                       msg_dict.get("id"), e)
 
 
 async def _post_to_receiver(url: str, msg: dict, classification: dict) -> None:
