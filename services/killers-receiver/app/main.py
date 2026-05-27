@@ -80,6 +80,19 @@ class Config:
         self.max_entry_slippage_pct = float(os.environ.get(
             "KILLERS_MAX_ENTRY_SLIPPAGE_PCT", "3.0",
         ))
+        # Phase 2: place LIMIT exit orders at each TP at open-time instead
+        # of waiting for the channel to announce target hits. Default ON
+        # because the Killers signaler explicitly publishes the full TP
+        # ladder at open and never closes at non-TP prices manually —
+        # channel close_partial msgs are post-hoc announcements of fills
+        # the exchange already captured.
+        self.active_tp_limits = (os.environ.get(
+            "KILLERS_ACTIVE_TP_LIMITS", "true",
+        ).lower() in ("true", "1", "yes"))
+        # Reconciler tick interval for target_orders state transitions.
+        self.target_reconcile_sec = int(os.environ.get(
+            "KILLERS_TARGET_RECONCILE_SEC", "20",
+        ))
 
 
 # ── Symbol mapping ─────────────────────────────────────────────────────────
@@ -272,6 +285,33 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_pos_signal_symbol ON positions(signal_id, symbol);
 CREATE INDEX IF NOT EXISTS idx_pos_state ON positions(state);
+
+CREATE TABLE IF NOT EXISTS target_orders (
+    -- Phase 2: active limit-order placement at each signal TP.
+    -- Set-and-forget on open: parse TARGETS line → place LIMIT exit at
+    -- each TP via /forceexit ordertype=limit → exchange fills the TPs
+    -- as price walks. Channel "Target N hit" messages become dedupe
+    -- audit only (the exchange already executed it).
+    target_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    pos_id      INTEGER NOT NULL REFERENCES positions(pos_id),
+    idx         INTEGER NOT NULL,           -- 0-based index in the signal's target ladder
+    price       REAL NOT NULL,              -- TP price (limit price)
+    amount      REAL NOT NULL,              -- base-currency slice assigned to this TP
+    state       TEXT NOT NULL DEFAULT 'pending',
+                                            -- pending: not yet posted to FT
+                                            -- active: limit order open on FT
+                                            -- filled: exchange filled the limit
+                                            -- cancelled: explicitly cancelled
+                                            -- rejected: FT rejected (precision, min-notional, etc)
+                                            -- skipped: filtered out before placement
+    ft_order_id TEXT,                       -- exchange order id (from FT trade.orders[])
+    placed_at   TEXT,
+    filled_at   TEXT,
+    last_check_at TEXT,
+    notes       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_target_orders_pos ON target_orders(pos_id, state);
+CREATE INDEX IF NOT EXISTS idx_target_orders_state ON target_orders(state);
 """
 
 # Default partial-close pct when the signal doesn't specify ("TP1 hit", "took
@@ -533,6 +573,39 @@ async def ft_get_trade(cfg: Config, trade_id: int,
     return None
 
 
+async def ft_force_exit_limit(cfg: Config, trade_id: int, amount: float,
+                              price: float, session=None) -> dict:
+    """POST /forceexit with ordertype=limit at a specific price + amount.
+
+    Used by Phase 2 active-TP placement. Each TP gets its own resting
+    LIMIT exit order at the exchange — fills automatically when price
+    crosses the TP, no need for the receiver to react to channel
+    "Target N hit" announcements.
+
+    Caller MUST have already computed `amount` in base currency (slice
+    of the position) and verified `price` is on the favorable side
+    relative to current mark. Returns `{status, body}` like the market
+    helpers.
+    """
+    url = f"{cfg.ft_base}/api/v1/forceexit"
+    body: dict[str, Any] = {
+        "tradeid": str(trade_id),
+        "ordertype": "limit",
+        "amount": round(float(amount), 8),
+        "price": float(price),
+    }
+    timeout = aiohttp.ClientTimeout(total=10)
+    if session is not None:
+        async with session.post(url, json=body, timeout=timeout) as r:
+            txt = await r.text()
+            return {"status": r.status, "body": txt}
+    auth = aiohttp.BasicAuth(cfg.ft_user, cfg.ft_pass)
+    async with aiohttp.ClientSession() as s:
+        async with s.post(url, json=body, auth=auth, timeout=timeout) as r:
+            txt = await r.text()
+            return {"status": r.status, "body": txt}
+
+
 async def ft_open_trades(cfg: Config, session=None) -> list[dict]:
     url = f"{cfg.ft_base}/api/v1/status"
     timeout = aiohttp.ClientTimeout(total=5)
@@ -558,6 +631,267 @@ async def ft_open_trades(cfg: Config, session=None) -> list[dict]:
 class EventPayload(BaseModel):
     msg: dict
     classification: dict
+
+
+# ── Phase 2: active TP-limit-order placement ─────────────────────────────
+
+
+async def _place_target_limits(
+    cfg: Config, conn: sqlite3.Connection,
+    pos_id: int, ft_trade_id: int,
+    targets: list[float], slice_amount: float,
+    session=None,
+) -> list[dict]:
+    """Post a LIMIT exit order at each TP, persist a target_orders row per
+    target. Returns a list of `{idx, price, ft_order_id, state}` dicts for
+    audit + the open response.
+
+    Best-effort per target: if one TP's /forceexit rejects (precision,
+    min-notional, etc.) we still attempt the rest. Failures are logged
+    and the target_orders row is marked `rejected` with the FT body for
+    operator review.
+    """
+    if session is None:
+        session = getattr(app.state, "ft_session", None)
+    placed: list[dict] = []
+    for idx, tp_price in enumerate(targets):
+        # Persist row in 'pending' state before posting so a crash mid-call
+        # leaves an audit trail. UNIQUE constraint via composite, but we
+        # don't enforce it — each (pos_id, idx) is unique by construction.
+        cur = conn.execute(
+            "INSERT INTO target_orders (pos_id, idx, price, amount, state) "
+            "VALUES (?, ?, ?, ?, 'pending')",
+            (pos_id, idx, float(tp_price), round(float(slice_amount), 8)),
+        )
+        target_id = cur.lastrowid
+        try:
+            resp = await ft_force_exit_limit(
+                cfg, ft_trade_id, slice_amount, tp_price, session=session,
+            )
+        except Exception as e:
+            logger.exception("[PHASE2] /forceexit limit raised for pos=%d idx=%d", pos_id, idx)
+            conn.execute(
+                "UPDATE target_orders SET state='rejected', notes=?, "
+                "last_check_at=? WHERE target_id=?",
+                (f"exception: {e}", datetime.now(timezone.utc).isoformat(), target_id),
+            )
+            placed.append({"idx": idx, "price": tp_price, "state": "rejected",
+                           "reason": str(e)})
+            continue
+
+        ok = 200 <= resp["status"] < 300
+        if not ok:
+            logger.error(
+                "[PHASE2] target idx=%d price=%g REJECTED pos=%d ft_trade=%d "
+                "status=%d body=%s",
+                idx, tp_price, pos_id, ft_trade_id, resp["status"],
+                (resp.get("body") or "")[:200],
+            )
+            conn.execute(
+                "UPDATE target_orders SET state='rejected', notes=?, "
+                "last_check_at=? WHERE target_id=?",
+                (f"ft_status={resp['status']} body={resp.get('body','')[:300]}",
+                 datetime.now(timezone.utc).isoformat(), target_id),
+            )
+            placed.append({"idx": idx, "price": tp_price,
+                           "state": "rejected",
+                           "ft_status": resp["status"]})
+            continue
+
+        # FT accepted. Try to pull the new order_id from the response body
+        # (FT returns the freshly created trade snapshot whose `orders[]`
+        # array includes the new exit order). Pick the most recent
+        # ft_order_side=sell/buy-close order with status=open. If we can't
+        # find it now, the reconciler will back-link by pos+price+amount.
+        new_order_id = None
+        try:
+            body = json.loads(resp.get("body") or "{}")
+            new_order_id = _extract_new_exit_order_id(body, tp_price, slice_amount)
+        except Exception:
+            pass
+
+        conn.execute(
+            "UPDATE target_orders SET state='active', ft_order_id=?, placed_at=?, "
+            "last_check_at=? WHERE target_id=?",
+            (new_order_id, datetime.now(timezone.utc).isoformat(),
+             datetime.now(timezone.utc).isoformat(), target_id),
+        )
+        placed.append({
+            "target_id": target_id, "idx": idx, "price": tp_price,
+            "ft_order_id": new_order_id, "state": "active",
+        })
+        logger.info(
+            "[PHASE2] pos=%d idx=%d limit posted at price=%g amount=%.6f ft_order_id=%s",
+            pos_id, idx, tp_price, slice_amount, new_order_id,
+        )
+    return placed
+
+
+def _extract_new_exit_order_id(body: dict, target_price: float,
+                                expected_amount: float) -> Optional[str]:
+    """Pick the newly-created limit exit order from a /forceexit response.
+
+    FT's snapshot may contain legacy orders from earlier requests. Sort
+    candidates by `order_timestamp` descending so we prefer the most
+    recent matching limit, which is the one we just placed.
+    """
+    orders = body.get("orders") or []
+    candidates: list[tuple[int, dict]] = []
+    for o in orders:
+        if not isinstance(o, dict):
+            continue
+        if not o.get("is_open"):
+            continue
+        if o.get("order_type") != "limit":
+            continue
+        price = o.get("safe_price") or o.get("price")
+        amount = o.get("amount")
+        try:
+            if (price is not None and abs(float(price) - float(target_price)) / float(target_price) < 0.001
+                    and amount is not None and abs(float(amount) - float(expected_amount)) / float(expected_amount) < 0.01):
+                ts = o.get("order_timestamp") or 0
+                try:
+                    ts_int = int(ts)
+                except (TypeError, ValueError):
+                    ts_int = 0
+                candidates.append((ts_int, o))
+        except (TypeError, ValueError, ZeroDivisionError):
+            continue
+    if not candidates:
+        return None
+    candidates.sort(key=lambda t: t[0], reverse=True)
+    return candidates[0][1].get("order_id")
+
+
+async def _reconcile_target_orders(
+    cfg: Config, conn: sqlite3.Connection, session=None,
+) -> dict:
+    """Scan active target_orders and transition states based on FT's view.
+
+    For each row state='active': query /trade/{ft_trade_id}, find the
+    matching order by ft_order_id (or by price+amount as fallback), and
+    transition:
+      order.status=='closed' + filled > 0 → state='filled'
+      order.status in ('canceled','cancelled','expired') → state='cancelled'
+      no matching order found → leave active (might be partial-fill that
+                                FT consolidated; safer than guessing)
+    """
+    summary = {"checked": 0, "filled": 0, "cancelled": 0, "still_active": 0}
+    rows = conn.execute(
+        "SELECT t.target_id, t.pos_id, t.idx, t.price, t.amount, t.ft_order_id, "
+        "       p.ft_trade_id, p.state AS pos_state "
+        "FROM target_orders t JOIN positions p ON p.pos_id = t.pos_id "
+        "WHERE t.state = 'active' AND p.state = 'open'"
+    ).fetchall()
+    if not rows:
+        return summary
+
+    # Group by ft_trade_id so we query FT once per trade.
+    trades_by_id: dict[int, dict] = {}
+    for r in rows:
+        ft_tid = r["ft_trade_id"]
+        if ft_tid is None:
+            continue
+        if ft_tid not in trades_by_id:
+            trade = await ft_get_trade(cfg, ft_tid, session=session)
+            if trade is None:
+                continue
+            trades_by_id[ft_tid] = trade
+        trade = trades_by_id.get(ft_tid)
+        if trade is None:
+            continue
+        summary["checked"] += 1
+        order = _find_matching_order(trade.get("orders") or [],
+                                     r["ft_order_id"], r["price"], r["amount"])
+        if order is None:
+            summary["still_active"] += 1
+            continue
+        status = (order.get("status") or "").lower()
+        filled = float(order.get("filled") or 0)
+        if status == "closed" and filled > 0:
+            conn.execute(
+                "UPDATE target_orders SET state='filled', filled_at=?, "
+                "last_check_at=? WHERE target_id=?",
+                (datetime.now(timezone.utc).isoformat(),
+                 datetime.now(timezone.utc).isoformat(), r["target_id"]),
+            )
+            summary["filled"] += 1
+            logger.info(
+                "[PHASE2 RECONCILE] FILLED pos=%d idx=%d price=%g order_id=%s",
+                r["pos_id"], r["idx"], r["price"], r["ft_order_id"],
+            )
+        elif status in ("canceled", "cancelled", "expired", "rejected"):
+            conn.execute(
+                "UPDATE target_orders SET state='cancelled', notes=?, "
+                "last_check_at=? WHERE target_id=?",
+                (f"ft_order_status={status}",
+                 datetime.now(timezone.utc).isoformat(), r["target_id"]),
+            )
+            summary["cancelled"] += 1
+            logger.warning(
+                "[PHASE2 RECONCILE] CANCELLED pos=%d idx=%d order_id=%s status=%s",
+                r["pos_id"], r["idx"], r["ft_order_id"], status,
+            )
+        else:
+            summary["still_active"] += 1
+            conn.execute(
+                "UPDATE target_orders SET last_check_at=? WHERE target_id=?",
+                (datetime.now(timezone.utc).isoformat(), r["target_id"]),
+            )
+    return summary
+
+
+def _find_matching_order(orders: list[dict], ft_order_id: Optional[str],
+                         target_price: float, expected_amount: float) -> Optional[dict]:
+    """Locate a target's matching order in FT's trade.orders[] array.
+
+    Prefers exact ft_order_id match. Falls back to price+amount match for
+    limit-type orders only — never matches market orders (those are entries
+    or full force-exits, not TPs). When multiple limits match in fallback
+    mode, pick the newest by order_timestamp.
+    """
+    if ft_order_id:
+        for o in orders:
+            if isinstance(o, dict) and o.get("order_id") == ft_order_id:
+                return o
+    # Fallback: match by limit + price + amount.
+    candidates: list[tuple[int, dict]] = []
+    for o in orders:
+        if not isinstance(o, dict):
+            continue
+        if o.get("order_type") != "limit":
+            continue
+        try:
+            price = float(o.get("safe_price") or o.get("price") or 0)
+            amount = float(o.get("amount") or 0)
+            if (price > 0 and abs(price - float(target_price)) / float(target_price) < 0.001
+                    and amount > 0 and abs(amount - float(expected_amount)) / float(expected_amount) < 0.01):
+                ts = o.get("order_timestamp") or 0
+                try:
+                    ts_int = int(ts)
+                except (TypeError, ValueError):
+                    ts_int = 0
+                candidates.append((ts_int, o))
+        except (TypeError, ValueError, ZeroDivisionError):
+            continue
+    if not candidates:
+        return None
+    candidates.sort(key=lambda t: t[0], reverse=True)
+    return candidates[0][1]
+
+
+async def target_orders_reconcile_loop(cfg: Config, conn: sqlite3.Connection,
+                                       ft_session=None) -> None:
+    """Background loop that ticks _reconcile_target_orders every
+    cfg.target_reconcile_sec. Separate from the position-level reconcile
+    so cadences can differ."""
+    import asyncio
+    while True:
+        try:
+            await _reconcile_target_orders(cfg, conn, session=ft_session)
+        except Exception as e:
+            logger.warning("target_orders reconcile error: %s", e)
+        await asyncio.sleep(cfg.target_reconcile_sec)
 
 
 async def reconcile_loop(cfg: Config, conn: sqlite3.Connection,
@@ -638,17 +972,26 @@ async def lifespan(app: FastAPI):
     app.state.notify_tasks = set()
     logger.info(
         "receiver up ft=%s db=%s stake=$%.0f lev=%.1fx max_open=%d "
-        "max_slippage=%.1f%%",
+        "max_slippage=%.1f%% active_tp=%s reconcile_sec=%d",
         cfg.ft_base, cfg.db_path, cfg.stake_usd, cfg.leverage, cfg.max_open,
-        cfg.max_entry_slippage_pct,
+        cfg.max_entry_slippage_pct, cfg.active_tp_limits,
+        cfg.target_reconcile_sec,
     )
     recon = asyncio.create_task(
         reconcile_loop(cfg, conn, ft_session=app.state.ft_session)
     )
+    target_recon = None
+    if cfg.active_tp_limits:
+        target_recon = asyncio.create_task(
+            target_orders_reconcile_loop(cfg, conn,
+                                          ft_session=app.state.ft_session)
+        )
     try:
         yield
     finally:
         recon.cancel()
+        if target_recon is not None:
+            target_recon.cancel()
         # Drain in-flight notify tasks with a short timeout so we don't
         # leak Telegram POSTs on container restart.
         if app.state.notify_tasks:
@@ -675,6 +1018,37 @@ async def list_positions():
         "SELECT * FROM positions ORDER BY pos_id DESC LIMIT 100"
     )]
     return {"count": len(rows), "positions": rows}
+
+
+@app.get("/target_orders")
+async def list_target_orders(pos_id: Optional[int] = None,
+                              state: Optional[str] = None,
+                              limit: int = 100):
+    """Inspect phase-2 target_orders state. Useful for verifying limit
+    placements + reconciler progression. Filter by pos_id and/or state."""
+    conn: sqlite3.Connection = app.state.conn
+    sql = "SELECT * FROM target_orders WHERE 1=1"
+    params: list = []
+    if pos_id is not None:
+        sql += " AND pos_id = ?"
+        params.append(pos_id)
+    if state is not None:
+        sql += " AND state = ?"
+        params.append(state)
+    sql += " ORDER BY target_id DESC LIMIT ?"
+    params.append(limit)
+    rows = [dict(r) for r in conn.execute(sql, params)]
+    return {"count": len(rows), "target_orders": rows}
+
+
+@app.post("/target_orders/reconcile")
+async def force_reconcile_target_orders():
+    """Manually tick the target_orders reconciler. Returns the summary."""
+    cfg: Config = app.state.cfg
+    conn: sqlite3.Connection = app.state.conn
+    session = getattr(app.state, "ft_session", None)
+    summary = await _reconcile_target_orders(cfg, conn, session=session)
+    return summary
 
 
 # Pending events older than this are surfaced as "stuck" — the receiver
@@ -1225,11 +1599,13 @@ async def _process_event(payload: EventPayload):
              json.dumps(resp)),
         )
 
-        # Try to extract Freqtrade trade_id from the response body
+        # Try to extract Freqtrade trade_id + filled amount from the response body
         ft_trade_id = None
+        ft_amount = None
         try:
             body = json.loads(resp["body"])
             ft_trade_id = body.get("trade_id") or body.get("tradeid")
+            ft_amount = body.get("amount")
         except Exception:
             pass
 
@@ -1239,15 +1615,37 @@ async def _process_event(payload: EventPayload):
             "WHERE pos_id = ?",
             (new_state, ft_trade_id, datetime.now(timezone.utc).isoformat(), pos_id),
         )
+
+        # ── Phase 2: active TP-limit-order placement ──────────────────────
+        # The Killers signaler publishes the FULL TP ladder at open time
+        # and never mid-trade-closes at non-TP prices. Wiring those TPs
+        # directly to the exchange as limit exits captures fills at
+        # exchange-latency speed without round-tripping through the
+        # channel's "Target N hit" announcement (which is post-hoc).
+        placed_tps: list[dict] = []
+        if (new_state == "open" and cfg.active_tp_limits
+                and ft_trade_id and ft_amount and remaining_targets):
+            try:
+                amount_total = float(ft_amount)
+            except (TypeError, ValueError):
+                amount_total = 0.0
+            n = len(remaining_targets)
+            if amount_total > 0 and n > 0:
+                slice_amt = amount_total / n
+                placed_tps = await _place_target_limits(
+                    cfg, conn, pos_id, ft_trade_id, remaining_targets, slice_amt,
+                )
+
         logger.info(
             "[OPEN] pos_id=%d signal=#%s %s %s pair=%s stake=$%.0f lev=%.1fx "
-            "remaining_targets=%s → ft_status=%d ft_trade_id=%s",
+            "remaining_targets=%s tp_orders_placed=%d → ft_status=%d ft_trade_id=%s",
             pos_id, signal_id, symbol, direction.upper(), pair, stake, leverage,
-            remaining_targets, resp["status"], ft_trade_id,
+            remaining_targets, len(placed_tps), resp["status"], ft_trade_id,
         )
         return {"action": "force_enter", "pos_id": pos_id, "ft": resp,
                 "remaining_targets": remaining_targets,
-                "signal_targets": signal_targets}
+                "signal_targets": signal_targets,
+                "tp_orders_placed": placed_tps}
 
     if kind in ("close_full", "close_partial"):
         if not symbol:
@@ -1311,6 +1709,49 @@ async def _process_event(payload: EventPayload):
                         kind.upper(), msg_id, pos["pos_id"], kind)
             return {"action": "deduped", "pos_id": pos["pos_id"], "kind": kind}
 
+        # ── Phase 2 audit-only path ───────────────────────────────────────
+        # When active TP limits are placed at open time, channel
+        # close_partial messages are post-hoc announcements of fills the
+        # exchange should have already captured. Calling ft_force_exit
+        # market here would double-exit (limit filled or about-to-fill +
+        # market reduce). Force a reconcile FIRST (in case the limit just
+        # filled and we haven't ticked), then audit-only if any Phase 2
+        # rows exist for this position (pending/active/filled). close_full
+        # still goes through the market path so explicit "close all" /
+        # SL-hit messages from the channel are honored.
+        phase2_audit_only = False
+        if kind == "close_partial" and cfg.active_tp_limits:
+            try:
+                await _reconcile_target_orders(
+                    cfg, conn,
+                    session=getattr(app.state, "ft_session", None),
+                )
+            except Exception as e:
+                logger.warning("inline reconcile before close_partial failed: %s", e)
+            phase2_rows = conn.execute(
+                "SELECT COUNT(*) FROM target_orders WHERE pos_id=? "
+                "AND state IN ('pending','active','filled')",
+                (pos["pos_id"],),
+            ).fetchone()[0]
+            if phase2_rows > 0:
+                phase2_audit_only = True
+                logger.info(
+                    "[%s AUDIT-ONLY] msg_id=%d pos_id=%d — %d Phase 2 target_orders "
+                    "exist; channel target-hit is post-hoc, NOT calling ft_force_exit",
+                    kind.upper(), msg_id, pos["pos_id"], phase2_rows,
+                )
+                conn.execute(
+                    "UPDATE events SET response = ? "
+                    "WHERE pos_id = ? AND msg_id = ? AND kind = ?",
+                    (json.dumps({"status": "audit_only",
+                                 "reason": "active_tp_limits"}),
+                     pos["pos_id"], msg_id, kind),
+                )
+                return {"action": "audit_only",
+                        "pos_id": pos["pos_id"], "kind": kind,
+                        "reason": "active_tp_limits",
+                        "phase2_rows": phase2_rows}
+
         resp = await ft_force_exit(
             cfg, pos["ft_trade_id"], pct=close_pct_of_remaining,
             session=getattr(app.state, "ft_session", None),
@@ -1335,6 +1776,17 @@ async def _process_event(payload: EventPayload):
                 "last_event_at = ? WHERE pos_id = ?",
                 (new_state, msg_id, str(msg.get("date")),
                  kind, datetime.now(timezone.utc).isoformat(), pos["pos_id"]),
+            )
+            # Phase 2: market exit on close_full implicitly closes the
+            # position on FT's side, which the exchange interprets as
+            # cancellation of any pending LIMIT exit orders attached to
+            # this trade. Mark our local target_orders rows accordingly
+            # so the reconciler doesn't keep polling cancelled orders.
+            conn.execute(
+                "UPDATE target_orders SET state='cancelled', "
+                "notes=COALESCE(notes,'') || ' | position-closed', "
+                "last_check_at=? WHERE pos_id=? AND state IN ('pending','active')",
+                (datetime.now(timezone.utc).isoformat(), pos["pos_id"]),
             )
         elif ft_ok:
             # Partial succeeded; position stays open with reduced size.
