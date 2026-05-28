@@ -662,6 +662,15 @@ class EventPayload(BaseModel):
 # ── Phase 2: active TP-limit-order placement ─────────────────────────────
 
 
+def _phase2_lock() -> Optional["asyncio.Lock"]:
+    """Return the cascade lock if the app has finished startup. Tests
+    that hand-wire `app.state` may omit it — return None so the call
+    paths degrade to no-locking (single-threaded test invocation is
+    safe without it).
+    """
+    return getattr(app.state, "phase2_lock", None)
+
+
 async def _place_target_limits(
     cfg: Config, conn: sqlite3.Connection,
     pos_id: int, ft_trade_id: int,
@@ -707,9 +716,16 @@ async def _place_target_limits(
     # order or POST a new one for the lowest-idx pending target. If this
     # fails, the row is marked 'rejected' inside the helper and the rest
     # remain 'pending' for reconciler retry or operator action.
-    activated = await _adopt_or_post_next_tp(
-        cfg, conn, pos_id, ft_trade_id, session=session,
-    )
+    lock = _phase2_lock()
+    if lock is not None:
+        async with lock:
+            activated = await _adopt_or_post_next_tp(
+                cfg, conn, pos_id, ft_trade_id, session=session,
+            )
+    else:
+        activated = await _adopt_or_post_next_tp(
+            cfg, conn, pos_id, ft_trade_id, session=session,
+        )
     if activated is not None:
         # Patch our return list to reflect the activated/rejected row.
         for entry in placed:
@@ -759,8 +775,13 @@ async def _adopt_or_post_next_tp(
     # ── Step A: try to adopt an existing open limit exit ──────────────
     trade = await ft_get_trade(cfg, ft_trade_id, session=session)
     if trade is not None:
+        # Side filter: long-close=sell, short-close=buy. Prevents adopting
+        # an unrelated same-price limit on the wrong side (codex
+        # 019e7030 review). Killers config blocks position adjustment so
+        # cross-side limits shouldn't appear, but cost-free belt + suspenders.
+        is_short = bool(trade.get("is_short"))
         existing = _find_open_limit_exit_at_price(
-            trade.get("orders") or [], tp_price,
+            trade.get("orders") or [], tp_price, is_short=is_short,
         )
         if existing is not None:
             actual_amount = float(existing.get("amount") or slice_amount)
@@ -826,8 +847,9 @@ async def _adopt_or_post_next_tp(
     actual_amount = slice_amount
     trade2 = await ft_get_trade(cfg, ft_trade_id, session=session)
     if trade2 is not None:
+        is_short2 = bool(trade2.get("is_short"))
         found = _find_open_limit_exit_at_price(
-            trade2.get("orders") or [], tp_price,
+            trade2.get("orders") or [], tp_price, is_short=is_short2,
         )
         if found is not None:
             new_order_id = found.get("order_id")
@@ -852,12 +874,15 @@ async def _adopt_or_post_next_tp(
 
 
 def _find_open_limit_exit_at_price(
-    orders: list[dict], target_price: float, tol: float = 0.001,
+    orders: list[dict], target_price: float,
+    is_short: bool = False, tol: float = 0.001,
 ) -> Optional[dict]:
     """Return the open limit exit order whose price matches `target_price`
-    within relative tolerance `tol` (default 0.1%). Prefers the newest by
-    `order_timestamp`. Skips market/closed/buy-side orders.
+    within relative tolerance `tol` (default 0.1%) AND whose side matches
+    the exit side for this trade (long-close=sell, short-close=buy).
+    Prefers the newest by `order_timestamp`. Skips market/closed orders.
     """
+    expected_side = "buy" if is_short else "sell"
     candidates: list[tuple[int, dict]] = []
     for o in orders:
         if not isinstance(o, dict):
@@ -866,10 +891,11 @@ def _find_open_limit_exit_at_price(
             continue
         if o.get("order_type") != "limit":
             continue
-        if o.get("ft_order_side") not in ("sell", "buy"):
+        # Side filter — long trades close via sell limits, short trades
+        # close via buy limits. Prevents adopting an unrelated same-price
+        # entry limit if one ever exists on the trade.
+        if o.get("ft_order_side") != expected_side:
             continue
-        # Skip the entry buy/sell. Phase 2 sells on LONG → ft_order_side='sell';
-        # shorts → 'buy'. The entry is opposite-side and already closed.
         price = o.get("safe_price") or o.get("price")
         if price is None:
             continue
@@ -938,7 +964,21 @@ async def _reconcile_target_orders(
       order.status in ('canceled','cancelled','expired') → state='cancelled'
       no matching order found → leave active (might be partial-fill that
                                 FT consolidated; safer than guessing)
+
+    Serialized via app.state.phase2_lock so concurrent ticks (background
+    loop + manual /target_orders/reconcile endpoint) cannot both pick
+    the same pending row and double-POST /forceexit.
     """
+    lock = _phase2_lock()
+    if lock is not None:
+        async with lock:
+            return await _reconcile_target_orders_inner(cfg, conn, session)
+    return await _reconcile_target_orders_inner(cfg, conn, session)
+
+
+async def _reconcile_target_orders_inner(
+    cfg: Config, conn: sqlite3.Connection, session=None,
+) -> dict:
     summary = {"checked": 0, "filled": 0, "cancelled": 0,
                "still_active": 0, "cascaded": 0}
     rows = conn.execute(
@@ -1171,6 +1211,13 @@ async def lifespan(app: FastAPI):
     app.state.public_session = aiohttp.ClientSession()
     # Track background notify tasks so we can drain on shutdown.
     app.state.notify_tasks = set()
+    # Phase 2 cascade serialization: the background reconcile loop
+    # AND the manual `POST /target_orders/reconcile` endpoint both call
+    # _reconcile_target_orders / _adopt_or_post_next_tp. Without a lock,
+    # two concurrent ticks can both select the same 'pending' row, both
+    # POST /forceexit, and FT will cancel the first → re-creating the
+    # 2026-05-28 19:21 incident pattern (per codex 019e7030 review).
+    app.state.phase2_lock = asyncio.Lock()
     logger.info(
         "receiver up ft=%s db=%s stake=$%.0f lev=%.1fx max_open=%d "
         "max_slippage=%.1f%% active_tp=%s reconcile_sec=%d",

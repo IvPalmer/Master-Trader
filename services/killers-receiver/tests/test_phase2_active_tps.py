@@ -259,6 +259,138 @@ def test_place_marks_rejected_on_ft_error():
     assert "min notional" in (row["notes"] or "")
 
 
+def test_concurrent_reconcile_serialized_by_lock():
+    """Codex 019e7030 finding #1: background loop and manual
+    /target_orders/reconcile must not both pick the same pending row
+    and double-POST /forceexit. The phase2_lock serializes both
+    entry points — concurrent calls produce ONE POST, not two.
+    """
+    import asyncio as _aio
+    cfg, conn, pos_id = _setup_db()
+    # Seed: idx=0 active about to fill, idx=1 pending
+    conn.execute(
+        "INSERT INTO target_orders (pos_id, idx, price, amount, state, ft_order_id, placed_at) "
+        "VALUES (?, 0, 59.5, 0.5, 'active', 'sim-tp1', ?)",
+        (pos_id, "2026-05-28T19:00:00+00:00"),
+    )
+    conn.execute(
+        "INSERT INTO target_orders (pos_id, idx, price, amount, state) "
+        "VALUES (?, 1, 62.0, 0.5, 'pending')",
+        (pos_id,),
+    )
+
+    # Install the lock on app.state — production lifespan does this.
+    class _S:
+        def __init__(self, c, cf):
+            self.conn = c; self.cfg = cf; self.ft_session = None
+            self.public_session = None; self.notify_tasks = set()
+            self.phase2_lock = _aio.Lock()
+    receiver_main.app.state = _S(conn, cfg)
+
+    get_trade_calls = {"n": 0}
+
+    async def fake_get_trade(_cfg, trade_id, session=None):
+        get_trade_calls["n"] += 1
+        # Both concurrent ticks first see TP1 as filled
+        if get_trade_calls["n"] <= 2:
+            return {"orders": [{
+                "order_id": "sim-tp1", "order_type": "limit",
+                "is_open": False, "status": "closed",
+                "ft_order_side": "sell", "filled": 0.5,
+                "amount": 0.5, "safe_price": 59.5,
+            }]}
+        # After cascade has run once, TP2 is visible
+        return {"orders": [{
+            "order_id": "sim-tp2", "order_type": "limit",
+            "is_open": True, "ft_order_side": "sell",
+            "safe_price": 62.0, "amount": 0.5,
+            "order_timestamp": 1_700_000_001_000,
+        }]}
+
+    posted = []
+
+    async def fake_force_exit_limit(_cfg, trade_id, amount, price, session=None):
+        posted.append((trade_id, amount, price))
+        # Yield to event loop so the other concurrent reconcile can interleave
+        await _aio.sleep(0)
+        return {"status": 200, "body": '{"result":"ok"}'}
+
+    async def run_two_concurrent():
+        with patch.object(receiver_main, "ft_get_trade",
+                          side_effect=fake_get_trade), \
+             patch.object(receiver_main, "ft_force_exit_limit",
+                          side_effect=fake_force_exit_limit):
+            return await _aio.gather(
+                receiver_main._reconcile_target_orders(cfg, conn),
+                receiver_main._reconcile_target_orders(cfg, conn),
+            )
+
+    results = _run(run_two_concurrent())
+
+    # The lock should have serialized them: ONE POST, not two.
+    assert len(posted) == 1, \
+        f"concurrent reconciles must serialize via lock; got {len(posted)} POSTs"
+    # Both calls should report some work, summed filled count is 1 total.
+    total_filled = sum(r["filled"] for r in results)
+    assert total_filled == 1, \
+        f"TP1 should be marked filled exactly once across both ticks; got {total_filled}"
+
+    rows = conn.execute(
+        "SELECT idx, state FROM target_orders WHERE pos_id=? ORDER BY idx",
+        (pos_id,),
+    ).fetchall()
+    assert rows[0]["state"] == "filled"
+    assert rows[1]["state"] == "active"
+
+
+def test_adoption_rejects_wrong_side_order():
+    """Codex 019e7030 finding #2: on a SHORT trade, adoption must
+    require ft_order_side='buy' (close a short). A same-price 'sell'
+    limit (e.g. an unrelated entry) must NOT be adopted.
+    """
+    orders = [
+        {"order_id": "wrong-side-entry", "order_type": "limit",
+         "is_open": True, "ft_order_side": "sell",
+         "safe_price": 100.0, "amount": 1.0,
+         "order_timestamp": 1_700_000_000_000},
+    ]
+    # Short trade → exit side is 'buy'. Sell at same price must NOT match.
+    found = receiver_main._find_open_limit_exit_at_price(
+        orders, 100.0, is_short=True,
+    )
+    assert found is None, "must not adopt wrong-side limit on short trade"
+
+    # Correct side present → matches
+    orders.append({
+        "order_id": "correct-buy-close", "order_type": "limit",
+        "is_open": True, "ft_order_side": "buy",
+        "safe_price": 100.0, "amount": 1.0,
+        "order_timestamp": 1_700_000_001_000,
+    })
+    found = receiver_main._find_open_limit_exit_at_price(
+        orders, 100.0, is_short=True,
+    )
+    assert found is not None
+    assert found["order_id"] == "correct-buy-close"
+
+
+def test_adoption_long_default_requires_sell():
+    """Long trade (is_short=False default) → exit side is 'sell'."""
+    orders = [
+        {"order_id": "buy-noise", "order_type": "limit",
+         "is_open": True, "ft_order_side": "buy",
+         "safe_price": 65.0, "amount": 0.5,
+         "order_timestamp": 1_700_000_000_000},
+        {"order_id": "correct-sell-close", "order_type": "limit",
+         "is_open": True, "ft_order_side": "sell",
+         "safe_price": 65.0, "amount": 0.5,
+         "order_timestamp": 1_700_000_001_000},
+    ]
+    found = receiver_main._find_open_limit_exit_at_price(orders, 65.0)
+    assert found is not None
+    assert found["order_id"] == "correct-sell-close"
+
+
 def test_reconcile_loop_skips_tick_when_ft_unreachable():
     """Regression: incident 2026-05-28 19:58 UTC. ft-killers-scalp was
     restarted; ft_open_trades returned None (was: []); reconcile_loop
