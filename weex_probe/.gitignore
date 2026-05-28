@@ -1,0 +1,10 @@
+.env*
+!.env*.template
+__pycache__/
+*.pyc
+
+# Regenerable price-data caches (kept locally for re-testing, out of git)
+historical_klines/
+backtest_klines/
+*_cache.json
+replay_on_weex_output.json
