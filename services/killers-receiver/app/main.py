@@ -622,7 +622,14 @@ async def ft_force_exit_limit(cfg: Config, trade_id: int, amount: float,
             return {"status": r.status, "body": txt}
 
 
-async def ft_open_trades(cfg: Config, session=None) -> list[dict]:
+async def ft_open_trades(cfg: Config, session=None) -> Optional[list[dict]]:
+    """Return the list of open trades from FT, or None on transport
+    failure. Returning `None` (not `[]`) is important so the position
+    reconciler can distinguish "FT says zero open trades" (a valid
+    closed-detection signal) from "FT was unreachable" (must skip the
+    reconcile to avoid false-closing every open position — incident
+    2026-05-28 19:58 UTC on WLD #8 after ft-killers-scalp restart).
+    """
     url = f"{cfg.ft_base}/api/v1/status"
     timeout = aiohttp.ClientTimeout(total=5)
     try:
@@ -630,15 +637,18 @@ async def ft_open_trades(cfg: Config, session=None) -> list[dict]:
             async with session.get(url, timeout=timeout) as r:
                 if r.status == 200:
                     return await r.json()
-                return []
+                logger.warning("ft_open_trades non-200 status=%d", r.status)
+                return None
         auth = aiohttp.BasicAuth(cfg.ft_user, cfg.ft_pass)
         async with aiohttp.ClientSession() as s:
             async with s.get(url, auth=auth, timeout=timeout) as r:
                 if r.status == 200:
                     return await r.json()
+                logger.warning("ft_open_trades non-200 status=%d", r.status)
+                return None
     except Exception as e:
         logger.warning("ft_open_trades failed: %s", e)
-    return []
+    return None
 
 
 # ── HTTP API ───────────────────────────────────────────────────────────────
@@ -1093,6 +1103,14 @@ async def reconcile_loop(cfg: Config, conn: sqlite3.Connection,
     while True:
         try:
             ft_open = await ft_open_trades(cfg, session=ft_session)
+            if ft_open is None:
+                # Transport failure — skip the WHOLE reconcile tick. False
+                # "missing trade" detection would mark every open position
+                # closed (incident 2026-05-28 19:58 UTC). Try again next tick.
+                logger.warning("[RECONCILE] FT unreachable; skipping tick")
+                await asyncio.sleep(60)
+                continue
+
             ft_by_pair: dict[tuple, dict] = {}
             for t in ft_open:
                 key = (t.get("pair"), bool(t.get("is_short")))
@@ -1115,7 +1133,8 @@ async def reconcile_loop(cfg: Config, conn: sqlite3.Connection,
                     logger.info("[RECONCILE] orphan pos_id=%d linked to ft_trade_id=%d",
                                 pos["pos_id"], ft["trade_id"])
 
-            # (2) detect closes we missed
+            # (2) detect closes we missed. Only safe when ft_open is a
+            # genuine response (handled above by the `is None` guard).
             our_open_ids = {row["ft_trade_id"] for row in conn.execute(
                 "SELECT ft_trade_id FROM positions WHERE state = 'open' AND ft_trade_id IS NOT NULL"
             )}
