@@ -123,40 +123,112 @@ def _setup_db():
     return cfg, conn, pos_id
 
 
-def test_place_target_limits_persists_rows():
+def test_place_target_limits_cascade_only_one_active():
+    """Cascade design: persist all targets, but only the FIRST gets
+    posted to FT. Rest remain 'pending' until cascade fires on fill.
+
+    Regression for incident 2026-05-28 19:21 UTC (WLD #8): the prior
+    "all-at-once" loop posted 8 forceexits sequentially and FT cancelled
+    7 of them, leaving the trade naked when the 8th timed out.
+    """
     cfg, conn, pos_id = _setup_db()
 
     posted_orders = []
 
     async def fake_force_exit_limit(_cfg, trade_id, amount, price, session=None):
-        order_id = f"sim-tp-{price}"
-        posted_orders.append((trade_id, amount, price, order_id))
+        posted_orders.append((trade_id, amount, price))
+        # Real FT body — NOT a trade snapshot, just `{"result": "..."}`.
         return {"status": 200, "body": json.dumps({
-            "trade_id": trade_id,
-            "orders": [{
-                "order_id": order_id, "order_type": "limit",
-                "is_open": True, "ft_order_side": "sell",
-                "safe_price": price, "amount": amount,
-            }],
+            "result": f"Created exit order for trade {trade_id}.",
         })}
 
+    # After POST, the cascade helper re-fetches /trade to find the new
+    # order_id. Simulate FT returning the freshly created exit order on
+    # idx=0 only (since only idx=0 gets posted).
+    get_trade_calls = {"n": 0}
+
+    async def fake_get_trade(_cfg, trade_id, session=None):
+        get_trade_calls["n"] += 1
+        # First call: adoption check — no existing open exit yet.
+        # Subsequent calls: return the just-posted TP1 exit order.
+        if get_trade_calls["n"] == 1:
+            return {"orders": []}
+        return {"orders": [{
+            "order_id": "sim-tp-59.5", "order_type": "limit",
+            "is_open": True, "ft_order_side": "sell",
+            "safe_price": 59.5, "amount": 0.5,
+            "order_timestamp": 1_700_000_000_000,
+        }]}
+
     with patch.object(receiver_main, "ft_force_exit_limit",
-                      side_effect=fake_force_exit_limit):
+                      side_effect=fake_force_exit_limit), \
+         patch.object(receiver_main, "ft_get_trade",
+                      side_effect=fake_get_trade):
         placed = _run(receiver_main._place_target_limits(
             cfg, conn, pos_id, ft_trade_id=42,
             targets=[59.5, 62.0, 65.0], slice_amount=0.5,
         ))
 
+    # ONLY one /forceexit, no matter how many targets are in the ladder
+    assert len(posted_orders) == 1, \
+        f"cascade must post exactly 1 limit; got {len(posted_orders)}"
+    assert posted_orders[0][2] == 59.5  # lowest-idx TP first
+
+    # Return list reflects all 3 targets, but only idx=0 is active
     assert len(placed) == 3
-    assert all(p["state"] == "active" for p in placed)
+    states_by_idx = {p["idx"]: p["state"] for p in placed}
+    assert states_by_idx[0] == "active"
+    assert states_by_idx[1] == "pending"
+    assert states_by_idx[2] == "pending"
+
+    # DB rows match
     rows = conn.execute("SELECT * FROM target_orders WHERE pos_id=? ORDER BY idx",
                         (pos_id,)).fetchall()
     assert len(rows) == 3
-    assert all(r["state"] == "active" for r in rows)
-    assert rows[0]["price"] == 59.5
-    assert rows[1]["price"] == 62.0
-    assert rows[2]["price"] == 65.0
-    assert all(r["ft_order_id"] is not None for r in rows)
+    assert rows[0]["state"] == "active"
+    assert rows[0]["ft_order_id"] == "sim-tp-59.5"
+    assert rows[1]["state"] == "pending"
+    assert rows[2]["state"] == "pending"
+
+
+def test_adopt_existing_open_exit_skips_post():
+    """If FT already has an open limit exit at the next TP's price (e.g.
+    operator manually placed it before deploy / receiver restart), adopt
+    it instead of posting a duplicate. This is the case for WLD #8 hotfix
+    on 2026-05-28.
+    """
+    cfg, conn, pos_id = _setup_db()
+    posted = []
+
+    async def fake_force_exit_limit(*a, **k):
+        posted.append(a)
+        return {"status": 200, "body": '{"result":"ok"}'}
+
+    async def fake_get_trade(_cfg, trade_id, session=None):
+        return {"orders": [{
+            "order_id": "manual-tp1", "order_type": "limit",
+            "is_open": True, "ft_order_side": "sell",
+            "safe_price": 59.5, "amount": 0.5,
+            "order_timestamp": 1_700_000_000_000,
+        }]}
+
+    with patch.object(receiver_main, "ft_force_exit_limit",
+                      side_effect=fake_force_exit_limit), \
+         patch.object(receiver_main, "ft_get_trade",
+                      side_effect=fake_get_trade):
+        placed = _run(receiver_main._place_target_limits(
+            cfg, conn, pos_id, ft_trade_id=42,
+            targets=[59.5, 62.0], slice_amount=0.5,
+        ))
+
+    assert posted == [], "adoption path must NOT call /forceexit"
+    rows = conn.execute(
+        "SELECT idx, state, ft_order_id FROM target_orders WHERE pos_id=? ORDER BY idx",
+        (pos_id,),
+    ).fetchall()
+    assert rows[0]["state"] == "active"
+    assert rows[0]["ft_order_id"] == "manual-tp1"
+    assert rows[1]["state"] == "pending"
 
 
 def test_place_marks_rejected_on_ft_error():
@@ -165,19 +237,95 @@ def test_place_marks_rejected_on_ft_error():
     async def fake_force_exit_limit(*args, **kwargs):
         return {"status": 400, "body": json.dumps({"error": "min notional"})}
 
+    async def fake_get_trade(*args, **kwargs):
+        return {"orders": []}  # nothing to adopt
+
     with patch.object(receiver_main, "ft_force_exit_limit",
-                      side_effect=fake_force_exit_limit):
+                      side_effect=fake_force_exit_limit), \
+         patch.object(receiver_main, "ft_get_trade",
+                      side_effect=fake_get_trade):
         placed = _run(receiver_main._place_target_limits(
             cfg, conn, pos_id, ft_trade_id=42,
             targets=[59.5], slice_amount=0.5,
         ))
 
-    assert placed[0]["state"] == "rejected"
+    # idx=0 rejected; the entry in `placed` reflects that
+    rejected = [p for p in placed if p["idx"] == 0][0]
+    assert rejected["state"] == "rejected"
     row = conn.execute(
         "SELECT * FROM target_orders WHERE pos_id=?", (pos_id,)
     ).fetchone()
     assert row["state"] == "rejected"
     assert "min notional" in (row["notes"] or "")
+
+
+def test_cascade_after_fill_places_next_tp():
+    """Reconciler detects an active TP filled → cascades to place idx+1.
+
+    Regression test for the core cascade design: FT only allows one open
+    exit at a time, so the next TP can only be placed AFTER the prior one
+    fills.
+    """
+    cfg, conn, pos_id = _setup_db()
+    # Seed: idx=0 active (about to fill), idx=1 pending
+    conn.execute(
+        "INSERT INTO target_orders (pos_id, idx, price, amount, state, ft_order_id, placed_at) "
+        "VALUES (?, 0, 59.5, 0.5, 'active', 'sim-tp1', ?)",
+        (pos_id, "2026-05-28T19:00:00+00:00"),
+    )
+    conn.execute(
+        "INSERT INTO target_orders (pos_id, idx, price, amount, state) "
+        "VALUES (?, 1, 62.0, 0.5, 'pending')",
+        (pos_id,),
+    )
+
+    get_trade_calls = []
+
+    async def fake_get_trade(_cfg, trade_id, session=None):
+        get_trade_calls.append(trade_id)
+        # Reconciler call (#1) — TP1 closed/filled
+        if len(get_trade_calls) == 1:
+            return {"orders": [{
+                "order_id": "sim-tp1", "order_type": "limit",
+                "is_open": False, "status": "closed",
+                "ft_order_side": "sell", "filled": 0.5,
+                "amount": 0.5, "safe_price": 59.5,
+            }]}
+        # Cascade adoption-check (#2) — no existing open exit
+        if len(get_trade_calls) == 2:
+            return {"orders": []}
+        # Cascade post-discovery (#3) — TP2 now visible
+        return {"orders": [{
+            "order_id": "sim-tp2", "order_type": "limit",
+            "is_open": True, "ft_order_side": "sell",
+            "safe_price": 62.0, "amount": 0.5,
+            "order_timestamp": 1_700_000_001_000,
+        }]}
+
+    posted = []
+
+    async def fake_force_exit_limit(_cfg, trade_id, amount, price, session=None):
+        posted.append((trade_id, amount, price))
+        return {"status": 200, "body": '{"result":"ok"}'}
+
+    with patch.object(receiver_main, "ft_get_trade",
+                      side_effect=fake_get_trade), \
+         patch.object(receiver_main, "ft_force_exit_limit",
+                      side_effect=fake_force_exit_limit):
+        summary = _run(receiver_main._reconcile_target_orders(cfg, conn))
+
+    assert summary["filled"] == 1
+    assert summary["cascaded"] == 1
+    assert posted == [(42, 0.5, 62.0)], \
+        f"cascade should post TP2 at 62.0; got {posted}"
+
+    rows = conn.execute(
+        "SELECT idx, state, ft_order_id FROM target_orders WHERE pos_id=? ORDER BY idx",
+        (pos_id,),
+    ).fetchall()
+    assert rows[0]["state"] == "filled"
+    assert rows[1]["state"] == "active"
+    assert rows[1]["ft_order_id"] == "sim-tp2"
 
 
 def test_reconciler_advances_filled_state():
