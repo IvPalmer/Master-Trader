@@ -916,16 +916,15 @@ def _find_open_limit_exit_at_price(
     return candidates[0][1]
 
 
-def _extract_new_exit_order_id(body: dict, target_price: float,
-                                expected_amount: float) -> Optional[str]:
-    """Pick the newly-created limit exit order from a /forceexit response.
-
-    FT's snapshot may contain legacy orders from earlier requests. Sort
-    candidates by `order_timestamp` descending so we prefer the most
-    recent matching limit, which is the one we just placed.
+def _has_open_limit_exit(orders: list[dict], is_short: bool = False) -> bool:
+    """True if Freqtrade currently has at least one OPEN limit exit order on
+    the trade (long-close=sell, short-close=buy). This is the real-world
+    "the position has live TP coverage" check — used to decide whether a
+    channel close_partial is genuinely post-hoc (a resting limit will capture
+    it → audit-only) or whether the ladder has stalled (no live limit → the
+    channel close must be honored via a market exit).
     """
-    orders = body.get("orders") or []
-    candidates: list[tuple[int, dict]] = []
+    expected_side = "buy" if is_short else "sell"
     for o in orders:
         if not isinstance(o, dict):
             continue
@@ -933,23 +932,10 @@ def _extract_new_exit_order_id(body: dict, target_price: float,
             continue
         if o.get("order_type") != "limit":
             continue
-        price = o.get("safe_price") or o.get("price")
-        amount = o.get("amount")
-        try:
-            if (price is not None and abs(float(price) - float(target_price)) / float(target_price) < 0.001
-                    and amount is not None and abs(float(amount) - float(expected_amount)) / float(expected_amount) < 0.01):
-                ts = o.get("order_timestamp") or 0
-                try:
-                    ts_int = int(ts)
-                except (TypeError, ValueError):
-                    ts_int = 0
-                candidates.append((ts_int, o))
-        except (TypeError, ValueError, ZeroDivisionError):
+        if o.get("ft_order_side") != expected_side:
             continue
-    if not candidates:
-        return None
-    candidates.sort(key=lambda t: t[0], reverse=True)
-    return candidates[0][1].get("order_id")
+        return True
+    return False
 
 
 async def _reconcile_target_orders(
@@ -1127,6 +1113,62 @@ async def target_orders_reconcile_loop(cfg: Config, conn: sqlite3.Connection,
         await asyncio.sleep(cfg.target_reconcile_sec)
 
 
+async def _reconcile_loop_once(cfg: Config, conn: sqlite3.Connection,
+                               session=None) -> str:
+    """One position-level reconcile tick. Returns 'skipped' when FT was
+    unreachable (a partial view must never drive missed-close detection),
+    else 'ok'. Extracted from `reconcile_loop` so the guard is testable
+    against real code rather than a reimplemented stub (incident
+    2026-05-28 19:58 UTC: a None response false-closed every position).
+    """
+    ft_open = await ft_open_trades(cfg, session=session)
+    if ft_open is None:
+        # Transport failure — skip the WHOLE reconcile tick. False
+        # "missing trade" detection would mark every open position closed.
+        logger.warning("[RECONCILE] FT unreachable; skipping tick")
+        return "skipped"
+
+    ft_by_pair: dict[tuple, dict] = {}
+    for t in ft_open:
+        key = (t.get("pair"), bool(t.get("is_short")))
+        ft_by_pair[key] = t
+
+    # (1) link orphans
+    orphans = conn.execute(
+        "SELECT * FROM positions WHERE state = 'requested' AND ft_trade_id IS NULL "
+        "ORDER BY open_date DESC LIMIT 50"
+    ).fetchall()
+    for pos in orphans:
+        key = (pos["pair"], pos["direction"] == "short")
+        ft = ft_by_pair.get(key)
+        if ft and ft.get("trade_id"):
+            conn.execute(
+                "UPDATE positions SET state = 'open', ft_trade_id = ?, last_event_at = ? "
+                "WHERE pos_id = ?",
+                (ft["trade_id"], datetime.now(timezone.utc).isoformat(), pos["pos_id"]),
+            )
+            logger.info("[RECONCILE] orphan pos_id=%d linked to ft_trade_id=%d",
+                        pos["pos_id"], ft["trade_id"])
+
+    # (2) detect closes we missed. Only safe when ft_open is a genuine
+    # response (handled above by the `is None` guard).
+    our_open_ids = {row["ft_trade_id"] for row in conn.execute(
+        "SELECT ft_trade_id FROM positions WHERE state = 'open' AND ft_trade_id IS NOT NULL"
+    )}
+    ft_open_ids = {t["trade_id"] for t in ft_open}
+    missed = our_open_ids - ft_open_ids
+    for tid in missed:
+        conn.execute(
+            "UPDATE positions SET state = 'closed', close_reason = 'reconciled_missing', "
+            "close_date = ?, last_event_at = ? WHERE ft_trade_id = ? AND state = 'open'",
+            (datetime.now(timezone.utc).isoformat(),
+             datetime.now(timezone.utc).isoformat(), tid),
+        )
+        logger.info("[RECONCILE] ft_trade_id=%d no longer open in freqtrade; marked closed",
+                    tid)
+    return "ok"
+
+
 async def reconcile_loop(cfg: Config, conn: sqlite3.Connection,
                          ft_session=None) -> None:
     """Repair orphans: positions stuck in 'requested' with no ft_trade_id,
@@ -1142,53 +1184,7 @@ async def reconcile_loop(cfg: Config, conn: sqlite3.Connection,
     import asyncio
     while True:
         try:
-            ft_open = await ft_open_trades(cfg, session=ft_session)
-            if ft_open is None:
-                # Transport failure — skip the WHOLE reconcile tick. False
-                # "missing trade" detection would mark every open position
-                # closed (incident 2026-05-28 19:58 UTC). Try again next tick.
-                logger.warning("[RECONCILE] FT unreachable; skipping tick")
-                await asyncio.sleep(60)
-                continue
-
-            ft_by_pair: dict[tuple, dict] = {}
-            for t in ft_open:
-                key = (t.get("pair"), bool(t.get("is_short")))
-                ft_by_pair[key] = t
-
-            # (1) link orphans
-            orphans = conn.execute(
-                "SELECT * FROM positions WHERE state = 'requested' AND ft_trade_id IS NULL "
-                "ORDER BY open_date DESC LIMIT 50"
-            ).fetchall()
-            for pos in orphans:
-                key = (pos["pair"], pos["direction"] == "short")
-                ft = ft_by_pair.get(key)
-                if ft and ft.get("trade_id"):
-                    conn.execute(
-                        "UPDATE positions SET state = 'open', ft_trade_id = ?, last_event_at = ? "
-                        "WHERE pos_id = ?",
-                        (ft["trade_id"], datetime.now(timezone.utc).isoformat(), pos["pos_id"]),
-                    )
-                    logger.info("[RECONCILE] orphan pos_id=%d linked to ft_trade_id=%d",
-                                pos["pos_id"], ft["trade_id"])
-
-            # (2) detect closes we missed. Only safe when ft_open is a
-            # genuine response (handled above by the `is None` guard).
-            our_open_ids = {row["ft_trade_id"] for row in conn.execute(
-                "SELECT ft_trade_id FROM positions WHERE state = 'open' AND ft_trade_id IS NOT NULL"
-            )}
-            ft_open_ids = {t["trade_id"] for t in ft_open}
-            missed = our_open_ids - ft_open_ids
-            for tid in missed:
-                conn.execute(
-                    "UPDATE positions SET state = 'closed', close_reason = 'reconciled_missing', "
-                    "close_date = ?, last_event_at = ? WHERE ft_trade_id = ? AND state = 'open'",
-                    (datetime.now(timezone.utc).isoformat(),
-                     datetime.now(timezone.utc).isoformat(), tid),
-                )
-                logger.info("[RECONCILE] ft_trade_id=%d no longer open in freqtrade; marked closed",
-                            tid)
+            await _reconcile_loop_once(cfg, conn, session=ft_session)
         except Exception as e:
             logger.warning("reconcile loop error: %s", e)
         await asyncio.sleep(60)
@@ -2061,17 +2057,22 @@ async def _process_event(payload: EventPayload):
         # exchange should have already captured. Calling ft_force_exit
         # market here would double-exit (limit filled or about-to-fill +
         # market reduce). Force a reconcile FIRST (in case the limit just
-        # filled and we haven't ticked), then audit-only if any Phase 2
-        # rows exist for this position (pending/active/filled). close_full
-        # still goes through the market path so explicit "close all" /
-        # SL-hit messages from the channel are honored.
+        # filled and we haven't ticked).
+        #
+        # CRITICAL: audit-only is only safe when the exchange ACTUALLY has a
+        # live limit exit covering this trade. A stalled ladder (the active
+        # limit was cancelled by FT for a re-margin/partial reduction, or was
+        # never armed because FT was down at open) still has phase-2 rows but
+        # NO live limit — swallowing the channel close there would leave the
+        # position naked AND drop the signaler's close intent. So we check
+        # Freqtrade's REAL order state, not local row state. No live limit →
+        # fall through to the market exit so the channel close is honored.
+        # close_full always goes through the market path regardless.
         phase2_audit_only = False
         if kind == "close_partial" and cfg.active_tp_limits:
+            ft_session = getattr(app.state, "ft_session", None)
             try:
-                await _reconcile_target_orders(
-                    cfg, conn,
-                    session=getattr(app.state, "ft_session", None),
-                )
+                await _reconcile_target_orders(cfg, conn, session=ft_session)
             except Exception as e:
                 logger.warning("inline reconcile before close_partial failed: %s", e)
             phase2_rows = conn.execute(
@@ -2079,12 +2080,25 @@ async def _process_event(payload: EventPayload):
                 "AND state IN ('pending','active','filled')",
                 (pos["pos_id"],),
             ).fetchone()[0]
+            live_limit = False
+            confirm_failed = False
             if phase2_rows > 0:
+                trade_snap = await ft_get_trade(
+                    cfg, pos["ft_trade_id"], session=ft_session,
+                )
+                if trade_snap is not None:
+                    live_limit = _has_open_limit_exit(
+                        trade_snap.get("orders") or [],
+                        is_short=bool(trade_snap.get("is_short")),
+                    )
+                else:
+                    confirm_failed = True
+            if live_limit:
                 phase2_audit_only = True
                 logger.info(
-                    "[%s AUDIT-ONLY] msg_id=%d pos_id=%d — %d Phase 2 target_orders "
-                    "exist; channel target-hit is post-hoc, NOT calling ft_force_exit",
-                    kind.upper(), msg_id, pos["pos_id"], phase2_rows,
+                    "[%s AUDIT-ONLY] msg_id=%d pos_id=%d — live limit exit on FT; "
+                    "channel target-hit is post-hoc, NOT calling ft_force_exit",
+                    kind.upper(), msg_id, pos["pos_id"],
                 )
                 conn.execute(
                     "UPDATE events SET response = ? "
@@ -2097,6 +2111,52 @@ async def _process_event(payload: EventPayload):
                         "pos_id": pos["pos_id"], "kind": kind,
                         "reason": "active_tp_limits",
                         "phase2_rows": phase2_rows}
+            elif confirm_failed:
+                # Couldn't reach FT to confirm the live-limit state. If we
+                # LOCALLY believe a limit is active, market-closing now risks a
+                # double-exit (FT GET and POST hit the same host; a GET-fail /
+                # POST-success window would close on top of a filling limit —
+                # codex review). Defer: leave the position to the resting limit
+                # + the position-level reconciler. Only fall through to market
+                # when no local 'active' row exists (then there is no live limit
+                # to double against).
+                active_local = conn.execute(
+                    "SELECT COUNT(*) FROM target_orders "
+                    "WHERE pos_id=? AND state='active'",
+                    (pos["pos_id"],),
+                ).fetchone()[0]
+                if active_local > 0:
+                    logger.warning(
+                        "[%s DEFERRED] msg_id=%d pos_id=%d — FT unreachable + local "
+                        "active TP row; skipping market close to avoid double-exit",
+                        kind.upper(), msg_id, pos["pos_id"],
+                    )
+                    # Keep the event row status='pending' (not a terminal state)
+                    # so it surfaces in GET /events/pending and stays resolvable
+                    # via /events/pending/{id}/resolve — the claim's UNIQUE
+                    # constraint means it is never auto-retried, so the operator
+                    # path is the only recovery (codex review).
+                    conn.execute(
+                        "UPDATE events SET response = ? "
+                        "WHERE pos_id = ? AND msg_id = ? AND kind = ?",
+                        (json.dumps({"status": "pending",
+                                     "deferred_reason": "ft_unreachable_active_row"}),
+                         pos["pos_id"], msg_id, kind),
+                    )
+                    return {"action": "deferred",
+                            "pos_id": pos["pos_id"], "kind": kind,
+                            "reason": "ft_unreachable_active_row"}
+                logger.warning(
+                    "[%s] msg_id=%d pos_id=%d — FT unreachable but no local active "
+                    "row; honoring channel close via market exit",
+                    kind.upper(), msg_id, pos["pos_id"],
+                )
+            elif phase2_rows > 0:
+                logger.warning(
+                    "[%s STALLED-LADDER] msg_id=%d pos_id=%d — %d phase-2 rows but "
+                    "NO live limit on FT; honoring channel close via market exit",
+                    kind.upper(), msg_id, pos["pos_id"], phase2_rows,
+                )
 
         resp = await ft_force_exit(
             cfg, pos["ft_trade_id"], pct=close_pct_of_remaining,

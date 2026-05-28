@@ -1,7 +1,7 @@
 """Phase 2 tests: active TP-limit-order placement + reconciliation.
 
-Tests the pure-function helpers (_extract_new_exit_order_id,
-_find_matching_order) and one integration test that drives
+Tests the pure-function helpers (_has_open_limit_exit,
+_find_matching_order) and integration tests that drive
 _place_target_limits + _reconcile_target_orders against a fake FT.
 """
 import asyncio
@@ -11,11 +11,13 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import main as receiver_main  # noqa: E402
 from app.main import (  # noqa: E402
-    _extract_new_exit_order_id, _find_matching_order,
+    _find_matching_order, _has_open_limit_exit,
 )
 
 
@@ -27,49 +29,64 @@ def _run(coro):
         loop.close()
 
 
-# ── _extract_new_exit_order_id ────────────────────────────────────────────
+@pytest.fixture(autouse=True)
+def _restore_app_state():
+    """Several tests overwrite the module-global `receiver_main.app.state`
+    with a fake. Without restoration that fake (and any `phase2_lock` it
+    installs) leaks into every later test, making the lock vs no-lock code
+    paths order-dependent. Snapshot and restore around each test."""
+    saved = getattr(receiver_main.app, "state", None)
+    try:
+        yield
+    finally:
+        if saved is not None:
+            receiver_main.app.state = saved
 
 
-def test_extract_exit_order_id_matches_price_amount():
-    body = {
-        "trade_id": 42,
-        "orders": [
-            {"order_id": "buy-1", "order_type": "market",
-             "is_open": False, "ft_order_side": "buy",
-             "safe_price": 60.0, "amount": 1.0},
-            {"order_id": "exit-tp1", "order_type": "limit",
-             "is_open": True, "ft_order_side": "sell",
-             "safe_price": 65.0, "amount": 0.25},
-        ],
-    }
-    assert _extract_new_exit_order_id(body, target_price=65.0,
-                                       expected_amount=0.25) == "exit-tp1"
+# ── _has_open_limit_exit ──────────────────────────────────────────────────
 
 
-def test_extract_returns_none_when_no_match():
-    body = {"orders": [
+def test_has_open_limit_exit_true_for_long_sell():
+    orders = [
+        {"order_id": "entry", "order_type": "market", "is_open": False,
+         "ft_order_side": "buy"},
+        {"order_id": "tp", "order_type": "limit", "is_open": True,
+         "ft_order_side": "sell"},
+    ]
+    assert _has_open_limit_exit(orders, is_short=False) is True
+
+
+def test_has_open_limit_exit_true_for_short_buy():
+    orders = [
+        {"order_id": "tp", "order_type": "limit", "is_open": True,
+         "ft_order_side": "buy"},
+    ]
+    assert _has_open_limit_exit(orders, is_short=True) is True
+
+
+def test_has_open_limit_exit_false_when_only_closed():
+    orders = [
+        {"order_id": "tp", "order_type": "limit", "is_open": False,
+         "ft_order_side": "sell"},
+    ]
+    assert _has_open_limit_exit(orders, is_short=False) is False
+
+
+def test_has_open_limit_exit_false_on_wrong_side():
+    # A long trade's exit is a SELL limit; an open BUY limit must not count.
+    orders = [
         {"order_id": "x", "order_type": "limit", "is_open": True,
-         "safe_price": 100.0, "amount": 1.0},
-    ]}
-    assert _extract_new_exit_order_id(body, 65.0, 0.25) is None
+         "ft_order_side": "buy"},
+    ]
+    assert _has_open_limit_exit(orders, is_short=False) is False
 
 
-def test_extract_skips_closed_orders():
-    body = {"orders": [
-        {"order_id": "old", "order_type": "limit", "is_open": False,
-         "safe_price": 65.0, "amount": 0.25},
-        {"order_id": "live", "order_type": "limit", "is_open": True,
-         "safe_price": 65.0, "amount": 0.25},
-    ]}
-    assert _extract_new_exit_order_id(body, 65.0, 0.25) == "live"
-
-
-def test_extract_skips_market_orders():
-    body = {"orders": [
-        {"order_id": "mkt", "order_type": "market", "is_open": True,
-         "safe_price": 65.0, "amount": 0.25},
-    ]}
-    assert _extract_new_exit_order_id(body, 65.0, 0.25) is None
+def test_has_open_limit_exit_false_for_market_order():
+    orders = [
+        {"order_id": "x", "order_type": "market", "is_open": True,
+         "ft_order_side": "sell"},
+    ]
+    assert _has_open_limit_exit(orders, is_short=False) is False
 
 
 # ── _find_matching_order ──────────────────────────────────────────────────
@@ -398,7 +415,6 @@ def test_reconcile_loop_skips_tick_when_ft_unreachable():
     open position. The position-reconciler must SKIP the tick on
     None, never proceed with missed-trade detection on a partial view.
     """
-    import asyncio as _aio
     cfg, conn, pos_id = _setup_db()
     # Mark a position open with ft_trade_id=42 — must NOT be closed
     # by the reconcile when FT is unreachable.
@@ -410,19 +426,11 @@ def test_reconcile_loop_skips_tick_when_ft_unreachable():
     async def fake_unreachable(*a, **k):
         return None
 
-    # Run one iteration manually by patching ft_open_trades + breaking
-    # after the first sleep.
-    async def one_tick():
-        # Inline the body — same structure as reconcile_loop, but exits
-        # after the FT call instead of sleeping forever.
-        ft_open = await receiver_main.ft_open_trades(cfg, session=None)
-        if ft_open is None:
-            return "skipped"
-        return "proceeded"
-
+    # Drive the REAL loop body (not a reimplemented stub) so deleting the
+    # `is None` guard from production code would actually fail this test.
     with patch.object(receiver_main, "ft_open_trades",
                       side_effect=fake_unreachable):
-        result = _run(one_tick())
+        result = _run(receiver_main._reconcile_loop_once(cfg, conn, session=None))
 
     assert result == "skipped"
     row = conn.execute(
@@ -432,6 +440,33 @@ def test_reconcile_loop_skips_tick_when_ft_unreachable():
     assert row["state"] == "open", \
         "position must NOT be closed when FT is unreachable"
     assert row["close_reason"] is None
+
+
+def test_reconcile_loop_marks_closed_when_trade_gone_from_real_response():
+    """Complement to the skip test: when FT returns a genuine list that no
+    longer contains our open trade, the REAL loop body marks it closed. This
+    proves the guard (not a stub) is the only thing standing between a None
+    response and a false-close — i.e. the skip test exercises live code."""
+    cfg, conn, pos_id = _setup_db()
+    conn.execute(
+        "UPDATE positions SET state='open', ft_trade_id=42 WHERE pos_id=?",
+        (pos_id,),
+    )
+
+    async def fake_empty_list(*a, **k):
+        return []  # FT reachable, genuinely no open trades
+
+    with patch.object(receiver_main, "ft_open_trades",
+                      side_effect=fake_empty_list):
+        result = _run(receiver_main._reconcile_loop_once(cfg, conn, session=None))
+
+    assert result == "ok"
+    row = conn.execute(
+        "SELECT state, close_reason FROM positions WHERE pos_id=?",
+        (pos_id,),
+    ).fetchone()
+    assert row["state"] == "closed"
+    assert row["close_reason"] == "reconciled_missing"
 
 
 def test_cascade_after_fill_places_next_tp():
@@ -536,13 +571,25 @@ def test_reconciler_advances_filled_state():
     assert row["filled_at"] is not None
 
 
-def test_reconciler_marks_cancelled_status():
+def test_reconciler_marks_cancelled_status_and_does_not_rearm():
+    """A cancelled active TP must NOT auto-cascade the next pending TP. The
+    background loop deliberately refuses to re-arm after a cancel (a cancel
+    often means position-close/liquidation/operator) — re-arming would fight
+    the operator. The reactive close_partial path is the safety net instead."""
     cfg, conn, pos_id = _setup_db()
     conn.execute(
         "INSERT INTO target_orders (pos_id, idx, price, amount, state, ft_order_id, placed_at) "
         "VALUES (?, ?, ?, ?, 'active', ?, ?)",
         (pos_id, 0, 65.0, 0.5, "sim-tp-65", "2026-05-27T20:00:00+00:00"),
     )
+    # A higher pending rung exists — it must stay pending after the cancel.
+    conn.execute(
+        "INSERT INTO target_orders (pos_id, idx, price, amount, state) "
+        "VALUES (?, ?, ?, ?, 'pending')",
+        (pos_id, 1, 72.0, 0.5),
+    )
+
+    posted = {"n": 0}
 
     async def fake_get_trade(_cfg, trade_id, session=None):
         return {"orders": [{
@@ -551,14 +598,23 @@ def test_reconciler_marks_cancelled_status():
             "filled": 0.0, "amount": 0.5, "safe_price": 65.0,
         }]}
 
+    async def fail_post(*a, **k):
+        posted["n"] += 1
+        return {"status": 200, "body": '{"result":"created"}'}
+
     with patch.object(receiver_main, "ft_get_trade",
-                      side_effect=fake_get_trade):
+                      side_effect=fake_get_trade), \
+         patch.object(receiver_main, "ft_force_exit_limit",
+                      side_effect=fail_post):
         summary = _run(receiver_main._reconcile_target_orders(cfg, conn))
 
     assert summary["cancelled"] == 1
-    row = conn.execute("SELECT * FROM target_orders WHERE pos_id=?",
-                       (pos_id,)).fetchone()
-    assert row["state"] == "cancelled"
+    assert summary["cascaded"] == 0, "must not cascade after a cancel"
+    assert posted["n"] == 0, "must not POST a replacement limit after a cancel"
+    states = {r["idx"]: r["state"] for r in conn.execute(
+        "SELECT idx, state FROM target_orders WHERE pos_id=?", (pos_id,))}
+    assert states[0] == "cancelled"
+    assert states[1] == "pending", "pending rung must NOT be auto-armed"
 
 
 def test_reconciler_leaves_active_when_still_open():
@@ -668,10 +724,20 @@ def test_close_partial_audit_only_when_active_tp_rows_exist():
     async def quiet_reconcile(*args, **kwargs):
         return {"checked": 0, "filled": 0, "cancelled": 0, "still_active": 0}
 
+    # FT confirms a LIVE limit exit at the active TP price — audit-only is
+    # only legitimate when the exchange genuinely has TP coverage resting.
+    async def fake_get_trade(*args, **kwargs):
+        return {"trade_id": 50, "is_short": False, "orders": [
+            {"order_id": "tp-active-1", "order_type": "limit", "is_open": True,
+             "ft_order_side": "sell", "safe_price": 65.0, "amount": 0.5},
+        ]}
+
     with patch.object(receiver_main, "ft_force_exit",
                       side_effect=fail_force_exit), \
          patch.object(receiver_main, "_reconcile_target_orders",
-                      side_effect=quiet_reconcile):
+                      side_effect=quiet_reconcile), \
+         patch.object(receiver_main, "ft_get_trade",
+                      side_effect=fake_get_trade):
         result = _run(receiver_main._process_event(payload))
 
     assert result["action"] == "audit_only"
@@ -683,6 +749,150 @@ def test_close_partial_audit_only_when_active_tp_rows_exist():
         (pos_id, 777002),
     ).fetchone()
     assert "audit_only" in row["response"]
+
+
+def test_close_partial_market_closes_when_ladder_stalled():
+    """Phase 2 rows exist locally BUT Freqtrade shows NO live limit exit
+    (the active TP was cancelled by FT for a re-margin / partial reduction,
+    or never armed because FT was down at open). The channel then sends a
+    close_partial. The old code swallowed it as audit-only because a row
+    existed — leaving the position naked with the signaler's close dropped.
+    Fix: audit-only requires a CONFIRMED live limit on FT; otherwise honor
+    the channel and market-close."""
+    import os
+    tf = tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False)
+    os.environ["KILLERS_DB"] = tf.name
+    os.environ["KILLERS_ACTIVE_TP_LIMITS"] = "true"
+    cfg = receiver_main.Config()
+    conn = receiver_main.init_db(cfg.db_path)
+    conn.execute(
+        "INSERT INTO positions (signal_id, symbol, pair, direction, state, "
+        " open_msg_id, open_date, ft_trade_id, pct_open) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
+        (1003, "WLD", "WLD/USDT:USDT", "long", "open",
+         777020, "2026-05-28T19:00:00+00:00", 8, 100),
+    )
+    pos_id = conn.execute("SELECT pos_id FROM positions WHERE open_msg_id=777020"
+                          ).fetchone()[0]
+    # A row exists (so phase2_rows > 0) but it points at an order that FT no
+    # longer has open — the stall.
+    conn.execute(
+        "INSERT INTO target_orders (pos_id, idx, price, amount, state, ft_order_id, placed_at) "
+        "VALUES (?, ?, ?, ?, 'active', ?, ?)",
+        (pos_id, 0, 3.50, 0.5, "tp-cancelled-1", "2026-05-28T19:00:00+00:00"),
+    )
+
+    class _FakeState:
+        def __init__(self, c, cf):
+            self.conn = c; self.cfg = cf; self.ft_session = None
+            self.public_session = None; self.notify_tasks = set()
+    receiver_main.app.state = _FakeState(conn, cfg)
+
+    payload = receiver_main.EventPayload(
+        msg={"id": 777021, "date": "2026-05-28T19:30:00+00:00",
+             "text": "Target 1: 3.50✅"},
+        classification={"kind": "close_partial", "signal_id": 1003,
+                         "symbol": "WLD", "direction": "long", "pct": 50},
+    )
+
+    called = {"force_exit": False}
+
+    async def fake_force_exit(*args, **kwargs):
+        called["force_exit"] = True
+        return {"status": 200, "body": '{"trade_id":8}'}
+
+    async def quiet_reconcile(*args, **kwargs):
+        return {"checked": 0, "filled": 0, "cancelled": 0, "still_active": 0}
+
+    # FT trade has only the (closed) entry order — NO open limit exit.
+    async def fake_get_trade(*args, **kwargs):
+        return {"trade_id": 8, "is_short": False, "orders": [
+            {"order_id": "entry-1", "order_type": "market", "is_open": False,
+             "ft_order_side": "buy", "safe_price": 3.40, "amount": 1.0},
+        ]}
+
+    with patch.object(receiver_main, "ft_force_exit",
+                      side_effect=fake_force_exit), \
+         patch.object(receiver_main, "_reconcile_target_orders",
+                      side_effect=quiet_reconcile), \
+         patch.object(receiver_main, "ft_get_trade",
+                      side_effect=fake_get_trade):
+        result = _run(receiver_main._process_event(payload))
+
+    assert called["force_exit"], \
+        "stalled ladder (no live limit) MUST market-close, not swallow as audit-only"
+    assert result["action"] == "force_exit"
+
+
+def test_close_partial_defers_when_ft_unconfirmed_and_local_active():
+    """FT GET fails (trade_snap None) but we have a local 'active' row, i.e.
+    we believe a limit is resting and can't confirm. Market-closing here could
+    double-exit (a correlated GET-fail / POST-success window: limit fills AND
+    market reduce). Conservative: do NOT market-close; defer. (codex review.)"""
+    import os
+    tf = tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False)
+    os.environ["KILLERS_DB"] = tf.name
+    os.environ["KILLERS_ACTIVE_TP_LIMITS"] = "true"
+    cfg = receiver_main.Config()
+    conn = receiver_main.init_db(cfg.db_path)
+    conn.execute(
+        "INSERT INTO positions (signal_id, symbol, pair, direction, state, "
+        " open_msg_id, open_date, ft_trade_id, pct_open) "
+        "VALUES (?,?,?,?,?,?,?,?,?)",
+        (1004, "SOL", "SOL/USDT:USDT", "long", "open",
+         777030, "2026-05-28T19:00:00+00:00", 9, 100),
+    )
+    pos_id = conn.execute("SELECT pos_id FROM positions WHERE open_msg_id=777030"
+                          ).fetchone()[0]
+    conn.execute(
+        "INSERT INTO target_orders (pos_id, idx, price, amount, state, ft_order_id, placed_at) "
+        "VALUES (?, ?, ?, ?, 'active', ?, ?)",
+        (pos_id, 0, 150.0, 0.5, "tp-live-1", "2026-05-28T19:00:00+00:00"),
+    )
+
+    class _FakeState:
+        def __init__(self, c, cf):
+            self.conn = c; self.cfg = cf; self.ft_session = None
+            self.public_session = None; self.notify_tasks = set()
+    receiver_main.app.state = _FakeState(conn, cfg)
+
+    payload = receiver_main.EventPayload(
+        msg={"id": 777031, "date": "2026-05-28T19:30:00+00:00",
+             "text": "Target 1: 150.00✅"},
+        classification={"kind": "close_partial", "signal_id": 1004,
+                         "symbol": "SOL", "direction": "long", "pct": 50},
+    )
+
+    async def fail_force_exit(*args, **kwargs):
+        raise AssertionError(
+            "ft_force_exit MUST NOT be called when FT unconfirmed + local active row")
+
+    async def quiet_reconcile(*args, **kwargs):
+        return {"checked": 0, "filled": 0, "cancelled": 0, "still_active": 0}
+
+    async def unreachable_get_trade(*args, **kwargs):
+        return None  # FT GET failed
+
+    with patch.object(receiver_main, "ft_force_exit",
+                      side_effect=fail_force_exit), \
+         patch.object(receiver_main, "_reconcile_target_orders",
+                      side_effect=quiet_reconcile), \
+         patch.object(receiver_main, "ft_get_trade",
+                      side_effect=unreachable_get_trade):
+        result = _run(receiver_main._process_event(payload))
+
+    assert result["action"] == "deferred"
+    assert result["reason"] == "ft_unreachable_active_row"
+    # Event row must stay 'pending' (not terminal) so the operator can see and
+    # resolve it via /events/pending — the claim is never auto-retried.
+    import json as _json
+    row = conn.execute(
+        "SELECT response FROM events WHERE pos_id=? AND msg_id=? AND kind='close_partial'",
+        (pos_id, 777031),
+    ).fetchone()
+    resp = _json.loads(row["response"])
+    assert resp["status"] == "pending"
+    assert resp["deferred_reason"] == "ft_unreachable_active_row"
 
 
 def test_close_partial_falls_through_to_market_when_no_phase2_rows():
@@ -735,21 +945,6 @@ def test_close_partial_falls_through_to_market_when_no_phase2_rows():
     # No Phase 2 rows → fall through to legacy partial path
     assert called["force_exit"], "ft_force_exit should be called when no phase2 rows"
     assert result["action"] == "force_exit"
-
-
-# ── _extract_new_exit_order_id newest preference ──────────────────────────
-
-
-def test_extract_prefers_newest_timestamp():
-    body = {"orders": [
-        {"order_id": "old", "order_type": "limit", "is_open": True,
-         "safe_price": 65.0, "amount": 0.25,
-         "order_timestamp": 1_000_000_000},
-        {"order_id": "new", "order_type": "limit", "is_open": True,
-         "safe_price": 65.0, "amount": 0.25,
-         "order_timestamp": 2_000_000_000},
-    ]}
-    assert _extract_new_exit_order_id(body, 65.0, 0.25) == "new"
 
 
 def test_find_matching_prefers_newest_timestamp_in_fallback():
