@@ -6,15 +6,16 @@ HL for real (fills, stops, funding, withdrawal). Treat the ~$100 as **tuition, w
 off on day one.** Max loss = whatever USDC you fund (isolated margin).
 
 Codex stance: no-capital-until-forward-test; this overrides that as a *deliberate,
-capped execution test*. Whitelist = the validated 20-pair universe minus ZEC (HL squeeze anomaly, risky to
-short) and the 3 thinnest on HL (LTC/ARB/UNI, stop-gap risk) = **16 pairs**. Limit
-entries at ~$90 notional fill fine on HL's $2-6M/24h alts, so the earlier 6-pair cut
-was over-conservative.
+capped execution test*. Whitelist = **11 liquid pairs** (BTC/ETH/SOL/XRP/SUI/NEAR/DOGE/
+BNB/LINK/AVAX/ADA). Entries fill fine on any HL alt at ~$90 notional, but a forced
+EXIT/stop during a squeeze needs depth — so restricted to liquid names (codex). Excludes
+ZEC (HL squeeze anomaly, risky to short) + the thin alts.
 
 ## What's DONE (by Claude — no money/keys involved)
 - Live config template committed: `ft_userdata/user_data/configs/ShortKeltnerV2HL-live.json`
-  (dry_run=false, **empty keys**, liquid-6 whitelist, stake $45 × max 2 @ 2x isolated,
-  stoploss_on_exchange=true). Inert until you add keys on the VPS.
+  (dry_run=false, **empty keys**, 11-pair liquid whitelist, stake $45 × max 2 @ 2x isolated,
+  **bot-managed market-simulated stops** — stoploss_on_exchange=false, stop/force/emergency
+  exits = market). Inert until you add keys on the VPS.
 - Strategy `ShortKeltnerV2HL` already validated to boot + run on HL (dry-run live now).
 - Dashboard already shows the HL bot.
 
@@ -37,6 +38,9 @@ share it, never put the seed/master key anywhere near the VPS.**
   orders but CANNOT withdraw** — that's the whole point (if the VPS key leaks, funds
   can't be stolen, only mis-traded, capped by your $100 isolated margin).
 - Note your **main account address** (public, starts 0x...) AND the **agent private key**.
+- **Hardening (codex):** use a dedicated HL sub-account/account for this bot only; fund ONLY
+  the test amount; **verify the agent key cannot withdraw** before funding more; rotate/delete
+  the agent key when the test ends. Never the master seed/key on the VPS.
 
 ### 4. Put the keys on the VPS (NOT in git)
 The live config is **already placed** (empty keys, chmod 600) at
@@ -70,9 +74,12 @@ sleep 20; sudo docker logs ft-short-keltner-hl 2>&1 | grep -iE "balance|dry|erro
 If logs show a real USDC balance and no auth error → it's live.
 
 ### 6. First-trade + withdrawal test (the actual point)
-- Wait for the first real fill (sparse — gated to BTC<200d-MA, only 6 pairs; could be
-  days). Confirm: entry fills at a sane price, the protective stop appears on HL, funding
-  debits look right.
+- Wait for the first real fill (sparse — gated to BTC<200d-MA, 11 pairs; could be days).
+- **STOP-FILL VERIFICATION — codex's go/no-go gate.** On the first live trade, confirm the
+  stop actually *executes*: when the −5% stop triggers, the bot must submit a market-simulated
+  exit that **fills** (not a dead limit sitting unfilled). Check the HL fills + bot logs. If a
+  real adverse move does NOT produce a clean stop fill → STOP, do not add capital, rethink.
+- Confirm entry fills at a sane price + funding debits look right.
 - After a trade or two, **test a withdrawal** of ~$10 USDC HL→Arbitrum→your wallet, to
   prove the exit path before trusting HL with anything.
 
@@ -84,10 +91,13 @@ sudo docker rm -f ft-short-keltner-hl    # stops trading immediately (open posit
 
 ## Caveats (eyes open)
 - **Not an alpha test.** Won't prove profit. Plumbing only.
-- **HL stops are limit (no market orders)** → in a fast move a stop may not fill; isolated
-  margin + $100 caps the worst case.
-- **Universe mismatch:** live runs 16 HL pairs (validated-20 minus ZEC + 3 thinnest); HL
-  prices/funding/liquidity differ from Binance → results are NOT comparable to the +27.86%.
+- **HL has no native market orders** → stops/forced-exits use ccxt's market-simulation
+  (aggressive limit, 5% cap). Stop is **bot-managed** (stoploss_on_exchange=false): if the
+  bot/VPS is DOWN there's no protective order resting on HL — acceptable ONLY because isolated
+  margin + the ~$100 wallet caps the worst case. The first-trade stop-fill check (step 6) is
+  what proves the exit actually works.
+- **Universe mismatch:** live runs 11 liquid HL pairs; HL prices/funding/liquidity differ
+  from Binance → results are NOT comparable to the +27.86%.
 - **BR tax/legal:** HL perps are derivatives (CVM scope) + Receita reporting applies. Self-
   custody ≠ invisible. Get advice before scaling beyond the test.
 - **Hot key:** agent key on the VPS can mis-trade the sub-account to zero (not withdraw).

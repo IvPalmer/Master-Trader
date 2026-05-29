@@ -13,8 +13,8 @@
   "unfilledtimeout": { "entry": 10, "exit": 10, "exit_timeout_count": 0, "unit": "minutes" },
   "order_types": {
     "entry": "limit", "exit": "limit",
-    "emergency_exit": "limit", "force_exit": "limit", "force_entry": "limit",
-    "stoploss": "limit", "stoploss_on_exchange": true, "stoploss_on_exchange_interval": 60
+    "emergency_exit": "market", "force_exit": "market", "force_entry": "market",
+    "stoploss": "market", "stoploss_on_exchange": false, "stoploss_on_exchange_interval": 60
   },
   "entry_pricing": { "price_side": "other", "use_order_book": true, "order_book_top": 1, "price_last_balance": 0.0, "check_depth_of_market": { "enabled": false, "bids_to_ask_delta": 1 } },
   "exit_pricing": { "price_side": "other", "use_order_book": true, "order_book_top": 1 },
@@ -25,8 +25,7 @@
     "ccxt_config": {}, "ccxt_async_config": {},
     "pair_whitelist": [
       "BTC/USDC:USDC","ETH/USDC:USDC","SOL/USDC:USDC","XRP/USDC:USDC","SUI/USDC:USDC","NEAR/USDC:USDC",
-      "TAO/USDC:USDC","DOGE/USDC:USDC","BNB/USDC:USDC","ADA/USDC:USDC","LINK/USDC:USDC","AVAX/USDC:USDC",
-      "BCH/USDC:USDC","HBAR/USDC:USDC","ENA/USDC:USDC","TRX/USDC:USDC"
+      "DOGE/USDC:USDC","BNB/USDC:USDC","LINK/USDC:USDC","AVAX/USDC:USDC","ADA/USDC:USDC"
     ],
     "pair_blacklist": []
   },
