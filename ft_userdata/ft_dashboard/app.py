@@ -90,40 +90,24 @@ BOTS: list[dict[str, Any]] = [
         },
     },
     {
-        "key": "killers-ft",
-        "name": "KillersScalpV1",
-        "label": "killers-scalp",
-        "url": "http://ft-killers-scalp:8080",
-        # Copy-trader of the Binance Killers VIP private channel.
-        # Observational + no_baseline mode: KillersScalpV1 is a pass-through
-        # copy-trader of an external signaler, not a quant strategy with a
-        # validated backtest baseline. Gate comparisons are meaningless here;
-        # the bar to go live is "plumbing works." baseline/gate1/gate2/gate3
-        # are set to null in the API response. Added 2026-05-25.
+        "key": "short-keltner-hl",
+        "name": "ShortKeltnerV2HL",
+        "label": "short-keltner-hl",
+        "url": "http://ft-short-keltner-hl:8080",
+        # DRY-RUN on Hyperliquid (self-custody DEX perps, USDC-margined). Same
+        # logic as short-keltner, forward-only: HL serves NO historical OHLCV so
+        # it cannot be backtested — this is the on-venue OOS measurement codex
+        # required before any capital. No baseline transfers from the Binance
+        # backtest (HL funding is oracle/premium-based and inverts vs Binance).
+        # Observational; no keys, no capital. Standalone container (not in this
+        # compose). See docs/hyperliquid_short_validation_2026-05-29.md.
         "observational": True,
-        "no_baseline": True,  # stronger than observational: null-out gates entirely
+        "no_baseline": True,
         "baseline": None,
     },
-    {
-        "key": "insiders",
-        "name": "InsidersScalpV1",
-        "label": "insiders-scalp",
-        "url": "http://ft-insiders-scalp:8080",
-        # Observational mode: gates skip baseline-deviation comparisons because
-        # this is a copy-trader of an UNKNOWN external signaler, not a quant
-        # strategy whose edge we validated. Running gate-2 against the 30-day
-        # replay number (228%/yr extrapolated) would produce false failures
-        # since real live return will be much smaller (latency drag, execution
-        # cost). See docs/insiders-signals/session-handoff.md.
-        #
-        # Reactivate baseline gates after 30-50 live trades have established
-        # a real reference. Until then dashboard shows raw P&L + trade stats
-        # without pass/fail gating.
-        "observational": True,
-        "baseline": {
-            "starting_equity_in_csv": 200.0,
-        },
-    },
+    # killers-scalp + insiders-scalp RETIRED 2026-05-29: both validated dead this
+    # session (Killers unprofitable −$511/−$1536 + live PF 0.011; Insiders copier
+    # edge negative −8.7%/−13%). Containers removed; do not re-add.
 ]
 
 API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "")
