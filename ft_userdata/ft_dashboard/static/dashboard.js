@@ -277,7 +277,7 @@ function dash() {
           items.push({
             color: 'blue', icon: '○',
             subject: `${b.label} running observational · no baseline gate`,
-            reason: 'copy-trader mode — graduation gates not active',
+            reason: 'observational — graduation gates not active (no transferable baseline)',
             cta: 'view bot',
             logsHint: b.links?.logs_hint || null,
             action: () => { this.setTab('bot:' + b.key); },
