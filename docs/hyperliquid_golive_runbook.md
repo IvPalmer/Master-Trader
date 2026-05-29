@@ -11,6 +11,56 @@ BNB/LINK/AVAX/ADA). Entries fill fine on any HL alt at ~$90 notional, but a forc
 EXIT/stop during a squeeze needs depth — so restricted to liquid names (codex). Excludes
 ZEC (HL squeeze anomaly, risky to short) + the thin alts.
 
+## ⭐ RECOMMENDED FIRST: testnet (free) — makes the $100 mostly redundant (codex)
+
+HL has a full **testnet** + faucet (1,000 mock USDC / 4h). Freqtrade/ccxt supports it
+(`exchange.sandbox: true`). This tests the execution mechanics for **free**, so the $100
+mainnet run is mostly redundant as a plumbing test.
+
+**Testnet PROVES:** auth + agent-key signing, order accept/reject, min-size/precision/
+leverage/isolated-margin rules, stop placement→trigger→fill *mechanics*, cancel/replace,
+force-exit, rate-limits.
+**Testnet does NOT prove:** mainnet book depth, real slippage, **real stop-fill in a
+squeeze**, real funding magnitude, liquidation path.
+**⚠️ Single caveat (codex):** "stop filled on testnet" ≠ a stop-limit will save a short
+alt on mainnet. Testnet = mechanics; mainnet liquidity-under-stress is unproven by it.
+
+### Minimal no-/low-capital sequence (codex)
+1. Create a **dedicated wallet** (only for this).
+2. **Tiny mainnet deposit (~$10), then withdraw most back** → this IS the custody test
+   (≈$1 fee / ~5 min) AND unlocks the faucet. Use the SAME address for the faucet. No bot.
+3. Claim **1,000 mock USDC** at https://app.hyperliquid-testnet.xyz/drip
+4. Create a **TESTNET agent wallet** (app.hyperliquid-testnet.xyz → API).
+5. Put the testnet walletAddress + testnet agent key into the pre-placed testnet config
+   `~/hl_validation/user_data/configs/ShortKeltnerV2HL-testnet.json` (sandbox=true,
+   dry_run=false, force_entry_enable=true, BTC/ETH/SOL). chmod 600.
+6. Launch the testnet bot:
+```
+U=$(sudo docker exec ft-dashboard printenv FREQTRADE__API_SERVER__USERNAME)
+P=$(sudo docker exec ft-dashboard printenv FREQTRADE__API_SERVER__PASSWORD)
+sudo docker run -d --name ft-short-keltner-hl-testnet --memory 1g \
+  -e FREQTRADE__API_SERVER__USERNAME="$U" -e FREQTRADE__API_SERVER__PASSWORD="$P" \
+  -p 127.0.0.1:8102:8080 \
+  -v /home/ubuntu/hl_validation/user_data:/freqtrade/user_data \
+  freqtradeorg/freqtrade:stable \
+  trade --strategy ShortKeltnerV2HL --config /freqtrade/user_data/configs/ShortKeltnerV2HL-testnet.json
+```
+7. **Force tiny trades** + verify the full mechanic chain (force_entry_enable is on):
+```
+curl -s -u "$U:$P" -H "Content-Type: application/json" -X POST \
+  http://127.0.0.1:8102/api/v1/forceenter -d '{"pair":"BTC/USDC:USDC","side":"short"}'
+# then watch logs/HL-testnet: entry fill, stop placement, stop trigger+fill, cancel/replace,
+# forceexit (market), precision/min-size logs.
+```
+8. **Only then** consider a one-trade mainnet micro test (BTC/ETH/SOL only) — the live
+   config below. Don't deploy the autonomous 11-alt run on mainnet just to test plumbing.
+
+### Testnet gotchas (don't be misled)
+Testnet liquidity can be fake/thin/stale; fills can be false +/-; funding & liquidations
+aren't economically meaningful; testnet asset IDs/keys are SEPARATE from mainnet.
+
+---
+
 ## What's DONE (by Claude — no money/keys involved)
 - Live config template committed: `ft_userdata/user_data/configs/ShortKeltnerV2HL-live.json`
   (dry_run=false, **empty keys**, 11-pair liquid whitelist, stake $45 × max 2 @ 2x isolated,
