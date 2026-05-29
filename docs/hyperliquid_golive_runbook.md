@@ -107,34 +107,33 @@ nano ~/hl_validation/user_data/configs/ShortKeltnerV2HL-live.json
 # (already chmod 600; keep it that way)
 ```
 
-### 5. Flip it live (replaces the dry-run container, same name/port)
+### 5. Launch the $20 live as a SEPARATE container (dry-run keeps running)
+The dry-run (`ft-short-keltner-hl`, port 8101) stays up. The live is a NEW container
+`ft-short-keltner-hl-live` on port 8103 — both run side by side.
 ```
-# fetch the dashboard API creds so the dashboard keeps polling it
 U=$(sudo docker exec ft-dashboard printenv FREQTRADE__API_SERVER__USERNAME)
 P=$(sudo docker exec ft-dashboard printenv FREQTRADE__API_SERVER__PASSWORD)
-sudo docker rm -f ft-short-keltner-hl                 # stop the dry-run
-sudo docker run -d --restart unless-stopped --name ft-short-keltner-hl --memory 1g \
+sudo docker run -d --restart unless-stopped --name ft-short-keltner-hl-live --memory 1g \
   -e FREQTRADE__API_SERVER__USERNAME="$U" -e FREQTRADE__API_SERVER__PASSWORD="$P" \
-  -p 127.0.0.1:8101:8080 \
+  -p 127.0.0.1:8103:8080 \
   -v /home/ubuntu/hl_validation/user_data:/freqtrade/user_data \
   freqtradeorg/freqtrade:stable \
   trade --strategy ShortKeltnerV2HL \
         --config /freqtrade/user_data/configs/ShortKeltnerV2HL-live.json
-sudo docker network connect compose-bypass-mobile-port-fbk1m6_default ft-short-keltner-hl
-# confirm it authenticated + sees your balance:
-sleep 20; sudo docker logs ft-short-keltner-hl 2>&1 | grep -iE "balance|dry|error|exchange" | tail
+# confirm it authenticated + sees your ~$20 balance:
+sleep 20; sudo docker logs ft-short-keltner-hl-live 2>&1 | grep -iE "balance|error|exchange" | tail
 ```
 If logs show a real USDC balance and no auth error → it's live.
 
 ### 6. First-trade + withdrawal test (the actual point)
-- **Force the test trade** (force_entry_enable is on — don't wait for a sparse natural signal):
+- **Force the test trade** on the LIVE container (port 8103; force_entry_enable is on):
 ```
 U=$(sudo docker exec ft-dashboard printenv FREQTRADE__API_SERVER__USERNAME)
 P=$(sudo docker exec ft-dashboard printenv FREQTRADE__API_SERVER__PASSWORD)
 curl -s -u "$U:$P" -H "Content-Type: application/json" -X POST \
-  http://127.0.0.1:8101/api/v1/forceenter -d '{"pair":"BTC/USDC:USDC","side":"short"}'
+  http://127.0.0.1:8103/api/v1/forceenter -d '{"pair":"BTC/USDC:USDC","side":"short"}'
 # let it sit briefly, then test the exit path:
-curl -s -u "$U:$P" -X POST http://127.0.0.1:8101/api/v1/forceexit -d '{"tradeid":"all"}'
+curl -s -u "$U:$P" -X POST http://127.0.0.1:8103/api/v1/forceexit -d '{"tradeid":"all"}'
 ```
 - **STOP-FILL VERIFICATION — codex's go/no-go gate.** On the first live trade, confirm the
   stop actually *executes*: when the −5% stop triggers, the bot must submit a market-simulated
@@ -146,8 +145,9 @@ curl -s -u "$U:$P" -X POST http://127.0.0.1:8101/api/v1/forceexit -d '{"tradeid"
 
 ### Kill switch
 ```
-sudo docker rm -f ft-short-keltner-hl    # stops trading immediately (open positions
-                                          # stay on HL — close them in the HL app)
+sudo docker rm -f ft-short-keltner-hl-live   # stops the LIVE bot immediately (dry-run
+                                              # ft-short-keltner-hl keeps running). Open
+                                              # positions stay on HL — close them in the app.
 ```
 
 ## Caveats (eyes open)
