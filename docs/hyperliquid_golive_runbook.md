@@ -1,15 +1,18 @@
-# Hyperliquid $100 live go-live runbook — ShortKeltnerV2HL
+# Hyperliquid live go-live runbook — ShortKeltnerV2HL (testnet → $20 micro)
 
 **Status:** prepped, NOT live. This is a **plumbing / execution test**, not an alpha
-test — at ~22 trades/yr it will NOT prove profitability; it proves the bot can trade
-HL for real (fills, stops, funding, withdrawal). Treat the ~$100 as **tuition, written
-off on day one.** Max loss = whatever USDC you fund (isolated margin).
+test — it proves the bot can trade HL for real (fills, stops, funding, withdrawal), NOT
+that it's profitable. Treat the money as **tuition, written off on day one.**
 
-Codex stance: no-capital-until-forward-test; this overrides that as a *deliberate,
-capped execution test*. Whitelist = **11 liquid pairs** (BTC/ETH/SOL/XRP/SUI/NEAR/DOGE/
-BNB/LINK/AVAX/ADA). Entries fill fine on any HL alt at ~$90 notional, but a forced
-EXIT/stop during a squeeze needs depth — so restricted to liquid names (codex). Excludes
-ZEC (HL squeeze anomaly, risky to short) + the thin alts.
+**Chosen path (2026-05-29):** keep the mainnet dry-run running for a few trades AND do a
+**$20 mainnet micro-test** in parallel. The live config is now sized for that: **BTC/ETH/SOL
+only, stake $15 × max 1 position @ 2x, force_entry_enable=true** — a *controlled forced*
+micro-test on majors (codex's "one forced micro trade, not the autonomous alt run"), bot-
+managed market-simulated stops. Max loss ≈ the ~$20 funded.
+
+Note: HL **testnet** (next section) would cover the execution *mechanics* for free; the $20
+mainnet's unique value is just real fills + a real withdrawal on real liquidity. Both are
+fine; testnet-first is cheaper if you'd rather.
 
 ## ⭐ RECOMMENDED FIRST: testnet (free) — makes the $100 mostly redundant (codex)
 
@@ -62,10 +65,10 @@ aren't economically meaningful; testnet asset IDs/keys are SEPARATE from mainnet
 ---
 
 ## What's DONE (by Claude — no money/keys involved)
-- Live config template committed: `ft_userdata/user_data/configs/ShortKeltnerV2HL-live.json`
-  (dry_run=false, **empty keys**, 11-pair liquid whitelist, stake $45 × max 2 @ 2x isolated,
-  **bot-managed market-simulated stops** — stoploss_on_exchange=false, stop/force/emergency
-  exits = market). Inert until you add keys on the VPS.
+- Live config committed: `ft_userdata/user_data/configs/ShortKeltnerV2HL-live.json`
+  (dry_run=false, **empty keys**, **$20 micro: BTC/ETH/SOL, stake $15 × max 1 @ 2x isolated,
+  force_entry_enable=true**, bot-managed market-simulated stops — stoploss_on_exchange=false,
+  stop/force/emergency exits = market). Inert until you add keys on the VPS.
 - Strategy `ShortKeltnerV2HL` already validated to boot + run on HL (dry-run live now).
 - Dashboard already shows the HL bot.
 
@@ -124,7 +127,15 @@ sleep 20; sudo docker logs ft-short-keltner-hl 2>&1 | grep -iE "balance|dry|erro
 If logs show a real USDC balance and no auth error → it's live.
 
 ### 6. First-trade + withdrawal test (the actual point)
-- Wait for the first real fill (sparse — gated to BTC<200d-MA, 11 pairs; could be days).
+- **Force the test trade** (force_entry_enable is on — don't wait for a sparse natural signal):
+```
+U=$(sudo docker exec ft-dashboard printenv FREQTRADE__API_SERVER__USERNAME)
+P=$(sudo docker exec ft-dashboard printenv FREQTRADE__API_SERVER__PASSWORD)
+curl -s -u "$U:$P" -H "Content-Type: application/json" -X POST \
+  http://127.0.0.1:8101/api/v1/forceenter -d '{"pair":"BTC/USDC:USDC","side":"short"}'
+# let it sit briefly, then test the exit path:
+curl -s -u "$U:$P" -X POST http://127.0.0.1:8101/api/v1/forceexit -d '{"tradeid":"all"}'
+```
 - **STOP-FILL VERIFICATION — codex's go/no-go gate.** On the first live trade, confirm the
   stop actually *executes*: when the −5% stop triggers, the bot must submit a market-simulated
   exit that **fills** (not a dead limit sitting unfilled). Check the HL fills + bot logs. If a
