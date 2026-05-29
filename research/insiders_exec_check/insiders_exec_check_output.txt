@@ -1,0 +1,11 @@
+======================================================================
+BASELINE (posted-entry fill, = proper_backtest): n= 99  PnL=$   97.70 (  9.77%)  WR=45.5%  PF=1.22
+----------------------------------------------------------------------
+(1) LIMIT gate, entry must trade within 6h:
+    FILLED (would actually enter)     : n= 53  PnL=$  -87.15 ( -8.71%)  WR=43.4%  PF=0.71
+    NOT FILLED (limit never triggers) : n= 42  PnL=$  184.85 ( 18.48%)  WR=52.4%  PF=2.27
+    [no-kline-data trades skipped: 4]
+----------------------------------------------------------------------
+(2) MARKET entry at signal-time price (our bot's actual behavior):
+    n= 96  PnL=$ -130.42 (-13.04%)  WR=41.7%  PF=0.72
+======================================================================
