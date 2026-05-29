@@ -73,22 +73,10 @@ BOTS: list[dict[str, Any]] = [
             "starting_equity_in_csv": 200.0,
         },
     },
-    {
-        "key": "short-keltner",
-        "name": "ShortKeltnerV2",
-        "label": "short-keltner",
-        "url": "http://ft-short-keltner:8080",
-        # DRY-RUN. Inverse-Keltner short + BTC<200d-MA bear guard; trades only
-        # when BTC < its 200d MA. Backtest PF 1.53 / DD 10% / 3-of-4 yrs, but
-        # FAILS deflated-Sharpe (SR 0.855, ~22 trades/yr) -> UNPROVEN; this is a
-        # forward MEASUREMENT in the current bear, not a validated edge.
-        # Live blocked: Binance derivatives unavailable to BR residents.
-        "baseline": {
-            "annual_return_pct": 8.1, "profit_factor": 1.53, "win_rate": 0.53,
-            "max_dd_pct": 10.0, "trades_per_year": 22, "worst_trade_pct": -5.9,
-            "starting_equity_in_csv": 200.0,
-        },
-    },
+    # ShortKeltnerV2 Binance dry-run (port 8100) RETIRED 2026-05-29 — going
+    # HL-only for the short (Binance futures are CVM-banned for BR anyway).
+    # Code kept in git (ShortKeltnerV2.py/.json) — it's the only backtestable
+    # version since HL serves no history. Only the HL forward bot runs live.
     {
         "key": "short-keltner-hl",
         "name": "ShortKeltnerV2HL",

@@ -196,30 +196,6 @@ services:
     depends_on:
       - keltnerbouncev1
       - cascadefaderv1
-  shortkeltnerv2:
-    image: freqtradeorg/freqtrade:stable
-    restart: always
-    container_name: ft-short-keltner
-    environment: *a1
-    volumes:
-      - ft_user_data:/freqtrade/user_data
-      - ./user_data/configs:/freqtrade/user_data/configs:ro
-      - ./user_data/strategies:/freqtrade/user_data/strategies
-    ports:
-      - 127.0.0.1:8100:8080
-    healthcheck: *a2
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-    # DRY-RUN. Inverse-Keltner short-side MR + BTC<200d-MA macro guard.
-    # Validation 2026-05-28: PF 1.53 / DD 10% / 3-of-4 yrs / robust / survives 1m-detail.
-    # FAILS DSR (SR 0.855, ~22 trades/yr) -> UNPROVEN. Dry-run as MEASUREMENT, not validated.
-    # Live blocked: Binance derivatives unavailable to BR residents (Lei 6.385/1976).
-    entrypoint:
-      - /bin/sh
-      - -c
-      - mkdir -p /freqtrade/user_data/logs && sleep 90 && exec freqtrade trade --logfile /freqtrade/user_data/logs/ShortKeltnerV2.log --config /freqtrade/user_data/configs/ShortKeltnerV2.json --strategy ShortKeltnerV2
 networks:
   default: null
   dokploy-network:
