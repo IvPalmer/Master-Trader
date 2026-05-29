@@ -6,8 +6,10 @@ HL for real (fills, stops, funding, withdrawal). Treat the ~$100 as **tuition, w
 off on day one.** Max loss = whatever USDC you fund (isolated margin).
 
 Codex stance: no-capital-until-forward-test; this overrides that as a *deliberate,
-capped execution test*. Sizing/whitelist below reflect HL reality (most of the 20
-Binance pairs are thin on HL — live set is the 6 liquid names).
+capped execution test*. Whitelist = the validated 20-pair universe minus ZEC (HL squeeze anomaly, risky to
+short) and the 3 thinnest on HL (LTC/ARB/UNI, stop-gap risk) = **16 pairs**. Limit
+entries at ~$90 notional fill fine on HL's $2-6M/24h alts, so the earlier 6-pair cut
+was over-conservative.
 
 ## What's DONE (by Claude — no money/keys involved)
 - Live config template committed: `ft_userdata/user_data/configs/ShortKeltnerV2HL-live.json`
@@ -84,8 +86,8 @@ sudo docker rm -f ft-short-keltner-hl    # stops trading immediately (open posit
 - **Not an alpha test.** Won't prove profit. Plumbing only.
 - **HL stops are limit (no market orders)** → in a fast move a stop may not fill; isolated
   margin + $100 caps the worst case.
-- **Universe mismatch:** live runs 6 liquid HL pairs vs the 20-pair Binance backtest → HL
-  results are NOT comparable to the +27.86% number.
+- **Universe mismatch:** live runs 16 HL pairs (validated-20 minus ZEC + 3 thinnest); HL
+  prices/funding/liquidity differ from Binance → results are NOT comparable to the +27.86%.
 - **BR tax/legal:** HL perps are derivatives (CVM scope) + Receita reporting applies. Self-
   custody ≠ invisible. Get advice before scaling beyond the test.
 - **Hot key:** agent key on the VPS can mis-trade the sub-account to zero (not withdraw).

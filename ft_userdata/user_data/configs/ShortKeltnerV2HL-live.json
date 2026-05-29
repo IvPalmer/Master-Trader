@@ -24,7 +24,9 @@
     "privateKey": "",
     "ccxt_config": {}, "ccxt_async_config": {},
     "pair_whitelist": [
-      "BTC/USDC:USDC","ETH/USDC:USDC","SOL/USDC:USDC","XRP/USDC:USDC","SUI/USDC:USDC","NEAR/USDC:USDC"
+      "BTC/USDC:USDC","ETH/USDC:USDC","SOL/USDC:USDC","XRP/USDC:USDC","SUI/USDC:USDC","NEAR/USDC:USDC",
+      "TAO/USDC:USDC","DOGE/USDC:USDC","BNB/USDC:USDC","ADA/USDC:USDC","LINK/USDC:USDC","AVAX/USDC:USDC",
+      "BCH/USDC:USDC","HBAR/USDC:USDC","ENA/USDC:USDC","TRX/USDC:USDC"
     ],
     "pair_blacklist": []
   },
