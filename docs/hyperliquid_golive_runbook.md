@@ -37,16 +37,15 @@ share it, never put the seed/master key anywhere near the VPS.**
 - Note your **main account address** (public, starts 0x...) AND the **agent private key**.
 
 ### 4. Put the keys on the VPS (NOT in git)
-SSH to the VPS, copy the template into the bot's data dir (which is NOT a git repo),
-and fill the two fields:
+The live config is **already placed** (empty keys, chmod 600) at
+`~/hl_validation/user_data/configs/ShortKeltnerV2HL-live.json` — it's NOT in git.
+Just edit the two fields:
 ```
 ssh ubuntu@100.96.225.124
-cp ~/master-trader/ft_userdata/user_data/configs/ShortKeltnerV2HL-live.json \
-   ~/hl_validation/user_data/configs/ShortKeltnerV2HL-live.json
 nano ~/hl_validation/user_data/configs/ShortKeltnerV2HL-live.json
-#   set  "walletAddress": "0xYOUR_MAIN_HL_ADDRESS"
-#   set  "privateKey":    "0xYOUR_AGENT_WALLET_KEY"
-chmod 600 ~/hl_validation/user_data/configs/ShortKeltnerV2HL-live.json
+#   set  "walletAddress": "0xYOUR_MAIN_HL_ADDRESS"   (public — your HL account address)
+#   set  "privateKey":    "0xYOUR_AGENT_WALLET_KEY"    (secret — the agent key from step 3)
+# (already chmod 600; keep it that way)
 ```
 
 ### 5. Flip it live (replaces the dry-run container, same name/port)
