@@ -130,6 +130,12 @@ services:
     container_name: ft-killers-scalp
     environment:
       <<: *a1
+      # Belt-and-suspenders go-live guard (codex P1, 2026-05-31): env overrides
+      # config, so even a stray dry_run:false edit to KillersScalpV1.json cannot
+      # make this do-not-fund measurement instrument trade real capital. Keys are
+      # left intact (*a1) because Binance futures dry-run needs them to load
+      # leverage brackets/markets; the explicit flag is what closes the go-live path.
+      FREQTRADE__DRY_RUN: "true"
     volumes:
       - ft_user_data:/freqtrade/user_data
       - ./user_data/configs:/freqtrade/user_data/configs:ro
