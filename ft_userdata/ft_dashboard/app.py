@@ -93,9 +93,24 @@ BOTS: list[dict[str, Any]] = [
         "no_baseline": True,
         "baseline": None,
     },
-    # killers-scalp + insiders-scalp RETIRED 2026-05-29: both validated dead this
-    # session (Killers unprofitable −$511/−$1536 + live PF 0.011; Insiders copier
-    # edge negative −8.7%/−13%). Containers removed; do not re-add.
+    {
+        "key": "killers-ft",
+        "name": "KillersScalpV1",
+        "label": "killers-scalp",
+        "url": "http://ft-killers-scalp:8080",
+        # Copy-trader of the Binance Killers VIP private channel. RESTORED
+        # 2026-05-31 as a DRY-RUN measurement instrument ONLY — the channel's
+        # signals are price-verified unprofitable (−$511/−$1536 backtest, live
+        # PF 0.011, codex "do-not-fund VERY HIGH" 2026-05-28). No real capital,
+        # ever. Observational + no_baseline: a pass-through copy-trader of an
+        # external signaler, not a quant strategy with a validated backtest
+        # baseline, so gate comparisons are meaningless. baseline/gates null.
+        "observational": True,
+        "no_baseline": True,
+        "baseline": None,
+    },
+    # insiders-scalp RETIRED 2026-05-29: copier edge negative (−8.7%/−13%,
+    # Dennis path defunct). Container removed; do not re-add.
 ]
 
 API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "")
