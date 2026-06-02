@@ -154,7 +154,6 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}",
             "bot_name": "KeltnerBounceV1"
         },
         "webhookexitcancel": {
@@ -173,7 +172,6 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}",
             "bot_name": "KeltnerBounceV1"
         },
         "webhookstatus": {

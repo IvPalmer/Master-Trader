@@ -35,9 +35,9 @@
     "webhookentry": { "type": "entry", "pair": "{pair}", "stake_amount": "{stake_amount}", "stake_currency": "{stake_currency}", "limit": "{limit}", "open_rate": "{open_rate}", "order_type": "{order_type}", "direction": "{direction}", "leverage": "{leverage}", "bot_name": "ShortKeltnerV2" },
     "webhookentrycancel": { "type": "entry_cancel", "pair": "{pair}", "reason": "{reason}", "bot_name": "ShortKeltnerV2" },
     "webhookentryfill": { "type": "entry_fill", "pair": "{pair}", "stake_amount": "{stake_amount}", "stake_currency": "{stake_currency}", "open_rate": "{open_rate}", "order_type": "{order_type}", "direction": "{direction}", "leverage": "{leverage}", "bot_name": "ShortKeltnerV2" },
-    "webhookexit": { "type": "exit", "pair": "{pair}", "profit_ratio": "{profit_ratio}", "profit_amount": "{profit_amount}", "stake_currency": "{stake_currency}", "open_rate": "{open_rate}", "close_rate": "{close_rate}", "exit_reason": "{exit_reason}", "direction": "{direction}", "duration": "{duration}", "bot_name": "ShortKeltnerV2" },
+    "webhookexit": { "type": "exit", "pair": "{pair}", "profit_ratio": "{profit_ratio}", "profit_amount": "{profit_amount}", "stake_currency": "{stake_currency}", "open_rate": "{open_rate}", "close_rate": "{close_rate}", "exit_reason": "{exit_reason}", "direction": "{direction}", "bot_name": "ShortKeltnerV2" },
     "webhookexitcancel": { "type": "exit_cancel", "pair": "{pair}", "reason": "{reason}", "bot_name": "ShortKeltnerV2" },
-    "webhookexitfill": { "type": "exit_fill", "pair": "{pair}", "profit_ratio": "{profit_ratio}", "profit_amount": "{profit_amount}", "stake_currency": "{stake_currency}", "open_rate": "{open_rate}", "close_rate": "{close_rate}", "exit_reason": "{exit_reason}", "direction": "{direction}", "duration": "{duration}", "bot_name": "ShortKeltnerV2" },
+    "webhookexitfill": { "type": "exit_fill", "pair": "{pair}", "profit_ratio": "{profit_ratio}", "profit_amount": "{profit_amount}", "stake_currency": "{stake_currency}", "open_rate": "{open_rate}", "close_rate": "{close_rate}", "exit_reason": "{exit_reason}", "direction": "{direction}", "bot_name": "ShortKeltnerV2" },
     "webhookstatus": { "type": "status", "status": "{status}", "bot_name": "ShortKeltnerV2" },
     "format": "json"
   },

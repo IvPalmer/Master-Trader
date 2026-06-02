@@ -140,7 +140,6 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}",
             "bot_name": "FundingFadeV1"
         },
         "webhookexitcancel": {
@@ -159,7 +158,6 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}",
             "bot_name": "FundingFadeV1"
         },
         "webhookstatus": {

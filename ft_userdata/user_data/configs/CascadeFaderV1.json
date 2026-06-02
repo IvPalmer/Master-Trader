@@ -134,7 +134,6 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}",
             "bot_name": "CascadeFaderV1"
         },
         "webhookexitcancel": {
@@ -153,7 +152,6 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}",
             "bot_name": "CascadeFaderV1"
         },
         "webhookstatus": {
