@@ -79,19 +79,41 @@ that would settle it is a **multi-month** limit-in-zone + posted-TP run, out of 
   positive in May and our −40% was wrong," NOT enough to claim a durable edge.
 - Fill rate is in the number (mid-limit fills 18/32) — but live relay latency could lower it.
 
-## Bottom line (corrected)
+## OUT-OF-SAMPLE TEST (April) — the May edge does NOT replicate → NO-GO
 
-The session's question is answered on both halves, and the second half flipped:
-- **Read/track his book: YES** (87/87, validated at scale — the hard, novel part).
-- **Profit by copying him: YES in this sample, the way members actually do it** — rest a limit
-  in the posted zone + follow the posted TP ladder = **+6% (conservative) to +33% (patient
-  midpoint)** net of costs, not survivorship, distributed winners. My earlier "−40% / can't
-  fill like him" was a **methodology error** (market entry + his discretionary closes = the
-  wrong member behaviour), now retracted.
+The +6–33% above was **in-sample only, and the in-sample month is the one Dennis advertised
+(+2702%)** — i.e. selection/regime-contaminated. The honest test is a *normal* month. Parsed
+April's structured signals (`parse_signals.py`), back-filled the price cache to 04-01 for full
+coverage (`backfill_april.py`), ran the **identical** model:
 
-**This reopens productionization** (Track B), which I had prematurely shelved. The gating test
-is no longer "does any edge exist" (it does, in-sample) but **"does it hold out-of-sample"** —
-a multi-month limit-in-zone + posted-TP run.
+| Month | near-edge limit + posted TP | mid | Note |
+|---|---|---|---|
+| **May** (Dennis's *advertised* +2702% month) | **+6%** | +33% | in-sample |
+| **April** (normal month, full data, 0 dropped) | **−31%** (13/13 filled, **8/13 full stop-outs**) | −11% | out-of-sample |
+
+Same execution rules, same near-edge placement that was +6% in May → **−31% in April.** Codex
+verdict: *the May edge did not replicate; in the only non-advertised month tested it was
+materially negative.* Pooled (32 May + 13 April = 45 trades): **no demonstrated durable edge.**
+
+## Bottom line (FINAL)
+
+The session's two-part question is fully answered:
+- **Read/track his book: YES** (87/87, validated at scale — the genuine, novel, reusable result).
+- **Profitably copy him: NO durable edge.** His advertised month (May) reconstructs positive
+  under limit+TP, but a clean normal month (April) is −31% under identical rules. The reader
+  works; the *signals* don't carry a durable executable edge once you leave the marketed month.
+
+My intermediate "promising / reopens Track B" was **in-sample-only optimism on the advertised
+month** — corrected by the OOS test. The full chain of corrections (−40% market-error → +33%
+in-sample → −31% OOS) is itself the lesson: the answer was sensitive to method and to *which
+month*, and only the out-of-sample, full-data test is trustworthy.
+
+**Status: NO-GO for live deployment. Research-only pending more clean months under frozen
+rules. Do not allocate capital.** Honest hedge: 2 months / 45 trades / single trader — enough
+to *reject as a demonstrated edge*, not enough to prove structurally unprofitable forever.
+
+The reading substrate remains a reusable asset (claim-auditing — it just debunked his
+advertised edge — and trade journaling), independent of the copy-trade verdict.
 
 Artifacts: `track_a_matrix.py` (the full entry×exit matrix + realistic-member model — the
 correct one), `track_a_fills_v2.py` (staged-fill sub-finding), `track_a_pnl.py` (live-ledger

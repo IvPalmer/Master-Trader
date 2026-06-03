@@ -15,8 +15,9 @@ execution + posted TPs* — concentrated (survives ex-top, not ex-top-2), placem
 **one month / 31 trades**, so "promising, not proven." See
 [`TRACK-A-FILL-FEASIBILITY-2026-06-03.md`](TRACK-A-FILL-FEASIBILITY-2026-06-03.md).
 
-⇒ The gating question is no longer "does any edge exist" (it does, in-sample) but **"does it
-hold OUT of sample."** Next = a multi-month limit-in-zone + posted-TP run.
+⇒ OUT-OF-SAMPLE TEST DONE (2026-06-03): the May edge did NOT replicate. April (normal month,
+full data) = **−31%** under identical rules vs May's +6–33% — and May is Dennis's *advertised*
+month. **NO-GO for deployment; no demonstrated durable edge** (codex-reviewed). Research-only.
 
 > The NO-GO text below is RETAINED for the record but SUPERSEDED — it was a methodology error
 > (wrong fill model), not a finding about his signals.

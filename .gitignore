@@ -100,3 +100,4 @@ research/insiders_april_replication/causal_replay/runs/**/steps.jsonl
 research/insiders_april_replication/causal_replay/runs/blind_1611_vps/result.json
 research/insiders_april_replication/causal_replay/runs/blind_1609/final_ledger.json
 research/insiders_april_replication/causal_replay/runs/btc1609_mock/final_ledger.json
+research/insiders_april_replication/signals_parsed_*.json
