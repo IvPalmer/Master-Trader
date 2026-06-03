@@ -68,3 +68,35 @@ ft_userdata/insiders_bridge/out/
 ft_userdata/insiders_bridge/.env
 ft_userdata/insiders_bridge/*.session
 ft_userdata/insiders_bridge/secrets/
+
+# insiders smart-agent research — bulk price caches live on VPS, not git (133M+81M)
+research/insiders_april_replication/prices/
+research/insiders_april_replication/prices_may/
+research/insiders_april_replication/causal_replay/**/__pycache__/
+research/insiders_april_replication/**/__pycache__/
+# full-prompt cache reference (superseded by windowed; 114 expensive calls, keep local only)
+research/insiders_april_replication/causal_replay/runs/full_may/cache_fullprompt_ref/
+
+# Dennis/Insiders PRIVATE paid-channel content — third-party export, never commit
+# (same policy as ft_userdata/insiders_bridge/_local/). Code/docs/results are tracked; raw msgs are not.
+research/insiders_april_replication/paid_export/
+research/insiders_april_replication/raw_free_messages.json
+# causal_test fixtures embed full message dumps (private content) — keep local
+research/insiders_april_replication/causal_test/fixtures/
+# bounded-prompt dumps in runs/ also embed message text — keep the JSON results, drop the raw prompt text
+research/insiders_april_replication/causal_replay/runs/**/prompt.txt
+research/insiders_april_replication/causal_replay/runs/**/prompts/
+research/insiders_april_replication/causal_replay/runs/**/cache/
+research/insiders_april_replication/causal_replay/runs/**/window_test/
+research/insiders_april_replication/causal_replay/runs/**/haiku/
+research/insiders_april_replication/causal_replay/runs/**/raw_stdout.json
+research/insiders_april_replication/causal_replay/runs/**/raw/
+# llm.json/baseline.json embed message-text snippets — commit the .redacted.json instead
+research/insiders_april_replication/causal_replay/runs/full_may/llm.json
+research/insiders_april_replication/causal_replay/runs/full_may/baseline.json
+research/insiders_april_replication/causal_replay/runs/full_may/run_stdout.txt
+# steps.jsonl + blind result/ledger embed message text & model reasoning quoting Dennis — keep local
+research/insiders_april_replication/causal_replay/runs/**/steps.jsonl
+research/insiders_april_replication/causal_replay/runs/blind_1611_vps/result.json
+research/insiders_april_replication/causal_replay/runs/blind_1609/final_ledger.json
+research/insiders_april_replication/causal_replay/runs/btc1609_mock/final_ledger.json
