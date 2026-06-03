@@ -2,46 +2,54 @@
 
 Status: **technical feasibility of interpretation+tracking VALIDATED**
 ([`SMART-AGENT-VALIDATION-2026-06-03.md`](SMART-AGENT-VALIDATION-2026-06-03.md)). The
-"can a smart agent read and follow Dennis's book" question is answered yes. What remains is
-everything *downstream* of reading: does following it actually make money, and can we
-execute it under our real constraints.
+"can a smart agent read and follow Dennis's book" question is answered yes (87/87 intent).
 
-The work splits into two independent tracks. **Track A is cheap and answers the only
-question that matters before any build. Track B is the build, and should not start until
-Track A clears.**
+**UPDATE 2026-06-03 — Track A.1 ran → NO-GO for Track B (not "edge is dead").** Applying
+realistic costs to the validated LLM-managed book (20 closed May positions, `track_a_pnl.py`):
+gross **+1.65R** → net market **−0.10R**, and **−0.82R** stripping the single biggest winner
+(fails concentration). The only positive case (maker/limit +1.30R) is the *less-achievable*
+fill (adverse selection). Result is cost-fragile (0.10%→+0.77R … 0.25%→−0.54R) and
+statistically underpowered (20 trades; bootstrap ≈ −3.2R/−0.11R/+2.9R), but **operationally
+insufficient to justify productionizing.** Codex-reviewed verdict: *perfect reading does NOT
+convert to a robust trading edge net of costs on this month — materially better than
+mechanical copying (−31%/−41%), but not a green light.* **Do not start Track B on this
+evidence.** The reading substrate remains a reusable asset (claim-auditing, journaling)
+regardless.
+
+The work splits into two tracks. **Track A asks the only question that matters before any
+build (now answered: NO-GO). Track B is the build — gated, and NOT justified by current
+evidence.**
 
 ---
 
-## Track A — Does the *edge* survive? (cheap, do first)
+## Track A — Does the *edge* survive? → ran A.1, NO-GO
 
-The agent reads perfectly. That is necessary, not sufficient. The prior ceiling test showed
-mechanical copying loses on costs; this track asks whether *smart* management changes that.
+The agent reads perfectly. That is necessary, not sufficient.
 
-1. **PnL of the validated intent stream, net of costs.** Wire the 178 graded LLM decisions
-   through a fill+cost model (the existing `cost_ceiling.py` machinery: WEEX/Binance fees,
-   slippage, funding, realistic fill timing). We have the correct *intents* now — feed them
-   to execution and see the R. This is the direct test the ceiling test couldn't run because
-   it lacked correct intents. **Zero new LLM spend** (intents are cached).
-   - Kill-gate: if the smart-managed book is still net-negative after costs, the reading
-     edge does not convert to a trading edge, and the project stops at "interesting, not
-     fundable" — exactly as the operator pre-agreed.
+1. **PnL of the validated intent stream, net of costs.** ✅ **DONE — NO-GO** (`track_a_pnl.py`).
+   Applied a cost model (cost_R = roundtrip / sl_dist_pct; market roundtrip 0.20%) to the
+   harness-computed gross R of the 20 closed LLM-managed May positions. Gross +1.65R → **net
+   market −0.10R**, **−0.82R ex-top-winner**. Cost-fragile, concentration-fragile, and the
+   only positive (maker/limit +1.30R) is the less-achievable fill. Underpowered (20 trades)
+   but operationally insufficient. **The reading edge does not convert to a trading edge on
+   this month.** Zero new LLM spend (cached intents).
 
-2. **Model the between-message stop.** Current replay only closes on a posted message. Add
-   hard-SL auto-triggering on the price loop (the harness already has the oracle + ledger
-   SL). This is the single biggest fidelity gap for PnL (not for intent).
+The remaining Track-A items below were the planned follow-ups *if A.1 had cleared.* Since it
+did not, they are now "only if we ever revisit with a bigger sample" — not active work:
 
-3. **Sizing fidelity, not just intent.** Grade the `frac` / `frac_of_remaining` compounding
-   against the curated `events[]` amounts (the harness math was unit-tested exact; confirm
-   end-to-end on the real run). Intent ≠ dollars; this closes that.
+2. *(deferred)* **Model the between-message stop.** Current replay closes only on a posted
+   message; a real copier places exchange stops, so some positions should stop before Dennis
+   posts management. Codex flagged this as the biggest reason A.1's gross **flatters** the
+   result — modelling it would likely make the book *worse*, reinforcing the no-go.
+3. *(deferred)* **Sizing fidelity.** 3 of 20 openers lacked curated sl_dist (1585 isn't even a
+   clean opener — a data smell to clean before any re-test).
+4. *(deferred)* **Adverse-selection under smart entry** — only meaningful with a larger,
+   multi-month, stop-aware replay.
 
-4. **Adverse-selection check under smart entry.** The −8.7%/+18% reachable-vs-unreachable
-   split was the mechanical killer. Re-measure it when the *agent* chooses entry behavior
-   (market vs wait-for-zone vs skip) rather than a fixed rule. Does judgment beat the
-   adverse-selection tax, or not?
-
-If Track A clears (positive expectancy net of costs, edge not from one tail trade), **then**
-Track B is justified. If it doesn't, document and shelve — the reading substrate is still a
-reusable asset (claim-auditing, journaling, the very thing that debunked the +2702%).
+**Conclusion: shelve productionization.** The reading substrate is a reusable asset
+(claim-auditing, journaling, the thing that debunked the +2702%) and stands on its own. Do
+not build Track B unless a larger, stop-aware execution replay across multiple months stays
+net-positive AND survives concentration — none of which current evidence supports.
 
 ---
 
@@ -71,13 +79,20 @@ architecture, now with a validated interpreter core.
 
 ## Decision points for the stakeholder
 
-- **A1 (PnL net of costs) is the gate.** Recommend running it next — it's cheap, uses cached
-  intents, and tells us if there's any point in Track B at all.
-- **Venue (B4)** is a real fork that needs an explicit call (WEEX-only-and-its-risks vs
-  Binance-but-not-his-fills). Not urgent until Track A clears.
-- Everything else is execution detail on top of those two.
+- **A.1 (the gate) ran → NO-GO.** Productionization is not justified by current evidence.
+  Venue (B4) is moot until/unless a future larger sample reopens the question.
+- **What's banked regardless:** the causality-enforced reading substrate (87/87 intent
+  fidelity, 11/11 tests) is a validated, reusable asset — useful for claim-auditing any
+  signaler's channel and for trade journaling, independent of whether we ever copy-trade.
 
-## Immediate, concrete
+## Where this lands
 
-Run **Track A.1** (PnL of the cached intent stream net of costs) — no new LLM spend, directly
-extends `cost_ceiling.py`, and is the honest go/no-go before any further build.
+The session's question — *"a mechanical copier can't, but could a smart agent?"* — is fully
+answered on both halves:
+- **Reading/tracking: YES**, validated at scale (the hard, novel part).
+- **Profitable copying: NOT on this evidence** — perfect reading is consumed by execution
+  costs; Dennis's edge is the WEEX fill, which late-relayed text cannot reproduce.
+
+Recommend **shelving the copier** and keeping the substrate on the shelf as tooling. Reopen
+only with a fundamentally larger dataset (multiple months / signalers) and a stop-aware
+execution model — and only if there's appetite to chase a thin, unproven edge.
