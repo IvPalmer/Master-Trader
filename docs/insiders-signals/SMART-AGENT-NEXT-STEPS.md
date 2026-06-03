@@ -4,21 +4,22 @@ Status: **technical feasibility of interpretation+tracking VALIDATED**
 ([`SMART-AGENT-VALIDATION-2026-06-03.md`](SMART-AGENT-VALIDATION-2026-06-03.md)). The
 "can a smart agent read and follow Dennis's book" question is answered yes (87/87 intent).
 
-**UPDATE 2026-06-03 — Track A.1 ran → NO-GO for Track B (not "edge is dead").** Applying
-realistic costs to the validated LLM-managed book (20 closed May positions, `track_a_pnl.py`):
-gross **+1.65R** → net market **−0.10R**, and **−0.82R** stripping the single biggest winner
-(fails concentration). The only positive case (maker/limit +1.30R) is the *less-achievable*
-fill (adverse selection). Result is cost-fragile (0.10%→+0.77R … 0.25%→−0.54R) and
-statistically underpowered (20 trades; bootstrap ≈ −3.2R/−0.11R/+2.9R), but **operationally
-insufficient to justify productionizing.** Codex-reviewed verdict: *perfect reading does NOT
-convert to a robust trading edge net of costs on this month — materially better than
-mechanical copying (−31%/−41%), but not a green light.* **Do not start Track B on this
-evidence.** The reading substrate remains a reusable asset (claim-auditing, journaling)
-regardless.
+**UPDATE 2026-06-03 (FINAL, supersedes the NO-GO below) — Track A reopened Track B.** The
+A.1 NO-GO tested the WRONG member behaviour (market entry + his discretionary closes = −31%).
+Testing the FULL entry×exit matrix (`track_a_matrix.py`) — what a real member does, **limit in
+the posted zone + his posted TP ladder** — flips it POSITIVE: **+6% (near-edge, fills 31/32) to
++33% (patient midpoint, fills 18/32)** net of costs, verified not survivorship (the 14 missed
+mid-limit trades averaged +0.14R, not avoided losers), winners distributed (BTC-1609/HYPE/
+BTC-1644/BTC-1634). Codex-reviewed verdict: *there is copyable edge under patient limit
+execution + posted TPs* — concentrated (survives ex-top, not ex-top-2), placement-sensitive,
+**one month / 31 trades**, so "promising, not proven." See
+[`TRACK-A-FILL-FEASIBILITY-2026-06-03.md`](TRACK-A-FILL-FEASIBILITY-2026-06-03.md).
 
-The work splits into two tracks. **Track A asks the only question that matters before any
-build (now answered: NO-GO). Track B is the build — gated, and NOT justified by current
-evidence.**
+⇒ The gating question is no longer "does any edge exist" (it does, in-sample) but **"does it
+hold OUT of sample."** Next = a multi-month limit-in-zone + posted-TP run.
+
+> The NO-GO text below is RETAINED for the record but SUPERSEDED — it was a methodology error
+> (wrong fill model), not a finding about his signals.
 
 ---
 
