@@ -118,3 +118,54 @@ advertised edge — and trade journaling), independent of the copy-trade verdict
 Artifacts: `track_a_matrix.py` (the full entry×exit matrix + realistic-member model — the
 correct one), `track_a_fills_v2.py` (staged-fill sub-finding), `track_a_pnl.py` (live-ledger
 PnL), `track_a_staged_fill.py` (first pass, superseded).
+
+---
+
+## Multi-month extension + April autopsy (the FINAL verdict)
+
+Operator asked "what went wrong, did members lose, check other months." Extended the test to
+**4 months / 50 trades** (Feb–May), parsed structured signals from the export, back-filled
+Binance caches to Feb 1 for full coverage, ran the **identical** near-edge limit + posted-TP
+model on a consistent venue.
+
+| Month | Net | WR | Dir bias | BTC move | Read |
+|---|---|---|---|---|---|
+| Feb | −7% | 1/3 | 3 longs | **−14%** | long into a crash → lost |
+| Mar | +11% | 1/3 | 3 shorts | flat | aligned → won (thin) |
+| Apr | **−31%** | 4/13 | 9 shorts | **+12%** | short into a rally → lost hard |
+| May | +0% (Bin) / +6% (WEEX) | 13/31 | 15sh/16lg | **−9%** | shorts aligned → won |
+| **POOLED** | **−27% (−5.45R)** | **19/50** | | | **no durable edge** |
+
+### What went wrong in April (autopsy — corrected)
+
+My first guess ("April chopped, May trended") was **wrong** — April BTC actually moved *more*
+(+12% vs May −9%). The real cause is **directional**: he was **9-short into a +12% BTC rally**,
+so the shorts stopped out (8 of 13 full −1R), amplified by tight stops (1.4%) and far TPs (5.7R
+away — needing a big move *in his direction* that never came).
+
+### The pattern across all 4 months
+
+**Lose when his net direction fights the BTC move; win when aligned:**
+- Apr shorts into +12% → −4.0R · Feb longs into −14% → −1.2R (fought the move, lost)
+- May shorts into −9% → +5.3R · Mar shorts into flat → +2.3R (aligned, won)
+
+⇒ **The "edge" is regime/direction timing, not the posted signals.** His signals work when his
+directional read happens to match BTC, and lose when it doesn't. Codex: directionally consistent
+with regime dependence, but n=4 months is too few for statistical significance — so it's a
+strong hypothesis, and the **pooled −27% is the clean headline.**
+
+### Did members lose too?
+
+The export contains **only Dennis's messages** (no member posts), so member P&L isn't directly
+observable. But: a member mechanically taking April's signals lost (−31%); Dennis himself called
+April *"the market decided to kill us with boredom… chopping"* (04-04) and teed up May *"I want
+to make this next month really show"* (04-15) — i.e. **May was the advertised showcase, not a
+representative month.** Members who profit are present in aligned months (like May) and/or add
+his live discretion.
+
+### FINAL verdict
+
+**NO for mechanical copy-trading.** 50 trades, 4 months, pooled −27% net, no durable edge. Worth
+reopening only if the *question* changes (a BTC-regime filter, WEEX-fill advantage, or mid-zone
+robustness) — **not** copying the posted signals as-is. The reading substrate (87/87) remains a
+validated, reusable asset.
