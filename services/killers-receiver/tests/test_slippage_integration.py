@@ -33,6 +33,10 @@ def _setup(conn_path, *, max_slip=3.0):
     # Point Config at the temp DB; cap from the test param.
     os.environ["KILLERS_DB"] = conn_path
     os.environ["KILLERS_MAX_ENTRY_SLIPPAGE_PCT"] = str(max_slip)
+    # These tests assert the gate's SKIP contract; pin limit-in-zone OFF so
+    # a breach skips (not rests a limit). The limit-on-breach path is
+    # covered by test_limit_in_zone.py.
+    os.environ["KILLERS_ENTRY_LIMIT_IN_ZONE"] = "false"
     cfg = receiver_main.Config()
     conn = receiver_main.init_db(cfg.db_path)
     state = _FakeAppState(conn, cfg)
