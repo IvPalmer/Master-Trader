@@ -169,3 +169,48 @@ his live discretion.
 reopening only if the *question* changes (a BTC-regime filter, WEEX-fill advantage, or mid-zone
 robustness) — **not** copying the posted signals as-is. The reading substrate (87/87) remains a
 validated, reusable asset.
+
+---
+
+## Free-channel member chatter — independent corroboration (the convergence)
+
+The paid export is Dennis-only, but the FREE channel export (`raw_free_messages.json`, 219 msgs,
+**115 from real members**, Apr 15 – May 6 — overlapping the −31% April window) has member
+discussion. This is qualitative ground truth I did not have when running the backtest. It
+**corroborates** the −27% finding from a completely independent angle.
+
+**Members losing / struggling (their own words, same window the backtest flagged):**
+- **H_Osm11** (05-06): *"I have 5 other positions from previous days and they are all at a loss:
+  50%, 40%, and 60%. I am waiting to get back to the entry point."* (bag-holding losers)
+- **Naruntyagi** (05-06): *"Sl triggered high lev, risked 5 prcnt"* (stopped out)
+- **cioddoss** (04-29): *"my short BTC position … hit SL 77000"* — exactly the short-into-the-rally
+  failure the April autopsy identified
+- **Master_killik** (05-05): *"Too bad I didn't close 24h ago when it was 220% profit"*
+  (round-tripped a winner — the management gap)
+- **cioddoss** (05-04): *"I set tp1 and close 25%, but it closed my position completely, why?"*
+  (execution confusion)
+
+**The one clearly-profitable member proves the point, not the opposite — Normen_Richter** (04-17):
+*"I follow him and made some nice profits 🤑 … I am long on BTC … building shorts as Dennis said
+too. In weex you can hedge positions."* He profits by **hedging both directions + his own
+discretion + being positioned weeks ahead** — not by mechanically copying signals.
+
+**The killer structural insight — voldemmort23** (04-18), an experienced member, independently
+explaining *why* mechanical copying fails — arrived at the exact conclusion as the backtest from
+lived experience:
+> *"what dennis is doing is managing risk by taking partial profits and moving stops — you CANT do
+> this in copy trading, it requires you to only OPEN and CLOSE (higher risk, less flexibility =
+> potential huge losses). You never know his risk appetite. WEEX elite trader cannot take partial
+> profit."*
+
+**The presentation gap:** Dennis's advertised same-window stats are all big leveraged % wins (BTC
++227%, ETH +361%, SOL +409%, AAVE +117% …). Members post 40–60% losing positions and bag-holding.
+Not necessarily fraud (the posted winners may be real on isolated leveraged sizing) — but **the
+advertised percentages do not translate into copyable member returns.**
+
+**Convergence (codex-reviewed):** the quantitative backtest (−27%, candle mechanics) and the
+qualitative member experience (losses, stop-outs, round-tripped winners, the discretion caveat)
+**independently arrive at the same conclusion** — mechanical copying loses; whatever edge exists
+is in discretionary direction-selection, partial-profit-taking, stop-management, hedging, and
+risk control, none of which the posted signal stream carries. Two methods, different data, one
+answer. That is as strong as this kind of finding gets.
