@@ -75,6 +75,19 @@ class Config:
         self.max_entry_slippage_pct = float(os.environ.get(
             "KILLERS_MAX_ENTRY_SLIPPAGE_PCT", "3.0",
         ))
+        # Limit-in-zone entry (Insiders/Track-A "fill like the signaler"):
+        # when the slippage gate WOULD skip an open because mark has run
+        # past the posted entry zone, instead of discarding the signal,
+        # rest a LIMIT order at the near edge of the zone (LONG → entry_hi,
+        # SHORT → entry_lo). The limit price structurally bounds slippage
+        # (you can never fill worse than the zone edge), so it replaces the
+        # skip on a breach. Marks WITHIN the gate are untouched (market).
+        # Requires the slippage gate on (max_entry_slippage_pct > 0) and
+        # usable entry bounds; bounds-missing still fails closed. Resting
+        # entries live for Freqtrade's `unfilledtimeout.entry` then cancel.
+        self.entry_limit_in_zone = (os.environ.get(
+            "KILLERS_ENTRY_LIMIT_IN_ZONE", "true",
+        ).lower() in ("true", "1", "yes"))
         # Phase 2: place LIMIT exit orders at each TP at open-time instead
         # of waiting for the channel to announce target hits. Default ON
         # because the Killers signaler explicitly publishes the full TP
@@ -481,12 +494,18 @@ def compute_stake(
 
 async def ft_force_enter(
     cfg: Config, pair: str, direction: str, stake: float, leverage: float,
-    session=None,
+    session=None, ordertype: str = "market", price: Optional[float] = None,
 ) -> dict:
     """POST /forceenter to the killers Freqtrade bot. Returns response dict.
 
     Per Freqtrade docs: side is 'long' or 'short'; stakeamount in quote currency;
-    leverage as float; ordertype 'market' for immediate fills (matches config).
+    leverage as float.
+
+    `ordertype` defaults to 'market' (immediate fill). Pass 'limit' + `price`
+    to rest a LIMIT entry at a specific price — used by the limit-in-zone
+    path so a signal whose mark has already run past the posted entry zone
+    is captured at the signaler's price on a pullback (or expires unfilled
+    per Freqtrade's `unfilledtimeout.entry`) instead of being market-chased.
 
     If `session` is provided (a pre-authed aiohttp.ClientSession), reuses it.
     Falls back to a one-shot session if None — keeps the function usable
@@ -498,8 +517,10 @@ async def ft_force_enter(
         "side": direction,
         "stakeamount": round(stake, 2),
         "leverage": leverage,
-        "ordertype": "market",
+        "ordertype": ordertype,
     }
+    if ordertype == "limit" and price is not None:
+        body["price"] = float(price)
     timeout = aiohttp.ClientTimeout(total=10)
     if session is not None:
         async with session.post(url, json=body, timeout=timeout) as r:
@@ -1166,6 +1187,57 @@ async def _reconcile_loop_once(cfg: Config, conn: sqlite3.Connection,
         )
         logger.info("[RECONCILE] ft_trade_id=%d no longer open in freqtrade; marked closed",
                     tid)
+
+    # (3) arm the TP ladder for limit-in-zone entries that filled AFTER open.
+    # A resting limit returns trade_id immediately with amount=0, so the
+    # open-path Phase-2 arming (which needs the filled base amount) is
+    # skipped. Once the entry fills we arm here — the posted-TP half of
+    # "fill like the signaler" for breach-fills. Gate exactly like the open
+    # path: active_tp_limits on, targets persisted, and NO target_orders
+    # rows yet. Never re-arm a cancelled/filled ladder (rows exist) — that
+    # is left to the OPEN path / manual reconcile by design (see the cascade
+    # cancel note in _reconcile_target_orders_inner).
+    if cfg.active_tp_limits:
+        ft_by_id = {t.get("trade_id"): t for t in ft_open}
+        unarmed = conn.execute(
+            "SELECT pos_id, ft_trade_id, targets_remaining FROM positions "
+            "WHERE state = 'open' AND ft_trade_id IS NOT NULL "
+            "AND targets_remaining IS NOT NULL "
+            "AND NOT EXISTS (SELECT 1 FROM target_orders t "
+            "                WHERE t.pos_id = positions.pos_id)"
+        ).fetchall()
+        for pos in unarmed:
+            trade = ft_by_id.get(pos["ft_trade_id"])
+            if trade is None:
+                continue
+            try:
+                filled = float(trade.get("amount") or 0)
+            except (TypeError, ValueError):
+                filled = 0.0
+            if filled <= 0:
+                continue  # entry order still resting / unfilled
+            try:
+                targets = json.loads(pos["targets_remaining"]) or []
+            except (TypeError, ValueError):
+                targets = []
+            if not targets:
+                continue
+            slice_amt = filled / len(targets)
+            try:
+                await _place_target_limits(
+                    cfg, conn, pos["pos_id"], int(pos["ft_trade_id"]),
+                    targets, slice_amt, session=session,
+                )
+                logger.info(
+                    "[RECONCILE] armed delayed-fill TP ladder pos_id=%d "
+                    "ft_trade_id=%s targets=%d filled=%.8g",
+                    pos["pos_id"], pos["ft_trade_id"], len(targets), filled,
+                )
+            except Exception:
+                logger.exception(
+                    "[RECONCILE] delayed-fill TP arm failed pos_id=%d",
+                    pos["pos_id"],
+                )
     return "ok"
 
 
@@ -1216,9 +1288,9 @@ async def lifespan(app: FastAPI):
     app.state.phase2_lock = asyncio.Lock()
     logger.info(
         "receiver up ft=%s db=%s stake=$%.0f lev=%.1fx max_open=%d "
-        "max_slippage=%.1f%% active_tp=%s reconcile_sec=%d",
+        "max_slippage=%.1f%% limit_in_zone=%s active_tp=%s reconcile_sec=%d",
         cfg.ft_base, cfg.db_path, cfg.stake_usd, cfg.leverage, cfg.max_open,
-        cfg.max_entry_slippage_pct, cfg.active_tp_limits,
+        cfg.max_entry_slippage_pct, cfg.entry_limit_in_zone, cfg.active_tp_limits,
         cfg.target_reconcile_sec,
     )
     recon = asyncio.create_task(
@@ -1819,6 +1891,11 @@ async def _process_event(payload: EventPayload):
         # CLOSED rather than silently opening — the operator turned the
         # gate ON specifically to limit slippage, so missing data means
         # we cannot honor that contract.
+        # Entry order shape. Default market; the slippage gate may switch
+        # this to a resting limit at the zone edge (limit-in-zone) when the
+        # mark has run past the posted zone but the feature is enabled.
+        entry_ordertype = "market"
+        entry_limit_price: Optional[float] = None
         if cfg.max_entry_slippage_pct > 0 and mark is not None:
             entry_lo = cls.get("entry_lo")
             entry_hi = cls.get("entry_hi")
@@ -1857,29 +1934,55 @@ async def _process_event(payload: EventPayload):
                 bound = entry_lo
                 slip_pct = (bound - mark) / bound * 100.0
             if slip_pct > cfg.max_entry_slippage_pct:
-                logger.warning(
-                    "[SLIPPAGE GUARD] %s %s entry=%.6g-%.6g mark=%.6g "
-                    "slippage=%.2f%% > %.1f%% — skipping open",
-                    symbol, direction.upper(), entry_lo, entry_hi, mark,
-                    slip_pct, cfg.max_entry_slippage_pct,
-                )
-                return {"action": "skipped",
-                        "reason": "entry_slippage_exceeded",
-                        "mark": mark,
-                        "entry_lo": entry_lo,
-                        "entry_hi": entry_hi,
-                        "slippage_pct": round(slip_pct, 2),
-                        "max_slippage_pct": cfg.max_entry_slippage_pct}
+                if cfg.entry_limit_in_zone:
+                    # Mark ran past the zone, but rather than chase (market)
+                    # or discard (skip), rest a LIMIT at the near edge —
+                    # `bound` is entry_hi (LONG) / entry_lo (SHORT). It fills
+                    # only if price pulls back into the signaler's zone, at
+                    # his price, or expires per unfilledtimeout.entry. The
+                    # limit price caps slippage at the zone edge by
+                    # construction, so the gate no longer needs to skip.
+                    entry_ordertype = "limit"
+                    entry_limit_price = bound
+                    logger.info(
+                        "[LIMIT-IN-ZONE] %s %s mark=%.6g %.2f%% past zone "
+                        "%.6g-%.6g → resting LIMIT @ %.6g (near edge)",
+                        symbol, direction.upper(), mark, slip_pct,
+                        entry_lo, entry_hi, bound,
+                    )
+                else:
+                    logger.warning(
+                        "[SLIPPAGE GUARD] %s %s entry=%.6g-%.6g mark=%.6g "
+                        "slippage=%.2f%% > %.1f%% — skipping open",
+                        symbol, direction.upper(), entry_lo, entry_hi, mark,
+                        slip_pct, cfg.max_entry_slippage_pct,
+                    )
+                    return {"action": "skipped",
+                            "reason": "entry_slippage_exceeded",
+                            "mark": mark,
+                            "entry_lo": entry_lo,
+                            "entry_hi": entry_hi,
+                            "slippage_pct": round(slip_pct, 2),
+                            "max_slippage_pct": cfg.max_entry_slippage_pct}
 
         # ── Target remaining filter ───────────────────────────────────────
+        # Reference price for "is this target still ahead?": for a market
+        # fill that's the live mark, but for a resting limit-in-zone entry
+        # we will actually fill at the zone edge, not the runaway mark —
+        # so evaluate the ladder against the limit price. Otherwise targets
+        # that the current mark has overshot (but a pullback-fill would
+        # leave ahead of us) get wrongly dropped.
+        target_ref = (entry_limit_price
+                      if entry_ordertype == "limit" and entry_limit_price is not None
+                      else mark)
         if signal_targets:
             remaining_targets = filter_remaining_targets(
-                signal_targets, mark, direction,
+                signal_targets, target_ref, direction,
             )
             if not remaining_targets:
                 logger.warning(
-                    "[TARGET GUARD] all targets crossed for %s %s: mark=%s, targets=%s — skipping open",
-                    symbol, direction.upper(), mark, signal_targets,
+                    "[TARGET GUARD] all targets crossed for %s %s: ref=%s, targets=%s — skipping open",
+                    symbol, direction.upper(), target_ref, signal_targets,
                 )
                 return {"action": "skipped",
                         "reason": "all_targets_crossed",
@@ -1888,9 +1991,9 @@ async def _process_event(payload: EventPayload):
             crossed = len(signal_targets) - len(remaining_targets)
             if crossed > 0:
                 logger.info(
-                    "[TARGET GUARD] %s %s mark=%s: %d/%d targets already crossed, "
+                    "[TARGET GUARD] %s %s ref=%s: %d/%d targets already crossed, "
                     "%d remaining=%s",
-                    symbol, direction.upper(), mark, crossed, len(signal_targets),
+                    symbol, direction.upper(), target_ref, crossed, len(signal_targets),
                     len(remaining_targets), remaining_targets,
                 )
         else:
@@ -1929,6 +2032,7 @@ async def _process_event(payload: EventPayload):
         resp = await ft_force_enter(
             cfg, pair, direction, stake, leverage,
             session=getattr(app.state, "ft_session", None),
+            ordertype=entry_ordertype, price=entry_limit_price,
         )
         conn.execute(
             "INSERT INTO events (pos_id, msg_id, event_at, kind, payload, response) "
@@ -1936,6 +2040,8 @@ async def _process_event(payload: EventPayload):
             (pos_id, msg_id, datetime.now(timezone.utc).isoformat(),
              json.dumps({"pair": pair, "side": direction, "stake": stake,
                          "leverage": leverage,
+                         "ordertype": entry_ordertype,
+                         "limit_price": entry_limit_price,
                          "signal_targets": signal_targets,
                          "remaining_targets": remaining_targets}),
              json.dumps(resp)),
@@ -1978,13 +2084,19 @@ async def _process_event(payload: EventPayload):
                     cfg, conn, pos_id, ft_trade_id, remaining_targets, slice_amt,
                 )
 
+        entry_desc = (
+            f"limit@{entry_limit_price:.6g}" if entry_ordertype == "limit"
+            else "market"
+        )
         logger.info(
             "[OPEN] pos_id=%d signal=#%s %s %s pair=%s stake=$%.0f lev=%.1fx "
-            "remaining_targets=%s tp_orders_placed=%d → ft_status=%d ft_trade_id=%s",
+            "entry=%s remaining_targets=%s tp_orders_placed=%d → ft_status=%d ft_trade_id=%s",
             pos_id, signal_id, symbol, direction.upper(), pair, stake, leverage,
-            remaining_targets, len(placed_tps), resp["status"], ft_trade_id,
+            entry_desc, remaining_targets, len(placed_tps), resp["status"], ft_trade_id,
         )
         return {"action": "force_enter", "pos_id": pos_id, "ft": resp,
+                "ordertype": entry_ordertype,
+                "limit_price": entry_limit_price,
                 "remaining_targets": remaining_targets,
                 "signal_targets": signal_targets,
                 "tp_orders_placed": placed_tps}
