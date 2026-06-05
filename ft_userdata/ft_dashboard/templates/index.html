@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css?v=17">
+<link rel="stylesheet" href="/static/styles.css?v=18">
 <script defer
         src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
         integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
@@ -677,6 +677,14 @@
   <!-- ══════════════ TRADES TAB ══════════════ -->
   <main class="tab-panel" x-show="tab === 'trades'" x-cloak>
 
+    <!-- open / closed view toggle -->
+    <div class="trades-view-toggle">
+      <button class="filter-pill" :class="tradesView === 'open' ? 'on' : ''"
+              @click="setTradesView('open')">open <span x-text="openTradesAll.length">0</span></button>
+      <button class="filter-pill" :class="tradesView === 'closed' ? 'on' : ''"
+              @click="setTradesView('closed')">closed <span x-text="closedTrades.length">0</span></button>
+    </div>
+
     <!-- Recent activity header -->
     <div class="trades-activity-header">
       <span x-text="tradesRecentSummary" class="trades-activity-summary">—</span>
@@ -690,9 +698,11 @@
                   @click="setTradesFilter(bot.key)"
                   x-text="bot.label || bot.name">bot</button>
         </template>
-        <button class="filter-pill"
-                :class="tradesFilter === 'recent24h' ? 'on' : ''"
-                @click="setTradesFilter('recent24h')">recent 24h</button>
+        <template x-if="tradesView === 'closed'">
+          <button class="filter-pill"
+                  :class="tradesFilter === 'recent24h' ? 'on' : ''"
+                  @click="setTradesFilter('recent24h')">recent 24h</button>
+        </template>
         <button class="filter-pill"
                 :class="tradesFilter === 'all' ? 'on' : ''"
                 @click="setTradesFilter('all')">all</button>
@@ -712,13 +722,15 @@
                 <span x-text="(trade.profit_pct >= 0 ? '+' : '') + (trade.profit_pct||0).toFixed(2) + '%'">—</span>
                 <span class="abs" x-text="'(' + fmtUsdSigned(trade.profit_abs) + ')'">—</span>
               </span>
-              <span class="trade-reason" :class="'reason-' + (trade.exit_reason||'unknown')" x-text="trade.exit_reason || '—'">—</span>
+              <span class="trade-reason"
+                    :class="trade.is_open ? 'reason-open' : ('reason-' + (trade.exit_reason||'unknown'))"
+                    x-text="trade.is_open ? 'OPEN' : (trade.exit_reason || '—')">—</span>
             </div>
           </div>
           <div class="trade-card-detail">
             <span>entry <strong x-text="(trade.open_rate||0).toPrecision(5)">—</strong></span>
             <span class="sep">→</span>
-            <span>exit <strong x-text="(trade.close_rate||0).toPrecision(5)">—</strong></span>
+            <span><span x-text="trade.is_open ? 'now' : 'exit'">exit</span> <strong x-text="(trade.close_rate||0).toPrecision(5)">—</strong></span>
             <span class="sep">·</span>
             <span x-text="formatTradeWindow(trade)">—</span>
             <span class="grow"></span>
@@ -731,13 +743,13 @@
               </template>
             </div>
           </div>
-          <div class="trade-chart" :id="'trade-chart-' + trade.bot_key + '-' + trade.open_ts"></div>
+          <div class="trade-chart" :id="tradeChartId(trade)"></div>
         </div>
       </template>
 
       <div class="empty" x-show="!filteredTrades.length">
         <div class="icon">∅</div>
-        no closed trades yet
+        <span x-text="tradesView === 'open' ? 'no open positions' : 'no closed trades yet'">no closed trades yet</span>
       </div>
     </div>
 
@@ -972,6 +984,6 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=27"></script>
+<script src="/static/dashboard.js?v=28"></script>
 </body>
 </html>
