@@ -592,7 +592,11 @@ function dash() {
             open_ts: t.open_timestamp, close_ts: now,
             profit_pct: t.profit_pct, profit_abs: t.profit_abs,
             is_win: (t.profit_abs || 0) > 0, is_open: true,
-            stop_rate: null, stoploss_pct: null,
+            // Freqtrade's actual stop price for the position (for the killers
+            // pass-through that's the -99%/near-liquidation level). Drawn as
+            // the stop line so you can see how close a loser is to wipeout.
+            stop_rate: (typeof t.stop_loss_abs === 'number' && t.stop_loss_abs > 0) ? t.stop_loss_abs : null,
+            stoploss_pct: t.stop_loss_pct,
             duration_min: openMs ? Math.round((now - openMs) / 60000) : 0,
           });
         }
@@ -678,8 +682,17 @@ function dash() {
       // Key by open_ts too so distinct trades on the same bot/pair/tf (e.g. two
       // SUI scalps) don't share a window. Open trades skip the cache so the
       // chart keeps up with the live candle on each poll.
-      const cacheKey = trade.bot_key + ':' + trade.pair + ':' + tf + ':' + trade.open_ts;
-      let candles = trade.is_open ? null : this._tradeCandles[cacheKey];
+      const cacheKey = trade.bot_key + ':' + trade.pair + ':' + tf + ':' + trade.open_ts + ':' + (trade.is_open ? 'open' : 'closed');
+      // Closed trades are immutable → cache forever. Open trades refresh on a
+      // 60s TTL so the chart tracks the live candle without re-fetching Binance
+      // on every tab switch / 30s poll (the over-fetch caused intermittent
+      // blank charts when a fetch failed or was still in flight).
+      const cached = this._tradeCandles[cacheKey];
+      let candles = null;
+      if (cached) {
+        if (!trade.is_open) candles = cached.candles;
+        else if (Date.now() - cached.ts < 60000) candles = cached.candles;
+      }
       if (!candles) {
         try {
           const tfMs = { '5m': 5*60_000, '15m': 15*60_000, '1h': 60*60_000, '4h': 4*60*60_000 }[tf] || 60*60_000;
@@ -692,7 +705,7 @@ function dash() {
           if (!r.ok) return;
           const data = await r.json();
           candles = data.candles || [];
-          if (!trade.is_open) this._tradeCandles[cacheKey] = candles;
+          this._tradeCandles[cacheKey] = { ts: Date.now(), candles };
         } catch { return; }
       }
       if (!candles.length) return;
@@ -738,7 +751,7 @@ function dash() {
             return lo - range * 0.05;
           },
           max: ({ min, max }) => {
-            const hi = Math.max(max, trade.open_rate, trade.close_rate);
+            const hi = Math.max(max, trade.open_rate, trade.close_rate, trade.stop_rate || trade.open_rate);
             const range = Math.max(max - min, 0.0001);
             return hi + range * 0.05;
           },
@@ -776,7 +789,7 @@ function dash() {
               ...(trade.stop_rate ? [{
                 yAxis: trade.stop_rate,
                 lineStyle: { color: COLORS.neg, type: 'dashed', width: 1, opacity: 0.35 },
-                label: { show: true, formatter: 'stop ' + (trade.stoploss_pct||0).toFixed(1) + '%',
+                label: { show: true, formatter: 'stop ' + (trade.is_open ? (trade.stop_rate||0).toPrecision(5) : (trade.stoploss_pct||0).toFixed(1) + '%'),
                          position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, padding: [2, 4],
                          backgroundColor: 'rgba(252,252,250,0.9)', borderRadius: 2, opacity: 0.8 },
               }] : []),
@@ -807,6 +820,10 @@ function dash() {
           },
         },
       }, true);
+      // Re-fit to the container: if the card was initialised while its tab was
+      // hidden (display:none → 0×0), this picks up the real size once visible,
+      // preventing a blank chart after a tab switch.
+      chart.resize();
     },
 
     _ensureChart(id) {
