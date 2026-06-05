@@ -54,6 +54,7 @@ function dash() {
     _charts: {},
     _equityData: {},
     _tradeCandles: {},
+    _killersSL: {},   // {symbol: posted channel SL} for copy-trader open positions
     _attentionExpanded: false,
     // Command bar: dismissed incident keys (session-local)
     _dismissedIncidents: new Set(),
@@ -67,6 +68,7 @@ function dash() {
 
       this.tickClock();
       setInterval(() => this.tickClock(), 1000);
+      this.fetchKillersSL();
       this.refresh().then(() => {
         this.equityBot = this.liveBots[0]?.key || null;
         // Default the dry-run drawer to whichever bot is closest to graduation.
@@ -77,6 +79,7 @@ function dash() {
       });
       setInterval(() => this.refresh().then(() => {
         this.fetchClosedTrades();
+        this.fetchKillersSL();
         this.$nextTick(() => this.renderCharts());
       }), this.pollInterval * 1000);
       window.addEventListener('hashchange', () => {
@@ -586,16 +589,29 @@ function dash() {
       for (const b of this.allBots) {
         for (const t of (b.open_trades || [])) {
           const openMs = toMs(t.open_timestamp || 0);
+          // Stop line: copy-trader (observational) bots run no hard stop —
+          // Freqtrade's stop_loss_abs is the -99%/liquidation level, which is
+          // not what the position is managed to. Prefer the channel's POSTED
+          // SL for the symbol; fall back to the Freqtrade stop for quant bots
+          // (where stop_loss_abs IS the real strategy stop).
+          // Only the killers copy-trader has channel-posted SLs — gate on its
+          // exact key (short-keltner-hl is also observational but has none).
+          // Best-effort match: latest OPEN signal per symbol; aliased bases
+          // (e.g. 1000PEPE vs channel PEPE) just fall back to the Freqtrade
+          // stop. The exact position→signal SL lives in the receiver DB, which
+          // the dashboard doesn't mount.
+          const sym = String(t.pair || '').split('/')[0];
+          const postedSL = (b.key === 'killers-ft') ? this._killersSL[sym] : null;
+          const ftStop = (typeof t.stop_loss_abs === 'number' && t.stop_loss_abs > 0) ? t.stop_loss_abs : null;
+          const stopIsPosted = (typeof postedSL === 'number' && postedSL > 0);
           out.push({
             bot_key: b.key, bot_name: b.name, pair: t.pair,
             open_rate: t.open_rate, close_rate: t.current_rate,
             open_ts: t.open_timestamp, close_ts: now,
             profit_pct: t.profit_pct, profit_abs: t.profit_abs,
             is_win: (t.profit_abs || 0) > 0, is_open: true,
-            // Freqtrade's actual stop price for the position (for the killers
-            // pass-through that's the -99%/near-liquidation level). Drawn as
-            // the stop line so you can see how close a loser is to wipeout.
-            stop_rate: (typeof t.stop_loss_abs === 'number' && t.stop_loss_abs > 0) ? t.stop_loss_abs : null,
+            stop_rate: stopIsPosted ? postedSL : ftStop,
+            stop_is_posted: stopIsPosted,
             stoploss_pct: t.stop_loss_pct,
             duration_min: openMs ? Math.round((now - openMs) / 60000) : 0,
           });
@@ -660,6 +676,18 @@ function dash() {
     setTradeTimeframe(trade, tf) {
       this._tradeTfOverride[this._tradeKey(trade)] = tf;
       this.$nextTick(() => this.renderTradeChart(trade));
+    },
+
+    async fetchKillersSL() {
+      // Posted channel stop-loss per symbol for copy-trader open positions.
+      try {
+        const r = await fetch('/api/killers/state', { cache: 'no-store' });
+        if (!r.ok) return;
+        const data = await r.json();
+        this._killersSL = data.posted_sl || {};
+        // SL map may arrive after the first chart render → repaint open cards.
+        if (this.tab === 'trades' && this.tradesView === 'open') this.$nextTick(() => this.renderTradesCharts());
+      } catch (e) { console.warn('fetchKillersSL', e); }
     },
 
     async fetchClosedTrades() {
@@ -789,7 +817,7 @@ function dash() {
               ...(trade.stop_rate ? [{
                 yAxis: trade.stop_rate,
                 lineStyle: { color: COLORS.neg, type: 'dashed', width: 1, opacity: 0.35 },
-                label: { show: true, formatter: 'stop ' + (trade.is_open ? (trade.stop_rate||0).toPrecision(5) : (trade.stoploss_pct||0).toFixed(1) + '%'),
+                label: { show: true, formatter: (trade.is_open ? (trade.stop_is_posted ? 'SL ' : 'stop ') + (trade.stop_rate||0).toPrecision(5) : 'stop ' + (trade.stoploss_pct||0).toFixed(1) + '%'),
                          position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, padding: [2, 4],
                          backgroundColor: 'rgba(252,252,250,0.9)', borderRadius: 2, opacity: 0.8 },
               }] : []),
