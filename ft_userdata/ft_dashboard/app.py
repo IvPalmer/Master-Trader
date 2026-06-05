@@ -933,6 +933,18 @@ async def api_killers_state():
             "SELECT substr(classified_at, 1, 13) AS hour, COUNT(*) AS n "
             "FROM classifications GROUP BY hour ORDER BY hour ASC"
         )]
+        # Posted stop-loss per symbol: the SL the channel published on its
+        # latest OPEN signal for each symbol. The dashboard draws this as the
+        # stop line on open copy-trader positions — Freqtrade's own stop is
+        # -99%/liquidation here because exits are channel-driven, so the posted
+        # SL is the meaningful level. Iterate ascending so the latest wins.
+        posted_sl: dict[str, float] = {}
+        for r in conn.execute(
+            "SELECT symbol, sl FROM classifications "
+            "WHERE kind = 'open' AND sl IS NOT NULL AND symbol IS NOT NULL "
+            "ORDER BY msg_id ASC"
+        ):
+            posted_sl[r["symbol"]] = r["sl"]
     finally:
         conn.close()
 
@@ -952,6 +964,7 @@ async def api_killers_state():
         "rate_by_hour": rate_rows,
         "recent_classifications": recent_classifications,
         "recent_positions": recent_positions,
+        "posted_sl": posted_sl,
     })
 
 
