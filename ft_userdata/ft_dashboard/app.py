@@ -22,7 +22,6 @@ import json
 import logging
 import os
 import re
-import sqlite3
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
@@ -118,7 +117,7 @@ API_PASS = os.environ.get("FREQTRADE__API_SERVER__PASSWORD", "")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
 REQUEST_TIMEOUT = float(os.environ.get("REQUEST_TIMEOUT", "10"))
 OVERLAYS_DIR = Path(os.environ.get("OVERLAYS_DIR", "/overlays"))
-KILLERS_DB = Path(os.environ.get("KILLERS_DB", "/data/killers/state.db"))
+KILLERS_DB = Path(os.environ.get("KILLERS_DB", "/var/lib/killers/state.sqlite"))
 
 # Phase 5 / Gate constants
 GATE1_TRADES, GATE1_DAYS, GATE1_PAIRS = 30, 14, 5
@@ -735,122 +734,6 @@ def _fleet_status() -> dict:
     return {"level": level, "summary": summary, "stale_bots": stale_bots}
 
 
-# ── Killers SQLite helpers ─────────────────────────────────────────────────────
-
-def _killers_db_query(sql: str, params: tuple = ()) -> list[dict]:
-    """Run a read-only query against the killers state.db.
-
-    Returns list of row dicts. Returns [] if the DB file doesn't exist or any
-    error occurs — the endpoint degrades gracefully rather than 500ing.
-    """
-    if not KILLERS_DB.exists():
-        return []
-    try:
-        con = sqlite3.connect(f"file:{KILLERS_DB}?mode=ro", uri=True, check_same_thread=False)
-        con.row_factory = sqlite3.Row
-        try:
-            cur = con.execute(sql, params)
-            return [dict(r) for r in cur.fetchall()]
-        finally:
-            con.close()
-    except Exception as exc:
-        log.warning("killers DB query failed: %s", exc)
-        return []
-
-
-def _killers_open_positions() -> list[dict]:
-    """Read open positions from the killers SQLite positions table.
-
-    Returns a list of dicts shaped for the frontend hero card.
-    Computes pnl_pct from entry vs current price (uses entry if current unknown).
-    """
-    rows = _killers_db_query(
-        "SELECT id, symbol, side, entry_price, current_price, opened_at, signal_id "
-        "FROM positions WHERE state = 'open' ORDER BY opened_at DESC"
-    )
-    now = time.time()
-    out = []
-    for r in rows:
-        entry = r.get("entry_price") or 0.0
-        current = r.get("current_price") or entry
-        pnl_pct = ((current - entry) / entry * 100) if entry else 0.0
-        side = (r.get("side") or "LONG").upper()
-        if side == "SHORT":
-            pnl_pct = -pnl_pct
-
-        opened_at_str = r.get("opened_at") or ""
-        age_minutes = 0
-        if opened_at_str:
-            try:
-                import datetime
-                opened_dt = datetime.datetime.fromisoformat(opened_at_str.replace("Z", "+00:00"))
-                age_minutes = int((now - opened_dt.timestamp()) / 60)
-            except Exception:
-                age_minutes = 0
-
-        out.append({
-            "symbol": r.get("symbol", ""),
-            "side": side,
-            "entry": round(entry, 8),
-            "current": round(current, 8),
-            "pnl_pct": round(pnl_pct, 4),
-            "age_minutes": age_minutes,
-            "signal_id": r.get("signal_id"),
-        })
-    return out
-
-
-def _killers_paper_pnl_history(wallet_start: float = 1000.0) -> list[dict]:
-    """Build a time-indexed paper P&L series from the killers SQLite.
-
-    Starts at wallet_start (default $1 000) at the bot's first event.
-    Appends each closed position cumulatively.  If zero closed positions,
-    returns a 2-point series so the frontend chart always has something to draw.
-
-    Shape: [{ts: ISO8601, equity: float}, ...]
-    """
-    import datetime
-
-    # Try to get the earliest event timestamp as "started_at"
-    meta_rows = _killers_db_query(
-        "SELECT MIN(created_at) as started_at FROM positions LIMIT 1"
-    )
-    started_at_str = (meta_rows[0].get("started_at") if meta_rows else None) or ""
-
-    now_iso = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    if not started_at_str:
-        # No data at all — flat 2-point series
-        return [
-            {"ts": "2026-05-25T00:00:00Z", "equity": wallet_start},
-            {"ts": now_iso, "equity": wallet_start},
-        ]
-
-    # Normalise to ISO
-    started_iso = started_at_str if "T" in started_at_str else started_at_str.replace(" ", "T") + "Z"
-
-    closed_rows = _killers_db_query(
-        "SELECT closed_at, pnl_abs FROM positions "
-        "WHERE state = 'closed' AND closed_at IS NOT NULL "
-        "ORDER BY closed_at ASC"
-    )
-
-    history = [{"ts": started_iso, "equity": wallet_start}]
-    cum = 0.0
-    for r in closed_rows:
-        closed_at = r.get("closed_at", "")
-        pnl = float(r.get("pnl_abs") or 0.0)
-        cum += pnl
-        ts_iso = (closed_at if "T" in closed_at else closed_at.replace(" ", "T") + "Z")
-        history.append({"ts": ts_iso, "equity": round(wallet_start + cum, 4)})
-
-    # Ensure a final "now" point so the chart tip is up to date
-    if not closed_rows:
-        history.append({"ts": now_iso, "equity": wallet_start})
-
-    return history
-
-
 # ── App ────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -979,7 +862,6 @@ _PAIR_RE = re.compile(r"^[A-Z0-9]{2,15}/(USDT|USDC|BTC|ETH|BUSD)$")
 
 import sqlite3 as _sqlite
 
-KILLERS_DB = os.environ.get("KILLERS_DB", "/var/lib/killers/state.sqlite")
 
 
 @app.get("/api/killers/state")
@@ -1114,69 +996,6 @@ async def api_closed_trades():
             })
     out.sort(key=lambda x: x.get("close_ts") or 0, reverse=True)
     return JSONResponse({"trades": out, "count": len(out)})
-
-
-@app.get("/api/killers/state")
-async def api_killers_state():
-    """Killers copy-trader paper-sim state from SQLite.
-
-    Reads /data/killers/state.db (read-only mount).  Returns both the
-    existing summary fields (signal count, wallet equity, recent signals) AND
-    the new hero-promotion fields:
-
-      open_positions — [{symbol, side, entry, current, pnl_pct, age_minutes,
-                         signal_id}]  — live SQLite read, not cached
-      paper_pnl_history — [{ts, equity}] — full cumulative equity time series
-                          starting at $1 000 wallet.  Always ≥2 points so the
-                          frontend chart has something to draw.
-
-    Degrades gracefully: if the DB file doesn't exist (e.g. running locally
-    without the killers sidecar), returns empty collections rather than 500.
-    """
-    # ── Core summary (existing schema, kept additive) ─────────────────────
-    signal_rows = _killers_db_query(
-        "SELECT id, symbol, direction, confidence, raw_text, created_at "
-        "FROM signals ORDER BY created_at DESC LIMIT 50"
-    )
-    position_summary = _killers_db_query(
-        "SELECT COUNT(*) as total, "
-        "SUM(CASE WHEN state='open' THEN 1 ELSE 0 END) as open_count, "
-        "SUM(CASE WHEN state='closed' THEN 1 ELSE 0 END) as closed_count, "
-        "SUM(CASE WHEN state='closed' THEN pnl_abs ELSE 0 END) as realized_pnl "
-        "FROM positions"
-    )
-    summary = position_summary[0] if position_summary else {}
-
-    realized_pnl = float(summary.get("realized_pnl") or 0.0)
-    wallet_equity = 1000.0 + realized_pnl
-
-    # ── NEW: hero data + pnl history ──────────────────────────────────────
-    open_positions = _killers_open_positions()
-    paper_pnl_history = _killers_paper_pnl_history(wallet_start=1000.0)
-
-    return JSONResponse({
-        # Existing fields (preserved)
-        "reachable": KILLERS_DB.exists(),
-        "wallet_equity": round(wallet_equity, 4),
-        "realized_pnl": round(realized_pnl, 4),
-        "total_positions": int(summary.get("total") or 0),
-        "open_count": int(summary.get("open_count") or 0),
-        "closed_count": int(summary.get("closed_count") or 0),
-        "recent_signals": [
-            {
-                "id": r.get("id"),
-                "symbol": r.get("symbol"),
-                "direction": r.get("direction"),
-                "confidence": r.get("confidence"),
-                "raw_text": r.get("raw_text"),
-                "created_at": r.get("created_at"),
-            }
-            for r in signal_rows
-        ],
-        # ── NEW ──────────────────────────────────────────────────────────────
-        "open_positions": open_positions,
-        "paper_pnl_history": paper_pnl_history,
-    })
 
 
 @app.get("/api/binance_candles")
