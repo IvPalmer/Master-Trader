@@ -856,13 +856,13 @@
         <!-- Live vs backtest deviation -->
         <div class="card col-4">
           <div class="card-head">
-            <div class="card-title">live vs backtest</div>
-            <div class="card-sub">deviation from expected · all-time</div>
+            <div class="card-title" x-text="(bot.observational || bot.no_baseline) ? 'performance' : 'live vs backtest'">live vs backtest</div>
+            <div class="card-sub" x-text="(bot.observational || bot.no_baseline) ? 'copy-trader · no backtest baseline' : 'deviation from expected · all-time'">deviation from expected · all-time</div>
           </div>
           <div class="kv">
             <span class="k">p&l</span>
               <span class="v" :class="(bot.pnl?.all_pct ?? 0) >= 0 ? 'pos' : 'neg'"
-                    x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '% · expected ' + (bot.gate2?.profit?.expected_pct ?? bot.baseline?.annual_return_pct ?? 0).toFixed(2) + '%'">—</span>
+                    x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '%' + ((bot.observational || bot.no_baseline) ? '' : ' · expected ' + (bot.gate2?.profit?.expected_pct ?? bot.baseline?.annual_return_pct ?? 0).toFixed(2) + '%')">—</span>
             <span class="k">profit factor</span>
               <span class="v" x-text="(bot.stats?.profit_factor?.toFixed(2) ?? '—') + (bot.baseline?.profit_factor ? ' · lab ' + bot.baseline.profit_factor : '')">—</span>
             <span class="k">win rate</span>
@@ -972,6 +972,6 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=26"></script>
+<script src="/static/dashboard.js?v=27"></script>
 </body>
 </html>
