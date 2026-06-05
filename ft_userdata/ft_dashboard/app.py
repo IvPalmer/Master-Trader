@@ -853,7 +853,7 @@ async def api_equity(bot_key: str):
 
 
 _ALLOWED_TIMEFRAMES = {"1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"}
-_PAIR_RE = re.compile(r"^[A-Z0-9]{2,15}/(USDT|USDC|BTC|ETH|BUSD)$")
+_PAIR_RE = re.compile(r"^[A-Z0-9]{2,15}/(USDT|USDC|BTC|ETH|BUSD)(:[A-Z0-9]{2,8})?$")
 
 
 # ── killers_bot observer state ────────────────────────────────────────────
@@ -1028,8 +1028,14 @@ async def api_binance_candles(
         return JSONResponse({"error": "invalid timeframe"}, status_code=400)
     limit = max(10, min(limit, 1000))
 
-    symbol = pair.replace("/", "")
-    url = "https://api.binance.com/api/v3/klines"
+    # Futures pairs are "BASE/QUOTE:SETTLE" (e.g. TAO/USDT:USDT). Strip the
+    # settle suffix for the Binance symbol and route to the USDⓈ-M futures
+    # klines endpoint, which carries every perp symbol (incl. 1000PEPE etc.).
+    # Spot pairs keep the spot endpoint. Both return the same kline schema.
+    is_futures = ":" in pair
+    symbol = pair.split(":", 1)[0].replace("/", "")
+    url = ("https://fapi.binance.com/fapi/v1/klines" if is_futures
+           else "https://api.binance.com/api/v3/klines")
     params: dict[str, int | str] = {"symbol": symbol, "interval": timeframe, "limit": limit}
     if start_ms is not None:
         params["startTime"] = int(start_ms)

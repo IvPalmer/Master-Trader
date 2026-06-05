@@ -48,6 +48,7 @@ function dash() {
     // Single selection so the table controls the view rather than stacking dossiers.
     selectedDryBot: null,
     closedTrades: [],
+    tradesView: 'open',
     tradesFilter: 'all',
     _tradeTfOverride: {},
     _charts: {},
@@ -76,7 +77,7 @@ function dash() {
       });
       setInterval(() => this.refresh().then(() => {
         this.fetchClosedTrades();
-        this.renderCharts();
+        this.$nextTick(() => this.renderCharts());
       }), this.pollInterval * 1000);
       window.addEventListener('hashchange', () => {
         this.tab = location.hash.slice(1) || 'live';
@@ -96,6 +97,7 @@ function dash() {
     },
 
     setTradesFilter(f) { this.tradesFilter = f; this.$nextTick(() => this.renderCharts()); },
+    setTradesView(v) { this.tradesView = v; this.tradesFilter = 'all'; this.$nextTick(() => this.renderCharts()); },
     tickClock() {
       const d = new Date();
       this.clock = String(d.getUTCHours()).padStart(2, '0') + ':' +
@@ -574,12 +576,35 @@ function dash() {
     },
 
     // ─── trades tab ───
+    // Open positions across the whole fleet, shaped to mirror a closed-trade
+    // record so the same card template + chart renderer can draw them.
+    // `close_rate`/`close_ts` stand in as the live current price / "now" so
+    // the chart spans entry → now. No exit/stop lines (is_open branches those).
+    get openTradesAll() {
+      const now = Date.now();
+      const out = [];
+      for (const b of this.allBots) {
+        for (const t of (b.open_trades || [])) {
+          const openMs = toMs(t.open_timestamp || 0);
+          out.push({
+            bot_key: b.key, bot_name: b.name, pair: t.pair,
+            open_rate: t.open_rate, close_rate: t.current_rate,
+            open_ts: t.open_timestamp, close_ts: now,
+            profit_pct: t.profit_pct, profit_abs: t.profit_abs,
+            is_win: (t.profit_abs || 0) > 0, is_open: true,
+            stop_rate: null, stoploss_pct: null,
+            duration_min: openMs ? Math.round((now - openMs) / 60000) : 0,
+          });
+        }
+      }
+      return out.sort((a, b) => toMs(b.open_ts) - toMs(a.open_ts));
+    },
     get filteredTrades() {
-      let trades = this.closedTrades;
-      if (this.tradesFilter === 'recent24h') {
+      let trades = this.tradesView === 'open' ? this.openTradesAll : this.closedTrades;
+      if (this.tradesView === 'closed' && this.tradesFilter === 'recent24h') {
         const cutoff = Date.now() - 24 * 3600 * 1000;
         trades = trades.filter(t => toMs(t.close_ts) > cutoff);
-      } else if (this.tradesFilter !== 'all') {
+      } else if (this.tradesFilter !== 'all' && this.tradesFilter !== 'recent24h') {
         trades = trades.filter(t => t.bot_key === this.tradesFilter);
       }
       return trades;
@@ -596,7 +621,10 @@ function dash() {
       const f = this.filteredTrades;
       const wr = f.length ? ((f.filter(t => t.is_win).length / f.length) * 100).toFixed(0) : 0;
       const pnl = f.reduce((s, t) => s + (t.profit_abs || 0), 0);
-      const pnlStr = (pnl >= 0 ? '+' : '') + '$' + Math.abs(pnl).toFixed(2);
+      const pnlStr = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toFixed(2);
+      if (this.tradesView === 'open') {
+        return `${f.length} open position${f.length === 1 ? '' : 's'} · unrealized ${pnlStr}`;
+      }
       // estimate days window for the filter
       if (this.tradesFilter === 'recent24h') {
         return `${f.length} closed trades · last 24h · win ${wr}% · ${pnlStr}`;
@@ -613,6 +641,9 @@ function dash() {
       return `${day} ${hh} · ${durStr}`;
     },
     _tradeKey(trade) { return trade.bot_key + ':' + trade.pair + ':' + trade.open_ts; },
+    // DOM id for a trade's chart — includes a sanitized pair so two trades a
+    // bot opens in the same ms (different pairs) don't collide on bot+open_ts.
+    tradeChartId(trade) { return 'trade-chart-' + trade.bot_key + '-' + trade.open_ts + '-' + String(trade.pair || '').replace(/[^A-Za-z0-9]/g, ''); },
     tradeTimeframe(trade) {
       const k = this._tradeKey(trade);
       if (this._tradeTfOverride[k]) return this._tradeTfOverride[k];
@@ -642,10 +673,13 @@ function dash() {
     },
 
     async renderTradeChart(trade) {
-      const chartId = 'trade-chart-' + trade.bot_key + '-' + trade.open_ts;
+      const chartId = this.tradeChartId(trade);
       const tf = this.tradeTimeframe(trade);
-      const cacheKey = trade.bot_key + ':' + trade.pair + ':' + tf;
-      let candles = this._tradeCandles[cacheKey];
+      // Key by open_ts too so distinct trades on the same bot/pair/tf (e.g. two
+      // SUI scalps) don't share a window. Open trades skip the cache so the
+      // chart keeps up with the live candle on each poll.
+      const cacheKey = trade.bot_key + ':' + trade.pair + ':' + tf + ':' + trade.open_ts;
+      let candles = trade.is_open ? null : this._tradeCandles[cacheKey];
       if (!candles) {
         try {
           const tfMs = { '5m': 5*60_000, '15m': 15*60_000, '1h': 60*60_000, '4h': 4*60*60_000 }[tf] || 60*60_000;
@@ -658,7 +692,7 @@ function dash() {
           if (!r.ok) return;
           const data = await r.json();
           candles = data.candles || [];
-          this._tradeCandles[cacheKey] = candles;
+          if (!trade.is_open) this._tradeCandles[cacheKey] = candles;
         } catch { return; }
       }
       if (!candles.length) return;
@@ -736,7 +770,7 @@ function dash() {
                          backgroundColor: 'rgba(252,252,250,0.9)', borderRadius: 2, borderColor: COLORS.border, borderWidth: 1 } },
               { yAxis: trade.close_rate,
                 lineStyle: { color: winColor, type: 'solid', width: 1, opacity: 0.8 },
-                label: { show: true, formatter: (trade.is_win ? 'roi ' : 'sl ') + (trade.close_rate||0).toPrecision(5),
+                label: { show: true, formatter: (trade.is_open ? 'now ' : (trade.is_win ? 'roi ' : 'sl ')) + (trade.close_rate||0).toPrecision(5),
                          position: 'insideEndTop', color: winColor, fontSize: 10, padding: [2, 4],
                          backgroundColor: 'rgba(252,252,250,0.9)', borderRadius: 2, borderColor: winColor, borderWidth: 1 } },
               ...(trade.stop_rate ? [{
