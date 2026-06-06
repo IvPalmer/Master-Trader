@@ -101,6 +101,18 @@ class Config:
         self.target_reconcile_sec = int(os.environ.get(
             "KILLERS_TARGET_RECONCILE_SEC", "20",
         ))
+        # Posted-SL hard stop — OFF by default. When on, force-exit an open
+        # position once mark price breaches the signal's posted SL, instead of
+        # riding to the channel's (delayed) close or to liquidation. This
+        # CHANGES the measured object from "copy the channel" to "copy the
+        # posted plan with a stop", so it is an explicit opt-in mode, not the
+        # default. Evidence: research/killers_sl_replay/RESULTS.md — a posted-SL
+        # stop halves the loss and removes liquidations across residual models
+        # (both still lose; do-not-fund stands). Replicates the third posted
+        # level (the bot already replicates entry + the TP ladder).
+        self.posted_sl = (os.environ.get(
+            "KILLERS_POSTED_SL", "false",
+        ).lower() in ("true", "1", "yes"))
 
 
 # ── Symbol mapping ─────────────────────────────────────────────────────────
@@ -369,6 +381,13 @@ def init_db(path: str) -> sqlite3.Connection:
     # the target-guard only consults it on new opens.
     try:
         conn.execute("ALTER TABLE positions ADD COLUMN targets_remaining TEXT")
+    except sqlite3.OperationalError:
+        pass
+    # Migration: absolute posted SL price per position, for the KILLERS_POSTED_SL
+    # hard-stop mode. NULL on legacy rows → those positions are never SL-exited
+    # (mode only acts on positions opened with a parsed posted SL).
+    try:
+        conn.execute("ALTER TABLE positions ADD COLUMN sl_abs REAL")
     except sqlite3.OperationalError:
         pass
     # Migration: add UNIQUE(pos_id, msg_id, kind) on events for partial-close
@@ -1120,6 +1139,88 @@ def _find_matching_order(orders: list[dict], ft_order_id: Optional[str],
     return candidates[0][1]
 
 
+def _posted_sl_breached(direction: str, mark: float, sl_abs: float) -> bool:
+    """True once mark price has reached/passed the signal's posted SL.
+    LONG stops when mark <= SL; SHORT stops when mark >= SL."""
+    if direction == "long":
+        return mark <= sl_abs
+    return mark >= sl_abs
+
+
+async def _check_posted_sl(cfg: Config, conn: sqlite3.Connection, ft_session=None) -> None:
+    """KILLERS_POSTED_SL mode (off by default): force-exit any open position
+    whose mark price has breached the signal's posted SL, mirroring the
+    channel-close path (full force_exit + cancel the resting TP ladder + mark
+    closed with reason 'posted_sl').
+
+    Fail-OPEN: a missing mark or a failed force_exit leaves the position open —
+    we never realise an exit we can't price or execute. Idempotent: only acts on
+    state='open' rows, and the force_exit + state='closed' update removes the row
+    from the next tick's selection.
+    """
+    if not cfg.posted_sl:
+        return
+    rows = conn.execute(
+        "SELECT pos_id, symbol, direction, ft_trade_id, sl_abs FROM positions "
+        "WHERE state = 'open' AND ft_trade_id IS NOT NULL AND sl_abs IS NOT NULL"
+    ).fetchall()
+    for pos in rows:
+        sl = pos["sl_abs"]
+        if not isinstance(sl, (int, float)) or sl <= 0:
+            continue
+        mark = await get_binance_mark_price(pos["symbol"])  # own public session
+        if mark is None:
+            continue  # fail-open: never force a false exit on missing data
+        if not _posted_sl_breached(pos["direction"], mark, sl):
+            continue
+        # Compare-and-swap: a channel close / reconcile may have closed this
+        # trade during the awaited mark fetch. Re-read state immediately before
+        # exiting so we don't double-exit or clobber the channel's close_reason.
+        still = conn.execute(
+            "SELECT state FROM positions WHERE pos_id=?", (pos["pos_id"],)
+        ).fetchone()
+        if not still or still["state"] != "open":
+            continue
+        resp = await ft_force_exit(cfg, pos["ft_trade_id"], pct=100, session=ft_session)
+        if not (200 <= resp.get("status", 0) < 300):
+            logger.error("[POSTED-SL] force_exit FAILED pos_id=%d ft_trade_id=%s status=%s — left open",
+                         pos["pos_id"], pos["ft_trade_id"], resp.get("status"))
+            continue
+        now = datetime.now(timezone.utc).isoformat()
+        # Atomic local state transition (autocommit conn → explicit txn). If it
+        # throws after the FT exit, position reconcile recovers the row.
+        try:
+            conn.execute("BEGIN")
+            conn.execute(
+                "UPDATE positions SET state='closed', pct_open=0, close_date=?, "
+                "close_reason='posted_sl', last_event_at=? WHERE pos_id=? AND state='open'",
+                (now, now, pos["pos_id"]),
+            )
+            conn.execute(
+                "UPDATE target_orders SET state='cancelled', "
+                "notes=COALESCE(notes,'') || ' | posted-sl-exit', last_check_at=? "
+                "WHERE pos_id=? AND state IN ('pending','active')",
+                (now, pos["pos_id"]),
+            )
+            conn.execute("COMMIT")
+        except Exception:
+            try:
+                conn.execute("ROLLBACK")
+            except Exception:
+                pass
+            logger.exception("[POSTED-SL] local update failed pos_id=%d after FT exit — "
+                             "reconcile will recover", pos["pos_id"])
+            continue
+        logger.warning("[POSTED-SL] pos_id=%d %s %s mark=%.6g breached SL=%.6g — force-exited",
+                       pos["pos_id"], pos["symbol"], pos["direction"].upper(), mark, sl)
+        try:
+            await _notify_telegram(
+                cfg, f"⛔ KillersScalp posted-SL hit: {pos['symbol']} "
+                     f"{pos['direction']} mark {mark:g} vs SL {sl:g} → exited")
+        except Exception:
+            pass
+
+
 async def target_orders_reconcile_loop(cfg: Config, conn: sqlite3.Connection,
                                        ft_session=None) -> None:
     """Background loop that ticks _reconcile_target_orders every
@@ -1129,6 +1230,7 @@ async def target_orders_reconcile_loop(cfg: Config, conn: sqlite3.Connection,
     while True:
         try:
             await _reconcile_target_orders(cfg, conn, session=ft_session)
+            await _check_posted_sl(cfg, conn, ft_session=ft_session)
         except Exception as e:
             logger.warning("target_orders reconcile error: %s", e)
         await asyncio.sleep(cfg.target_reconcile_sec)
@@ -1288,16 +1390,19 @@ async def lifespan(app: FastAPI):
     app.state.phase2_lock = asyncio.Lock()
     logger.info(
         "receiver up ft=%s db=%s stake=$%.0f lev=%.1fx max_open=%d "
-        "max_slippage=%.1f%% limit_in_zone=%s active_tp=%s reconcile_sec=%d",
+        "max_slippage=%.1f%% limit_in_zone=%s active_tp=%s posted_sl=%s reconcile_sec=%d",
         cfg.ft_base, cfg.db_path, cfg.stake_usd, cfg.leverage, cfg.max_open,
         cfg.max_entry_slippage_pct, cfg.entry_limit_in_zone, cfg.active_tp_limits,
-        cfg.target_reconcile_sec,
+        cfg.posted_sl, cfg.target_reconcile_sec,
     )
     recon = asyncio.create_task(
         reconcile_loop(cfg, conn, ft_session=app.state.ft_session)
     )
     target_recon = None
-    if cfg.active_tp_limits:
+    if cfg.active_tp_limits or cfg.posted_sl:
+        # The loop drives both the TP-ladder reconcile AND the posted-SL check,
+        # so start it if EITHER is enabled (posted-SL must work even with active
+        # TP limits off).
         target_recon = asyncio.create_task(
             target_orders_reconcile_loop(cfg, conn,
                                           ft_session=app.state.ft_session)
@@ -1838,6 +1943,10 @@ async def _process_event(payload: EventPayload):
             return {"action": "skipped", "reason": f"max_open ({cfg.max_open})"}
 
         stake, leverage, sl_dist = compute_stake(cls, cfg)
+        # Absolute posted SL price — stored for the KILLERS_POSTED_SL hard-stop
+        # mode (off by default). None when the signal carried no parseable SL.
+        _sl_raw = cls.get("sl")
+        sl_abs = float(_sl_raw) if isinstance(_sl_raw, (int, float)) and _sl_raw > 0 else None
         direction = cls["direction"].lower()
         if direction not in ("long", "short"):
             return {"action": "skipped", "reason": "bad_direction"}
@@ -2010,11 +2119,11 @@ async def _process_event(payload: EventPayload):
         try:
             cur = conn.execute(
                 "INSERT INTO positions (signal_id, symbol, pair, direction, state, "
-                " open_msg_id, open_date, stake_usd, leverage, sl_distance_pct, "
+                " open_msg_id, open_date, stake_usd, leverage, sl_distance_pct, sl_abs, "
                 " last_event_at, targets_remaining) "
-                "VALUES (?, ?, ?, ?, 'requested', ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, 'requested', ?, ?, ?, ?, ?, ?, ?, ?)",
                 (signal_id, symbol, pair, direction, msg_id, str(msg.get("date")),
-                 stake, leverage, sl_dist, datetime.now(timezone.utc).isoformat(),
+                 stake, leverage, sl_dist, sl_abs, datetime.now(timezone.utc).isoformat(),
                  targets_json),
             )
             pos_id = cur.lastrowid
