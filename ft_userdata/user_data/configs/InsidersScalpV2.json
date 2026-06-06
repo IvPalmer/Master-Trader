@@ -1,0 +1,207 @@
+{
+    "dry_run": true,
+    "dry_run_wallet": 200,
+    "cancel_open_orders_on_exit": true,
+    "trading_mode": "futures",
+    "margin_mode": "isolated",
+    "liquidation_buffer": 0.05,
+    "stake_currency": "USDT",
+    "stake_amount": "unlimited",
+    "tradable_balance_ratio": 0.99,
+    "fiat_display_currency": "",
+    "max_open_trades": 10,
+    "amount_reserve_percent": 0.05,
+    "unfilledtimeout": {
+        "entry": 240,
+        "exit": 43200,
+        "exit_timeout_count": 0,
+        "unit": "minutes"
+    },
+    "entry_pricing": {
+        "price_side": "other",
+        "use_order_book": true,
+        "order_book_top": 1,
+        "price_last_balance": 0.0,
+        "check_depth_of_market": {
+            "enabled": false,
+            "bids_to_ask_delta": 1
+        }
+    },
+    "exit_pricing": {
+        "price_side": "other",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "order_types": {
+        "entry": "market",
+        "exit": "market",
+        "emergency_exit": "market",
+        "force_exit": "market",
+        "force_entry": "market",
+        "stoploss": "market",
+        "stoploss_on_exchange": false,
+        "stoploss_on_exchange_interval": 60
+    },
+    "exchange": {
+        "name": "binance",
+        "key": "",
+        "secret": "",
+        "ccxt_config": {},
+        "ccxt_async_config": {},
+        "pair_whitelist": [
+            "BTC/USDT:USDT",
+            "ETH/USDT:USDT",
+            "SOL/USDT:USDT",
+            "ADA/USDT:USDT",
+            "SUI/USDT:USDT",
+            "LINK/USDT:USDT",
+            "DOGE/USDT:USDT",
+            "XRP/USDT:USDT",
+            "AAVE/USDT:USDT",
+            "ATOM/USDT:USDT",
+            "AVAX/USDT:USDT",
+            "BCH/USDT:USDT",
+            "DOT/USDT:USDT",
+            "LTC/USDT:USDT",
+            "OP/USDT:USDT",
+            "ARB/USDT:USDT",
+            "APT/USDT:USDT",
+            "NEAR/USDT:USDT",
+            "INJ/USDT:USDT",
+            "TIA/USDT:USDT",
+            "SEI/USDT:USDT",
+            "PEPE/USDT:USDT",
+            "SHIB/USDT:USDT",
+            "ENA/USDT:USDT",
+            "WLD/USDT:USDT",
+            "JUP/USDT:USDT",
+            "ONDO/USDT:USDT",
+            "TON/USDT:USDT",
+            "BNB/USDT:USDT",
+            "MKR/USDT:USDT",
+            "FIL/USDT:USDT",
+            "ICP/USDT:USDT",
+            "TAO/USDT:USDT",
+            "WLFI/USDT:USDT",
+            "ASTER/USDT:USDT",
+            "FARTCOIN/USDT:USDT",
+            "HYPE/USDT:USDT",
+            "PUMP/USDT:USDT",
+            "ZEC/USDT:USDT",
+            "XMR/USDT:USDT",
+            "RENDER/USDT:USDT",
+            "ETC/USDT:USDT",
+            "XLM/USDT:USDT",
+            "TRX/USDT:USDT",
+            "DASH/USDT:USDT",
+            "FET/USDT:USDT",
+            "RUNE/USDT:USDT",
+            "POL/USDT:USDT",
+            "1000PEPE/USDT:USDT",
+            "1000SHIB/USDT:USDT",
+            "1000FLOKI/USDT:USDT",
+            "1000BONK/USDT:USDT",
+            "JTO/USDT:USDT",
+            "WAVES/USDT:USDT",
+            "ZIL/USDT:USDT"
+        ],
+        "pair_blacklist": []
+    },
+    "pairlists": [
+        {
+            "method": "StaticPairList"
+        }
+    ],
+    "webhook": {
+        "enabled": true,
+        "url": "http://trade-webhook:8088/freqtrade/event",
+        "format": "json",
+        "webhookentry": {
+            "type": "entry",
+            "bot_name": "InsidersScalp",
+            "pair": "{pair}",
+            "stake_amount": "{stake_amount}",
+            "stake_currency": "{stake_currency}",
+            "limit": "{limit}",
+            "open_rate": "{open_rate}",
+            "order_type": "{order_type}",
+            "direction": "{direction}",
+            "leverage": "{leverage}"
+        },
+        "webhookentrycancel": {
+            "type": "entry_cancel",
+            "bot_name": "InsidersScalp",
+            "pair": "{pair}",
+            "reason": "{reason}"
+        },
+        "webhookentryfill": {
+            "type": "entry_fill",
+            "bot_name": "InsidersScalp",
+            "pair": "{pair}",
+            "stake_amount": "{stake_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "order_type": "{order_type}",
+            "direction": "{direction}",
+            "leverage": "{leverage}"
+        },
+        "webhookexit": {
+            "type": "exit",
+            "bot_name": "InsidersScalp",
+            "pair": "{pair}",
+            "profit_ratio": "{profit_ratio}",
+            "profit_amount": "{profit_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "close_rate": "{close_rate}",
+            "exit_reason": "{exit_reason}",
+            "direction": "{direction}"
+        },
+        "webhookexitcancel": {
+            "type": "exit_cancel",
+            "bot_name": "InsidersScalp",
+            "pair": "{pair}",
+            "reason": "{reason}"
+        },
+        "webhookexitfill": {
+            "type": "exit_fill",
+            "bot_name": "InsidersScalp",
+            "pair": "{pair}",
+            "profit_ratio": "{profit_ratio}",
+            "profit_amount": "{profit_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "close_rate": "{close_rate}",
+            "exit_reason": "{exit_reason}",
+            "direction": "{direction}"
+        },
+        "webhookstatus": {
+            "type": "status",
+            "bot_name": "InsidersScalp",
+            "status": "{status}"
+        }
+    },
+    "telegram": {
+        "enabled": false,
+        "token": "",
+        "chat_id": ""
+    },
+    "api_server": {
+        "enabled": true,
+        "listen_ip_address": "0.0.0.0",
+        "listen_port": 8080,
+        "verbosity": "error",
+        "enable_openapi": true,
+        "jwt_secret_key": "insiders-scalp-dev-key-change-for-prod",
+        "CORS_origins": [],
+        "username": "freqtrader",
+        "password": "mastertrader"
+    },
+    "bot_name": "InsidersScalp",
+    "initial_state": "running",
+    "force_entry_enable": true,
+    "internals": {
+        "process_throttle_secs": 5
+    },
+    "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.InsidersScalpV2.sqlite"
+}
