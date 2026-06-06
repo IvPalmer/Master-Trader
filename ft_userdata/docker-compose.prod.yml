@@ -110,6 +110,12 @@ services:
       KILLERS_STAKE_USD: "20"
       KILLERS_LEVERAGE: "5"
       KILLERS_MAX_OPEN: "10"
+      # Posted-SL hard-stop mode ON (2026-06-06): force-exit a position once
+      # mark breaches the signal's posted SL, instead of riding to the channel's
+      # close / liquidation. Per research/killers_sl_replay this halves the loss
+      # and removes liquidations. Changes the measured object (channel→posted
+      # plan); still dry-run, do-not-fund stands. Set "false" to revert.
+      KILLERS_POSTED_SL: "true"
     volumes:
       - killers_receiver_state:/var/lib/killers
     ports:
