@@ -364,6 +364,62 @@ async def _post_to_receiver(url: str, msg: dict, classification: dict) -> None:
 # ── Main loop ──────────────────────────────────────────────────────────────
 
 
+async def _setup_channel(client, events, conn: sqlite3.Connection,
+                         config: "Config", label: str, backfill: bool = True) -> None:
+    """Resolve one channel, (optionally) backfill missed msgs, register new/edit
+    handlers — each routed to its OWN conn/config (DB + receiver). Extracted so a
+    single client/session can drive multiple channels (killers + insiders
+    fan-out). Each call's handlers close over their own channel/conn/config (no
+    leak). Handler bodies are wrapped so a per-message error is logged and never
+    propagates — the feed always continues."""
+    if config.channel_id_override:
+        channel = int(config.channel_id_override)
+        logger.info("[%s] channel id=%d (override) receiver=%s db=%s",
+                    label, channel, config.receiver_url, config.db_path)
+    else:
+        ent = await client.get_entity(config.channel_username)
+        channel = ent.id
+        logger.info("[%s] resolved @%s → id=%d title=%r receiver=%s",
+                    label, config.channel_username, channel,
+                    getattr(ent, "title", "?"), config.receiver_url)
+
+    if backfill:
+        last_id = last_msg_id(conn)
+        if last_id:
+            logger.info("[%s] backfilling msgs > %d", label, last_id)
+            async for msg in client.iter_messages(channel, min_id=last_id, limit=100):
+                await process_message(client, channel, conn, config, msg.to_dict(), source="backfill")
+
+    async def _handle(event, source):
+        try:
+            await process_message(client, channel, conn, config, event.message.to_dict(), source=source)
+        except Exception:
+            logger.exception("[%s] handler error (source=%s) — feed continues", label, source)
+
+    @client.on(events.NewMessage(chats=[channel]))
+    async def _on_new(event):
+        await _handle(event, "new")
+
+    @client.on(events.MessageEdited(chats=[channel]))
+    async def _on_edit(event):
+        await _handle(event, "edited")
+
+
+def _insiders_config() -> "Optional[Config]":
+    """Config for the INSIDERS fan-out, built from INSIDERS_* env and reusing the
+    shared killers api/session/claude settings. None (disabled) unless
+    INSIDERS_TG_CHANNEL_ID is set."""
+    cid = os.getenv("INSIDERS_TG_CHANNEL_ID")
+    if not cid:
+        return None
+    ins = Config()                       # re-reads shared api/session/claude env
+    ins.channel_id_override = cid
+    ins.channel_username = None
+    ins.receiver_url = os.getenv("INSIDERS_RECEIVER_URL", "http://127.0.0.1:8090/event")
+    ins.db_path = os.getenv("INSIDERS_OBSERVER_DB", "/home/ubuntu/insiders-bot/state.sqlite")
+    return ins
+
+
 async def run(config: Config, conn: sqlite3.Connection) -> None:
     from telethon import TelegramClient, events
 
@@ -372,32 +428,22 @@ async def run(config: Config, conn: sqlite3.Connection) -> None:
     me = await client.get_me()
     logger.info("auth OK as %s (id=%d phone=%s)", me.first_name, me.id, getattr(me, "phone", "?"))
 
-    # Resolve channel
-    if config.channel_id_override:
-        channel = int(config.channel_id_override)
-    else:
-        ent = await client.get_entity(config.channel_username)
-        channel = ent.id
-        logger.info("resolved channel @%s → id=%d title=%r",
-                    config.channel_username, channel, getattr(ent, "title", "?"))
+    # Primary channel (killers).
+    await _setup_channel(client, events, conn, config, "killers")
 
-    # Backfill on startup
-    last_id = last_msg_id(conn)
-    if last_id:
-        logger.info("backfilling msgs > %d (last seen)", last_id)
-        async for msg in client.iter_messages(channel, min_id=last_id, limit=100):
-            d = msg.to_dict()
-            await process_message(client, channel, conn, config, d, source="backfill")
-
-    @client.on(events.NewMessage(chats=[channel]))
-    async def _on_new(event):
-        d = event.message.to_dict()
-        await process_message(client, channel, conn, config, d, source="new")
-
-    @client.on(events.MessageEdited(chats=[channel]))
-    async def _on_edit(event):
-        d = event.message.to_dict()
-        await process_message(client, channel, conn, config, d, source="edited")
+    # Optional INSIDERS fan-out on the SAME session/client (one account, two
+    # channels — avoids a second session). Fully fault-isolated: any failure
+    # resolving/backfilling the insiders channel is logged and CANNOT affect the
+    # killers feed. Enabled only when INSIDERS_TG_CHANNEL_ID is set.
+    try:
+        ins = _insiders_config()
+        if ins is not None:
+            ins_conn = init_db(ins.db_path)
+            # No backfill: the forward measurement starts from NOW, and skipping
+            # the free-channel history keeps insiders load off the killers path.
+            await _setup_channel(client, events, ins_conn, ins, "insiders", backfill=False)
+    except Exception:
+        logger.exception("[insiders] fan-out setup FAILED — killers feed unaffected")
 
     # Heartbeat
     async def heartbeat():
