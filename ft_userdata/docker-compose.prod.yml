@@ -158,6 +158,67 @@ services:
       - -c
       - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KillersScalpV1.log --config /freqtrade/user_data/configs/KillersScalpV1.json --strategy KillersScalpV1
 
+  ft-insiders-scalp:
+    # Freqtrade Futures dry-run — Insiders Scalp FORWARD MEASUREMENT (Dennis's
+    # free channel). Reuses the validated killers pass-through strategy
+    # (KillersScalpV1, REST-driven); insiders-receiver drives entries/exits with
+    # limit-in-zone + posted-SL. Do-not-fund measurement instrument: settling
+    # "does copying Dennis's free signals pay" with a live forward verdict.
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-insiders-scalp
+    environment:
+      <<: *a1
+      FREQTRADE__DRY_RUN: "true"   # go-live guard (env overrides config)
+    volumes:
+      - ft_user_data:/freqtrade/user_data
+      - ./user_data/configs:/freqtrade/user_data/configs:ro
+      - ./user_data/strategies:/freqtrade/user_data/strategies
+    ports:
+      - 127.0.0.1:8098:8080
+    healthcheck: *a2
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    entrypoint:
+      - /bin/sh
+      - -c
+      - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/InsidersScalpV2.log --config /freqtrade/user_data/configs/InsidersScalpV2.json --strategy KillersScalpV1
+
+  insiders-receiver:
+    # FastAPI executor for the Insiders forward measurement — SAME validated
+    # image as killers-receiver, pointed at ft-insiders-scalp. limit-in-zone +
+    # posted-SL ON (the exit policies the killers replay validated). Fed by the
+    # observer fan-out (Dennis's free channel 3501314840).
+    build: ../services/killers-receiver
+    image: killers-receiver:latest
+    restart: unless-stopped
+    container_name: insiders-receiver
+    networks:
+      - default
+      - dokploy-network
+    environment:
+      KILLERS_FT_BASE_URL: http://ft-insiders-scalp:8080
+      KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
+      KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+      KILLERS_DB: /var/lib/killers/receiver.sqlite
+      KILLERS_STAKE_USD: "20"
+      KILLERS_LEVERAGE: "5"
+      KILLERS_MAX_OPEN: "10"
+      KILLERS_POSTED_SL: "true"
+      KILLERS_NOTIFY_URL: http://trade-webhook:8088/test/notify
+    volumes:
+      - insiders_receiver_state:/var/lib/killers
+    ports:
+      - 127.0.0.1:8090:8089
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    depends_on:
+      - ft-insiders-scalp
+
   funding-refresh:
     image: freqtradeorg/freqtrade:stable
     restart: always
