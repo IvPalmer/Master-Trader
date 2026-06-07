@@ -1,0 +1,2427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Insiders Scalp — LLM vs Regex Replay</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #111827;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --pos: #16a34a;
+    --neg: #dc2626;
+    --short: #dc2626;
+    --long: #16a34a;
+    --llm: #2563eb;
+    --regex: #f59e0b;
+  }
+  * { box-sizing: border-box }
+  body {
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    margin: 0;
+    padding: 24px 32px 64px;
+    max-width: 1280px;
+    margin-inline: auto;
+  }
+  h1 { margin: 0 0 4px; font-size: 22px }
+  h2 { margin: 32px 0 12px; font-size: 16px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em }
+  .sub { color: var(--muted); margin-bottom: 24px; font-size: 13px }
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 24px 0;
+  }
+  .col {
+    background: #f9fafb;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .col.llm   { border-top: 3px solid var(--llm) }
+  .col.regex { border-top: 3px solid var(--regex) }
+  .col.delta { border-top: 3px solid #6b7280 }
+  .col h3 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted) }
+  .col h3 .tag { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle }
+  .col.llm h3 .tag   { background: var(--llm) }
+  .col.regex h3 .tag { background: var(--regex) }
+  .stat { display: flex; justify-content: space-between; padding: 4px 0; font-variant-numeric: tabular-nums }
+  .stat .label { color: var(--muted); font-size: 12px }
+  .stat .value { font-weight: 600; font-size: 13px }
+  .stat .big { font-size: 26px; font-weight: 700 }
+  .pos { color: var(--pos) }
+  .neg { color: var(--neg) }
+  .equity {
+    background: #f9fafb;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 13px }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top }
+  th {
+    background: #f9fafb; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em;
+    cursor: pointer; user-select: none; position: sticky; top: 0;
+  }
+  th:hover { color: var(--fg) }
+  .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px }
+  .sym { font-weight: 600 }
+  .dir-long { color: var(--long); font-weight: 600 }
+  .dir-short { color: var(--short); font-weight: 600 }
+  .events { color: var(--muted); font-size: 11px; max-width: 320px }
+  .msg { color: var(--muted); font-family: ui-monospace, monospace; font-size: 11px }
+  ul.notes li { margin-bottom: 6px; font-size: 13px }
+  .me-tag {
+    display: inline-block; background: #dbeafe; color: var(--llm);
+    padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; margin-left: 4px;
+    vertical-align: middle;
+  }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 3px; font-size: 12px }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px }
+  .legend {
+    display: flex; gap: 16px; font-size: 12px; color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .legend .swatch { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 4px }
+  .insight {
+    background: #ecfeff; border: 1px solid #67e8f9; border-radius: 6px;
+    padding: 12px 16px; margin: 16px 0; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+  <h1>Insiders Scalp — LLM vs Regex Paper-Trading Replay</h1>
+  <p class="sub">
+    1087 messages · April 17 → May 16, 2026 · WEEX 1-min kline PnL
+    · $1k account, $10 risk per trade, $50 margin
+    · generated 2026-05-26 18:35
+  </p>
+
+  <div class="insight">
+    <strong>LLM rescued 15 market-entry trades</strong> that the regex skipped
+    (no parsed entry price). Net delta: <strong class="pos">+$1030.77 (+103.08pp account return)</strong>.
+  </div>
+
+  <h2>Headline metrics</h2>
+  <div class="compare">
+    <div class="col llm">
+      <h3><span class="tag"></span>LLM pipeline</h3>
+      <div class="stat"><span class="label">Total PnL</span><span class="value big pos">+$763.96</span></div>
+      <div class="stat"><span class="label">Account return</span><span class="value">+76.40%</span></div>
+      <div class="stat"><span class="label">Trades parsed</span><span class="value">147</span></div>
+      <div class="stat"><span class="label">Sized &amp; simulated</span><span class="value">99</span></div>
+      <div class="stat"><span class="label">Skipped (no SL)</span><span class="value">48</span></div>
+      <div class="stat"><span class="label">Win rate ($)</span><span class="value">48.5%</span></div>
+      <div class="stat"><span class="label">Profit factor</span><span class="value">2.75</span></div>
+      <div class="stat"><span class="label">TP / SL / Manual</span><span class="value">34 / 42 / 8</span></div>
+      <div class="stat"><span class="label">Still open</span><span class="value">14</span></div>
+      <div class="stat"><span class="label">Avg leverage</span><span class="value">8.9x</span></div>
+    </div>
+    <div class="col regex">
+      <h3><span class="tag"></span>Regex pipeline (Eduardo's baseline)</h3>
+      <div class="stat"><span class="label">Total PnL</span><span class="value big neg">$-266.81</span></div>
+      <div class="stat"><span class="label">Account return</span><span class="value">-26.68%</span></div>
+      <div class="stat"><span class="label">Trades parsed</span><span class="value">97</span></div>
+      <div class="stat"><span class="label">Sized &amp; simulated</span><span class="value">44</span></div>
+      <div class="stat"><span class="label">Skipped (no SL/entry)</span><span class="value">53</span></div>
+      <div class="stat"><span class="label">Win rate ($)</span><span class="value">43.2%</span></div>
+      <div class="stat"><span class="label">Profit factor</span><span class="value">0.65</span></div>
+      <div class="stat"><span class="label">TP / SL / Manual</span><span class="value">12 / 22 / 7</span></div>
+      <div class="stat"><span class="label">Still open</span><span class="value">2</span></div>
+      <div class="stat"><span class="label">Avg leverage</span><span class="value">41.0x</span></div>
+    </div>
+    <div class="col delta">
+      <h3>Δ LLM − Regex</h3>
+      <div class="stat"><span class="label">PnL delta</span><span class="value big pos">+$1030.77</span></div>
+      <div class="stat"><span class="label">Return delta</span><span class="value">+103.08pp</span></div>
+      <div class="stat"><span class="label">Trades delta</span><span class="value">+50</span></div>
+      <div class="stat"><span class="label">Sized delta</span><span class="value">+55</span></div>
+      <div class="stat"><span class="label">Market entries rescued</span><span class="value">15</span></div>
+      <div class="stat"><span class="label">Trades only in LLM</span><span class="value">62</span></div>
+      <div class="stat"><span class="label">Trades only in Regex</span><span class="value">12</span></div>
+      <div class="stat"><span class="label">Win-rate delta</span><span class="value">+5.3pp</span></div>
+      <div class="stat"><span class="label">PF delta</span><span class="value">+2.10</span></div>
+    </div>
+  </div>
+
+  <h2>Equity curves</h2>
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--llm)"></span> LLM</span>
+    <span><span class="swatch" style="background:var(--regex)"></span> Regex</span>
+  </div>
+  <div class="equity"><svg viewBox="0 0 960 240" width="100%" preserveAspectRatio="xMidYMid meet">
+  <line x1="48" y1="216.0" x2="912" y2="216.0" stroke="#e5e7eb" stroke-width="1"/><text x="6" y="220.0" fill="#6b7280" font-size="11">$-599</text> <line x1="48" y1="168.0" x2="912" y2="168.0" stroke="#e5e7eb" stroke-width="1"/><text x="6" y="172.0" fill="#6b7280" font-size="11">$-258</text> <line x1="48" y1="120.0" x2="912" y2="120.0" stroke="#e5e7eb" stroke-width="1"/><text x="6" y="124.0" fill="#6b7280" font-size="11">$82</text> <line x1="48" y1="72.0" x2="912" y2="72.0" stroke="#e5e7eb" stroke-width="1"/><text x="6" y="76.0" fill="#6b7280" font-size="11">$423</text> <line x1="48" y1="24.0" x2="912" y2="24.0" stroke="#e5e7eb" stroke-width="1"/><text x="6" y="28.0" fill="#6b7280" font-size="11">$764</text>
+  <line x1="48" y1="131.6" x2="912" y2="131.6"
+        stroke="#9ca3af" stroke-width="1" stroke-dasharray="2,3"/>
+  <path d="M 48.0 209.6 L 56.8 211.5 L 65.6 211.5 L 74.4 212.8 L 83.3 214.6 L 92.1 216.0 L 100.9 208.6 L 109.7 205.9 L 118.5 207.4 L 127.3 208.5 L 136.2 210.3 L 145.0 211.7 L 153.8 213.1 L 162.6 214.4 L 171.4 206.6 L 180.2 207.6 L 189.1 209.0 L 197.9 206.2 L 206.7 204.8 L 215.5 202.9 L 224.3 193.1 L 233.1 194.6 L 242.0 191.7 L 250.8 191.7 L 259.6 188.0 L 268.4 189.5 L 277.2 184.0 L 286.0 181.4 L 294.9 183.0 L 303.7 180.5 L 312.5 180.1 L 321.3 181.4 L 330.1 182.4 L 338.9 183.9 L 347.8 184.8 L 356.6 180.3 L 365.4 179.7 L 374.2 173.8 L 383.0 173.8 L 391.8 175.0 L 400.7 176.2 L 409.5 174.4 L 418.3 169.9 L 427.1 169.2" fill="none" stroke="#f59e0b" stroke-width="2.2"/>
+  <path d="M 48.0 133.0 L 56.8 134.4 L 65.6 135.5 L 74.4 132.2 L 83.3 130.9 L 92.1 132.2 L 100.9 130.0 L 109.7 128.6 L 118.5 130.1 L 127.3 129.1 L 136.2 130.4 L 145.0 131.6 L 153.8 131.9 L 162.6 133.2 L 171.4 134.8 L 180.2 132.8 L 189.1 134.3 L 197.9 132.6 L 206.7 134.2 L 215.5 135.6 L 224.3 134.5 L 233.1 123.6 L 242.0 122.1 L 250.8 123.8 L 259.6 125.5 L 268.4 118.4 L 277.2 115.0 L 286.0 116.8 L 294.9 118.4 L 303.7 114.9 L 312.5 116.4 L 321.3 115.0 L 330.1 106.2 L 338.9 107.7 L 347.8 109.4 L 356.6 110.7 L 365.4 111.7 L 374.2 107.7 L 383.0 106.8 L 391.8 107.4 L 400.7 105.4 L 409.5 104.7 L 418.3 100.2 L 427.1 100.2 L 435.9 96.1 L 444.7 97.7 L 453.6 99.0 L 462.4 100.5 L 471.2 95.7 L 480.0 97.0 L 488.8 98.3 L 497.6 91.1 L 506.4 89.0 L 515.3 90.4 L 524.1 83.0 L 532.9 80.4 L 541.7 80.1 L 550.5 81.7 L 559.3 83.2 L 568.2 81.4 L 577.0 82.6 L 585.8 83.6 L 594.6 85.4 L 603.4 75.5 L 612.2 72.7 L 621.1 68.7 L 629.9 70.0 L 638.7 70.0 L 647.5 66.3 L 656.3 66.1 L 665.1 64.7 L 674.0 66.3 L 682.8 60.8 L 691.6 60.8 L 700.4 58.1 L 709.2 59.5 L 718.0 59.3 L 726.9 60.9 L 735.7 58.4 L 744.5 58.2 L 753.3 59.5 L 762.1 60.3 L 770.9 59.9 L 779.8 60.9 L 788.6 49.3 L 797.4 50.6 L 806.2 37.6 L 815.0 39.0 L 823.8 40.0 L 832.7 35.5 L 841.5 35.5 L 850.3 35.5 L 859.1 36.8 L 867.9 38.0 L 876.7 36.9 L 885.6 31.0 L 894.4 29.3 L 903.2 24.7 L 912.0 24.0" fill="none" stroke="#2563eb" stroke-width="2.2"/>
+  <g font-size="12" font-weight="600">
+    <text x="712" y="18" fill="#2563eb">
+      LLM +$763.96
+    </text>
+    <text x="832" y="18" fill="#f59e0b">
+      Regex $-266.81
+    </text>
+  </g>
+</svg></div>
+
+  <h2>Market entries rescued by the LLM</h2>
+  <ul class='notes'><li><strong>#246 BTC LONG</strong> (2026-02-23): regex skipped (market entry), LLM filled via WEEX → <span class='neg'>$-3.91</span></li><li><strong>#413 BTC SHORT</strong> (2026-03-02): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>—</span></li><li><strong>#430 BTC LONG</strong> (2026-03-03): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>+$33.98</span></li><li><strong>#443 BTC SHORT</strong> (2026-03-03): regex skipped (market entry), LLM filled via WEEX → <span class='neg'>$-8.86</span></li><li><strong>#445 ETH SHORT</strong> (2026-03-03): regex skipped (market entry), LLM filled via WEEX → <span class='neg'>$-9.21</span></li><li><strong>#476 FF LONG</strong> (2026-03-04): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>+$51.10</span></li><li><strong>#549 PUMP SHORT</strong> (2026-03-10): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>+$12.30</span></li><li><strong>#791 BTC SHORT</strong> (2026-03-23): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>—</span></li><li><strong>#812 ETH SHORT</strong> (2026-03-24): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>—</span></li><li><strong>#835 BTC LONG</strong> (2026-03-26): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>+$28.30</span></li><li><strong>#858 VIRTUAL SHORT</strong> (2026-03-29): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>—</span></li><li><strong>#860 ETH SHORT</strong> (2026-03-29): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>+$1.34</span></li><li><strong>#940 ZEC SHORT</strong> (2026-04-02): regex skipped (market entry), LLM filled via WEEX → <span class='neg'>$-9.60</span></li><li><strong>#944 XAUT SHORT</strong> (2026-04-03): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>+$1.54</span></li><li><strong>#1065 TST LONG</strong> (2026-04-17): regex skipped (market entry), LLM filled via WEEX → <span class='pos'>+$0.00</span></li></ul>
+
+  <h2>Trades only in LLM pipeline</h2>
+  <ul class='notes'><li><strong>#6 ETH LONG</strong> (2026-01-30): pnl <span class='neg'>$-10.27</span></li><li><strong>#7 ETH LONG</strong> (2026-02-01): pnl <span class='neg'>$-9.54</span></li><li><strong>#8 BTC LONG</strong> (2026-02-01): pnl <span class='neg'>$-8.17</span></li><li><strong>#9 XAUT SHORT</strong> (2026-02-02): pnl <span class='pos'>+$24.00</span></li><li><strong>#12 XAG SHORT</strong> (2026-02-02): pnl <span class='pos'>+$9.09</span></li><li><strong>#14 XAUT LONG</strong> (2026-02-03): pnl <span class='neg'>$-9.39</span></li><li><strong>#20 HBAR SHORT</strong> (2026-02-03): pnl <span class='pos'>+$15.94</span></li><li><strong>#25 BTC LONG</strong> (2026-02-03): pnl <span class='pos'>+$9.50</span></li><li><strong>#26 BNB LONG</strong> (2026-02-03): pnl <span class='neg'>$-10.28</span></li><li><strong>#30 BTC LONG</strong> (2026-02-04): pnl <span class='pos'>+$6.53</span></li><li><strong>#33 ATOM SHORT</strong> (2026-02-04): pnl <span class='neg'>$-8.91</span></li><li><strong>#38 XAG LONG</strong> (2026-02-04): pnl <span class='neg'>$-8.79</span></li><li><strong>#41 ETH SHORT</strong> (2026-02-05): pnl <span class='neg'>$-1.53</span></li><li><strong>#42 BTC SHORT</strong> (2026-02-05): pnl <span class='neg'>$-9.63</span></li><li><strong>#53 LTC SHORT</strong> (2026-02-06): pnl <span class='pos'>—</span></li></ul><p class='sub'>(+47 more)</p>
+
+  <h2>Trades only in Regex pipeline</h2>
+  <ul class='notes'><li><strong>#212 HEDGE SHORT</strong> (2026-02-19): pnl <span class='pos'>—</span></li><li><strong>#460 ETH LONG</strong> (2026-03-03): pnl <span class='pos'>—</span></li><li><strong>#572 GENERATIONAL LONG</strong> (2026-03-11): pnl <span class='pos'>—</span></li><li><strong>#951 BTC SHORT</strong> (2026-04-05): pnl <span class='pos'>—</span></li><li><strong>#952 ETH SHORT</strong> (2026-04-05): pnl <span class='pos'>—</span></li><li><strong>#979 ETH SHORT</strong> (2026-04-09): pnl <span class='pos'>+$18.41</span></li><li><strong>#981 ARB SHORT</strong> (2026-04-09): pnl <span class='pos'>+$2.75</span></li><li><strong>#1031 BTC SHORT</strong> (2026-04-15): pnl <span class='pos'>—</span></li><li><strong>#1032 ETH SHORT</strong> (2026-04-15): pnl <span class='neg'>$-7.16</span></li><li><strong>#1056 BTC SHORT</strong> (2026-04-17): pnl <span class='neg'>$-6.93</span></li><li><strong>#1057 ETH SHORT</strong> (2026-04-17): pnl <span class='pos'>+$31.87</span></li><li><strong>#1105 BTC LONG</strong> (2026-04-20): pnl <span class='pos'>—</span></li></ul>
+
+  <h2>LLM trade log <span style="font-weight:400;color:var(--muted);font-size:12px;text-transform:none">M = market entry (filled via WEEX) · click headers to sort</span></h2>
+  <div class="table-wrap">
+    <table id="trades">
+      <thead><tr>
+        <th data-key="date">Date</th>
+        <th>Symbol</th>
+        <th>Dir</th>
+        <th>Entry</th>
+        <th>SL</th>
+        <th>TP</th>
+        <th>Exit</th>
+        <th>Reason</th>
+        <th>Lev</th>
+        <th>SL%</th>
+        <th data-key="pnl">PnL</th>
+        <th>Events</th>
+        <th>Msg</th>
+      </tr></thead>
+      <tbody><tr data-pnl="-10.27" data-date="2026-01-30T19:05:32+00:00">
+  <td class="mono">2026-01-30</td>
+  <td class="sym">ETH</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">2,739.56</td>
+  <td class="mono">2,632.84</td>
+  <td class="mono">2,825.47</td>
+  <td class="mono">2,632.84</td>
+  <td>✗ sl</td>
+  <td class="mono">5.1x</td>
+  <td class="mono">3.90%</td>
+  <td class="mono neg">$-10.27</td>
+  <td class="events">—</td>
+  <td class="msg">#6</td>
+</tr>
+<tr data-pnl="-9.54" data-date="2026-02-01T10:23:48+00:00">
+  <td class="mono">2026-02-01</td>
+  <td class="sym">ETH</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">2,427.09</td>
+  <td class="mono">2,350.75</td>
+  <td class="mono">2,488.51</td>
+  <td class="mono">2,350.75</td>
+  <td>✗ sl</td>
+  <td class="mono">6.4x</td>
+  <td class="mono">3.15%</td>
+  <td class="mono neg">$-9.54</td>
+  <td class="events">—</td>
+  <td class="msg">#7</td>
+</tr>
+<tr data-pnl="-8.17" data-date="2026-02-01T10:24:24+00:00">
+  <td class="mono">2026-02-01</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">78,964.2</td>
+  <td class="mono">77,032.2</td>
+  <td class="mono">80,522.8</td>
+  <td class="mono">77,032.2</td>
+  <td>✗ sl</td>
+  <td class="mono">8.2x</td>
+  <td class="mono">2.45%</td>
+  <td class="mono neg">$-8.17</td>
+  <td class="events">—</td>
+  <td class="msg">#8</td>
+</tr>
+<tr data-pnl="24.0" data-date="2026-02-02T12:06:52+00:00">
+  <td class="mono">2026-02-02</td>
+  <td class="sym">XAUT</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">4,800</td>
+  <td class="mono">4,880</td>
+  <td class="mono">4,600</td>
+  <td class="mono">4,600</td>
+  <td>✓ tp</td>
+  <td class="mono">12.0x</td>
+  <td class="mono">1.67%</td>
+  <td class="mono pos">+$24.00</td>
+  <td class="events">—</td>
+  <td class="msg">#9</td>
+</tr>
+<tr data-pnl="9.09" data-date="2026-02-02T15:43:57+00:00">
+  <td class="mono">2026-02-02</td>
+  <td class="sym">XAG</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">79.5</td>
+  <td class="mono">83</td>
+  <td class="mono">73</td>
+  <td class="mono">76.16</td>
+  <td>· open</td>
+  <td class="mono">4.5x</td>
+  <td class="mono">4.40%</td>
+  <td class="mono pos">+$9.09</td>
+  <td class="events">—</td>
+  <td class="msg">#12</td>
+</tr>
+<tr data-pnl="-9.39" data-date="2026-02-03T13:24:56+00:00">
+  <td class="mono">2026-02-03</td>
+  <td class="sym">XAUT</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">4,850</td>
+  <td class="mono">4,695</td>
+  <td class="mono">5,205</td>
+  <td class="mono">4,695</td>
+  <td>✗ sl</td>
+  <td class="mono">6.3x</td>
+  <td class="mono">3.20%</td>
+  <td class="mono neg">$-9.39</td>
+  <td class="events">move_sl</td>
+  <td class="msg">#14</td>
+</tr>
+<tr data-pnl="15.94" data-date="2026-02-03T14:22:21+00:00">
+  <td class="mono">2026-02-03</td>
+  <td class="sym">HBAR</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">0.093</td>
+  <td class="mono">0.0965</td>
+  <td class="mono">0.0875</td>
+  <td class="mono">0.0875</td>
+  <td>✓ tp</td>
+  <td class="mono">5.3x</td>
+  <td class="mono">3.76%</td>
+  <td class="mono pos">+$15.94</td>
+  <td class="events">move_sl</td>
+  <td class="msg">#20</td>
+</tr>
+<tr data-pnl="9.5" data-date="2026-02-03T19:19:40+00:00">
+  <td class="mono">2026-02-03</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">74,456.2</td>
+  <td class="mono">72,889.1</td>
+  <td class="mono">75,744.3</td>
+  <td class="mono">75,744.3</td>
+  <td>✓ tp</td>
+  <td class="mono">9.5x</td>
+  <td class="mono">2.10%</td>
+  <td class="mono pos">+$9.50</td>
+  <td class="events">—</td>
+  <td class="msg">#25</td>
+</tr>
+<tr data-pnl="-10.28" data-date="2026-02-03T19:20:38+00:00">
+  <td class="mono">2026-02-03</td>
+  <td class="sym">BNB</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">750.7</td>
+  <td class="mono">736.1</td>
+  <td class="mono">762.4</td>
+  <td class="mono">736.1</td>
+  <td>✗ sl</td>
+  <td class="mono">10.3x</td>
+  <td class="mono">1.94%</td>
+  <td class="mono neg">$-10.28</td>
+  <td class="events">—</td>
+  <td class="msg">#26</td>
+</tr>
+<tr data-pnl="6.53" data-date="2026-02-04T09:14:37+00:00">
+  <td class="mono">2026-02-04</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">73,500</td>
+  <td class="mono">69,000</td>
+  <td class="mono">82,250</td>
+  <td class="mono">76,084</td>
+  <td>· open</td>
+  <td class="mono">3.3x</td>
+  <td class="mono">6.12%</td>
+  <td class="mono pos">+$6.53</td>
+  <td class="events">—</td>
+  <td class="msg">#30</td>
+</tr>
+<tr data-pnl="-8.91" data-date="2026-02-04T13:04:36+00:00">
+  <td class="mono">2026-02-04</td>
+  <td class="sym">ATOM</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">2.08</td>
+  <td class="mono">2.15</td>
+  <td class="mono">1.92</td>
+  <td class="mono">2.15</td>
+  <td>✗ sl</td>
+  <td class="mono">5.9x</td>
+  <td class="mono">3.37%</td>
+  <td class="mono neg">$-8.91</td>
+  <td class="events">move_sl</td>
+  <td class="msg">#33</td>
+</tr>
+<tr data-pnl="-8.79" data-date="2026-02-04T20:06:08+00:00">
+  <td class="mono">2026-02-04</td>
+  <td class="sym">XAG</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">86.45</td>
+  <td class="mono">83.5</td>
+  <td class="mono">89</td>
+  <td class="mono">83.5</td>
+  <td>✗ sl</td>
+  <td class="mono">5.9x</td>
+  <td class="mono">3.41%</td>
+  <td class="mono neg">$-8.79</td>
+  <td class="events">—</td>
+  <td class="msg">#38</td>
+</tr>
+<tr data-pnl="-1.53" data-date="2026-02-05T11:28:48+00:00">
+  <td class="mono">2026-02-05</td>
+  <td class="sym">ETH</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">2,060.5</td>
+  <td class="mono">2,195</td>
+  <td class="mono">1,932.92</td>
+  <td class="mono">2,074.99</td>
+  <td>· open</td>
+  <td class="mono">3.1x</td>
+  <td class="mono">6.53%</td>
+  <td class="mono neg">$-1.53</td>
+  <td class="events">—</td>
+  <td class="msg">#41</td>
+</tr>
+<tr data-pnl="-9.63" data-date="2026-02-05T15:03:24+00:00">
+  <td class="mono">2026-02-05</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">69,075.8</td>
+  <td class="mono">71,944.4</td>
+  <td class="mono">66,265.9</td>
+  <td class="mono">71,944.4</td>
+  <td>✗ sl</td>
+  <td class="mono">4.8x</td>
+  <td class="mono">4.15%</td>
+  <td class="mono neg">$-9.63</td>
+  <td class="events">—</td>
+  <td class="msg">#42</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-06T00:20:31+00:00">
+  <td class="mono">2026-02-06</td>
+  <td class="sym">LTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">81</td>
+  <td class="mono">—</td>
+  <td class="mono">48.6</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">—</td>
+  <td class="msg">#53</td>
+</tr>
+<tr data-pnl="-11.11" data-date="2026-02-07T07:00:33+00:00">
+  <td class="mono">2026-02-07</td>
+  <td class="sym">ASTER</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">0.5442</td>
+  <td class="mono">0.5589</td>
+  <td class="mono">0.5305</td>
+  <td class="mono">0.5589</td>
+  <td>✗ sl</td>
+  <td class="mono">7.4x</td>
+  <td class="mono">2.70%</td>
+  <td class="mono neg">$-11.11</td>
+  <td class="events">—</td>
+  <td class="msg">#57</td>
+</tr>
+<tr data-pnl="13.77" data-date="2026-02-08T07:17:43+00:00">
+  <td class="mono">2026-02-08</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">69,432.1</td>
+  <td class="mono">68,928</td>
+  <td class="mono">69,814</td>
+  <td class="mono">69,814</td>
+  <td>✓ tp</td>
+  <td class="mono">27.5x</td>
+  <td class="mono">0.73%</td>
+  <td class="mono pos">+$13.77</td>
+  <td class="events">—</td>
+  <td class="msg">#58</td>
+</tr>
+<tr data-pnl="-10.35" data-date="2026-02-08T11:37:29+00:00">
+  <td class="mono">2026-02-08</td>
+  <td class="sym">ETH</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">2,128.84</td>
+  <td class="mono">2,067.16</td>
+  <td class="mono">2,173.97</td>
+  <td class="mono">2,067.16</td>
+  <td>✗ sl</td>
+  <td class="mono">6.9x</td>
+  <td class="mono">2.90%</td>
+  <td class="mono neg">$-10.35</td>
+  <td class="events">close_full</td>
+  <td class="msg">#61</td>
+</tr>
+<tr data-pnl="11.86" data-date="2026-02-08T11:37:38+00:00">
+  <td class="mono">2026-02-08</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">70,847.2</td>
+  <td class="mono">69,055</td>
+  <td class="mono">72,646.3</td>
+  <td class="mono">72,646.3</td>
+  <td>✓ tp</td>
+  <td class="mono">7.9x</td>
+  <td class="mono">2.53%</td>
+  <td class="mono pos">+$11.86</td>
+  <td class="events">—</td>
+  <td class="msg">#62</td>
+</tr>
+<tr data-pnl="-10.94" data-date="2026-02-09T16:35:50+00:00">
+  <td class="mono">2026-02-09</td>
+  <td class="sym">ASTER</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">0.5934</td>
+  <td class="mono">0.6151</td>
+  <td class="mono">0.5738</td>
+  <td class="mono">0.6151</td>
+  <td>✗ sl</td>
+  <td class="mono">5.5x</td>
+  <td class="mono">3.66%</td>
+  <td class="mono neg">$-10.94</td>
+  <td class="events">close_full</td>
+  <td class="msg">#68</td>
+</tr>
+<tr data-pnl="-9.97" data-date="2026-02-10T06:24:34+00:00">
+  <td class="mono">2026-02-10</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">69,113.7</td>
+  <td class="mono">70,499.9</td>
+  <td class="mono">67,711.3</td>
+  <td class="mono">70,499.9</td>
+  <td>✗ sl</td>
+  <td class="mono">10.0x</td>
+  <td class="mono">2.01%</td>
+  <td class="mono neg">$-9.97</td>
+  <td class="events">—</td>
+  <td class="msg">#70</td>
+</tr>
+<tr data-pnl="7.23" data-date="2026-02-10T07:55:36+00:00">
+  <td class="mono">2026-02-10</td>
+  <td class="sym">ASTER</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.633</td>
+  <td class="mono">0.598</td>
+  <td class="mono">0.6605</td>
+  <td class="mono">0.6605</td>
+  <td>✓ tp</td>
+  <td class="mono">3.6x</td>
+  <td class="mono">5.53%</td>
+  <td class="mono pos">+$7.23</td>
+  <td class="events">close_full</td>
+  <td class="msg">#73</td>
+</tr>
+<tr data-pnl="77.58" data-date="2026-02-11T08:39:48+00:00">
+  <td class="mono">2026-02-11</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">66,500</td>
+  <td class="mono">65,300</td>
+  <td class="mono">—</td>
+  <td class="mono">76,095.6</td>
+  <td>○ manual</td>
+  <td class="mono">11.1x</td>
+  <td class="mono">1.80%</td>
+  <td class="mono pos">+$77.58</td>
+  <td class="events">close_partial, move_sl, close_partial, move_sl, move_sl, move_sl, close_partial, close_partial, clos</td>
+  <td class="msg">#79</td>
+</tr>
+<tr data-pnl="10.85" data-date="2026-02-11T13:38:12+00:00">
+  <td class="mono">2026-02-11</td>
+  <td class="sym">ETH</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">1,966.65</td>
+  <td class="mono">1,930.39</td>
+  <td class="mono">1,999.92</td>
+  <td class="mono">1,999.92</td>
+  <td>✓ tp</td>
+  <td class="mono">10.8x</td>
+  <td class="mono">1.84%</td>
+  <td class="mono pos">+$10.85</td>
+  <td class="events">close_full</td>
+  <td class="msg">#84</td>
+</tr>
+<tr data-pnl="-12.32" data-date="2026-02-12T10:08:06+00:00">
+  <td class="mono">2026-02-12</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">67,750</td>
+  <td class="mono">68,300</td>
+  <td class="mono">—</td>
+  <td class="mono">68,300</td>
+  <td>✗ sl</td>
+  <td class="mono">24.6x</td>
+  <td class="mono">0.81%</td>
+  <td class="mono neg">$-12.32</td>
+  <td class="events">—</td>
+  <td class="msg">#95</td>
+</tr>
+<tr data-pnl="-11.77" data-date="2026-02-12T13:29:27+00:00">
+  <td class="mono">2026-02-12</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">67,690.6</td>
+  <td class="mono">68,265.5</td>
+  <td class="mono">67,041.3</td>
+  <td class="mono">68,265.5</td>
+  <td>✗ sl</td>
+  <td class="mono">23.5x</td>
+  <td class="mono">0.85%</td>
+  <td class="mono neg">$-11.77</td>
+  <td class="events">close_full</td>
+  <td class="msg">#103</td>
+</tr>
+<tr data-pnl="50.41" data-date="2026-02-12T20:12:02+00:00">
+  <td class="mono">2026-02-12</td>
+  <td class="sym">ZEC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">226.44</td>
+  <td class="mono">220.6</td>
+  <td class="mono">254.81</td>
+  <td class="mono">254.81</td>
+  <td>✓ tp</td>
+  <td class="mono">7.8x</td>
+  <td class="mono">2.58%</td>
+  <td class="mono pos">+$50.41</td>
+  <td class="events">close_partial, close_full</td>
+  <td class="msg">#117</td>
+</tr>
+<tr data-pnl="24.24" data-date="2026-02-13T03:20:02+00:00">
+  <td class="mono">2026-02-13</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">65,800</td>
+  <td class="mono">63,900</td>
+  <td class="mono">70,400</td>
+  <td class="mono">70,400</td>
+  <td>✓ tp</td>
+  <td class="mono">6.9x</td>
+  <td class="mono">2.89%</td>
+  <td class="mono pos">+$24.24</td>
+  <td class="events">move_sl, close_partial, close_partial, close_full</td>
+  <td class="msg">#122</td>
+</tr>
+<tr data-pnl="-13.17" data-date="2026-02-13T16:19:09+00:00">
+  <td class="mono">2026-02-13</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">69,150</td>
+  <td class="mono">70,200</td>
+  <td class="mono">—</td>
+  <td class="mono">70,200</td>
+  <td>✗ sl</td>
+  <td class="mono">13.2x</td>
+  <td class="mono">1.52%</td>
+  <td class="mono neg">$-13.17</td>
+  <td class="events">move_sl</td>
+  <td class="msg">#137</td>
+</tr>
+<tr data-pnl="-11.06" data-date="2026-02-13T17:31:40+00:00">
+  <td class="mono">2026-02-13</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">71,900</td>
+  <td class="mono">74,500</td>
+  <td class="mono">—</td>
+  <td class="mono">74,500</td>
+  <td>✗ sl</td>
+  <td class="mono">5.5x</td>
+  <td class="mono">3.62%</td>
+  <td class="mono neg">$-11.06</td>
+  <td class="events">close_full</td>
+  <td class="msg">#144</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-14T10:29:11+00:00">
+  <td class="mono">2026-02-14</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">76,738.6</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">move_sl, increase, increase, close_partial, close_partial, close_partial, close_full</td>
+  <td class="msg">#148</td>
+</tr>
+<tr data-pnl="25.0" data-date="2026-02-16T12:31:19+00:00">
+  <td class="mono">2026-02-16</td>
+  <td class="sym">ETH</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">1,966.15</td>
+  <td class="mono">1,926.83</td>
+  <td class="mono">2,061.87</td>
+  <td class="mono">2,061.87</td>
+  <td>✓ tp</td>
+  <td class="mono">10.0x</td>
+  <td class="mono">2.00%</td>
+  <td class="mono pos">+$25.00</td>
+  <td class="events">close_partial, close_full</td>
+  <td class="msg">#173</td>
+</tr>
+<tr data-pnl="-11.19" data-date="2026-02-17T01:04:50+00:00">
+  <td class="mono">2026-02-17</td>
+  <td class="sym">ASTER</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.70775</td>
+  <td class="mono">0.6951</td>
+  <td class="mono">0.73</td>
+  <td class="mono">0.6951</td>
+  <td>✗ sl</td>
+  <td class="mono">11.2x</td>
+  <td class="mono">1.79%</td>
+  <td class="mono neg">$-11.19</td>
+  <td class="events">close_partial</td>
+  <td class="msg">#176</td>
+</tr>
+<tr data-pnl="10.44" data-date="2026-02-17T10:16:50+00:00">
+  <td class="mono">2026-02-17</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">67,850</td>
+  <td class="mono">67,200</td>
+  <td class="mono">68,800</td>
+  <td class="mono">68,800</td>
+  <td>✓ tp</td>
+  <td class="mono">20.9x</td>
+  <td class="mono">0.96%</td>
+  <td class="mono pos">+$10.44</td>
+  <td class="events">move_sl, close_full</td>
+  <td class="msg">#179</td>
+</tr>
+<tr data-pnl="62.35" data-date="2026-02-17T15:21:21+00:00">
+  <td class="mono">2026-02-17</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">66,800</td>
+  <td class="mono">65,300</td>
+  <td class="mono">—</td>
+  <td class="mono">76,085.1</td>
+  <td>○ manual</td>
+  <td class="mono">8.9x</td>
+  <td class="mono">2.25%</td>
+  <td class="mono pos">+$62.35</td>
+  <td class="events">increase, close_partial, increase, increase, close_full</td>
+  <td class="msg">#182</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-18T10:32:18+00:00">
+  <td class="mono">2026-02-18</td>
+  <td class="sym">XRP <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial, close_full</td>
+  <td class="msg">#193</td>
+</tr>
+<tr data-pnl="-10.65" data-date="2026-02-18T18:44:10+00:00">
+  <td class="mono">2026-02-18</td>
+  <td class="sym">ETH</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">1,946.9</td>
+  <td class="mono">2,038.29</td>
+  <td class="mono">1,872.16</td>
+  <td class="mono">2,038.29</td>
+  <td>✗ sl</td>
+  <td class="mono">4.3x</td>
+  <td class="mono">4.69%</td>
+  <td class="mono neg">$-10.65</td>
+  <td class="events">move_sl, close_partial, close_full</td>
+  <td class="msg">#203</td>
+</tr>
+<tr data-pnl="-11.97" data-date="2026-02-19T09:49:34+00:00">
+  <td class="mono">2026-02-19</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">66,741.9</td>
+  <td class="mono">67,299.4</td>
+  <td class="mono">66,315.6</td>
+  <td class="mono">67,299.4</td>
+  <td>✗ sl</td>
+  <td class="mono">23.9x</td>
+  <td class="mono">0.84%</td>
+  <td class="mono neg">$-11.97</td>
+  <td class="events">move_sl, close_partial, move_sl, move_sl, close_full</td>
+  <td class="msg">#208</td>
+</tr>
+<tr data-pnl="-9.65" data-date="2026-02-19T16:07:35+00:00">
+  <td class="mono">2026-02-19</td>
+  <td class="sym">ETH</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">1,907.8</td>
+  <td class="mono">1,986.91</td>
+  <td class="mono">1,823.51</td>
+  <td class="mono">1,986.91</td>
+  <td>✗ sl</td>
+  <td class="mono">4.8x</td>
+  <td class="mono">4.15%</td>
+  <td class="mono neg">$-9.65</td>
+  <td class="events">close_partial</td>
+  <td class="msg">#222</td>
+</tr>
+<tr data-pnl="-7.15" data-date="2026-02-21T14:01:05+00:00">
+  <td class="mono">2026-02-21</td>
+  <td class="sym">EGLD</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">4.18</td>
+  <td class="mono">3.654</td>
+  <td class="mono">4.745</td>
+  <td class="mono">3.824</td>
+  <td>· open</td>
+  <td class="mono">1.6x</td>
+  <td class="mono">12.58%</td>
+  <td class="mono neg">$-7.15</td>
+  <td class="events">move_sl</td>
+  <td class="msg">#232</td>
+</tr>
+<tr data-pnl="28.53" data-date="2026-02-21T14:18:13+00:00">
+  <td class="mono">2026-02-21</td>
+  <td class="sym">ETC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">7.5775</td>
+  <td class="mono">7.126</td>
+  <td class="mono">8.85</td>
+  <td class="mono">8.85</td>
+  <td>✓ tp</td>
+  <td class="mono">3.4x</td>
+  <td class="mono">5.96%</td>
+  <td class="mono pos">+$28.53</td>
+  <td class="events">—</td>
+  <td class="msg">#233</td>
+</tr>
+<tr data-pnl="6.42" data-date="2026-02-21T14:22:36+00:00">
+  <td class="mono">2026-02-21</td>
+  <td class="sym">ETH</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">1,990</td>
+  <td class="mono">1,959</td>
+  <td class="mono">2,015.56</td>
+  <td class="mono">2,015.56</td>
+  <td>✓ tp</td>
+  <td class="mono">12.8x</td>
+  <td class="mono">1.56%</td>
+  <td class="mono pos">+$6.42</td>
+  <td class="events">close_partial</td>
+  <td class="msg">#235</td>
+</tr>
+<tr data-pnl="-3.91" data-date="2026-02-23T15:23:02+00:00">
+  <td class="mono">2026-02-23</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">76,738.6</td>
+  <td class="mono">64,950</td>
+  <td class="mono">72,222</td>
+  <td class="mono">72,222</td>
+  <td>✓ tp</td>
+  <td class="mono">1.3x</td>
+  <td class="mono">15.36%</td>
+  <td class="mono neg">$-3.91</td>
+  <td class="events">move_sl, move_sl, close_partial, close_partial, close_partial, move_sl, close_partial, close_full</td>
+  <td class="msg">#246</td>
+</tr>
+<tr data-pnl="14.19" data-date="2026-02-24T02:18:12+00:00">
+  <td class="mono">2026-02-24</td>
+  <td class="sym">ETH</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">1,845</td>
+  <td class="mono">1,780</td>
+  <td class="mono">1,940</td>
+  <td class="mono">1,940</td>
+  <td>✓ tp</td>
+  <td class="mono">5.7x</td>
+  <td class="mono">3.52%</td>
+  <td class="mono pos">+$14.19</td>
+  <td class="events">increase, close_partial, close_partial, close_partial, close_full</td>
+  <td class="msg">#251</td>
+</tr>
+<tr data-pnl="4.77" data-date="2026-02-24T07:24:44+00:00">
+  <td class="mono">2026-02-24</td>
+  <td class="sym">PUMP</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.00175</td>
+  <td class="mono">0.00164</td>
+  <td class="mono">0.0021</td>
+  <td class="mono">0.001795</td>
+  <td>○ manual</td>
+  <td class="mono">3.2x</td>
+  <td class="mono">6.29%</td>
+  <td class="mono pos">+$4.77</td>
+  <td class="events">close_partial, close_full</td>
+  <td class="msg">#258</td>
+</tr>
+<tr data-pnl="32.09" data-date="2026-02-24T07:27:21+00:00">
+  <td class="mono">2026-02-24</td>
+  <td class="sym">FF</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.07565</td>
+  <td class="mono">0.074</td>
+  <td class="mono">0.081</td>
+  <td class="mono">0.081</td>
+  <td>✓ tp</td>
+  <td class="mono">9.2x</td>
+  <td class="mono">2.18%</td>
+  <td class="mono pos">+$32.09</td>
+  <td class="events">close_partial, move_sl, close_full</td>
+  <td class="msg">#259</td>
+</tr>
+<tr data-pnl="0.0" data-date="2026-02-24T07:30:19+00:00">
+  <td class="mono">2026-02-24</td>
+  <td class="sym">ASTER <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.6842</td>
+  <td class="mono">0.66</td>
+  <td class="mono">0.81</td>
+  <td class="mono">0.6819</td>
+  <td>○ manual</td>
+  <td class="mono">5.7x</td>
+  <td class="mono">3.54%</td>
+  <td class="mono ">+$0.00</td>
+  <td class="events">close_full</td>
+  <td class="msg">#260</td>
+</tr>
+<tr data-pnl="28.72" data-date="2026-02-25T11:51:42+00:00">
+  <td class="mono">2026-02-25</td>
+  <td class="sym">FF</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.0766</td>
+  <td class="mono">0.075</td>
+  <td class="mono">0.081</td>
+  <td class="mono">0.081</td>
+  <td>✓ tp</td>
+  <td class="mono">9.6x</td>
+  <td class="mono">2.09%</td>
+  <td class="mono pos">+$28.72</td>
+  <td class="events">close_partial, close_partial</td>
+  <td class="msg">#277</td>
+</tr>
+<tr data-pnl="-10.98" data-date="2026-02-26T05:37:58+00:00">
+  <td class="mono">2026-02-26</td>
+  <td class="sym">PUMP</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.018125</td>
+  <td class="mono">0.0173</td>
+  <td class="mono">0.021</td>
+  <td class="mono">0.0173</td>
+  <td>✗ sl</td>
+  <td class="mono">4.4x</td>
+  <td class="mono">4.55%</td>
+  <td class="mono neg">$-10.98</td>
+  <td class="events">close_partial, close_full</td>
+  <td class="msg">#295</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-26T05:41:00+00:00">
+  <td class="mono">2026-02-26</td>
+  <td class="sym">FARTCOIN <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#296</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-26T12:56:08+00:00">
+  <td class="mono">2026-02-26</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">—</td>
+  <td class="msg">#301</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-26T12:56:18+00:00">
+  <td class="mono">2026-02-26</td>
+  <td class="sym">ETH <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial, close_partial, close_full</td>
+  <td class="msg">#302</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-27T09:05:21+00:00">
+  <td class="mono">2026-02-27</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">—</td>
+  <td class="msg">#322</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-28T04:10:22+00:00">
+  <td class="mono">2026-02-28</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#337</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-28T06:53:05+00:00">
+  <td class="mono">2026-02-28</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#344</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-28T13:54:53+00:00">
+  <td class="mono">2026-02-28</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">move_sl, close_partial, close_full</td>
+  <td class="msg">#352</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-28T13:54:57+00:00">
+  <td class="mono">2026-02-28</td>
+  <td class="sym">ETH <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">move_sl, close_full</td>
+  <td class="msg">#353</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-28T20:49:17+00:00">
+  <td class="mono">2026-02-28</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">increase, increase, close_partial, close_partial, increase, increase</td>
+  <td class="msg">#365</td>
+</tr>
+<tr data-pnl="0" data-date="2026-02-28T20:49:30+00:00">
+  <td class="mono">2026-02-28</td>
+  <td class="sym">ETH <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">increase, close_full</td>
+  <td class="msg">#366</td>
+</tr>
+<tr data-pnl="-9.26" data-date="2026-03-02T00:34:01+00:00">
+  <td class="mono">2026-03-02</td>
+  <td class="sym">XAUT</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">5,250</td>
+  <td class="mono">5,080</td>
+  <td class="mono">5,600</td>
+  <td class="mono">5,080</td>
+  <td>✗ sl</td>
+  <td class="mono">6.2x</td>
+  <td class="mono">3.24%</td>
+  <td class="mono neg">$-9.26</td>
+  <td class="events">close_full</td>
+  <td class="msg">#385</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-02T03:38:25+00:00">
+  <td class="mono">2026-03-02</td>
+  <td class="sym">ETH <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial, close_full</td>
+  <td class="msg">#390</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-02T03:55:46+00:00">
+  <td class="mono">2026-03-02</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">move_sl, close_partial, close_full</td>
+  <td class="msg">#395</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-02T14:35:16+00:00">
+  <td class="mono">2026-03-02</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">market</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">detail, move_sl</td>
+  <td class="msg">#413</td>
+</tr>
+<tr data-pnl="-10.81" data-date="2026-03-02T15:58:31+00:00">
+  <td class="mono">2026-03-02</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">70,250</td>
+  <td class="mono">72,200</td>
+  <td class="mono">62,000</td>
+  <td class="mono">72,200</td>
+  <td>✗ sl</td>
+  <td class="mono">7.2x</td>
+  <td class="mono">2.78%</td>
+  <td class="mono neg">$-10.81</td>
+  <td class="events">close_partial</td>
+  <td class="msg">#420</td>
+</tr>
+<tr data-pnl="33.98" data-date="2026-03-03T06:44:17+00:00">
+  <td class="mono">2026-03-03</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">67,950</td>
+  <td class="mono">67,550</td>
+  <td class="mono">69,500</td>
+  <td class="mono">69,500</td>
+  <td>✓ tp</td>
+  <td class="mono">34.0x</td>
+  <td class="mono">0.59%</td>
+  <td class="mono pos">+$33.98</td>
+  <td class="events">detail, close_full</td>
+  <td class="msg">#430</td>
+</tr>
+<tr data-pnl="-8.86" data-date="2026-03-03T12:34:59+00:00">
+  <td class="mono">2026-03-03</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">68,700</td>
+  <td class="mono">70,250</td>
+  <td class="mono">—</td>
+  <td class="mono">70,250</td>
+  <td>✗ sl</td>
+  <td class="mono">8.9x</td>
+  <td class="mono">2.26%</td>
+  <td class="mono neg">$-8.86</td>
+  <td class="events">detail, increase, increase, increase, move_sl, increase, move_sl, increase, move_sl, move_sl, increa</td>
+  <td class="msg">#443</td>
+</tr>
+<tr data-pnl="-9.21" data-date="2026-03-03T12:36:19+00:00">
+  <td class="mono">2026-03-03</td>
+  <td class="sym">ETH <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">1,995</td>
+  <td class="mono">2,060</td>
+  <td class="mono">—</td>
+  <td class="mono">2,060</td>
+  <td>✗ sl</td>
+  <td class="mono">6.1x</td>
+  <td class="mono">3.26%</td>
+  <td class="mono neg">$-9.21</td>
+  <td class="events">detail, increase, increase, move_sl, increase, increase, move_sl</td>
+  <td class="msg">#445</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-03T15:28:22+00:00">
+  <td class="mono">2026-03-03</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">detail, close_full</td>
+  <td class="msg">#457</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-03T15:28:22+00:00">
+  <td class="mono">2026-03-03</td>
+  <td class="sym">ETH <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">detail, close_full</td>
+  <td class="msg">#457</td>
+</tr>
+<tr data-pnl="51.1" data-date="2026-03-04T06:36:41+00:00">
+  <td class="mono">2026-03-04</td>
+  <td class="sym">FF <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.073</td>
+  <td class="mono">0.072</td>
+  <td class="mono">0.078</td>
+  <td class="mono">0.078</td>
+  <td>✓ tp</td>
+  <td class="mono">14.6x</td>
+  <td class="mono">1.37%</td>
+  <td class="mono pos">+$51.10</td>
+  <td class="events">detail, close_full</td>
+  <td class="msg">#476</td>
+</tr>
+<tr data-pnl="14.63" data-date="2026-03-06T14:12:09+00:00">
+  <td class="mono">2026-03-06</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">67,463.5</td>
+  <td class="mono">66,080</td>
+  <td class="mono">69,750</td>
+  <td class="mono">69,750</td>
+  <td>✓ tp</td>
+  <td class="mono">9.8x</td>
+  <td class="mono">2.05%</td>
+  <td class="mono pos">+$14.63</td>
+  <td class="events">increase, move_sl, close_partial, close_partial, close_partial, increase, increase, increase, increa</td>
+  <td class="msg">#512</td>
+</tr>
+<tr data-pnl="-10.17" data-date="2026-03-07T05:40:23+00:00">
+  <td class="mono">2026-03-07</td>
+  <td class="sym">PUMP <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.001865</td>
+  <td class="mono">0.00181</td>
+  <td class="mono">0.002049</td>
+  <td class="mono">0.00181</td>
+  <td>✗ sl</td>
+  <td class="mono">6.8x</td>
+  <td class="mono">2.95%</td>
+  <td class="mono neg">$-10.17</td>
+  <td class="events">detail, close_partial, close_partial, move_sl, close_partial, close_full</td>
+  <td class="msg">#520</td>
+</tr>
+<tr data-pnl="52.5" data-date="2026-03-07T12:41:28+00:00">
+  <td class="mono">2026-03-07</td>
+  <td class="sym">XMR <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">350</td>
+  <td class="mono">344</td>
+  <td class="mono">381</td>
+  <td class="mono">381</td>
+  <td>✓ tp</td>
+  <td class="mono">11.7x</td>
+  <td class="mono">1.71%</td>
+  <td class="mono pos">+$52.50</td>
+  <td class="events">detail</td>
+  <td class="msg">#529</td>
+</tr>
+<tr data-pnl="18.97" data-date="2026-03-09T00:37:58+00:00">
+  <td class="mono">2026-03-09</td>
+  <td class="sym">FF <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.0721</td>
+  <td class="mono">0.0702</td>
+  <td class="mono">0.076</td>
+  <td class="mono">0.076</td>
+  <td>✓ tp</td>
+  <td class="mono">7.6x</td>
+  <td class="mono">2.64%</td>
+  <td class="mono pos">+$18.97</td>
+  <td class="events">detail, close_partial, move_sl, close_partial</td>
+  <td class="msg">#533</td>
+</tr>
+<tr data-pnl="1.63" data-date="2026-03-09T14:03:54+00:00">
+  <td class="mono">2026-03-09</td>
+  <td class="sym">APT</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">0.98</td>
+  <td class="mono">1.04</td>
+  <td class="mono">0.87</td>
+  <td class="mono">0.9747</td>
+  <td>○ manual</td>
+  <td class="mono">3.3x</td>
+  <td class="mono">6.12%</td>
+  <td class="mono pos">+$1.63</td>
+  <td class="events">close_partial, close_partial, close_full</td>
+  <td class="msg">#541</td>
+</tr>
+<tr data-pnl="-11.36" data-date="2026-03-10T02:47:05+00:00">
+  <td class="mono">2026-03-10</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">71,000</td>
+  <td class="mono">73,500</td>
+  <td class="mono">58,000</td>
+  <td class="mono">73,500</td>
+  <td>✗ sl</td>
+  <td class="mono">5.7x</td>
+  <td class="mono">3.52%</td>
+  <td class="mono neg">$-11.36</td>
+  <td class="events">—</td>
+  <td class="msg">#542</td>
+</tr>
+<tr data-pnl="-10.07" data-date="2026-03-10T08:20:41+00:00">
+  <td class="mono">2026-03-10</td>
+  <td class="sym">HYPE <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">35.25</td>
+  <td class="mono">36.3</td>
+  <td class="mono">32</td>
+  <td class="mono">36.3</td>
+  <td>✗ sl</td>
+  <td class="mono">6.7x</td>
+  <td class="mono">2.98%</td>
+  <td class="mono neg">$-10.07</td>
+  <td class="events">detail, close_partial, close_full</td>
+  <td class="msg">#547</td>
+</tr>
+<tr data-pnl="12.3" data-date="2026-03-10T09:13:41+00:00">
+  <td class="mono">2026-03-10</td>
+  <td class="sym">PUMP <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">0.00205</td>
+  <td class="mono">0.0021</td>
+  <td class="mono">0.00198</td>
+  <td class="mono">0.00198</td>
+  <td>✓ tp</td>
+  <td class="mono">8.2x</td>
+  <td class="mono">2.44%</td>
+  <td class="mono pos">+$12.30</td>
+  <td class="events">detail</td>
+  <td class="msg">#549</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-11T01:53:58+00:00">
+  <td class="mono">2026-03-11</td>
+  <td class="sym">XTIU <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">74</td>
+  <td class="mono">120</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#564</td>
+</tr>
+<tr data-pnl="-8.2" data-date="2026-03-11T13:40:53+00:00">
+  <td class="mono">2026-03-11</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">71,750</td>
+  <td class="mono">73,500</td>
+  <td class="mono">—</td>
+  <td class="mono">73,500</td>
+  <td>✗ sl</td>
+  <td class="mono">8.2x</td>
+  <td class="mono">2.44%</td>
+  <td class="mono neg">$-8.20</td>
+  <td class="events">—</td>
+  <td class="msg">#577</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-11T14:45:34+00:00">
+  <td class="mono">2026-03-11</td>
+  <td class="sym">TRUMP <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">2.047</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#579</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-12T06:29:14+00:00">
+  <td class="mono">2026-03-12</td>
+  <td class="sym">AAVE <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial, move_sl, close_partial, close_full</td>
+  <td class="msg">#587</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-12T09:57:17+00:00">
+  <td class="mono">2026-03-12</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">—</td>
+  <td class="msg">#594</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-13T01:07:27+00:00">
+  <td class="mono">2026-03-13</td>
+  <td class="sym">HYPE <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">move_sl, close_full</td>
+  <td class="msg">#607</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-13T07:15:23+00:00">
+  <td class="mono">2026-03-13</td>
+  <td class="sym">FARTCOIN <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#620</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-13T07:19:03+00:00">
+  <td class="mono">2026-03-13</td>
+  <td class="sym">RENDER <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial, close_partial, move_sl, close_full</td>
+  <td class="msg">#622</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-14T09:06:24+00:00">
+  <td class="mono">2026-03-14</td>
+  <td class="sym">PUMP <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#645</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-15T02:46:44+00:00">
+  <td class="mono">2026-03-15</td>
+  <td class="sym">ETH <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">move_sl, close_full</td>
+  <td class="msg">#651</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-15T05:53:37+00:00">
+  <td class="mono">2026-03-15</td>
+  <td class="sym">SOL <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#654</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-16T06:40:22+00:00">
+  <td class="mono">2026-03-16</td>
+  <td class="sym">1000PEPE <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">move_sl, close_partial, close_full</td>
+  <td class="msg">#664</td>
+</tr>
+<tr data-pnl="-6.94" data-date="2026-03-17T01:31:13+00:00">
+  <td class="mono">2026-03-17</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">76,300</td>
+  <td class="mono">77,400</td>
+  <td class="mono">69,500</td>
+  <td class="mono">77,400</td>
+  <td>✗ sl</td>
+  <td class="mono">13.9x</td>
+  <td class="mono">1.44%</td>
+  <td class="mono neg">$-6.94</td>
+  <td class="events">increase, move_sl, close_partial, close_partial, close_full</td>
+  <td class="msg">#676</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-17T14:14:14+00:00">
+  <td class="mono">2026-03-17</td>
+  <td class="sym">PUMP <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial</td>
+  <td class="msg">#684</td>
+</tr>
+<tr data-pnl="-12.7" data-date="2026-03-17T16:13:33+00:00">
+  <td class="mono">2026-03-17</td>
+  <td class="sym">ASTER</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.7554</td>
+  <td class="mono">0.7435</td>
+  <td class="mono">0.7914</td>
+  <td class="mono">0.7435</td>
+  <td>✗ sl</td>
+  <td class="mono">12.7x</td>
+  <td class="mono">1.58%</td>
+  <td class="mono neg">$-12.70</td>
+  <td class="events">close_partial</td>
+  <td class="msg">#687</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-18T12:02:25+00:00">
+  <td class="mono">2026-03-18</td>
+  <td class="sym">FF <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">move_sl</td>
+  <td class="msg">#695</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-18T12:09:14+00:00">
+  <td class="mono">2026-03-18</td>
+  <td class="sym">XPL <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#698</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-18T14:08:08+00:00">
+  <td class="mono">2026-03-18</td>
+  <td class="sym">ASTER <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#703</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-19T03:10:06+00:00">
+  <td class="mono">2026-03-19</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial, close_full</td>
+  <td class="msg">#713</td>
+</tr>
+<tr data-pnl="69.6" data-date="2026-03-19T07:34:25+00:00">
+  <td class="mono">2026-03-19</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">69,600</td>
+  <td class="mono">68,700</td>
+  <td class="mono">—</td>
+  <td class="mono">76,092.5</td>
+  <td>○ manual</td>
+  <td class="mono">15.5x</td>
+  <td class="mono">1.29%</td>
+  <td class="mono pos">+$69.60</td>
+  <td class="events">move_sl, move_sl, close_partial, close_full</td>
+  <td class="msg">#719</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-19T17:46:07+00:00">
+  <td class="mono">2026-03-19</td>
+  <td class="sym">UAI <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">increase, increase, close_full</td>
+  <td class="msg">#722</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-20T07:43:50+00:00">
+  <td class="mono">2026-03-20</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial, move_sl, close_partial, increase, move_sl, increase, close_partial, close_full</td>
+  <td class="msg">#730</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-22T00:07:33+00:00">
+  <td class="mono">2026-03-22</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#749</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-22T09:09:21+00:00">
+  <td class="mono">2026-03-22</td>
+  <td class="sym">BANANAS31</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">0.0135726</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial</td>
+  <td class="msg">#764</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-22T12:13:02+00:00">
+  <td class="mono">2026-03-22</td>
+  <td class="sym">SIREN <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">increase, close_partial</td>
+  <td class="msg">#766</td>
+</tr>
+<tr data-pnl="20.07" data-date="2026-03-23T09:01:33+00:00">
+  <td class="mono">2026-03-23</td>
+  <td class="sym">PUMP <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.00172</td>
+  <td class="mono">0.00166</td>
+  <td class="mono">0.00184</td>
+  <td class="mono">0.00184</td>
+  <td>✓ tp</td>
+  <td class="mono">5.7x</td>
+  <td class="mono">3.49%</td>
+  <td class="mono pos">+$20.07</td>
+  <td class="events">detail, close_full</td>
+  <td class="msg">#781</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-23T11:13:59+00:00">
+  <td class="mono">2026-03-23</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">76,738.6</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">detail, close_partial, close_partial, move_sl, move_sl</td>
+  <td class="msg">#791</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-24T17:13:24+00:00">
+  <td class="mono">2026-03-24</td>
+  <td class="sym">ETH <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">market</td>
+  <td class="mono">2,215</td>
+  <td class="mono">2,000</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">detail, increase, close_partial, close_full</td>
+  <td class="msg">#812</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-25T15:57:35+00:00">
+  <td class="mono">2026-03-25</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">detail, move_sl, close_partial, increase, close_full</td>
+  <td class="msg">#819</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-25T16:41:26+00:00">
+  <td class="mono">2026-03-25</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#826</td>
+</tr>
+<tr data-pnl="28.3" data-date="2026-03-26T03:55:01+00:00">
+  <td class="mono">2026-03-26</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">70,750</td>
+  <td class="mono">70,000</td>
+  <td class="mono">73,000</td>
+  <td class="mono">73,000</td>
+  <td>✓ tp</td>
+  <td class="mono">18.9x</td>
+  <td class="mono">1.06%</td>
+  <td class="mono pos">+$28.30</td>
+  <td class="events">detail, move_sl, close_partial, increase, close_partial, close_partial, increase, increase, close_pa</td>
+  <td class="msg">#835</td>
+</tr>
+<tr data-pnl="-9.04" data-date="2026-03-26T04:51:13+00:00">
+  <td class="mono">2026-03-26</td>
+  <td class="sym">ETH</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">2,147.5</td>
+  <td class="mono">2,100</td>
+  <td class="mono">—</td>
+  <td class="mono">2,100</td>
+  <td>✗ sl</td>
+  <td class="mono">9.0x</td>
+  <td class="mono">2.21%</td>
+  <td class="mono neg">$-9.04</td>
+  <td class="events">close_partial, close_partial, increase, increase, move_sl, close_partial, close_full</td>
+  <td class="msg">#838</td>
+</tr>
+<tr data-pnl="0.0" data-date="2026-03-26T14:38:58+00:00">
+  <td class="mono">2026-03-26</td>
+  <td class="sym">XAUT</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">4,475</td>
+  <td class="mono">4,550</td>
+  <td class="mono">4,270</td>
+  <td class="mono">4,486.9</td>
+  <td>○ manual</td>
+  <td class="mono">11.9x</td>
+  <td class="mono">1.68%</td>
+  <td class="mono ">+$0.00</td>
+  <td class="events">move_sl, close_full</td>
+  <td class="msg">#848</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-27T07:19:56+00:00">
+  <td class="mono">2026-03-27</td>
+  <td class="sym">PUMP</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.00969</td>
+  <td class="mono">—</td>
+  <td class="mono">0.01914</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">—</td>
+  <td class="msg">#851</td>
+</tr>
+<tr data-pnl="26.66" data-date="2026-03-27T09:55:27+00:00">
+  <td class="mono">2026-03-27</td>
+  <td class="sym">FF <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.0696</td>
+  <td class="mono">0.06725</td>
+  <td class="mono">0.076</td>
+  <td class="mono">0.076</td>
+  <td>✓ tp</td>
+  <td class="mono">5.9x</td>
+  <td class="mono">3.38%</td>
+  <td class="mono pos">+$26.66</td>
+  <td class="events">detail</td>
+  <td class="msg">#852</td>
+</tr>
+<tr data-pnl="0" data-date="2026-03-29T08:17:34+00:00">
+  <td class="mono">2026-03-29</td>
+  <td class="sym">VIRTUAL <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">0.7568</td>
+  <td class="mono">—</td>
+  <td class="mono">0.6459</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_full</td>
+  <td class="msg">#858</td>
+</tr>
+<tr data-pnl="1.34" data-date="2026-03-29T09:00:13+00:00">
+  <td class="mono">2026-03-29</td>
+  <td class="sym">ETH <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">2,093.91</td>
+  <td class="mono">2,250</td>
+  <td class="mono">1,880</td>
+  <td class="mono">2,075.37</td>
+  <td>· open</td>
+  <td class="mono">2.7x</td>
+  <td class="mono">7.45%</td>
+  <td class="mono pos">+$1.34</td>
+  <td class="events">—</td>
+  <td class="msg">#860</td>
+</tr>
+<tr data-pnl="9.41" data-date="2026-03-30T12:49:36+00:00">
+  <td class="mono">2026-03-30</td>
+  <td class="sym">LTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">55.375</td>
+  <td class="mono">57.14</td>
+  <td class="mono">53.73</td>
+  <td class="mono">53.73</td>
+  <td>✓ tp</td>
+  <td class="mono">6.3x</td>
+  <td class="mono">3.19%</td>
+  <td class="mono pos">+$9.41</td>
+  <td class="events">close_partial</td>
+  <td class="msg">#869</td>
+</tr>
+<tr data-pnl="-10.83" data-date="2026-03-30T13:24:34+00:00">
+  <td class="mono">2026-03-30</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">68,600</td>
+  <td class="mono">70,500</td>
+  <td class="mono">65,000</td>
+  <td class="mono">70,500</td>
+  <td>✗ sl</td>
+  <td class="mono">7.2x</td>
+  <td class="mono">2.77%</td>
+  <td class="mono neg">$-10.83</td>
+  <td class="events">increase, close_full</td>
+  <td class="msg">#871</td>
+</tr>
+<tr data-pnl="38.93" data-date="2026-03-31T10:15:32+00:00">
+  <td class="mono">2026-03-31</td>
+  <td class="sym">ZEC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">228.5</td>
+  <td class="mono">215</td>
+  <td class="mono">280</td>
+  <td class="mono">280</td>
+  <td>✓ tp</td>
+  <td class="mono">3.4x</td>
+  <td class="mono">5.91%</td>
+  <td class="mono pos">+$38.93</td>
+  <td class="events">detail, close_partial, close_partial, move_sl, close_full</td>
+  <td class="msg">#888</td>
+</tr>
+<tr data-pnl="0.0" data-date="2026-03-31T10:45:01+00:00">
+  <td class="mono">2026-03-31</td>
+  <td class="sym">SOL <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">84.1</td>
+  <td class="mono">100</td>
+  <td class="mono">70</td>
+  <td class="mono">83.88</td>
+  <td>○ manual</td>
+  <td class="mono">1.1x</td>
+  <td class="mono">18.91%</td>
+  <td class="mono ">+$0.00</td>
+  <td class="events">close_partial, close_partial, close_full</td>
+  <td class="msg">#893</td>
+</tr>
+<tr data-pnl="18.86" data-date="2026-04-02T13:58:44+00:00">
+  <td class="mono">2026-04-02</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">66,000</td>
+  <td class="mono">65,300</td>
+  <td class="mono">67,500</td>
+  <td class="mono">67,500</td>
+  <td>✓ tp</td>
+  <td class="mono">18.9x</td>
+  <td class="mono">1.06%</td>
+  <td class="mono pos">+$18.86</td>
+  <td class="events">close_partial, close_full</td>
+  <td class="msg">#930</td>
+</tr>
+<tr data-pnl="-9.6" data-date="2026-04-02T16:23:43+00:00">
+  <td class="mono">2026-04-02</td>
+  <td class="sym">ZEC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">240</td>
+  <td class="mono">260</td>
+  <td class="mono">221</td>
+  <td class="mono">260</td>
+  <td>✗ sl</td>
+  <td class="mono">2.4x</td>
+  <td class="mono">8.33%</td>
+  <td class="mono neg">$-9.60</td>
+  <td class="events">detail, close_full</td>
+  <td class="msg">#940</td>
+</tr>
+<tr data-pnl="1.54" data-date="2026-04-03T15:42:47+00:00">
+  <td class="mono">2026-04-03</td>
+  <td class="sym">XAUT <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">4,517.2</td>
+  <td class="mono">4,810</td>
+  <td class="mono">4,485</td>
+  <td class="mono">4,485</td>
+  <td>✓ tp</td>
+  <td class="mono">3.1x</td>
+  <td class="mono">6.48%</td>
+  <td class="mono pos">+$1.54</td>
+  <td class="events">—</td>
+  <td class="msg">#944</td>
+</tr>
+<tr data-pnl="-11.97" data-date="2026-04-07T22:59:34+00:00">
+  <td class="mono">2026-04-07</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">71,800</td>
+  <td class="mono">73,000</td>
+  <td class="mono">—</td>
+  <td class="mono">73,000</td>
+  <td>✗ sl</td>
+  <td class="mono">12.0x</td>
+  <td class="mono">1.67%</td>
+  <td class="mono neg">$-11.97</td>
+  <td class="events">close_partial</td>
+  <td class="msg">#971</td>
+</tr>
+<tr data-pnl="18.41" data-date="2026-04-09T22:58:14+00:00">
+  <td class="mono">2026-04-09</td>
+  <td class="sym">ETH</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">2,235</td>
+  <td class="mono">2,320</td>
+  <td class="mono">1,900</td>
+  <td class="mono">2,075.37</td>
+  <td>· open</td>
+  <td class="mono">5.3x</td>
+  <td class="mono">3.80%</td>
+  <td class="mono pos">+$18.41</td>
+  <td class="events">—</td>
+  <td class="msg">#980</td>
+</tr>
+<tr data-pnl="1.38" data-date="2026-04-09T23:01:29+00:00">
+  <td class="mono">2026-04-09</td>
+  <td class="sym">ARB</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">0.11</td>
+  <td class="mono">0.118</td>
+  <td class="mono">0.095</td>
+  <td class="mono">0.1084</td>
+  <td>· open</td>
+  <td class="mono">2.8x</td>
+  <td class="mono">7.27%</td>
+  <td class="mono pos">+$1.38</td>
+  <td class="events">—</td>
+  <td class="msg">#982</td>
+</tr>
+<tr data-pnl="-9.49" data-date="2026-04-11T03:13:01+00:00">
+  <td class="mono">2026-04-11</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">73,550</td>
+  <td class="mono">75,100</td>
+  <td class="mono">61,000</td>
+  <td class="mono">75,100</td>
+  <td>✗ sl</td>
+  <td class="mono">9.5x</td>
+  <td class="mono">2.11%</td>
+  <td class="mono neg">$-9.49</td>
+  <td class="events">—</td>
+  <td class="msg">#990</td>
+</tr>
+<tr data-pnl="-5.7" data-date="2026-04-12T03:20:22+00:00">
+  <td class="mono">2026-04-12</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">76,738.6</td>
+  <td class="mono">71,350</td>
+  <td class="mono">73,500</td>
+  <td class="mono">73,500</td>
+  <td>✓ tp</td>
+  <td class="mono">2.8x</td>
+  <td class="mono">7.02%</td>
+  <td class="mono neg">$-5.70</td>
+  <td class="events">increase, move_sl, close_partial, close_full</td>
+  <td class="msg">#995</td>
+</tr>
+<tr data-pnl="2.72" data-date="2026-04-14T09:12:03+00:00">
+  <td class="mono">2026-04-14</td>
+  <td class="sym">PLTR</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">134</td>
+  <td class="mono">124.16</td>
+  <td class="mono">141</td>
+  <td class="mono">137.33</td>
+  <td>· open</td>
+  <td class="mono">2.7x</td>
+  <td class="mono">7.34%</td>
+  <td class="mono pos">+$2.72</td>
+  <td class="events">move_sl</td>
+  <td class="msg">#1008</td>
+</tr>
+<tr data-pnl="-6.79" data-date="2026-04-15T11:53:21+00:00">
+  <td class="mono">2026-04-15</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">74,700</td>
+  <td class="mono">75,800</td>
+  <td class="mono">69,000</td>
+  <td class="mono">75,800</td>
+  <td>✗ sl</td>
+  <td class="mono">13.6x</td>
+  <td class="mono">1.47%</td>
+  <td class="mono neg">$-6.79</td>
+  <td class="events">—</td>
+  <td class="msg">#1018</td>
+</tr>
+<tr data-pnl="82.01" data-date="2026-04-15T11:57:46+00:00">
+  <td class="mono">2026-04-15</td>
+  <td class="sym">ETH</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">2,348.5</td>
+  <td class="mono">2,380</td>
+  <td class="mono">2,100</td>
+  <td class="mono">2,100</td>
+  <td>✓ tp</td>
+  <td class="mono">14.9x</td>
+  <td class="mono">1.34%</td>
+  <td class="mono pos">+$82.01</td>
+  <td class="events">—</td>
+  <td class="msg">#1019</td>
+</tr>
+<tr data-pnl="-8.86" data-date="2026-04-15T22:43:10+00:00">
+  <td class="mono">2026-04-15</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">75,350</td>
+  <td class="mono">76,200</td>
+  <td class="mono">—</td>
+  <td class="mono">76,200</td>
+  <td>✗ sl</td>
+  <td class="mono">17.7x</td>
+  <td class="mono">1.13%</td>
+  <td class="mono neg">$-8.86</td>
+  <td class="events">—</td>
+  <td class="msg">#1033</td>
+</tr>
+<tr data-pnl="92.22" data-date="2026-04-15T22:43:28+00:00">
+  <td class="mono">2026-04-15</td>
+  <td class="sym">ETH</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">2,376.5</td>
+  <td class="mono">2,410</td>
+  <td class="mono">—</td>
+  <td class="mono">2,075.37</td>
+  <td>· open</td>
+  <td class="mono">14.2x</td>
+  <td class="mono">1.41%</td>
+  <td class="mono pos">+$92.22</td>
+  <td class="events">—</td>
+  <td class="msg">#1034</td>
+</tr>
+<tr data-pnl="-10.25" data-date="2026-04-16T09:57:14+00:00">
+  <td class="mono">2026-04-16</td>
+  <td class="sym">LYN</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.082</td>
+  <td class="mono">0.07</td>
+  <td class="mono">—</td>
+  <td class="mono">0.07</td>
+  <td>✗ sl</td>
+  <td class="mono">1.4x</td>
+  <td class="mono">14.63%</td>
+  <td class="mono neg">$-10.25</td>
+  <td class="events">—</td>
+  <td class="msg">#1038</td>
+</tr>
+<tr data-pnl="-6.93" data-date="2026-04-17T09:34:31+00:00">
+  <td class="mono">2026-04-17</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">76,200</td>
+  <td class="mono">77,300</td>
+  <td class="mono">71,000</td>
+  <td class="mono">77,300</td>
+  <td>✗ sl</td>
+  <td class="mono">13.9x</td>
+  <td class="mono">1.44%</td>
+  <td class="mono neg">$-6.93</td>
+  <td class="events">move_sl, move_sl</td>
+  <td class="msg">#1058</td>
+</tr>
+<tr data-pnl="31.87" data-date="2026-04-17T09:35:41+00:00">
+  <td class="mono">2026-04-17</td>
+  <td class="sym">ETH</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">2,390</td>
+  <td class="mono">2,480</td>
+  <td class="mono">2,100</td>
+  <td class="mono">2,100</td>
+  <td>✓ tp</td>
+  <td class="mono">5.3x</td>
+  <td class="mono">3.77%</td>
+  <td class="mono pos">+$31.87</td>
+  <td class="events">—</td>
+  <td class="msg">#1059</td>
+</tr>
+<tr data-pnl="0.0" data-date="2026-04-17T11:39:00+00:00">
+  <td class="mono">2026-04-17</td>
+  <td class="sym">TST <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.01717</td>
+  <td class="mono">0.012</td>
+  <td class="mono">—</td>
+  <td class="mono">0.017198</td>
+  <td>· open</td>
+  <td class="mono">0.7x</td>
+  <td class="mono">30.11%</td>
+  <td class="mono ">+$0.00</td>
+  <td class="events">—</td>
+  <td class="msg">#1065</td>
+</tr>
+<tr data-pnl="0" data-date="2026-04-17T19:19:14+00:00">
+  <td class="mono">2026-04-17</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial, close_partial</td>
+  <td class="msg">#1071</td>
+</tr>
+<tr data-pnl="0" data-date="2026-04-17T19:19:14+00:00">
+  <td class="mono">2026-04-17</td>
+  <td class="sym">ETH <span class="me-tag">M</span></td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial, close_partial, close_partial, increase</td>
+  <td class="msg">#1071</td>
+</tr>
+<tr data-pnl="0.0" data-date="2026-04-18T09:08:22+00:00">
+  <td class="mono">2026-04-18</td>
+  <td class="sym">XTIU</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">82</td>
+  <td class="mono">73.5</td>
+  <td class="mono">98</td>
+  <td class="mono">—</td>
+  <td> —</td>
+  <td class="mono">1.9x</td>
+  <td class="mono">10.37%</td>
+  <td class="mono ">+$0.00</td>
+  <td class="events">—</td>
+  <td class="msg">#1073</td>
+</tr>
+<tr data-pnl="0" data-date="2026-04-18T11:19:20+00:00">
+  <td class="mono">2026-04-18</td>
+  <td class="sym">BTC <span class="me-tag">M</span></td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td>○ manual</td>
+  <td class="mono">—</td>
+  <td class="mono">—</td>
+  <td class="mono ">—</td>
+  <td class="events">close_partial, move_sl, close_partial, close_full</td>
+  <td class="msg">#1078</td>
+</tr>
+<tr data-pnl="-9.17" data-date="2026-04-19T05:21:39+00:00">
+  <td class="mono">2026-04-19</td>
+  <td class="sym">HYPE</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">44.25</td>
+  <td class="mono">46.181</td>
+  <td class="mono">36.4</td>
+  <td class="mono">46.181</td>
+  <td>✗ sl</td>
+  <td class="mono">4.6x</td>
+  <td class="mono">4.36%</td>
+  <td class="mono neg">$-9.17</td>
+  <td class="events">move_sl, close_full</td>
+  <td class="msg">#1088</td>
+</tr>
+<tr data-pnl="-8.18" data-date="2026-04-19T05:30:38+00:00">
+  <td class="mono">2026-04-19</td>
+  <td class="sym">PUMP</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">0.00184</td>
+  <td class="mono">0.001795</td>
+  <td class="mono">0.00203</td>
+  <td class="mono">0.001795</td>
+  <td>✗ sl</td>
+  <td class="mono">8.2x</td>
+  <td class="mono">2.45%</td>
+  <td class="mono neg">$-8.18</td>
+  <td class="events">move_sl, close_full</td>
+  <td class="msg">#1089</td>
+</tr>
+<tr data-pnl="7.22" data-date="2026-04-20T18:37:30+00:00">
+  <td class="mono">2026-04-20</td>
+  <td class="sym">BTC</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">77,650</td>
+  <td class="mono">79,800</td>
+  <td class="mono">—</td>
+  <td class="mono">76,089</td>
+  <td>· open</td>
+  <td class="mono">7.2x</td>
+  <td class="mono">2.77%</td>
+  <td class="mono pos">+$7.22</td>
+  <td class="events">—</td>
+  <td class="msg">#1118</td>
+</tr>
+<tr data-pnl="42.0" data-date="2026-04-20T18:42:52+00:00">
+  <td class="mono">2026-04-20</td>
+  <td class="sym">ETH</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">2,400</td>
+  <td class="mono">2,480</td>
+  <td class="mono">—</td>
+  <td class="mono">2,075.37</td>
+  <td>· open</td>
+  <td class="mono">6.0x</td>
+  <td class="mono">3.33%</td>
+  <td class="mono pos">+$42.00</td>
+  <td class="events">—</td>
+  <td class="msg">#1119</td>
+</tr>
+<tr data-pnl="12.6" data-date="2026-04-21T04:04:10+00:00">
+  <td class="mono">2026-04-21</td>
+  <td class="sym">BTC</td>
+  <td class="dir-long">LONG</td>
+  <td class="mono">75,600</td>
+  <td class="mono">75,000</td>
+  <td class="mono">79,000</td>
+  <td class="mono">76,089</td>
+  <td>· open</td>
+  <td class="mono">25.2x</td>
+  <td class="mono">0.79%</td>
+  <td class="mono pos">+$12.60</td>
+  <td class="events">close_partial, move_sl, close_partial</td>
+  <td class="msg">#1122</td>
+</tr>
+<tr data-pnl="31.97" data-date="2026-04-21T12:04:17+00:00">
+  <td class="mono">2026-04-21</td>
+  <td class="sym">PUMP</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">0.001865</td>
+  <td class="mono">0.0019</td>
+  <td class="mono">0.00176</td>
+  <td class="mono">0.00176</td>
+  <td>✓ tp</td>
+  <td class="mono">10.7x</td>
+  <td class="mono">1.88%</td>
+  <td class="mono pos">+$31.97</td>
+  <td class="events">close_full</td>
+  <td class="msg">#1129</td>
+</tr>
+<tr data-pnl="5.32" data-date="2026-04-21T12:09:42+00:00">
+  <td class="mono">2026-04-21</td>
+  <td class="sym">ASTER</td>
+  <td class="dir-short">SHORT</td>
+  <td class="mono">0.692</td>
+  <td class="mono">0.705</td>
+  <td class="mono">0.666</td>
+  <td class="mono">0.6817</td>
+  <td>· open</td>
+  <td class="mono">10.6x</td>
+  <td class="mono">1.88%</td>
+  <td class="mono pos">+$5.32</td>
+  <td class="events">—</td>
+  <td class="msg">#1130</td>
+</tr></tbody>
+    </table>
+  </div>
+
+<script>
+document.querySelectorAll('#trades th[data-key]').forEach(th => {
+  let asc = true;
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    const tbody = document.querySelector('#trades tbody');
+    const rows = [...tbody.querySelectorAll('tr')];
+    rows.sort((a, b) => {
+      const av = key === 'pnl' ? parseFloat(a.dataset.pnl) : a.dataset[key];
+      const bv = key === 'pnl' ? parseFloat(b.dataset.pnl) : b.dataset[key];
+      if (key === 'pnl') return (asc ? 1 : -1) * (av - bv);
+      return (asc ? 1 : -1) * String(av).localeCompare(String(bv));
+    });
+    asc = !asc;
+    rows.forEach(r => tbody.appendChild(r));
+  });
+});
+</script>
+</body>
+</html>

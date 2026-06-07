@@ -10,6 +10,7 @@ Endpoints:
   /api/state           full snapshot (cached)
   /api/equity/{key}    live cumulative + scaled backtest expected curve
   /api/candles/{key}   OHLC candles for current open trade pairs
+  /api/killers/state   killers copy-trader paper-sim state (SQLite)
   /healthz             liveness
 """
 
@@ -28,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import yaml
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -70,26 +72,44 @@ BOTS: list[dict[str, Any]] = [
             "starting_equity_in_csv": 200.0,
         },
     },
+    # ShortKeltnerV2 Binance dry-run (port 8100) RETIRED 2026-05-29 — going
+    # HL-only for the short (Binance futures are CVM-banned for BR anyway).
+    # Code kept in git (ShortKeltnerV2.py/.json) — it's the only backtestable
+    # version since HL serves no history. Only the HL forward bot runs live.
     {
-        "key": "insiders",
-        "name": "InsidersScalpV1",
-        "label": "insiders-scalp",
-        "url": "http://ft-insiders-scalp:8080",
-        # Observational mode: gates skip baseline-deviation comparisons because
-        # this is a copy-trader of an UNKNOWN external signaler, not a quant
-        # strategy whose edge we validated. Running gate-2 against the 30-day
-        # replay number (228%/yr extrapolated) would produce false failures
-        # since real live return will be much smaller (latency drag, execution
-        # cost). See docs/insiders-signals/session-handoff.md.
-        #
-        # Reactivate baseline gates after 30-50 live trades have established
-        # a real reference. Until then dashboard shows raw P&L + trade stats
-        # without pass/fail gating.
+        "key": "short-keltner-hl",
+        "name": "ShortKeltnerV2HL",
+        "label": "short-keltner-hl",
+        "url": "http://ft-short-keltner-hl:8080",
+        # DRY-RUN on Hyperliquid (self-custody DEX perps, USDC-margined). Same
+        # logic as short-keltner, forward-only: HL serves NO historical OHLCV so
+        # it cannot be backtested — this is the on-venue OOS measurement codex
+        # required before any capital. No baseline transfers from the Binance
+        # backtest (HL funding is oracle/premium-based and inverts vs Binance).
+        # Observational; no keys, no capital. Standalone container (not in this
+        # compose). See docs/hyperliquid_short_validation_2026-05-29.md.
         "observational": True,
-        "baseline": {
-            "starting_equity_in_csv": 200.0,
-        },
+        "no_baseline": True,
+        "baseline": None,
     },
+    {
+        "key": "killers-ft",
+        "name": "KillersScalpV1",
+        "label": "killers-scalp",
+        "url": "http://ft-killers-scalp:8080",
+        # Copy-trader of the Binance Killers VIP private channel. RESTORED
+        # 2026-05-31 as a DRY-RUN measurement instrument ONLY — the channel's
+        # signals are price-verified unprofitable (−$511/−$1536 backtest, live
+        # PF 0.011, codex "do-not-fund VERY HIGH" 2026-05-28). No real capital,
+        # ever. Observational + no_baseline: a pass-through copy-trader of an
+        # external signaler, not a quant strategy with a validated backtest
+        # baseline, so gate comparisons are meaningless. baseline/gates null.
+        "observational": True,
+        "no_baseline": True,
+        "baseline": None,
+    },
+    # insiders-scalp RETIRED 2026-05-29: copier edge negative (−8.7%/−13%,
+    # Dennis path defunct). Container removed; do not re-add.
 ]
 
 API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "")
@@ -97,6 +117,7 @@ API_PASS = os.environ.get("FREQTRADE__API_SERVER__PASSWORD", "")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
 REQUEST_TIMEOUT = float(os.environ.get("REQUEST_TIMEOUT", "10"))
 OVERLAYS_DIR = Path(os.environ.get("OVERLAYS_DIR", "/overlays"))
+KILLERS_DB = Path(os.environ.get("KILLERS_DB", "/var/lib/killers/state.sqlite"))
 
 # Phase 5 / Gate constants
 GATE1_TRADES, GATE1_DAYS, GATE1_PAIRS = 30, 14, 5
@@ -104,12 +125,61 @@ GATE2_PROFIT_BAND, GATE2_PF_BAND, GATE2_DD_MULT = 0.25, 0.20, 1.5
 GATE3_LOSS_MULT, GATE3_CONSEC_LOSSES = 1.5, 5
 CONCENTRATION_WARN, CONCENTRATION_DANGER = 0.40, 0.50
 
+# How long since last successful poll before a bot is considered stale.
+STALE_THRESHOLD_S = 60
+
 _cache: dict[str, Any] = {
     "last_poll_started_at": None,
     "last_poll_finished_at": None,
     "bots": {},
     "errors": {},
+    # Maps bot_key → unix timestamp of last successful (reachable=True) poll.
+    "last_reachable_at": {},
 }
+
+# ── Events store ──────────────────────────────────────────────────────────────
+# events.yml lives alongside app.py.  We cache in module scope and hot-reload
+# when the file modtime changes — no restart required.
+_EVENTS_PATH = Path(__file__).parent / "events.yml"
+_events_cache: dict[str, Any] = {"mtime": 0.0, "data": []}
+
+
+def _load_events() -> list[dict]:
+    """Load and cache fleet events from events.yml.
+
+    Contract: each entry has {bot, ts, label, kind}.  Returns a list of dicts
+    ready for JSON serialisation.  Hot-reloads on file modtime change so the
+    operator can append events live without restarting the container.
+    """
+    try:
+        mtime = _EVENTS_PATH.stat().st_mtime
+    except FileNotFoundError:
+        return []
+    if mtime != _events_cache["mtime"]:
+        try:
+            with open(_EVENTS_PATH) as f:
+                raw = yaml.safe_load(f) or []
+            _events_cache["data"] = [
+                {"bot": e.get("bot", "fleet"), "ts": str(e.get("ts", "")),
+                 "label": str(e.get("label", "")), "kind": str(e.get("kind", "milestone"))}
+                for e in raw if isinstance(e, dict)
+            ]
+            _events_cache["mtime"] = mtime
+        except Exception as exc:
+            log.warning("events.yml parse error: %s", exc)
+    return _events_cache["data"]
+
+
+def _global_events() -> list[dict]:
+    """Return global events feed sorted newest-first."""
+    events = _load_events()
+    return sorted(events, key=lambda e: e["ts"], reverse=True)
+
+
+def _bot_events(bot_key: str) -> list[dict]:
+    """Return events for a specific bot, oldest-first (for equity chart annotations)."""
+    events = _load_events()
+    return sorted([e for e in events if e.get("bot") == bot_key], key=lambda e: e["ts"])
 
 
 # ── HTTP ───────────────────────────────────────────────────────────────────
@@ -205,63 +275,114 @@ def _consec_losses(trades: list[dict]) -> int:
 
 
 def _gate1(trades: list[dict], days_running: float) -> dict:
+    """Gate 1: minimum sample checks.
+
+    Adds `blocked_on` to each sub-key: a human-readable string when the gate
+    is not yet met, null when it passes.
+    """
     closed = [t for t in trades if not t.get("is_open")]
     pairs = {t.get("pair") for t in closed if t.get("pair")}
+    trade_ok = len(closed) >= GATE1_TRADES
+    days_ok = days_running >= GATE1_DAYS
+    pairs_ok = len(pairs) >= GATE1_PAIRS
     return {
-        "trades": {"actual": len(closed), "target": GATE1_TRADES, "ok": len(closed) >= GATE1_TRADES,
-                   "pct": min(100, len(closed) / GATE1_TRADES * 100)},
-        "days":   {"actual": round(days_running, 1), "target": GATE1_DAYS, "ok": days_running >= GATE1_DAYS,
-                   "pct": min(100, days_running / GATE1_DAYS * 100)},
-        "pairs":  {"actual": len(pairs), "target": GATE1_PAIRS, "ok": len(pairs) >= GATE1_PAIRS,
-                   "pct": min(100, len(pairs) / GATE1_PAIRS * 100)},
+        "trades": {
+            "actual": len(closed), "target": GATE1_TRADES, "ok": trade_ok,
+            "pct": min(100, len(closed) / GATE1_TRADES * 100),
+            "blocked_on": (f"{GATE1_TRADES - len(closed)} more trades" if not trade_ok else None),
+        },
+        "days": {
+            "actual": round(days_running, 1), "target": GATE1_DAYS, "ok": days_ok,
+            "pct": min(100, days_running / GATE1_DAYS * 100),
+            "blocked_on": (f"{GATE1_DAYS - days_running:.1f} more days" if not days_ok else None),
+        },
+        "pairs": {
+            "actual": len(pairs), "target": GATE1_PAIRS, "ok": pairs_ok,
+            "pct": min(100, len(pairs) / GATE1_PAIRS * 100),
+            "blocked_on": (f"{GATE1_PAIRS - len(pairs)} more pairs" if not pairs_ok else None),
+        },
     }
 
 
 def _gate2(profit: dict, starting_capital: float, days_running: float, baseline: dict) -> dict:
+    """Gate 2: calibration checks (profit, profit-factor, drawdown).
+
+    Adds `blocked_on` to each sub-key: human string when failing, null when ok.
+    """
     actual_pct = (profit.get("profit_all_coin", 0.0) / starting_capital * 100) if starting_capital else 0
     expected_pct = baseline["annual_return_pct"] * (days_running / 365) if days_running > 0 else 0
+    profit_lower = round(expected_pct * (1 - GATE2_PROFIT_BAND), 2)
+    profit_upper = round(expected_pct * (1 + GATE2_PROFIT_BAND), 2)
+    profit_status = ("n/a" if expected_pct == 0
+                     else "cold" if actual_pct < profit_lower
+                     else "hot" if actual_pct > profit_upper
+                     else "ok")
+    profit_ok = profit_status == "ok"
+    delta_pp = round(actual_pct - expected_pct, 2)
     profit_b = {
         "actual_pct": round(actual_pct, 2), "expected_pct": round(expected_pct, 2),
-        "lower": round(expected_pct * (1 - GATE2_PROFIT_BAND), 2),
-        "upper": round(expected_pct * (1 + GATE2_PROFIT_BAND), 2),
+        "lower": profit_lower, "upper": profit_upper, "status": profit_status,
+        "blocked_on": (f"outside ±25% band · {delta_pp:+.1f}pp vs expected"
+                       if not profit_ok and profit_status != "n/a" else None),
     }
-    profit_b["status"] = ("n/a" if expected_pct == 0
-                          else "cold" if actual_pct < profit_b["lower"]
-                          else "hot" if actual_pct > profit_b["upper"]
-                          else "ok")
 
     pf_actual = profit.get("profit_factor")
+    pf_lower = round(baseline["profit_factor"] * (1 - GATE2_PF_BAND), 2)
+    pf_upper = round(baseline["profit_factor"] * (1 + GATE2_PF_BAND), 2)
+    pf_status = ("n/a" if pf_actual is None
+                 else "cold" if pf_actual < pf_lower
+                 else "hot" if pf_actual > pf_upper
+                 else "ok")
+    pf_ok = pf_status == "ok"
     pf_b = {
         "actual": round(pf_actual, 2) if pf_actual else None,
         "expected": baseline["profit_factor"],
-        "lower": round(baseline["profit_factor"] * (1 - GATE2_PF_BAND), 2),
-        "upper": round(baseline["profit_factor"] * (1 + GATE2_PF_BAND), 2),
+        "lower": pf_lower, "upper": pf_upper, "status": pf_status,
+        "blocked_on": (f"outside ±20% band · need {pf_lower:.2f} to {pf_upper:.2f}"
+                       if not pf_ok and pf_status != "n/a" else None),
     }
-    pf_b["status"] = ("n/a" if pf_actual is None
-                      else "cold" if pf_actual < pf_b["lower"]
-                      else "hot" if pf_actual > pf_b["upper"]
-                      else "ok")
 
     dd_actual = (profit.get("max_drawdown", 0.0) or 0.0) * 100
     dd_cap = baseline["max_dd_pct"] * GATE2_DD_MULT
+    dd_status = "breach" if dd_actual > dd_cap else "hot" if dd_actual > baseline["max_dd_pct"] else "ok"
+    dd_ok = dd_status == "ok"
     dd_b = {
         "actual_pct": round(dd_actual, 2), "expected_pct": baseline["max_dd_pct"],
-        "cap_pct": round(dd_cap, 2),
-        "status": "breach" if dd_actual > dd_cap else "hot" if dd_actual > baseline["max_dd_pct"] else "ok",
+        "cap_pct": round(dd_cap, 2), "status": dd_status,
+        "blocked_on": (f"DD {dd_actual / baseline['max_dd_pct']:.1f}× backtest · cap 1.5×"
+                       if not dd_ok else None),
     }
     return {"profit": profit_b, "pf": pf_b, "dd": dd_b}
 
 
 def _gate3(trades: list[dict], baseline: dict) -> dict:
+    """Gate 3: tail-risk checks (worst trade, consec losses, force exits).
+
+    Adds `blocked_on` to each sub-key.
+    """
     closed = [t for t in trades if not t.get("is_open")]
     worst = min((t.get("profit_pct", 0) or 0) for t in closed) if closed else 0
     worst_cap = baseline["worst_trade_pct"] * GATE3_LOSS_MULT
     force_exits = sum(1 for t in closed if "force" in (t.get("exit_reason") or "").lower())
     consec = _consec_losses(closed)
+    worst_ok = worst >= worst_cap
+    consec_ok = consec <= GATE3_CONSEC_LOSSES
+    force_ok = force_exits == 0
     return {
-        "worst_trade_pct": {"actual": round(worst, 2), "cap": round(worst_cap, 2), "ok": worst >= worst_cap},
-        "consec_losses":   {"actual": consec, "cap": GATE3_CONSEC_LOSSES, "ok": consec <= GATE3_CONSEC_LOSSES},
-        "force_exits":     {"actual": force_exits, "cap": 0, "ok": force_exits == 0},
+        "worst_trade_pct": {
+            "actual": round(worst, 2), "cap": round(worst_cap, 2), "ok": worst_ok,
+            "blocked_on": (f"worst trade {worst:.1f}% · cap {worst_cap:.1f}%"
+                           if not worst_ok else None),
+        },
+        "consec_losses": {
+            "actual": consec, "cap": GATE3_CONSEC_LOSSES, "ok": consec_ok,
+            "blocked_on": (f"{consec} consecutive losses · cap {GATE3_CONSEC_LOSSES}"
+                           if not consec_ok else None),
+        },
+        "force_exits": {
+            "actual": force_exits, "cap": 0, "ok": force_ok,
+            "blocked_on": (f"{force_exits} force-exit(s) detected" if not force_ok else None),
+        },
     }
 
 
@@ -324,6 +445,94 @@ def _drawdown_curve(equity: list[list]) -> list[list]:
     return out
 
 
+# ── New helpers: links, 24h delta, equity annotations ─────────────────────────
+
+def _bot_links(bot: dict, open_trades: list[dict], per_pair: list[dict]) -> dict:
+    """Build the `links` block for a bot.
+
+    freqtrade_ui derives the public hostname from the bot's label (same
+    subdomain pattern as the Cloudflare Access-protected dashboard).
+
+    tradingview_top_pair picks the top open position by stake; if none, falls
+    back to the top-profit closed pair.  Futures pairs get `.P` suffix.
+    """
+    label = bot.get("label", bot["key"])
+    freqtrade_ui = f"https://{label}.master-trader.grooveops.dev/"
+
+    # Pick candidate pair for TradingView link.
+    tv_pair: str | None = None
+    is_futures = False  # KillersScalp uses futures
+    if open_trades:
+        best_open = max(open_trades, key=lambda t: t.get("stake_amount") or 0)
+        tv_pair = best_open.get("pair")
+        # Detect futures by checking the pair string or bot name
+        is_futures = "killers" in bot["key"].lower()
+    elif per_pair:
+        tv_pair = per_pair[0]["pair"]
+        is_futures = "killers" in bot["key"].lower()
+
+    tv_url: str | None = None
+    if tv_pair:
+        symbol = tv_pair.replace("/", "")
+        suffix = ".P" if is_futures else ""
+        tv_url = f"https://www.tradingview.com/chart/?symbol=BINANCE:{symbol}{suffix}"
+
+    return {
+        "freqtrade_ui": freqtrade_ui,
+        "tradingview_top_pair": tv_url,
+        "logs_hint": f"docker logs ft-{label} --tail 50",
+    }
+
+
+def _delta_24h(
+    closed_trades: list[dict],
+    current_dd_pct: float,
+    baseline: dict | None,
+    bot: dict,
+) -> dict:
+    """Compute 24-hour rolling window metrics.
+
+    closed_trades — all closed trades for the bot (not just recent 30).
+    current_dd_pct — current max drawdown as a percentage (0-100 scale).
+    baseline — bot baseline dict or None for observational bots.
+
+    Returns:
+      new_trades        — closed trades in the last 24 h
+      pnl_usd           — sum of profit_abs for those trades
+      dd_breach         — True if current drawdown > 1.5× baseline drawdown cap
+      signals_observed  — placeholder (killers-style bots would populate this
+                          from SQLite; for Freqtrade bots always 0)
+    """
+    cutoff_ms = (time.time() - 86_400) * 1000
+    recent = [t for t in closed_trades
+              if not t.get("is_open") and (t.get("close_timestamp") or 0) >= cutoff_ms]
+    pnl_usd = sum(float(t.get("profit_abs") or 0) for t in recent)
+
+    dd_breach = False
+    if baseline and baseline.get("max_dd_pct"):
+        dd_cap = baseline["max_dd_pct"] * GATE2_DD_MULT
+        dd_breach = current_dd_pct > dd_cap
+
+    return {
+        "new_trades": len(recent),
+        "pnl_usd": round(pnl_usd, 4),
+        "dd_breach": dd_breach,
+        "signals_observed": 0,  # populated for killers bots via /api/killers/state
+    }
+
+
+def _equity_annotations(bot_key: str) -> list[dict]:
+    """Return equity chart annotations for a bot from the events store.
+
+    Shape: [{ts, label, kind}, ...] ordered oldest-first so the chart can
+    render vertical markers chronologically.
+    """
+    return [
+        {"ts": e["ts"], "label": e["label"], "kind": e["kind"]}
+        for e in _bot_events(bot_key)
+    ]
+
+
 # ── Polling ────────────────────────────────────────────────────────────────
 async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     paths = ["profit", "status", "balance", "show_config", "whitelist"]
@@ -355,6 +564,31 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     live_equity = _equity_curve_live(closed_trades, open_trades, starting_capital, bot_start_ts_ms)
     drawdown_curve = _drawdown_curve(live_equity)
 
+    # ── New: compute current DD % for dd_breach check ──────────────────────
+    current_dd_pct = (profit or {}).get("max_drawdown", 0.0) or 0.0
+    current_dd_pct *= 100  # Freqtrade returns ratio (e.g. 0.05 = 5%)
+
+    # ── New: no-baseline bots (killers-scalp) ─────────────────────────────
+    no_baseline = bot.get("no_baseline", False)
+    baseline = bot.get("baseline") if not no_baseline else None
+
+    open_trades_out = [
+        {
+            "pair": t.get("pair"),
+            "open_rate": t.get("open_rate"),
+            "current_rate": t.get("current_rate"),
+            "profit_pct": t.get("profit_pct"),
+            "profit_abs": t.get("profit_abs"),
+            "stake_amount": t.get("stake_amount"),
+            "open_date": t.get("open_date"),
+            "open_timestamp": t.get("open_timestamp"),
+            "stop_loss_abs": t.get("stop_loss_abs"),
+            "stop_loss_pct": t.get("stop_loss_pct"),
+            "amount": t.get("amount"),
+        }
+        for t in open_trades
+    ]
+
     return {
         "key": bot["key"], "name": bot["name"], "label": bot["label"],
         "reachable": True, "dry_run": is_dry_run,
@@ -384,22 +618,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             "best_pair_pct": (profit or {}).get("best_rate"),
             "avg_duration": (profit or {}).get("avg_duration"),
         },
-        "open_trades": [
-            {
-                "pair": t.get("pair"),
-                "open_rate": t.get("open_rate"),
-                "current_rate": t.get("current_rate"),
-                "profit_pct": t.get("profit_pct"),
-                "profit_abs": t.get("profit_abs"),
-                "stake_amount": t.get("stake_amount"),
-                "open_date": t.get("open_date"),
-                "open_timestamp": t.get("open_timestamp"),
-                "stop_loss_abs": t.get("stop_loss_abs"),
-                "stop_loss_pct": t.get("stop_loss_pct"),
-                "amount": t.get("amount"),
-            }
-            for t in open_trades
-        ],
+        "open_trades": open_trades_out,
         "recent_trades": [
             {
                 "pair": t.get("pair"),
@@ -422,16 +641,25 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "capital_at_risk": _capital_at_risk(open_trades),
         "concentration": _concentration(per_pair, closed_pnl),
         "observational": bot.get("observational", False),
-        "gate1": ({"status": "observational"} if bot.get("observational")
+        # Gates: null for no-baseline bots, observational marker for copy-traders
+        # with soft gating, full gate objects for quant-validated bots.
+        "gate1": (None if no_baseline
+                  else {"status": "observational"} if bot.get("observational")
                   else _gate1(all_trades, days_running)),
-        "gate2": ({"status": "observational"} if bot.get("observational")
+        "gate2": (None if no_baseline
+                  else {"status": "observational"} if bot.get("observational")
                   else _gate2(profit or {}, starting_capital, days_running, bot["baseline"])),
-        "gate3": ({"status": "observational"} if bot.get("observational")
+        "gate3": (None if no_baseline
+                  else {"status": "observational"} if bot.get("observational")
                   else _gate3(all_trades, bot["baseline"])),
-        "baseline": bot["baseline"],
+        "baseline": baseline,
         "equity_live": live_equity,
         "drawdown_curve": drawdown_curve,
         "whitelist_size": len((whitelist or {}).get("whitelist", [])) if whitelist else None,
+        # ── NEW: additive fields (frontend feature-detects these) ──────────
+        "links": _bot_links(bot, open_trades_out, per_pair),
+        "delta_24h": _delta_24h(closed_trades, current_dd_pct, baseline, bot),
+        "equity_annotations": _equity_annotations(bot["key"]),
     }
 
 
@@ -455,6 +683,7 @@ async def _poll_loop():
                         _cache["bots"][bot["key"]] = r
                         if r.get("reachable"):
                             _cache["errors"].pop(bot["key"], None)
+                            _cache["last_reachable_at"][bot["key"]] = time.time()
                         else:
                             _cache["errors"][bot["key"]] = r.get("error", "unreachable")
         except Exception as exc:
@@ -463,9 +692,53 @@ async def _poll_loop():
         await asyncio.sleep(POLL_INTERVAL)
 
 
+# ── Status level ──────────────────────────────────────────────────────────────
+
+def _fleet_status() -> dict:
+    """Compute top-level status level for the fleet.
+
+    green  — all bots reachable, none stale.
+    yellow — one or more dry-run bots stale/unreachable.
+    red    — any live bot unreachable, or any bot stale > threshold AND live.
+
+    live bot = dry_run is False in its snapshot.
+    """
+    now = time.time()
+    stale_bots: list[str] = []
+    any_live_unreachable = False
+
+    for bot in BOTS:
+        key = bot["key"]
+        snap = _cache["bots"].get(key, {})
+        last_ok = _cache["last_reachable_at"].get(key)
+        is_stale = (last_ok is None) or ((now - last_ok) > STALE_THRESHOLD_S)
+        is_live = not snap.get("dry_run", True)
+
+        if is_stale:
+            stale_bots.append(key)
+            if is_live:
+                any_live_unreachable = True
+
+    if any_live_unreachable:
+        level = "red"
+        summary = (f"live bot unreachable: {', '.join(stale_bots)}"
+                   if stale_bots else "live bot unreachable")
+    elif stale_bots:
+        level = "yellow"
+        summary = f"{len(stale_bots)} bot(s) stale: {', '.join(stale_bots)}"
+    else:
+        level = "green"
+        n = len([b for b in _cache["bots"].values() if b.get("reachable")])
+        summary = f"all {n} bots reachable"
+
+    return {"level": level, "summary": summary, "stale_bots": stale_bots}
+
+
 # ── App ────────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Pre-warm events cache at startup
+    _load_events()
     task = asyncio.create_task(_poll_loop())
     log.info("ft-dashboard up; poll interval %ds", POLL_INTERVAL)
     yield
@@ -497,11 +770,26 @@ async def healthz():
 
 @app.get("/api/state")
 async def api_state():
+    """Full fleet snapshot.
+
+    Additive extensions vs original schema:
+      bots[key].links             — freqtrade_ui, tradingview_top_pair, logs_hint
+      bots[key].delta_24h         — new_trades, pnl_usd, dd_breach, signals_observed
+      bots[key].gate1/2/3.*.blocked_on — human string when gate fails, null when ok
+      bots[key].equity_annotations — [{ts, label, kind}] for equity chart markers
+      bots[key].baseline          — null for killers-scalp (no quant baseline)
+      bots[key].gate1/2/3         — null for killers-scalp (no baseline to gate against)
+      events_global               — fleet-wide event feed [{ts, label, kind, bot}]
+      status                      — {level, summary, stale_bots}
+    """
     return JSONResponse({
         "last_poll": _cache.get("last_poll_finished_at"),
         "poll_age_s": (time.time() - _cache["last_poll_finished_at"]) if _cache.get("last_poll_finished_at") else None,
         "bots": _cache.get("bots", {}),
         "errors": _cache.get("errors", {}),
+        # ── NEW ──────────────────────────────────────────────────────────────
+        "events_global": _global_events(),
+        "status": _fleet_status(),
     })
 
 
@@ -534,8 +822,9 @@ async def api_equity(bot_key: str):
     # away when the user is looking at the live window.
     csv_path = OVERLAYS_DIR / f"expected_{snap['name']}.csv"
     expected: list[list] = []
-    if csv_path.exists() and starting > 0 and bot_start_ts_ms:
-        scale = starting / meta["baseline"]["starting_equity_in_csv"]
+    baseline = meta.get("baseline") or {}
+    if csv_path.exists() and starting > 0 and bot_start_ts_ms and baseline.get("starting_equity_in_csv"):
+        scale = starting / baseline["starting_equity_in_csv"]
         try:
             raw: list[tuple[int, float]] = []
             with open(csv_path) as f:
@@ -564,7 +853,119 @@ async def api_equity(bot_key: str):
 
 
 _ALLOWED_TIMEFRAMES = {"1m", "5m", "15m", "30m", "1h", "2h", "4h", "1d"}
-_PAIR_RE = re.compile(r"^[A-Z0-9]{2,15}/(USDT|USDC|BTC|ETH|BUSD)$")
+_PAIR_RE = re.compile(r"^[A-Z0-9]{2,15}/(USDT|USDC|BTC|ETH|BUSD)(:[A-Z0-9]{2,8})?$")
+
+
+# ── killers_bot observer state ────────────────────────────────────────────
+# Observer-only bot listening to Binance Killers VIP channel. Not a
+# Freqtrade instance — has its own SQLite. Mounted read-only at KILLERS_DB.
+
+import sqlite3 as _sqlite
+
+
+
+@app.get("/api/killers/state")
+async def api_killers_state():
+    """Compact summary of the killers_bot observer + paper positions."""
+    db_path = Path(KILLERS_DB)
+    if not db_path.exists():
+        return JSONResponse({"error": "killers db not mounted",
+                             "expected_at": str(db_path)}, status_code=404)
+
+    try:
+        conn = _sqlite.connect(f"file:{db_path}?mode=ro", uri=True)
+        conn.row_factory = _sqlite.Row
+    except _sqlite.Error as e:
+        return JSONResponse({"error": f"sqlite open: {e}"}, status_code=500)
+
+    try:
+        msg_count = conn.execute("SELECT COUNT(*) FROM raw_messages").fetchone()[0]
+        cls_count = conn.execute("SELECT COUNT(*) FROM classifications").fetchone()[0]
+        last_msg = conn.execute(
+            "SELECT msg_id, received_at, posted_at, text FROM raw_messages "
+            "ORDER BY msg_id DESC LIMIT 1"
+        ).fetchone()
+        kinds = {row["kind"]: row["n"] for row in conn.execute(
+            "SELECT kind, COUNT(*) AS n FROM classifications GROUP BY kind"
+        )}
+        positions_open = conn.execute(
+            "SELECT COUNT(*) FROM paper_positions WHERE state IN ('open','pending')"
+        ).fetchone()[0]
+        positions_closed = conn.execute(
+            "SELECT COUNT(*) FROM paper_positions WHERE state = 'closed'"
+        ).fetchone()[0]
+        realized_pnl_total = conn.execute(
+            "SELECT COALESCE(SUM(realized_pnl), 0) FROM paper_positions WHERE state = 'closed'"
+        ).fetchone()[0]
+        recent_classifications = [dict(r) for r in conn.execute(
+            "SELECT c.msg_id, c.classified_at, c.kind, c.signal_id, c.symbol, "
+            "       c.direction, c.confidence, "
+            "       substr(m.text, 1, 200) AS text "
+            "FROM classifications c "
+            "LEFT JOIN raw_messages m ON m.msg_id = c.msg_id "
+            "ORDER BY c.msg_id DESC LIMIT 20"
+        )]
+        recent_positions = [dict(r) for r in conn.execute(
+            "SELECT pos_id, signal_id, symbol, direction, state, "
+            "       open_msg_id, open_date, entry_mid, sl, leverage, "
+            "       position_notional, realized_pct, realized_pnl, "
+            "       close_reason, last_event_at "
+            "FROM paper_positions ORDER BY pos_id DESC LIMIT 20"
+        )]
+        # Equity timeline: each closed position contributes its realized_pnl
+        # to a cumulative virtual-account equity series starting at $1000.
+        equity_rows = [dict(r) for r in conn.execute(
+            "SELECT close_date, realized_pnl FROM paper_positions "
+            "WHERE state = 'closed' AND close_date IS NOT NULL "
+            "ORDER BY close_date ASC"
+        )]
+        # Per-symbol P&L for the top-symbol bar chart.
+        per_symbol = [dict(r) for r in conn.execute(
+            "SELECT symbol, COUNT(*) AS n, "
+            "       COALESCE(SUM(realized_pnl), 0) AS pnl "
+            "FROM paper_positions "
+            "WHERE symbol IS NOT NULL "
+            "GROUP BY symbol "
+            "ORDER BY ABS(pnl) DESC LIMIT 15"
+        )]
+        # Classification arrival rate — bucket by hour for an activity chart.
+        rate_rows = [dict(r) for r in conn.execute(
+            "SELECT substr(classified_at, 1, 13) AS hour, COUNT(*) AS n "
+            "FROM classifications GROUP BY hour ORDER BY hour ASC"
+        )]
+        # Posted stop-loss per symbol: the SL the channel published on its
+        # latest OPEN signal for each symbol. The dashboard draws this as the
+        # stop line on open copy-trader positions — Freqtrade's own stop is
+        # -99%/liquidation here because exits are channel-driven, so the posted
+        # SL is the meaningful level. Iterate ascending so the latest wins.
+        posted_sl: dict[str, float] = {}
+        for r in conn.execute(
+            "SELECT symbol, sl FROM classifications "
+            "WHERE kind = 'open' AND sl IS NOT NULL AND symbol IS NOT NULL "
+            "ORDER BY msg_id ASC"
+        ):
+            posted_sl[r["symbol"]] = r["sl"]
+    finally:
+        conn.close()
+
+    return JSONResponse({
+        "ok": True,
+        "msg_count": msg_count,
+        "classification_count": cls_count,
+        "last_msg": dict(last_msg) if last_msg else None,
+        "kind_distribution": kinds,
+        "positions": {
+            "open": positions_open,
+            "closed": positions_closed,
+            "realized_pnl_total_usd": round(realized_pnl_total or 0, 2),
+        },
+        "equity_timeline": equity_rows,
+        "per_symbol": per_symbol,
+        "rate_by_hour": rate_rows,
+        "recent_classifications": recent_classifications,
+        "recent_positions": recent_positions,
+        "posted_sl": posted_sl,
+    })
 
 
 @app.get("/api/closed_trades")
@@ -581,11 +982,12 @@ async def api_closed_trades():
         snap = _cache["bots"].get(bot["key"])
         if not snap:
             continue
+        baseline = bot.get("baseline") or {}
         for t in snap.get("recent_trades", []):
             if t.get("is_open") or not t.get("close_timestamp"):
                 continue
             entry = t.get("open_rate")
-            stoploss_pct = bot.get("baseline", {}).get("worst_trade_pct", -5.0) / 100.0
+            stoploss_pct = baseline.get("worst_trade_pct", -5.0) / 100.0
             stop_price = entry * (1 + stoploss_pct) if entry else None
             out.append({
                 "bot_key": bot["key"],
@@ -639,8 +1041,14 @@ async def api_binance_candles(
         return JSONResponse({"error": "invalid timeframe"}, status_code=400)
     limit = max(10, min(limit, 1000))
 
-    symbol = pair.replace("/", "")
-    url = "https://api.binance.com/api/v3/klines"
+    # Futures pairs are "BASE/QUOTE:SETTLE" (e.g. TAO/USDT:USDT). Strip the
+    # settle suffix for the Binance symbol and route to the USDⓈ-M futures
+    # klines endpoint, which carries every perp symbol (incl. 1000PEPE etc.).
+    # Spot pairs keep the spot endpoint. Both return the same kline schema.
+    is_futures = ":" in pair
+    symbol = pair.split(":", 1)[0].replace("/", "")
+    url = ("https://fapi.binance.com/fapi/v1/klines" if is_futures
+           else "https://api.binance.com/api/v3/klines")
     params: dict[str, int | str] = {"symbol": symbol, "interval": timeframe, "limit": limit}
     if start_ms is not None:
         params["startTime"] = int(start_ms)

@@ -28,7 +28,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 2G
     entrypoint:
       - /bin/sh
       - -c
@@ -51,7 +51,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 2G
     entrypoint:
       - /bin/sh
       - -c
@@ -71,7 +71,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 2G
     # DRY-RUN. Liquidation-cascade rebound fader (third candidate strategy).
     # Validation: Freqtrade native PF 1.76, 84% WR, max DD 0.51% (Oct 10 2025
     # cascade only) on 39mo backtest. 5/6 walk-forward windows positive.
@@ -80,6 +80,145 @@ services:
       - /bin/sh
       - -c
       - mkdir -p /freqtrade/user_data/logs && sleep 80 && exec freqtrade trade --logfile /freqtrade/user_data/logs/CascadeFaderV1.log --config /freqtrade/user_data/configs/CascadeFaderV1.json --strategy CascadeFaderV1
+
+  # ── killers (binance killers VIP copy-trader) ───────────────────────────
+  # RESTORED 2026-05-31 as a DRY-RUN measurement instrument only. The channel's
+  # signals are price-verified unprofitable (−$511/−$1536 backtest, live PF
+  # 0.011, codex "do-not-fund VERY HIGH" 2026-05-28). NO real capital, ever.
+  # Observer (host Telethon unit) intentionally NOT auto-started — shares
+  # Palmer's personal Telegram session with the insiders work; restart only
+  # after coordinating + a Telethon upgrade.
+  killers-receiver:
+    # FastAPI executor: receives classified channel events from killers_bot
+    # observer (running on host via systemd/nohup) → maps to Freqtrade REST
+    # /forceenter & /forceexit against ft-killers-scalp.
+    build: ../services/killers-receiver
+    image: killers-receiver:latest
+    restart: unless-stopped
+    container_name: killers-receiver
+    networks:
+      - default
+      - dokploy-network
+    environment:
+      KILLERS_FT_BASE_URL: http://ft-killers-scalp:8080
+      # Read from the shared anchor — sibling Freqtrade containers inherit
+      # *a1 which sets FREQTRADE__API_SERVER__USERNAME/PASSWORD. Hardcoding
+      # would 401 against rotated creds.
+      KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
+      KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+      KILLERS_DB: /var/lib/killers/receiver.sqlite
+      KILLERS_STAKE_USD: "20"
+      KILLERS_LEVERAGE: "5"
+      KILLERS_MAX_OPEN: "10"
+      # Posted-SL hard-stop mode ON (2026-06-06): force-exit a position once
+      # mark breaches the signal's posted SL, instead of riding to the channel's
+      # close / liquidation. Per research/killers_sl_replay this halves the loss
+      # and removes liquidations. Changes the measured object (channel→posted
+      # plan); still dry-run, do-not-fund stands. Set "false" to revert.
+      KILLERS_POSTED_SL: "true"
+    volumes:
+      - killers_receiver_state:/var/lib/killers
+    ports:
+      - 127.0.0.1:8089:8089
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    depends_on:
+      - ft-killers-scalp
+
+  ft-killers-scalp:
+    # Freqtrade Futures dry-run bot. Pass-through strategy: all entries +
+    # exits driven by killers-receiver via REST. $200 dry wallet, max 10
+    # concurrent positions, leverage default 5x (matches channel's 3-5x).
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-killers-scalp
+    environment:
+      <<: *a1
+      # Belt-and-suspenders go-live guard (codex P1, 2026-05-31): env overrides
+      # config, so even a stray dry_run:false edit to KillersScalpV1.json cannot
+      # make this do-not-fund measurement instrument trade real capital. Keys are
+      # left intact (*a1) because Binance futures dry-run needs them to load
+      # leverage brackets/markets; the explicit flag is what closes the go-live path.
+      FREQTRADE__DRY_RUN: "true"
+    volumes:
+      - ft_user_data:/freqtrade/user_data
+      - ./user_data/configs:/freqtrade/user_data/configs:ro
+      - ./user_data/strategies:/freqtrade/user_data/strategies
+    ports:
+      - 127.0.0.1:8099:8080
+    healthcheck: *a2
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    entrypoint:
+      - /bin/sh
+      - -c
+      - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KillersScalpV1.log --config /freqtrade/user_data/configs/KillersScalpV1.json --strategy KillersScalpV1
+
+  ft-insiders-scalp:
+    # Freqtrade Futures dry-run — Insiders Scalp FORWARD MEASUREMENT (Dennis's
+    # free channel). Reuses the validated killers pass-through strategy
+    # (KillersScalpV1, REST-driven); insiders-receiver drives entries/exits with
+    # limit-in-zone + posted-SL. Do-not-fund measurement instrument: settling
+    # "does copying Dennis's free signals pay" with a live forward verdict.
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-insiders-scalp
+    environment:
+      <<: *a1
+      FREQTRADE__DRY_RUN: "true"   # go-live guard (env overrides config)
+    volumes:
+      - ft_user_data:/freqtrade/user_data
+      - ./user_data/configs:/freqtrade/user_data/configs:ro
+      - ./user_data/strategies:/freqtrade/user_data/strategies
+    ports:
+      - 127.0.0.1:8098:8080
+    healthcheck: *a2
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    entrypoint:
+      - /bin/sh
+      - -c
+      - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/InsidersScalpV2.log --config /freqtrade/user_data/configs/InsidersScalpV2.json --strategy KillersScalpV1
+
+  insiders-receiver:
+    # FastAPI executor for the Insiders forward measurement — SAME validated
+    # image as killers-receiver, pointed at ft-insiders-scalp. limit-in-zone +
+    # posted-SL ON (the exit policies the killers replay validated). Fed by the
+    # observer fan-out (Dennis's free channel 3501314840).
+    build: ../services/killers-receiver
+    image: killers-receiver:latest
+    restart: unless-stopped
+    container_name: insiders-receiver
+    networks:
+      - default
+      - dokploy-network
+    environment:
+      KILLERS_FT_BASE_URL: http://ft-insiders-scalp:8080
+      KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
+      KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+      KILLERS_DB: /var/lib/killers/receiver.sqlite
+      KILLERS_STAKE_USD: "20"
+      KILLERS_LEVERAGE: "5"
+      KILLERS_MAX_OPEN: "10"
+      KILLERS_POSTED_SL: "true"
+      KILLERS_NOTIFY_URL: http://trade-webhook:8088/test/notify
+    volumes:
+      - insiders_receiver_state:/var/lib/killers
+    ports:
+      - 127.0.0.1:8090:8089
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    depends_on:
+      - ft-insiders-scalp
+
   funding-refresh:
     image: freqtradeorg/freqtrade:stable
     restart: always
@@ -169,8 +308,12 @@ services:
       FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
       POLL_INTERVAL: "30"
       OVERLAYS_DIR: /overlays
+      KILLERS_DB: /var/lib/killers/state.sqlite
     volumes:
       - ./overlays:/overlays:ro
+      # killers_bot SQLite (read-only) so the dashboard can render the
+      # observer-bot's state alongside the Freqtrade fleet.
+      - /home/ubuntu/killers-bot/state.sqlite:/var/lib/killers/state.sqlite:ro
     deploy:
       resources:
         limits:
@@ -192,104 +335,6 @@ services:
     depends_on:
       - keltnerbouncev1
       - cascadefaderv1
-  insiders-listener:
-    # ft-insiders-listener — Telethon listener for the Insiders Scalp Telegram
-    # group. Phase 1: piggybacks on Eduardo's user session. Phase 2: switches
-    # to our own session via env var.
-    #
-    # SCAFFOLD ONLY (2026-05-19) — won't start until insiders-listener image
-    # is built AND .session secret is present. Guarded behind `insiders`
-    # profile so default `docker compose up` skips it.
-    profiles:
-      - insiders
-    build: ./insiders_bridge
-    image: ft-insiders-listener:latest
-    restart: unless-stopped
-    container_name: ft-insiders-listener
-    env_file:
-      - ./insiders_bridge/.env
-    volumes:
-      - insiders_state:/var/lib/insiders
-      # Session file mounted as read-only secret. Per-deployment.
-      # Path source must be configured in the deployment's docker-compose
-      # override; do NOT commit the actual session.
-      - ./insiders_bridge/secrets/insiders.session:/run/secrets/insiders.session:ro
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    depends_on:
-      - insiders-receiver
-
-  insiders-receiver:
-    # FastAPI receiver: position graph + classifier dispatcher + freqtrade
-    # executor + reconciliation loop. Codex's "actual core product."
-    profiles:
-      - insiders
-    build: ../services/insiders-receiver
-    image: ft-insiders-receiver:latest
-    restart: unless-stopped
-    container_name: ft-insiders-receiver
-    environment:
-      INSIDERS_INSTANCE_ID: ${INSIDERS_INSTANCE_ID:-palmer-prod}
-      INSIDERS_DB: /var/lib/insiders/receiver.sqlite
-      INSIDERS_RECONCILE_SEC: "30"
-      INSIDERS_RISK_USD: "2.0"
-      INSIDERS_MARGIN_USD: "10.0"
-      INSIDERS_MAX_LEVERAGE: "30"
-      INSIDERS_FT_BASE_URL: http://insidersscalpv1:8080
-      INSIDERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
-      INSIDERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
-      INSIDERS_CLAUDE_ENABLED: "true"
-      INSIDERS_CLAUDE_TIMEOUT_SEC: "8.0"
-      INSIDERS_CLAUDE_BINARY: claude
-      # Stale-signal gate (codex hardening, default OFF per trust-signaler frame).
-      # Set to seconds (e.g. 18) to enable mechanical age-based reject.
-      INSIDERS_STALE_SIGNAL_MAX_SEC: "0"
-    volumes:
-      - insiders_receiver_state:/var/lib/insiders
-      - ./insiders_bridge:/app/insiders_bridge:ro
-      # Shared Claude auth — reuse same volume as elder-brain-bot, so
-      # /root/.claude in this container has the same Max-subscription
-      # credentials. external=true means the volume already exists from
-      # claude-assistant stack.
-      - claude_auth:/root/.claude
-    ports:
-      - "127.0.0.1:8089:8089"
-    deploy:
-      resources:
-        limits:
-          memory: 384M
-    depends_on:
-      - insidersscalpv1
-
-  insidersscalpv1:
-    # Futures Freqtrade bot for the Insiders Scalp copy trader. Pass-through
-    # strategy — entries/exits all driven by the receiver via REST.
-    profiles:
-      - insiders
-    image: freqtradeorg/freqtrade:stable
-    restart: always
-    container_name: ft-insiders-scalp
-    environment:
-      <<: *a1
-      INSIDERS_RECEIVER_URL: http://insiders-receiver:8089
-    volumes:
-      - ft_user_data:/freqtrade/user_data
-      - ./user_data/configs:/freqtrade/user_data/configs:ro
-      - ./user_data/strategies:/freqtrade/user_data/strategies
-    ports:
-      - 127.0.0.1:8098:8080
-    healthcheck: *a2
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-    entrypoint:
-      - /bin/sh
-      - -c
-      - sleep 90 && exec freqtrade trade --logfile /freqtrade/user_data/logs/InsidersScalpV1.log --config /freqtrade/user_data/configs/InsidersScalpV1.json --strategy InsidersScalpV1
-
 networks:
   default: null
   dokploy-network:
@@ -299,6 +344,7 @@ volumes:
   ft_user_data: null
   ft_exporter_state: null
   insiders_state: null
+  killers_receiver_state: null
   insiders_receiver_state: null
   claude_auth:
     external: true

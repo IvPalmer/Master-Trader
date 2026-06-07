@@ -1,15 +1,23 @@
-"""Build a compact prompt-input file from last_month_messages.json.
+"""Build a compact prompt-input file from a Telethon-shape message JSON.
 
 For each message, attach parent text + last 2 sibling replies so the classifier
 has full context (matches validate_llm.py's build_user_turn). Output is JSONL,
 one compact line per message, for easy chunked reading by the classifier.
+
+Usage:
+    python3 prep_classify_input.py [input_json] [output_jsonl]
+
+Defaults: _local/last_month_messages.json → out/classify_input.jsonl
 """
 import json
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).parent
-p = HERE / "_local" / "last_month_messages.json"
-content = p.read_text()
+in_path = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "_local" / "last_month_messages.json"
+out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else HERE / "out" / "classify_input.jsonl"
+
+content = in_path.read_text()
 msgs, _ = json.JSONDecoder().raw_decode(content)
 
 by_id = {m["id"]: m for m in msgs}
@@ -33,10 +41,9 @@ def build_ctx(msg):
 
 
 out = [build_ctx(m) for m in sorted(msgs, key=lambda m: m["id"])]
-(HERE / "out").mkdir(exist_ok=True)
-op = HERE / "out" / "classify_input.jsonl"
-with op.open("w") as f:
+out_path.parent.mkdir(parents=True, exist_ok=True)
+with out_path.open("w") as f:
     for item in out:
         f.write(json.dumps(item, ensure_ascii=False) + "\n")
-print(f"wrote {len(out)} lines to {op}")
-print(f"size: {op.stat().st_size} bytes")
+print(f"wrote {len(out)} lines to {out_path}")
+print(f"size: {out_path.stat().st_size} bytes")

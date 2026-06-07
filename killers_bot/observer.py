@@ -1,0 +1,477 @@
+"""Main orchestrator: Telethon listener → classifier → paper simulator → log.
+
+No exchange connection. No real orders. Observe-only.
+
+Run via the Docker entrypoint, or locally:
+  python3 -m killers_bot.observer
+"""
+import asyncio
+import json
+import logging
+import os
+import sqlite3
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+from . import classifier, simulator, strict_open
+
+logger = logging.getLogger(__name__)
+
+
+# ── Config ─────────────────────────────────────────────────────────────────
+
+
+def _load_dotenv():
+    """Load killers_bot/.env into os.environ if present.
+
+    Hand-rolled (no python-dotenv dep) to keep the image minimal. Strips
+    surrounding double-quotes so multi-word values like
+    `KILLERS_CLAUDE_BINARY="docker exec elder-brain-bot claude"` round-trip.
+    """
+    env_path = Path(__file__).parent / ".env"
+    if not env_path.exists():
+        return
+    for raw in env_path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        v = v.strip()
+        if len(v) >= 2 and ((v[0] == v[-1] == '"') or (v[0] == v[-1] == "'")):
+            v = v[1:-1]
+        os.environ.setdefault(k.strip(), v)
+
+
+class Config:
+    def __init__(self):
+        _load_dotenv()
+        self.api_id = int(_required("KILLERS_TG_API_ID"))
+        self.api_hash = _required("KILLERS_TG_API_HASH")
+        self.session_path = _required("KILLERS_TG_SESSION")
+        self.channel_username = os.getenv(
+            "KILLERS_TG_CHANNEL_USERNAME", "BinanceKillers_FreeSignal"
+        )
+        self.channel_id_override = os.getenv("KILLERS_TG_CHANNEL_ID")
+        self.db_path = os.getenv("KILLERS_DB", "/var/lib/killers/state.sqlite")
+        self.claude_binary = os.getenv("KILLERS_CLAUDE_BINARY", "claude")
+        self.claude_model = os.getenv("KILLERS_CLAUDE_MODEL") or None
+        self.claude_timeout = float(os.getenv("KILLERS_CLAUDE_TIMEOUT_SEC", "12"))
+        self.heartbeat_sec = int(os.getenv("KILLERS_HEARTBEAT_SEC", "60"))
+        # Receiver endpoint — when set, observer POSTs each classification.
+        # Receiver translates to Freqtrade Futures REST. Leave unset to run
+        # in pure observe-mode (Phase 1).
+        self.receiver_url = os.getenv("KILLERS_RECEIVER_URL", "")
+
+
+def _required(name: str) -> str:
+    val = os.getenv(name)
+    if not val:
+        raise SystemExit(f"missing required env var: {name}")
+    return val
+
+
+# ── DB ─────────────────────────────────────────────────────────────────────
+
+
+def init_db(path: str) -> sqlite3.Connection:
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    schema = (Path(__file__).parent / "schema.sql").read_text()
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    conn.executescript(schema)
+    return conn
+
+
+def last_msg_id(conn: sqlite3.Connection) -> Optional[int]:
+    row = conn.execute("SELECT MAX(msg_id) FROM raw_messages").fetchone()
+    return row[0] if row and row[0] else None
+
+
+def persist_raw(conn: sqlite3.Connection, msg: dict) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO raw_messages "
+        "(msg_id, received_at, posted_at, edited_at, reply_to_msg_id, text, raw_json) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            msg["id"],
+            datetime.now(timezone.utc).isoformat(),
+            str(msg.get("date")) if msg.get("date") else None,
+            str(msg.get("edit_date")) if msg.get("edit_date") else None,
+            msg.get("reply_to_msg_id"),
+            msg.get("message") or msg.get("text"),
+            json.dumps(msg, default=str),
+        ),
+    )
+    conn.commit()
+
+
+def persist_classification(conn: sqlite3.Connection, classification: dict) -> None:
+    entry_range = classification.get("entry_range") or [None, None]
+    if not isinstance(entry_range, list) or len(entry_range) != 2:
+        entry_range = [None, None]
+    sl_val = classification.get("sl")
+    sl_num = sl_val if isinstance(sl_val, (int, float)) else None
+    sl_str = sl_val if isinstance(sl_val, str) else None
+
+    conn.execute(
+        "INSERT OR REPLACE INTO classifications "
+        "(msg_id, classified_at, kind, signal_id, symbol, direction, "
+        " entry_lo, entry_hi, sl, sl_str, tp, pct, confidence, notes, raw_json) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            classification["id"],
+            datetime.now(timezone.utc).isoformat(),
+            classification.get("kind"),
+            classification.get("signal_id"),
+            classification.get("symbol"),
+            classification.get("direction"),
+            entry_range[0], entry_range[1],
+            sl_num, sl_str,
+            classification.get("tp"),
+            classification.get("pct"),
+            classification.get("confidence"),
+            (classification.get("notes") or "")[:1000],
+            json.dumps(classification, default=str),
+        ),
+    )
+    conn.commit()
+
+
+# ── Reply chain (small, in-memory cache + DB fallback) ─────────────────────
+
+
+async def build_reply_chain(client, channel_id, conn, msg_dict: dict, depth: int = 3) -> list[dict]:
+    chain = []
+    current = msg_dict
+    for _ in range(depth):
+        parent_id = current.get("reply_to_msg_id")
+        if not parent_id:
+            break
+        row = conn.execute(
+            "SELECT msg_id, posted_at, reply_to_msg_id, text FROM raw_messages WHERE msg_id = ?",
+            (parent_id,),
+        ).fetchone()
+        if row:
+            current = {"id": row["msg_id"], "date": row["posted_at"],
+                       "reply_to_msg_id": row["reply_to_msg_id"], "text": row["text"] or ""}
+        else:
+            try:
+                msg = await client.get_messages(channel_id, ids=parent_id)
+                if msg is None:
+                    break
+                d = msg.to_dict() if hasattr(msg, "to_dict") else dict(msg)
+                persist_raw(conn, d)
+                current = {"id": d.get("id"), "date": str(d.get("date")),
+                           "reply_to_msg_id": d.get("reply_to_msg_id"),
+                           "text": d.get("message") or d.get("text") or ""}
+            except Exception as e:
+                logger.warning("reply chain fetch failed parent=%d: %s", parent_id, e)
+                break
+        chain.append(current)
+    return chain
+
+
+# ── Process one message end-to-end ─────────────────────────────────────────
+
+
+async def process_message(client, channel_id, conn, config, msg_dict: dict, source: str) -> None:
+    # Telethon's to_dict() puts message content in the 'message' key, not 'text'.
+    # Mirror it onto 'text' for downstream callers (classifier prompt, snippet).
+    if not msg_dict.get("text") and msg_dict.get("message"):
+        msg_dict["text"] = msg_dict["message"]
+    persist_raw(conn, msg_dict)
+    snippet = (msg_dict.get("text") or "")[:80].replace("\n", " ⏎ ")
+    logger.info("[MSG %s] id=%d %r", source.upper(), msg_dict["id"], snippet)
+
+    chain = await build_reply_chain(client, channel_id, conn, msg_dict)
+
+    # FAST-PATH: try the rule parser first. Saves ~7s of Claude latency on
+    # clean OPEN signals. Strict checks inside the parser reject anything
+    # that isn't a complete single-coin open. Claude still runs in shadow
+    # after the receiver POST so any disagreement is visible.
+    text = msg_dict.get("text") or msg_dict.get("message") or ""
+    classification = strict_open.is_strict_killers_open(text, msg_dict["id"])
+    used_fast_path = classification is not None
+    if used_fast_path:
+        logger.info(
+            "[FAST-PATH] id=%d kind=open signal=#%s sym=%s — bypassing Claude",
+            msg_dict["id"], classification["signal_id"], classification["symbol"],
+        )
+    else:
+        classification = await classifier.classify(
+            msg_dict, chain,
+            binary=config.claude_binary,
+            model=config.claude_model,
+            timeout_sec=config.claude_timeout,
+        )
+    if classification is None:
+        logger.warning("[CLASSIFY FAIL] id=%d skipping downstream", msg_dict["id"])
+        return
+
+    persist_classification(conn, classification)
+    kind = classification.get("kind")
+    sym = classification.get("symbol")
+    sid = classification.get("signal_id")
+    conf = classification.get("confidence", 0)
+    logger.info("[CLASSIFY] id=%d kind=%s signal=#%s sym=%s conf=%.2f source=%s",
+                msg_dict["id"], kind, sid, sym, conf,
+                "rule" if used_fast_path else "claude")
+
+    # Route into paper simulator (local audit trail)
+    if kind == "open":
+        simulator.open_paper_position(conn, msg_dict, classification)
+    elif kind in ("close_partial", "close_full", "move_sl"):
+        simulator.update_paper_position(conn, msg_dict, classification)
+    elif kind == "increase":
+        logger.info("[INCREASE] not modeled in paper sim yet")
+    # else: chat — already logged via [CLASSIFY], nothing to do
+
+    # Forward to receiver for real Freqtrade Futures dry-run execution.
+    # Receiver is the source of truth for actual trades; paper sim stays
+    # for audit + offline comparison.
+    if config.receiver_url:
+        await _post_to_receiver(config.receiver_url, msg_dict, classification)
+
+    # Shadow Claude after the fast-path decision is already in flight. Logs
+    # disagreement but never blocks the receiver POST. Skip if Claude was
+    # already the primary classifier (no shadow needed).
+    if used_fast_path:
+        asyncio.create_task(
+            _shadow_classify(msg_dict, chain, classification, config),
+            name=f"shadow-classify-{msg_dict['id']}",
+        )
+
+
+async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
+                           config) -> None:
+    """Run Claude in the background after a fast-path open, log any
+    disagreement. Best-effort — never raises out of the task."""
+    try:
+        cls = await classifier.classify(
+            msg_dict, chain,
+            binary=config.claude_binary,
+            model=config.claude_model,
+            timeout_sec=config.claude_timeout,
+        )
+        if cls is None:
+            return
+        # Compare critical fields. Disagreement = different kind, symbol,
+        # direction, or sl off by >0.5%.
+        disagree_fields: list[str] = []
+        for f in ("kind", "symbol", "direction"):
+            if cls.get(f) != fast_path.get(f):
+                disagree_fields.append(f)
+        fp_sl = fast_path.get("sl")
+        cl_sl = cls.get("sl")
+        if (isinstance(fp_sl, (int, float)) and isinstance(cl_sl, (int, float))
+                and fp_sl > 0 and abs(fp_sl - cl_sl) / fp_sl > 0.005):
+            disagree_fields.append("sl")
+        if disagree_fields:
+            logger.warning(
+                "[FAST-PATH DISAGREE] id=%d fields=%s rule=%s claude=%s — "
+                "fast-path already committed (audit only)",
+                msg_dict.get("id"), disagree_fields,
+                {f: fast_path.get(f) for f in disagree_fields},
+                {f: cls.get(f) for f in disagree_fields},
+            )
+    except Exception as e:
+        logger.warning("shadow classify failed id=%d: %s",
+                       msg_dict.get("id"), e)
+
+
+async def _post_to_receiver(url: str, msg: dict, classification: dict) -> None:
+    """POST classified event to killers-receiver with bounded retry.
+
+    Bug discovered 2026-05-27 19:38: receiver crashed 500 on a real signal,
+    observer logged and moved on, msg lost silently. Retry policy:
+      - 3 attempts total
+      - Retry on: any exception (network drop, timeout), 5xx, 429 (rate-limit)
+      - Do NOT retry on: 4xx (client error — payload is broken, retrying
+        won't help)
+      - Backoff: 0s, 2s + jitter, 5s + jitter (jitter = ±20%)
+    Final failure logs at ERROR level with msg_id so it's loud enough to
+    notice in log review.
+
+    Telethon's to_dict() leaves datetime objects + bytes inline; pre-serialize
+    via json.dumps(default=str) and post as raw data so aiohttp doesn't trip
+    on its own json encoder.
+    """
+    import aiohttp
+    import random
+    payload = {"msg": msg, "classification": classification}
+    try:
+        body_json = json.dumps(payload, default=str)
+    except Exception as e:
+        logger.error("[RECV] payload serialize failed msg_id=%s: %s",
+                     msg.get("id"), e)
+        return
+
+    backoffs = [0.0, 2.0, 5.0]
+    last_err: Optional[str] = None
+    for attempt, base_delay in enumerate(backoffs, start=1):
+        if base_delay > 0:
+            # ±20% jitter on the base
+            delay = base_delay * random.uniform(0.8, 1.2)
+            await asyncio.sleep(delay)
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.post(
+                    url, data=body_json,
+                    headers={"Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as r:
+                    body = await r.text()
+                    if 200 <= r.status < 300:
+                        logger.info("[RECV] %d msg_id=%s kind=%s body=%s "
+                                    "(attempt %d)",
+                                    r.status, msg.get("id"),
+                                    classification.get("kind"),
+                                    body[:200], attempt)
+                        return
+                    if 400 <= r.status < 500 and r.status != 429:
+                        # Client error — payload broken, retrying won't help
+                        logger.error(
+                            "[RECV] %d msg_id=%s kind=%s body=%s — "
+                            "4xx, NOT retrying",
+                            r.status, msg.get("id"),
+                            classification.get("kind"), body[:200],
+                        )
+                        return
+                    # 5xx or 429 — retry
+                    last_err = f"HTTP {r.status}: {body[:200]}"
+                    logger.warning(
+                        "[RECV] %d msg_id=%s attempt %d/%d — will retry: %s",
+                        r.status, msg.get("id"), attempt, len(backoffs),
+                        body[:200],
+                    )
+        except Exception as e:
+            last_err = f"exception: {e}"
+            logger.warning(
+                "[RECV] post raised msg_id=%s attempt %d/%d: %s",
+                msg.get("id"), attempt, len(backoffs), e,
+            )
+
+    # Exhausted retries
+    logger.error(
+        "[RECV] EXHAUSTED %d retries for msg_id=%s kind=%s — message LOST. "
+        "Last error: %s",
+        len(backoffs), msg.get("id"), classification.get("kind"), last_err,
+    )
+
+
+# ── Main loop ──────────────────────────────────────────────────────────────
+
+
+async def _setup_channel(client, events, conn: sqlite3.Connection,
+                         config: "Config", label: str, backfill: bool = True) -> None:
+    """Resolve one channel, (optionally) backfill missed msgs, register new/edit
+    handlers — each routed to its OWN conn/config (DB + receiver). Extracted so a
+    single client/session can drive multiple channels (killers + insiders
+    fan-out). Each call's handlers close over their own channel/conn/config (no
+    leak). Handler bodies are wrapped so a per-message error is logged and never
+    propagates — the feed always continues."""
+    if config.channel_id_override:
+        channel = int(config.channel_id_override)
+        logger.info("[%s] channel id=%d (override) receiver=%s db=%s",
+                    label, channel, config.receiver_url, config.db_path)
+    else:
+        ent = await client.get_entity(config.channel_username)
+        channel = ent.id
+        logger.info("[%s] resolved @%s → id=%d title=%r receiver=%s",
+                    label, config.channel_username, channel,
+                    getattr(ent, "title", "?"), config.receiver_url)
+
+    if backfill:
+        last_id = last_msg_id(conn)
+        if last_id:
+            logger.info("[%s] backfilling msgs > %d", label, last_id)
+            async for msg in client.iter_messages(channel, min_id=last_id, limit=100):
+                await process_message(client, channel, conn, config, msg.to_dict(), source="backfill")
+
+    async def _handle(event, source):
+        try:
+            await process_message(client, channel, conn, config, event.message.to_dict(), source=source)
+        except Exception:
+            logger.exception("[%s] handler error (source=%s) — feed continues", label, source)
+
+    @client.on(events.NewMessage(chats=[channel]))
+    async def _on_new(event):
+        await _handle(event, "new")
+
+    @client.on(events.MessageEdited(chats=[channel]))
+    async def _on_edit(event):
+        await _handle(event, "edited")
+
+
+def _insiders_config() -> "Optional[Config]":
+    """Config for the INSIDERS fan-out, built from INSIDERS_* env and reusing the
+    shared killers api/session/claude settings. None (disabled) unless
+    INSIDERS_TG_CHANNEL_ID is set."""
+    cid = os.getenv("INSIDERS_TG_CHANNEL_ID")
+    if not cid:
+        return None
+    ins = Config()                       # re-reads shared api/session/claude env
+    ins.channel_id_override = cid
+    ins.channel_username = None
+    ins.receiver_url = os.getenv("INSIDERS_RECEIVER_URL", "http://127.0.0.1:8090/event")
+    ins.db_path = os.getenv("INSIDERS_OBSERVER_DB", "/home/ubuntu/insiders-bot/state.sqlite")
+    return ins
+
+
+async def run(config: Config, conn: sqlite3.Connection) -> None:
+    from telethon import TelegramClient, events
+
+    client = TelegramClient(config.session_path, config.api_id, config.api_hash)
+    await client.start()
+    me = await client.get_me()
+    logger.info("auth OK as %s (id=%d phone=%s)", me.first_name, me.id, getattr(me, "phone", "?"))
+
+    # Primary channel (killers).
+    await _setup_channel(client, events, conn, config, "killers")
+
+    # Optional INSIDERS fan-out on the SAME session/client (one account, two
+    # channels — avoids a second session). Fully fault-isolated: any failure
+    # resolving/backfilling the insiders channel is logged and CANNOT affect the
+    # killers feed. Enabled only when INSIDERS_TG_CHANNEL_ID is set.
+    try:
+        ins = _insiders_config()
+        if ins is not None:
+            ins_conn = init_db(ins.db_path)
+            # No backfill: the forward measurement starts from NOW, and skipping
+            # the free-channel history keeps insiders load off the killers path.
+            await _setup_channel(client, events, ins_conn, ins, "insiders", backfill=False)
+    except Exception:
+        logger.exception("[insiders] fan-out setup FAILED — killers feed unaffected")
+
+    # Heartbeat
+    async def heartbeat():
+        while True:
+            try:
+                await asyncio.wait_for(client.get_me(), timeout=5.0)
+                logger.info("[HB] alive — last_msg_id=%s", last_msg_id(conn))
+            except Exception as e:
+                logger.error("[HB] auth check failed: %s", e)
+            await asyncio.sleep(config.heartbeat_sec)
+
+    hb = asyncio.create_task(heartbeat())
+    try:
+        await client.run_until_disconnected()
+    finally:
+        hb.cancel()
+
+
+def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s | %(message)s",
+        stream=sys.stdout,
+    )
+    config = Config()
+    conn = init_db(config.db_path)
+    asyncio.run(run(config, conn))
+
+
+if __name__ == "__main__":
+    main()

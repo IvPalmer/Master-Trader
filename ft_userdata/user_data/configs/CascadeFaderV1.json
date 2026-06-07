@@ -47,7 +47,21 @@
         "secret": "",
         "ccxt_config": {},
         "ccxt_async_config": {},
-        "pair_whitelist": [],
+        "pair_whitelist": [
+            "ADA/USDT",
+            "ARB/USDT",
+            "AVAX/USDT",
+            "BNB/USDT",
+            "BTC/USDT",
+            "ETH/USDT",
+            "LTC/USDT",
+            "NEAR/USDT",
+            "SOL/USDT",
+            "SUI/USDT",
+            "UNI/USDT",
+            "ZEC/USDT",
+            "HBAR/USDT"
+        ],
         "pair_blacklist": [
             ".*BULL/USDT",
             ".*BEAR/USDT",
@@ -75,46 +89,7 @@
     },
     "pairlists": [
         {
-            "method": "VolumePairList",
-            "number_assets": 40,
-            "sort_key": "quoteVolume",
-            "min_value": 5000000,
-            "refresh_period": 86400,
-            "lookback_days": 3,
-            "lookback_timeframe": "1d"
-        },
-        {
-            "method": "AgeFilter",
-            "min_days_listed": 90
-        },
-        {
-            "method": "SpreadFilter",
-            "max_spread_ratio": 0.005
-        },
-        {
-            "method": "PriceFilter",
-            "min_price": 0.001,
-            "low_price_ratio": 0.02
-        },
-        {
-            "method": "VolatilityFilter",
-            "lookback_days": 14,
-            "min_volatility": 0.03,
-            "max_volatility": 0.75,
-            "refresh_period": 14400
-        },
-        {
-            "method": "RangeStabilityFilter",
-            "lookback_days": 10,
-            "min_rate_of_change": 0.03,
-            "max_rate_of_change": 0.5,
-            "refresh_period": 14400
-        },
-        {
-            "method": "PrecisionFilter"
-        },
-        {
-            "method": "ShuffleFilter"
+            "method": "StaticPairList"
         }
     ],
     "webhook": {
@@ -159,7 +134,6 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}",
             "bot_name": "CascadeFaderV1"
         },
         "webhookexitcancel": {
@@ -178,7 +152,6 @@
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
             "direction": "{direction}",
-            "duration": "{duration}",
             "bot_name": "CascadeFaderV1"
         },
         "webhookstatus": {

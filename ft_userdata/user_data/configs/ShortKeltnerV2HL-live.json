@@ -1,0 +1,46 @@
+{
+  "_WARNING": "LIVE REAL-MONEY $20 MICRO-TEST (dry_run=false). BTC/ETH/SOL only, forced (force_entry_enable) — a controlled plumbing test per codex, NOT an autonomous alt run. Inert until walletAddress + privateKey are filled on the VPS copy (NOT in git). privateKey MUST be a Hyperliquid AGENT/API wallet key (can trade, cannot withdraw) — NEVER the master wallet key. Max loss = the USDC funded (~$20). See docs/hyperliquid_golive_runbook.md.",
+  "dry_run": false,
+  "cancel_open_orders_on_exit": true,
+  "trading_mode": "futures",
+  "margin_mode": "isolated",
+  "stake_currency": "USDC",
+  "stake_amount": 15,
+  "tradable_balance_ratio": 0.9,
+  "fiat_display_currency": "",
+  "max_open_trades": 1,
+  "amount_reserve_percent": 0.05,
+  "unfilledtimeout": { "entry": 10, "exit": 10, "exit_timeout_count": 0, "unit": "minutes" },
+  "order_types": {
+    "entry": "limit", "exit": "limit",
+    "emergency_exit": "market", "force_exit": "market", "force_entry": "market",
+    "stoploss": "market", "stoploss_on_exchange": false, "stoploss_on_exchange_interval": 60
+  },
+  "entry_pricing": { "price_side": "other", "use_order_book": true, "order_book_top": 1, "price_last_balance": 0.0, "check_depth_of_market": { "enabled": false, "bids_to_ask_delta": 1 } },
+  "exit_pricing": { "price_side": "other", "use_order_book": true, "order_book_top": 1 },
+  "exchange": {
+    "name": "hyperliquid",
+    "walletAddress": "",
+    "privateKey": "",
+    "ccxt_config": {}, "ccxt_async_config": {},
+    "pair_whitelist": [
+      "BTC/USDC:USDC","ETH/USDC:USDC","SOL/USDC:USDC"
+    ],
+    "pair_blacklist": []
+  },
+  "pairlists": [ { "method": "StaticPairList" } ],
+  "webhook": { "enabled": false },
+  "telegram": { "enabled": false, "token": "", "chat_id": "" },
+  "api_server": {
+    "enabled": true, "listen_ip_address": "0.0.0.0", "listen_port": 8080,
+    "verbosity": "error", "enable_openapi": true,
+    "jwt_secret_key": "master-trader-dev-key-change-for-prod",
+    "CORS_origins": [ "http://localhost:8080" ],
+    "username": "freqtrader", "password": "mastertrader"
+  },
+  "bot_name": "ShortKeltnerV2HLlive",
+  "initial_state": "running",
+  "force_entry_enable": true,
+  "internals": { "process_throttle_secs": 5 },
+  "db_url": "sqlite:////freqtrade/user_data/tradesv3.live.ShortKeltnerV2HLlive.sqlite"
+}

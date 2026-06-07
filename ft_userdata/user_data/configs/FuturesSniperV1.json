@@ -140,8 +140,7 @@
             "open_rate": "{open_rate}",
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
-            "direction": "{direction}",
-            "duration": "{duration}"
+            "direction": "{direction}"
         },
         "webhookexitcancel": {
             "type": "exit_cancel",
@@ -157,8 +156,7 @@
             "open_rate": "{open_rate}",
             "close_rate": "{close_rate}",
             "exit_reason": "{exit_reason}",
-            "direction": "{direction}",
-            "duration": "{duration}"
+            "direction": "{direction}"
         },
         "webhookstatus": {
             "type": "status",

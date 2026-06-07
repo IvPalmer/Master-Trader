@@ -32,8 +32,12 @@ RISK_PER_TRADE = 10.0     # 1% of account
 MARGIN_PER_TRADE = 50.0   # 5% of account
 
 
-def load_messages():
-    content = (LOCAL / "last_month_messages.json").read_text()
+DEFAULT_INPUT = LOCAL / "last_month_messages.json"
+DEFAULT_OUTPUT = OUT / "trades_regex.json"
+
+
+def load_messages(path: Path):
+    content = path.read_text()
     msgs, _ = json.JSONDecoder().raw_decode(content)
     return msgs
 
@@ -76,8 +80,10 @@ def trade_to_dict(t, position_notional, leverage, scaled_pnl):
 
 
 def main():
-    msgs = load_messages()
-    print(f"loaded {len(msgs)} messages", flush=True)
+    in_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_INPUT
+    out_path = Path(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_OUTPUT
+    msgs = load_messages(in_path)
+    print(f"loaded {len(msgs)} messages from {in_path}", flush=True)
 
     trades = simulate(msgs, known_coins=None, resolve_market_entries=False)
     print(f"regex parsed {len(trades)} trades", flush=True)
@@ -121,9 +127,9 @@ def main():
         "trades": out_trades,
     }
 
-    op = OUT / "trades_regex.json"
-    op.write_text(json.dumps(out, indent=2, default=str))
-    print(f"wrote {op}", flush=True)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(out, indent=2, default=str))
+    print(f"wrote {out_path}", flush=True)
     print(f"PnL: ${pnl_total:.2f}  ({pnl_total / ACCOUNT * 100:.2f}% on ${ACCOUNT:.0f})")
     print(f"avg leverage: {out['avg_leverage']}x")
 

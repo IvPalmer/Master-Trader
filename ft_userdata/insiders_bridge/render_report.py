@@ -456,12 +456,16 @@ document.querySelectorAll('#trades th[data-key]').forEach(th => {{
 
 
 def main():
-    regex_data = json.loads((OUT / "trades_regex.json").read_text())
-    llm_data = json.loads((OUT / "trades_llm.json").read_text())
+    import os
+    regex_path = Path(os.environ.get("REGEX_PATH", OUT / "trades_regex.json"))
+    llm_path = Path(os.environ.get("LLM_PATH", OUT / "trades_llm.json"))
+    report_path = Path(os.environ.get("REPORT_PATH", OUT / "report.html"))
+    regex_data = json.loads(regex_path.read_text())
+    llm_data = json.loads(llm_path.read_text())
     html_out = render(regex_data, llm_data)
-    op = OUT / "report.html"
-    op.write_text(html_out)
-    print(f"wrote {op}  ({op.stat().st_size} bytes)")
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(html_out)
+    print(f"wrote {report_path}  ({report_path.stat().st_size} bytes)")
 
 
 if __name__ == "__main__":

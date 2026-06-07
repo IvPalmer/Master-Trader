@@ -1,0 +1,47 @@
+{
+  "dry_run": true,
+  "dry_run_wallet": 200,
+  "cancel_open_orders_on_exit": true,
+  "trading_mode": "futures",
+  "margin_mode": "isolated",
+  "stake_currency": "USDC",
+  "stake_amount": 100,
+  "tradable_balance_ratio": 0.99,
+  "fiat_display_currency": "",
+  "max_open_trades": 2,
+  "amount_reserve_percent": 0.05,
+  "unfilledtimeout": { "entry": 10, "exit": 10, "exit_timeout_count": 0, "unit": "minutes" },
+  "order_types": {
+    "entry": "limit", "exit": "limit",
+    "emergency_exit": "limit", "force_exit": "limit", "force_entry": "limit",
+    "stoploss": "limit", "stoploss_on_exchange": false, "stoploss_on_exchange_interval": 60
+  },
+  "entry_pricing": { "price_side": "other", "use_order_book": true, "order_book_top": 1, "price_last_balance": 0.0, "check_depth_of_market": { "enabled": false, "bids_to_ask_delta": 1 } },
+  "exit_pricing": { "price_side": "other", "use_order_book": true, "order_book_top": 1 },
+  "exchange": {
+    "name": "hyperliquid", "key": "", "secret": "", "walletAddress": "", "privateKey": "",
+    "ccxt_config": {}, "ccxt_async_config": {},
+    "pair_whitelist": [
+      "ADA/USDC:USDC","ARB/USDC:USDC","AVAX/USDC:USDC","BCH/USDC:USDC","BNB/USDC:USDC",
+      "BTC/USDC:USDC","DOGE/USDC:USDC","ENA/USDC:USDC","ETH/USDC:USDC","HBAR/USDC:USDC",
+      "LINK/USDC:USDC","LTC/USDC:USDC","NEAR/USDC:USDC","SOL/USDC:USDC","SUI/USDC:USDC",
+      "TAO/USDC:USDC","TRX/USDC:USDC","UNI/USDC:USDC","XRP/USDC:USDC","ZEC/USDC:USDC"
+    ],
+    "pair_blacklist": []
+  },
+  "pairlists": [ { "method": "StaticPairList" } ],
+  "webhook": { "enabled": false },
+  "telegram": { "enabled": false, "token": "", "chat_id": "" },
+  "api_server": {
+    "enabled": true, "listen_ip_address": "0.0.0.0", "listen_port": 8080,
+    "verbosity": "error", "enable_openapi": true,
+    "jwt_secret_key": "master-trader-dev-key-change-for-prod",
+    "CORS_origins": [ "http://localhost:8080" ],
+    "username": "freqtrader", "password": "mastertrader"
+  },
+  "bot_name": "ShortKeltnerV2HL",
+  "initial_state": "running",
+  "force_entry_enable": false,
+  "internals": { "process_throttle_secs": 5 },
+  "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.ShortKeltnerV2HL.sqlite"
+}
