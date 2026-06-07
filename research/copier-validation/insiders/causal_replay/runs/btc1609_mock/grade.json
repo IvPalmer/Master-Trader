@@ -1,0 +1,30 @@
+{
+  "run_dir": "/Users/palmer/Work/Dev/master-trader/research/insiders_april_replication/causal_replay/runs/btc1609_mock",
+  "per_step": [
+    {
+      "decision_msg_id": 1611,
+      "dimension": "btc1609_breakeven",
+      "checks": {
+        "intent_type_close_full": true,
+        "symbol_side_btc_short": true,
+        "evidence_clean": true,
+        "breakeven_R": true
+      },
+      "realized_R": 0.10002042622727107
+    }
+  ],
+  "dimension_accuracy": {
+    "btc1609": true,
+    "seeded_long_closed_at_1608": true
+  },
+  "causal_clean_count": 3,
+  "causal_total": 3,
+  "llm_vs_baseline": {
+    "btc1609": {
+      "causal_llm": "close_full @ breakeven (~0R)",
+      "regex_baseline": "sl_move to BE (mis-read 'be') -> rides short, books fictional multi-R win = FAIL",
+      "delta": "causal-LLM PASS, regex FAIL"
+    }
+  },
+  "summary": "BTC-1609 dimension: PASS (realized_R=0.10002042622727107); seeded-long closed at 1608: YES; causal-clean 3/3 steps; regex baseline FAILS the 1609 close (mis-reads 'be'). Overall: PASS."
+}

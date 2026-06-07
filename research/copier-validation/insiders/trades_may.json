@@ -1,0 +1,163 @@
+[
+  {"symbol":"BTC","direction":"SHORT","date":"2026-05-10T12:56:00+00:00","entry":82400,"entry_lo":81300,"entry_hi":83500,"sl":84500,"tps":[73000],"events":[
+    {"t":"2026-05-11T13:18:00+00:00","action":"close","frac":0.30,"src_id":1494,"note":"closing 30% of current position, will add higher"},
+    {"t":"2026-05-12T08:47:00+00:00","action":"close","frac":0.30,"src_id":1500,"note":"BTC close 30% here"},
+    {"t":"2026-05-12T14:17:00+00:00","action":"close","frac":0.25,"src_id":1509,"note":"ETH and BTC shorts close 25% more"},
+    {"t":"2026-05-14T01:26:00+00:00","action":"close","frac":0.30,"src_id":1530,"note":"BTC and ETH close 30% in both"},
+    {"t":"2026-05-15T08:45:00+00:00","action":"close","frac_of_remaining":0.70,"sl_to":"breakeven","src_id":1547,"note":"close 70% and move SL to 81300 (~entry); modeled as 70% of remaining + SL->BE"},
+    {"t":"2026-05-16T04:29:00+00:00","action":"close_full","src_id":1550,"note":"BTC and ETH full close"}
+  ],"src_id":1477,"claim_usd":11495,"claim_pct":146},
+
+  {"symbol":"SOL","direction":"SHORT","date":"2026-05-10T13:28:00+00:00","entry":95.0,"entry_lo":94.3,"entry_hi":95.7,"sl":96.7,"tps":[89.3],"events":[],"src_id":1483,"claim_usd":null,"claim_pct":null,
+    "_note":"fully-parameterized posted SOL short (Entry 94.3-95.7, SL 96.7, Target 89.3) that the original 31-trade set DROPPED while keeping the near-identical 1490 SOL short the next day (also -1R). At signal SOL was 93.61 (already below the entry range), rose into the range and hit SL 96.7 at 18:21 same day; TP 89.3 only reached 05-15 (5 days later). Resolves -1R under every entry model. Restored for honesty — a same-window posted short with full params should not be silently excluded."},
+
+  {"symbol":"ETH","direction":"SHORT","date":"2026-05-11T09:06:00+00:00","entry":2375,"entry_lo":2330,"entry_hi":2420,"sl":2485,"tps":[1910],"events":[
+    {"t":"2026-05-12T05:45:00+00:00","action":"close","frac":0.30,"src_id":1495,"note":"ETH close 30% here"},
+    {"t":"2026-05-12T12:31:00+00:00","action":"close","frac_of_remaining":0.20,"src_id":1508,"note":"ETH close 20% of remaining"},
+    {"t":"2026-05-12T14:17:00+00:00","action":"close","frac":0.25,"src_id":1509,"note":"ETH and BTC shorts close 25% more"}
+  ],"src_id":1489,"claim_usd":14381,"claim_pct":468},
+
+  {"symbol":"SOL","direction":"SHORT","date":"2026-05-11T09:44:00+00:00","entry":95.5,"entry_lo":95.0,"entry_hi":96.0,"sl":97.3,"tps":[89.0],"events":[
+    {"t":"2026-05-11T13:11:00+00:00","action":"close_full","src_id":1493,"note":"SOL got stopped (hard SL will catch it; event is belt+braces)"}
+  ],"src_id":1490,"claim_usd":-8413,"claim_pct":-180},
+
+  {"symbol":"ETH","direction":"LONG","date":"2026-05-12T08:45:00+00:00","entry":2276,"entry_lo":2265,"entry_hi":2288,"sl":2250,"tps":[2315],"events":[
+    {"t":"2026-05-12T14:36:00+00:00","action":"close","frac":0.50,"src_id":1511,"note":"ETH (Long) closing 50% around breakeven"},
+    {"t":"2026-05-13T04:25:00+00:00","action":"sl_to","sl_to":"breakeven","src_id":1514,"note":"ETH (Long) move SL to breakeven (2276)"},
+    {"t":"2026-05-13T07:27:00+00:00","action":"close_full","src_id":1515,"note":"ETH Long reached tp and fully closed"}
+  ],"src_id":1499,"claim_usd":3593,"claim_pct":67},
+
+  {"symbol":"NEAR","direction":"SHORT","date":"2026-05-12T09:27:00+00:00","entry":1.58,"entry_lo":1.54,"entry_hi":1.62,"sl":1.65,"tps":[1.41,1.28],"events":[],"src_id":1502,"claim_usd":-8011,"claim_pct":-371,
+    "_note":"inline ladder in opener (TP 1.41 close 75% + SL->BE, TP 1.28 close 25%) is captured by tps[]=[1.41,1.28] under the mechanical ladder. No separate post-fill management."},
+
+  {"symbol":"FIDA","direction":"LONG","date":"2026-05-13T12:42:00+00:00","entry":0.018,"entry_lo":0.01785,"entry_hi":0.01815,"sl":0.01763,"tps":[0.01855,0.01891,0.01964],"events":[
+    {"t":"2026-05-14T10:19:00+00:00","action":"close_full","src_id":1537,"note":"FIDA full close in small profit"}
+  ],"src_id":1524,"claim_usd":1232,"claim_pct":17},
+
+  {"symbol":"PUMP","direction":"LONG","date":"2026-05-13T23:34:00+00:00","entry":0.001839,"entry_lo":0.001803,"entry_hi":0.001875,"sl":0.001773,"tps":[0.002047],"events":[
+    {"t":"2026-05-14T10:19:00+00:00","action":"close","frac":0.50,"sl_to":"breakeven","src_id":1536,"note":"PUMP close 50%, SL to breakeven"}
+  ],"src_id":1526,"claim_usd":-119,"claim_pct":1},
+
+  {"symbol":"HYPE","direction":"LONG","date":"2026-05-13T23:42:00+00:00","entry":38.5,"entry_lo":38.1,"entry_hi":38.9,"sl":37.5,"tps":[42.1],"events":[
+    {"t":"2026-05-14T02:50:00+00:00","action":"close","frac":0.20,"sl_to":"breakeven","src_id":1532,"note":"HYPE close 20%, SL to breakeven (avg 38.372)"}
+  ],"src_id":1527,"claim_usd":5940,"claim_pct":170},
+
+  {"symbol":"PUMP","direction":"LONG","date":"2026-05-15T07:29:00+00:00","entry":0.001824,"entry_lo":0.001789,"entry_hi":0.001859,"sl":0.001665,"tps":[0.002237],"events":[],"src_id":1546,"claim_usd":-1756,"claim_pct":-30,
+    "_note":"no PUMP management post found before next PUMP opener (1624 short, 05-22); falls to mechanical ladder/SL"},
+
+  {"symbol":"ETH","direction":"LONG","date":"2026-05-16T06:24:00+00:00","entry":2130,"entry_lo":2080,"entry_hi":2180,"sl":2040,"tps":[],"events":[
+    {"t":"2026-05-17T10:10:00+00:00","action":"close","frac":0.60,"sl_to":"breakeven","src_id":1558,"note":"ETH close 60% and SL to breakeven (2171)"}
+  ],"src_id":1552,"claim_usd":2301,"claim_pct":84},
+
+  {"symbol":"BTC","direction":"LONG","date":"2026-05-18T00:26:00+00:00","entry":76575,"entry_lo":76200,"entry_hi":76950,"sl":75800,"tps":[79300],"events":[
+    {"t":"2026-05-18T03:29:00+00:00","action":"sl_to","sl_to":75250,"src_id":1562,"note":"SL to 75250 (below entry, still risk; modeled as numeric SL move)"}
+  ],"src_id":1561,"claim_usd":3951,"claim_pct":152,
+    "_note":"no explicit BTC-long full-close before next BTC opener (1609 short, 05-21 21:56); rides to ladder/SL/cutoff"},
+
+  {"symbol":"FARTCOIN","direction":"LONG","date":"2026-05-18T05:55:00+00:00","entry":0.17935,"entry_lo":0.1757,"entry_hi":0.183,"sl":0.169,"tps":[0.21],"events":[
+    {"t":"2026-05-19T11:12:00+00:00","action":"close_full","src_id":1584,"note":"FARTCOIN full close (small profit, reduce risk)"}
+  ],"src_id":1564,"claim_usd":1190,"claim_pct":195},
+
+  {"symbol":"ETC","direction":"SHORT","date":"2026-05-20T12:48:00+00:00","entry":9.15,"entry_lo":9.05,"entry_hi":9.25,"sl":9.35,"tps":[8.80,8.50],"events":[
+    {"t":"2026-05-20T13:35:00+00:00","action":"close","frac":0.30,"sl_to":"breakeven","src_id":1588,"note":"close 30% and SL to entry (big size)"},
+    {"t":"2026-05-21T07:42:00+00:00","action":"close","frac":0.30,"src_id":1592,"note":"ETC close another 30%"},
+    {"t":"2026-05-21T14:28:00+00:00","action":"close_full","src_id":1597,"note":"+$1901 on ETC, closing whole position (Iran noise)"}
+  ],"src_id":1587,"claim_usd":579,"claim_pct":29},
+
+  {"symbol":"FARTCOIN","direction":"LONG","date":"2026-05-21T09:05:00+00:00","entry":0.188,"entry_lo":0.187,"entry_hi":0.189,"sl":0.185,"tps":[],"events":[
+    {"t":"2026-05-21T13:44:00+00:00","action":"close","frac":0.50,"sl_to":"breakeven","src_id":1594,"note":"close 50%, SL to breakeven"},
+    {"t":"2026-05-21T15:53:00+00:00","action":"close_full","src_id":1606,"note":"FARTCOIN full close"}
+  ],"src_id":1593,"claim_usd":3001,"claim_pct":244},
+
+  {"symbol":"BTC","direction":"SHORT","date":"2026-05-21T21:56:00+00:00","entry":77600,"entry_lo":77300,"entry_hi":77900,"sl":78400,"tps":[73000],"events":[
+    {"t":"2026-05-21T22:20:00+00:00","action":"close_full","src_id":1611,"note":"'Closing around be' — Dennis posted a breakeven close 24 min after the opener (1611/1612: 'If we will fell below 77200 we will open by market'). He did NOT hold this short to TP 73000 (which BTC only reached 05-28, 7 days later); SL 78400 was never touched. The earlier events:[] let the model ride a 5-7R win he explicitly disclaimed."}
+  ],"src_id":1609,"claim_usd":-352,"claim_pct":-17,
+    "_note":"opener 1609 closed at breakeven in chat (1611 22:20 'Closing around be'); next BTC opener 1634 (long, 05-23 04:47) confirms he was flat. Now coded with the close_full he actually posted — books ~0R, not the +5.75/+7.65/+6.54R the empty-events version mis-credited."},
+
+  {"symbol":"FF","direction":"SHORT","date":"2026-05-22T02:05:00+00:00","entry":0.0893,"entry_lo":0.088,"entry_hi":0.0906,"sl":0.093,"tps":[0.07],"events":[
+    {"t":"2026-05-22T13:25:00+00:00","action":"close","frac":0.30,"src_id":1618,"note":"FF close 30% here (after Dennis fat-fingered his own close)"},
+    {"t":"2026-05-23T04:57:00+00:00","action":"close_full","src_id":1640,"note":"FF full close"}
+  ],"src_id":1614,"claim_usd":-2190,"claim_pct":-50},
+
+  {"symbol":"ETH","direction":"SHORT","date":"2026-05-22T03:20:00+00:00","entry":2160,"entry_lo":2128,"entry_hi":2191,"sl":2221,"tps":[1930],"events":[
+    {"t":"2026-05-22T20:04:00+00:00","action":"close","frac":0.30,"src_id":1627,"note":"ETH close 30%"},
+    {"t":"2026-05-23T00:25:00+00:00","action":"close","frac_of_remaining":0.20,"src_id":1632,"note":"ETH close 20% of remaining"},
+    {"t":"2026-05-23T04:50:00+00:00","action":"close","frac_of_remaining":0.30,"src_id":1635,"note":"ETH close 30% of remaining"},
+    {"t":"2026-05-23T04:52:00+00:00","action":"close_full","src_id":1636,"note":"full close"}
+  ],"src_id":1615,"claim_usd":8253,"claim_pct":581},
+
+  {"symbol":"VIRTUAL","direction":"SHORT","date":"2026-05-22T05:59:00+00:00","entry":0.78625,"entry_lo":0.7760,"entry_hi":0.7965,"sl":0.8086,"tps":[0.7116],"events":[],"src_id":1616,"claim_usd":-3104,"claim_pct":-218,
+    "_note":"no VIRTUAL-specific management post found after opener; rides to ladder/SL"},
+
+  {"symbol":"PUMP","direction":"SHORT","date":"2026-05-22T15:01:00+00:00","entry":0.001825,"entry_lo":0.0018,"entry_hi":0.00185,"sl":0.00189,"tps":[0.00171],"events":[
+    {"t":"2026-05-22T20:05:00+00:00","action":"close","frac":0.50,"sl_to":"breakeven","src_id":1628,"note":"PUMP close 50%, SL to breakeven"},
+    {"t":"2026-05-22T21:00:00+00:00","action":"close_full","src_id":1629,"note":"PUMP final target"}
+  ],"src_id":1624,"claim_usd":3947,"claim_pct":39},
+
+  {"symbol":"BTC","direction":"LONG","date":"2026-05-23T04:47:00+00:00","entry":74650,"entry_lo":74200,"entry_hi":75100,"sl":73800,"tps":[77200],"events":[
+    {"t":"2026-05-23T12:01:00+00:00","action":"close","frac":0.40,"sl_to":"breakeven","src_id":1642,"note":"close 40% in both trades, SL to breakeven"},
+    {"t":"2026-05-23T19:17:00+00:00","action":"close_full","src_id":1643,"note":"full close, both trades"}
+  ],"src_id":1634,"claim_usd":11099,"claim_pct":303},
+
+  {"symbol":"ETH","direction":"LONG","date":"2026-05-23T04:55:00+00:00","entry":2001,"entry_lo":1980,"entry_hi":2023,"sl":1953,"tps":[2100],"events":[
+    {"t":"2026-05-23T12:01:00+00:00","action":"close","frac":0.40,"sl_to":"breakeven","src_id":1642,"note":"close 40% in both trades, SL to breakeven"},
+    {"t":"2026-05-23T19:17:00+00:00","action":"close_full","src_id":1643,"note":"full close, both trades"}
+  ],"src_id":1639,"claim_usd":6112,"claim_pct":527},
+
+  {"symbol":"BTC","direction":"SHORT","date":"2026-05-23T19:18:00+00:00","entry":77050,"entry_lo":76500,"entry_hi":77600,"sl":78300,"tps":[73000],"events":[
+    {"t":"2026-05-24T11:18:00+00:00","action":"close","frac":0.30,"src_id":1656,"note":"BTC close 30% here"},
+    {"t":"2026-05-26T00:22:00+00:00","action":"close","frac_of_remaining":0.25,"src_id":1672,"note":"BTC close 25%"},
+    {"t":"2026-05-26T10:50:00+00:00","action":"close","frac_of_remaining":0.30,"sl_to":80350,"src_id":1681,"note":"BTC close 30% of remaining, SL to 80350 (above entry = locks profit on short)"},
+    {"t":"2026-05-27T02:27:00+00:00","action":"close","frac_of_remaining":0.40,"src_id":1685,"note":"BTC close 40%"}
+  ],"src_id":1644,"claim_usd":3029,"claim_pct":113,
+    "_note":"averaged swing short (avg entry ~77240 per Dennis). Closes mapped from BTC-named posts before next BTC opener 1686 (long, 05-27 02:32); residual rides to cutoff/tail."},
+
+  {"symbol":"FARTCOIN","direction":"SHORT","date":"2026-05-24T07:37:00+00:00","entry":0.1845,"entry_lo":0.182,"entry_hi":0.187,"sl":0.19012,"tps":[0.173],"events":[
+    {"t":"2026-05-24T11:16:00+00:00","action":"close","frac":0.40,"sl_to":"breakeven","src_id":1655,"note":"FARTCOIN close 40%, SL to breakeven"},
+    {"t":"2026-05-24T11:24:00+00:00","action":"close","frac_of_remaining":0.50,"src_id":1658,"note":"FARTCOIN close 50% of remaining"}
+  ],"src_id":1650,"claim_usd":3408,"claim_pct":159,
+    "_note":"residual after the two partials rides to cutoff (next FARTCOIN opener 1687, 05-27)."},
+
+  {"symbol":"NEAR","direction":"SHORT","date":"2026-05-25T05:36:00+00:00","entry":2.41,"entry_lo":2.37,"entry_hi":2.45,"sl":2.52,"tps":[2.1],"events":[
+    {"t":"2026-05-25T09:16:00+00:00","action":"close_full","src_id":1665,"note":"got stopped, as told extremely high risk (hard SL also catches)"}
+  ],"src_id":1661,"claim_usd":-3932,"claim_pct":-387},
+
+  {"symbol":"EIGEN","direction":"LONG","date":"2026-05-25T09:19:00+00:00","entry":0.2275,"entry_lo":0.22,"entry_hi":0.235,"sl":0.213,"tps":[0.31],"events":[
+    {"t":"2026-05-25T11:37:00+00:00","action":"close","frac":0.40,"sl_to":"breakeven","src_id":1667,"note":"close 40%, SL to breakeven"},
+    {"t":"2026-05-25T13:19:00+00:00","action":"close","frac_of_remaining":0.25,"sl_to":"breakeven","src_id":1669,"note":"close 25% of remaining, SL to breakeven"}
+  ],"src_id":1666,"claim_usd":6722,"claim_pct":58,
+    "_note":"residual (35%) rides to data-end tail (late-May, cache ends 05-30); 'trade of the month' candidate per Dennis, no full close posted."},
+
+  {"symbol":"LTC","direction":"SHORT","date":"2026-05-26T05:52:00+00:00","entry":53.0,"entry_lo":52.3,"entry_hi":53.7,"sl":54.8,"tps":[46.0],"events":[
+    {"t":"2026-05-27T02:27:00+00:00","action":"close_full","src_id":1684,"note":"LTC full close!"}
+  ],"src_id":1676,"claim_usd":311,"claim_pct":26},
+
+  {"symbol":"BTC","direction":"LONG","date":"2026-05-27T02:32:00+00:00","entry":75200,"entry_lo":74700,"entry_hi":75700,"sl":74200,"tps":[79000],"events":[
+    {"t":"2026-05-27T18:45:00+00:00","action":"sl_to","sl_to":73800,"src_id":1693,"note":"BTC SL to 73800 (below entry)"},
+    {"t":"2026-05-27T18:48:00+00:00","action":"close_full","src_id":1694,"note":"got stopped at breakeven, still good profit (per Dennis); 1696 confirms BTC long stopped out"}
+  ],"src_id":1686,"claim_usd":-8415,"claim_pct":111,
+    "_note":"Dennis claim_pct +111 but claim_usd -8415 are inconsistent; 1696 explicitly says 'BTC (Long) and Fartcoin got stopped out'. Treated as a loss/scratch."},
+
+  {"symbol":"FARTCOIN","direction":"LONG","date":"2026-05-27T02:37:00+00:00","entry":0.17,"entry_lo":0.167,"entry_hi":0.173,"sl":0.163,"tps":[0.19],"events":[
+    {"t":"2026-05-28T03:13:00+00:00","action":"close_full","src_id":1696,"note":"BTC (Long) and Fartcoin got stopped out (hard SL also catches)"}
+  ],"src_id":1687,"claim_usd":-3022,"claim_pct":-87},
+
+  {"symbol":"PUMP","direction":"LONG","date":"2026-05-28T03:47:00+00:00","entry":0.001665,"entry_lo":0.00165,"entry_hi":0.00168,"sl":0.00163,"tps":[0.00174],"events":[
+    {"t":"2026-05-28T08:17:00+00:00","action":"sl_to","sl_to":0.00161,"src_id":1700,"note":"PUMP move SL to 0.00161 (below entry)"},
+    {"t":"2026-05-28T14:56:00+00:00","action":"close","frac":0.30,"sl_to":"breakeven","src_id":1710,"note":"PUMP close 30%, SL to breakeven"},
+    {"t":"2026-05-29T05:17:00+00:00","action":"close_full","src_id":1713,"note":"PUMP got stopped at breakeven"}
+  ],"src_id":1699,"claim_usd":1499,"claim_pct":34},
+
+  {"symbol":"FARTCOIN","direction":"LONG","date":"2026-05-28T08:22:00+00:00","entry":0.1574,"entry_lo":0.154,"entry_hi":0.16070,"sl":0.153,"tps":[0.169],"events":[
+    {"t":"2026-05-28T13:55:00+00:00","action":"close","frac":0.20,"sl_to":"breakeven","src_id":1709,"note":"FARTCOIN close 20%, SL to breakeven"},
+    {"t":"2026-05-28T16:09:00+00:00","action":"close","frac_of_remaining":0.30,"sl_to":"breakeven","src_id":1712,"note":"close 30% in both trades, SL to breakeven"},
+    {"t":"2026-05-29T09:23:00+00:00","action":"close_full","src_id":1715,"note":"FARTCOIN close remaining position fully"}
+  ],"src_id":1703,"claim_usd":1560,"claim_pct":164},
+
+  {"symbol":"USELESS","direction":"LONG","date":"2026-05-29T05:23:00+00:00","entry":0.0675,"entry_lo":0.065,"entry_hi":0.07,"sl":0.0629,"tps":[0.09],"events":[
+    {"t":"2026-05-29T11:00:00+00:00","action":"close","frac":0.50,"src_id":1717,"note":"closing half to reduce risk (USELESS context, weak PA)"},
+    {"t":"2026-05-29T12:37:00+00:00","action":"close","frac_of_remaining":0.40,"sl_to":"breakeven","src_id":1719,"note":"close 40%, SL to breakeven"},
+    {"t":"2026-05-30T10:05:00+00:00","action":"close","frac_of_remaining":0.50,"src_id":1730,"note":"USELESS close 50% of remaining (within cache, just before 05-30 14:00 end of usable data)"}
+  ],"src_id":1714,"claim_usd":3205,"claim_pct":102,
+    "_note":"late-May trade; residual after 05-30 closes rides to data-end tail (cache ends 05-30 20:00)."}
+]

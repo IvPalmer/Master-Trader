@@ -1,0 +1,15 @@
+{
+  "name": "blind_1609",
+  "schema_version": "1.0",
+  "messages_path": "/Users/palmer/Work/Dev/master-trader/research/insiders_april_replication/paid_export/paid_messages.json",
+  "prices_dir": "/Users/palmer/Work/Dev/master-trader/research/insiders_april_replication/prices_may",
+  "as_of_policy": "closed_minute",
+  "interpreter_class": "MockInterpreter",
+  "model": null,
+  "mode": "strict",
+  "git_sha": "a01c7278f5e3e68ab2b0cf56781a48bae7671916",
+  "wall_clock": "2026-05-31T17:40:38.369680+00:00",
+  "seed_ledger": [
+    "BTC:long"
+  ]
+}
