@@ -1715,6 +1715,13 @@ async def resolve_pending_event(event_id: int,
         raise
 
 
+# In-memory dedup of msg_ids already alerted on, so observer redeliveries of the
+# same message do not re-spam Telegram. Guard-skips never create a position row, so
+# the DB open-dedup misses them; this covers them. Bounded; cleared on restart.
+_notified_msg_ids: dict = {}
+_NOTIFIED_CAP = 5000
+
+
 async def _notify_telegram(cfg: Config, text: str, session=None) -> None:
     """Best-effort POST to trade-webhook /test/notify → @elder_brain_bot.
     Silent on failure; observability shouldn't block the signal pipeline.
@@ -1846,7 +1853,15 @@ async def handle_event(payload: EventPayload):
     _ingress_log_finish(conn, ingress_id, result, 200)
 
     text = _format_event_summary(payload, result)
+    _dedup_msg_id = payload.msg.get("id") if isinstance(payload.msg, dict) else None
+    if text and _dedup_msg_id is not None and _dedup_msg_id in _notified_msg_ids:
+        # Observer redelivery of the same message — already alerted; suppress repeat.
+        text = None
     if text:
+        if _dedup_msg_id is not None:
+            _notified_msg_ids[_dedup_msg_id] = None
+            if len(_notified_msg_ids) > _NOTIFIED_CAP:
+                _notified_msg_ids.pop(next(iter(_notified_msg_ids)))
         # TRUE fire-and-forget: spawn the notify as a background task so
         # the observer's POST gets a response immediately rather than
         # blocking on the trade-webhook round-trip. Task is registered

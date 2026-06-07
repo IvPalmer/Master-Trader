@@ -28,7 +28,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 2G
     entrypoint:
       - /bin/sh
       - -c
@@ -51,7 +51,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 2G
     entrypoint:
       - /bin/sh
       - -c
@@ -71,7 +71,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 2G
     # DRY-RUN. Liquidation-cascade rebound fader (third candidate strategy).
     # Validation: Freqtrade native PF 1.76, 84% WR, max DD 0.51% (Oct 10 2025
     # cascade only) on 39mo backtest. 5/6 walk-forward windows positive.
@@ -152,7 +152,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 2G
     entrypoint:
       - /bin/sh
       - -c
@@ -180,7 +180,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          memory: 2G
     entrypoint:
       - /bin/sh
       - -c
