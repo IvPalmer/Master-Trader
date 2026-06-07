@@ -109,7 +109,22 @@ BOTS: list[dict[str, Any]] = [
         "baseline": None,
     },
     # insiders-scalp RETIRED 2026-05-29: copier edge negative (−8.7%/−13%,
-    # Dennis path defunct). Container removed; do not re-add.
+    # Dennis path defunct). REVIVED 2026-06-06 as a forward-measurement DRY-RUN
+    # only — same copy-trader plumbing as killers, fed by the observer fan-out of
+    # Dennis's free "Market Mastery" channel. The earlier −8.7%/−13% verdict was
+    # a backtest of his PAID path; this is a live, falsifiable re-test on real
+    # prices. Observational + no_baseline for the same reason as killers-ft: a
+    # pass-through copy-trader of an external signaler, not a quant strategy with
+    # a validated backtest baseline. No real capital, ever. baseline/gates null.
+    {
+        "key": "insiders-ft",
+        "name": "InsidersScalp",
+        "label": "insiders-scalp",
+        "url": "http://ft-insiders-scalp:8080",
+        "observational": True,
+        "no_baseline": True,
+        "baseline": None,
+    },
 ]
 
 API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "")

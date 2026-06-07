@@ -63,6 +63,12 @@ class Config:
         # Receiver translates to Freqtrade Futures REST. Leave unset to run
         # in pure observe-mode (Phase 1).
         self.receiver_url = os.getenv("KILLERS_RECEIVER_URL", "")
+        # Channel-specific classifier prompt + fast-path. Defaults are the
+        # Killers VIP settings; the insiders fan-out overrides both (Dennis's
+        # "Market Mastery" format is different and the strict-open rule parser
+        # is Killers-only, so it's disabled for insiders).
+        self.classifier_template = classifier.PROMPT_TEMPLATE
+        self.use_fast_path = True
 
 
 def _required(name: str) -> str:
@@ -192,7 +198,10 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     # that isn't a complete single-coin open. Claude still runs in shadow
     # after the receiver POST so any disagreement is visible.
     text = msg_dict.get("text") or msg_dict.get("message") or ""
-    classification = strict_open.is_strict_killers_open(text, msg_dict["id"])
+    classification = (
+        strict_open.is_strict_killers_open(text, msg_dict["id"])
+        if config.use_fast_path else None
+    )
     used_fast_path = classification is not None
     if used_fast_path:
         logger.info(
@@ -205,6 +214,7 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
             binary=config.claude_binary,
             model=config.claude_model,
             timeout_sec=config.claude_timeout,
+            template=config.classifier_template,
         )
     if classification is None:
         logger.warning("[CLASSIFY FAIL] id=%d skipping downstream", msg_dict["id"])
@@ -254,6 +264,7 @@ async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
             binary=config.claude_binary,
             model=config.claude_model,
             timeout_sec=config.claude_timeout,
+            template=config.classifier_template,
         )
         if cls is None:
             return
@@ -417,6 +428,12 @@ def _insiders_config() -> "Optional[Config]":
     ins.channel_username = None
     ins.receiver_url = os.getenv("INSIDERS_RECEIVER_URL", "http://127.0.0.1:8090/event")
     ins.db_path = os.getenv("INSIDERS_OBSERVER_DB", "/home/ubuntu/insiders-bot/state.sqlite")
+    # Dennis / Market Mastery format ≠ Killers VIP. Use the insiders-tuned prompt
+    # and disable the Killers-only strict-open rule parser (it would never match
+    # Dennis's terse "$SYM LONG" calls anyway, and bypassing the tuned prompt on
+    # a false match would mis-classify).
+    ins.classifier_template = classifier.INSIDERS_PROMPT_TEMPLATE
+    ins.use_fast_path = False
     return ins
 
 
