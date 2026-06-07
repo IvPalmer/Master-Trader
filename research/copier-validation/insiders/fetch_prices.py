@@ -12,7 +12,7 @@ import json, sys, time
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, "/Users/palmer/Work/Dev/master-trader/weex_probe")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "weex_probe"))
 import proper_backtest as pb          # fetch_binance, binance_pair
 import replay_on_weex as rw           # fetch_weex_candles (V2 historyCandles, cmt_ fmt)
 

@@ -25,7 +25,7 @@ follow his book the way a skilled human member does?**
 
 ## The substrate (causality-enforced harness)
 
-Built under [`research/insiders_april_replication/causal_replay/`](../../research/insiders_april_replication/causal_replay/).
+Built under [`research/copier-validation/insiders/causal_replay/`](../../research/copier-validation/insiders/causal_replay/).
 The design principle: **causality is enforced by the harness, never self-reported by the model.**
 
 - **`oracle.py`** — `PointInTimeFeed` / `PriceOracle`. The ONLY module that reads raw
@@ -117,7 +117,7 @@ See [`SMART-AGENT-NEXT-STEPS.md`](SMART-AGENT-NEXT-STEPS.md).
 
 ## Artifacts (on disk)
 
-- Substrate + tests: `research/insiders_april_replication/causal_replay/*.py`, `tests/`
+- Substrate + tests: `research/copier-validation/insiders/causal_replay/*.py`, `tests/`
 - Persisted run + evidence: `causal_replay/runs/full_may/` (178 windowed decision caches,
   `baseline.json`, `llm.json`, `summary.json`); `runs/blind_1611_vps/` (logged blind 1609);
   `runs/btc1609_mock/` (deterministic acceptance)

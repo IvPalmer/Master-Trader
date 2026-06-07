@@ -1,0 +1,10 @@
+# Reproducing this validation needs almost nothing.
+#
+#  - The strategy-search scripts (killers/ and insiders/ *.py) are PURE PYTHON
+#    STDLIB. No pip installs. They fetch price data from Binance's public REST
+#    API (no key) and cache it locally on first run.
+#  - The causality unit tests (insiders/causal_replay/tests/) need only pytest.
+#
+# So: Python 3.9+  and, if you want to run the unit tests, `pip install pytest`.
+
+pytest>=7.0

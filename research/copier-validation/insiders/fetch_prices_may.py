@@ -4,7 +4,7 @@ Window May 9 -> Jun 11 (covers entries + the 12-day MAX_TAIL walk for late-May t
 import json, sys
 from datetime import datetime, timezone
 from pathlib import Path
-sys.path.insert(0, "/Users/palmer/Work/Dev/master-trader/weex_probe")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "weex_probe"))
 import proper_backtest as pb
 import replay_on_weex as rw
 

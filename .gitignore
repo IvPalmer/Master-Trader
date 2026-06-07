@@ -70,50 +70,50 @@ ft_userdata/insiders_bridge/*.session
 ft_userdata/insiders_bridge/secrets/
 
 # insiders smart-agent research — bulk price caches live on VPS, not git (133M+81M)
-research/insiders_april_replication/prices/
-research/insiders_april_replication/prices_may/
-research/insiders_april_replication/causal_replay/**/__pycache__/
-research/insiders_april_replication/**/__pycache__/
+research/copier-validation/insiders/prices/
+research/copier-validation/insiders/prices_may/
+research/copier-validation/insiders/causal_replay/**/__pycache__/
+research/copier-validation/insiders/**/__pycache__/
 # full-prompt cache reference (superseded by windowed; 114 expensive calls, keep local only)
-research/insiders_april_replication/causal_replay/runs/full_may/cache_fullprompt_ref/
+research/copier-validation/insiders/causal_replay/runs/full_may/cache_fullprompt_ref/
 
 # Dennis/Insiders PRIVATE paid-channel content — third-party export, never commit
 # (same policy as ft_userdata/insiders_bridge/_local/). Code/docs/results are tracked; raw msgs are not.
-research/insiders_april_replication/paid_export/
-research/insiders_april_replication/raw_free_messages.json
+research/copier-validation/insiders/paid_export/
+research/copier-validation/insiders/raw_free_messages.json
 # causal_test fixtures embed full message dumps (private content) — keep local
-research/insiders_april_replication/causal_test/fixtures/
+research/copier-validation/insiders/causal_test/fixtures/
 # bounded-prompt dumps in runs/ also embed message text — keep the JSON results, drop the raw prompt text
-research/insiders_april_replication/causal_replay/runs/**/prompt.txt
-research/insiders_april_replication/causal_replay/runs/**/prompts/
-research/insiders_april_replication/causal_replay/runs/**/cache/
-research/insiders_april_replication/causal_replay/runs/**/window_test/
-research/insiders_april_replication/causal_replay/runs/**/haiku/
-research/insiders_april_replication/causal_replay/runs/**/raw_stdout.json
-research/insiders_april_replication/causal_replay/runs/**/raw/
+research/copier-validation/insiders/causal_replay/runs/**/prompt.txt
+research/copier-validation/insiders/causal_replay/runs/**/prompts/
+research/copier-validation/insiders/causal_replay/runs/**/cache/
+research/copier-validation/insiders/causal_replay/runs/**/window_test/
+research/copier-validation/insiders/causal_replay/runs/**/haiku/
+research/copier-validation/insiders/causal_replay/runs/**/raw_stdout.json
+research/copier-validation/insiders/causal_replay/runs/**/raw/
 # llm.json/baseline.json embed message-text snippets — commit the .redacted.json instead
-research/insiders_april_replication/causal_replay/runs/full_may/llm.json
-research/insiders_april_replication/causal_replay/runs/full_may/baseline.json
-research/insiders_april_replication/causal_replay/runs/full_may/run_stdout.txt
+research/copier-validation/insiders/causal_replay/runs/full_may/llm.json
+research/copier-validation/insiders/causal_replay/runs/full_may/baseline.json
+research/copier-validation/insiders/causal_replay/runs/full_may/run_stdout.txt
 # steps.jsonl + blind result/ledger embed message text & model reasoning quoting Dennis — keep local
-research/insiders_april_replication/causal_replay/runs/**/steps.jsonl
-research/insiders_april_replication/causal_replay/runs/blind_1611_vps/result.json
-research/insiders_april_replication/causal_replay/runs/blind_1609/final_ledger.json
-research/insiders_april_replication/causal_replay/runs/btc1609_mock/final_ledger.json
-research/insiders_april_replication/signals_parsed_*.json
+research/copier-validation/insiders/causal_replay/runs/**/steps.jsonl
+research/copier-validation/insiders/causal_replay/runs/blind_1611_vps/result.json
+research/copier-validation/insiders/causal_replay/runs/blind_1609/final_ledger.json
+research/copier-validation/insiders/causal_replay/runs/btc1609_mock/final_ledger.json
+research/copier-validation/insiders/signals_parsed_*.json
 
 # 2026-06-06/07 strategy-search research caches (bulk/regenerable) — commit docs+scripts, not data
-research/insiders_april_replication/prices_feb/
-research/insiders_april_replication/prices_mar/
-research/insiders_april_replication/dashboard.html
-research/insiders_april_replication/dashboard_data.json
-research/insiders_april_replication/dashboard_full.html
-research/insiders_april_replication/dashboard_full_data.json
-research/insiders_april_replication/causal_test/
-research/killers_sl_replay/klines_cache/
-research/killers_sl_replay/klines_cache_v2/
-research/killers_sl_replay/keltner_1h/
-research/killers_sl_replay/btc_1h.json
-research/killers_sl_replay/replay_results.json
-research/killers_sl_replay/v2_results_*.json
-research/killers_sl_replay/__pycache__/
+research/copier-validation/insiders/prices_feb/
+research/copier-validation/insiders/prices_mar/
+research/copier-validation/insiders/dashboard.html
+research/copier-validation/insiders/dashboard_data.json
+research/copier-validation/insiders/dashboard_full.html
+research/copier-validation/insiders/dashboard_full_data.json
+research/copier-validation/insiders/causal_test/
+research/copier-validation/killers/klines_cache/
+research/copier-validation/killers/klines_cache_v2/
+research/copier-validation/killers/keltner_1h/
+research/copier-validation/killers/btc_1h.json
+research/copier-validation/killers/replay_results.json
+research/copier-validation/killers/v2_results_*.json
+research/copier-validation/killers/__pycache__/

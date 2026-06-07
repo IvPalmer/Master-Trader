@@ -15,7 +15,7 @@ import json, os, sys
 from datetime import datetime
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-KILL = "/Users/palmer/Work/Dev/master-trader/research/killers_sl_replay"
+KILL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "killers")
 sys.path.insert(0, KILL)
 import replay_v2 as kr  # noqa: E402
 

@@ -6,7 +6,7 @@ The "reopen only with a fundamentally larger dataset" condition was tested. Pars
 month's openers from the paid export with the SAME regex parser (consistent; recovers May
 34≈curated 32, Apr 18≈curated 23) + SAME deterministic harness (entry × T1-exit, posted SL,
 12d tail, fees in R, **no LLM, no lookahead — pure price geometry**). Artifacts:
-`research/insiders_april_replication/` parse_signals.py, fetch_prices_oos.py, oos_runner.py,
+`research/copier-validation/insiders/` parse_signals.py, fetch_prices_oos.py, oos_runner.py,
 prices_feb/, prices_mar/, signals_parsed_2026_0{2,3,4,5}.json.
 
 **market+t1 (every signal, NO hindsight fill-selection — the honest copier metric), net of fee, R/trade:**
