@@ -101,3 +101,19 @@ research/insiders_april_replication/causal_replay/runs/blind_1611_vps/result.jso
 research/insiders_april_replication/causal_replay/runs/blind_1609/final_ledger.json
 research/insiders_april_replication/causal_replay/runs/btc1609_mock/final_ledger.json
 research/insiders_april_replication/signals_parsed_*.json
+
+# 2026-06-06/07 strategy-search research caches (bulk/regenerable) — commit docs+scripts, not data
+research/insiders_april_replication/prices_feb/
+research/insiders_april_replication/prices_mar/
+research/insiders_april_replication/dashboard.html
+research/insiders_april_replication/dashboard_data.json
+research/insiders_april_replication/dashboard_full.html
+research/insiders_april_replication/dashboard_full_data.json
+research/insiders_april_replication/causal_test/
+research/killers_sl_replay/klines_cache/
+research/killers_sl_replay/klines_cache_v2/
+research/killers_sl_replay/keltner_1h/
+research/killers_sl_replay/btc_1h.json
+research/killers_sl_replay/replay_results.json
+research/killers_sl_replay/v2_results_*.json
+research/killers_sl_replay/__pycache__/

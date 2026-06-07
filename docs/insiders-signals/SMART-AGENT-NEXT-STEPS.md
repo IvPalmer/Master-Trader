@@ -1,5 +1,35 @@
 # Smart agentic copier — next steps (2026-06-03)
 
+## MULTI-MONTH OOS — 2026-06-06 (the test the doc below asked for) → NO-GO CONFIRMED
+
+The "reopen only with a fundamentally larger dataset" condition was tested. Parsed each
+month's openers from the paid export with the SAME regex parser (consistent; recovers May
+34≈curated 32, Apr 18≈curated 23) + SAME deterministic harness (entry × T1-exit, posted SL,
+12d tail, fees in R, **no LLM, no lookahead — pure price geometry**). Artifacts:
+`research/insiders_april_replication/` parse_signals.py, fetch_prices_oos.py, oos_runner.py,
+prices_feb/, prices_mar/, signals_parsed_2026_0{2,3,4,5}.json.
+
+**market+t1 (every signal, NO hindsight fill-selection — the honest copier metric), net of fee, R/trade:**
+| month | R/trade | n | ex-top R/trade |
+|---|---|---|---|
+| FEB (OOS) | +0.034 | 11 | **−0.258** |
+| MAR (OOS) | +0.199 | 4 | **−0.343** |
+| APR | −0.648 | 9 | **−0.816** |
+| MAY | +0.240 | 20 | **−0.068** |
+| **AGG** | **+0.003** | **44** | — |
+
+**Verdict (codex-confirmed):** aggregate market+t1 ≈ **flat gross / negative after the ~0.10R
+sub cost**, and **ex-top R/trade is NEGATIVE in all four months** — every month's positive is
+one-winner concentration (tail luck, not durable signal). Only May (Dennis's self-advertised
+month) looks good → survivorship flag. posted+t1 agg +0.29R/trade is NOT dispositive (n=18,
+Apr −1.08, adverse-selected fill subset, zero Mar fills). **Feb+Mar did NOT rescue it.**
+Caveat (codex): still small N (44 market / 18 posted) — this is "failure to find a durable
+copyable edge under the tested rules," not proof of exactly zero. Reading substrate stays a
+validated asset; **copier shelved for capital. Do not re-litigate without a genuinely larger,
+stop-aware, management-faithful multi-month sample — and even then the prior is negative.**
+
+---
+
 Status: **technical feasibility of interpretation+tracking VALIDATED**
 ([`SMART-AGENT-VALIDATION-2026-06-03.md`](SMART-AGENT-VALIDATION-2026-06-03.md)). The
 "can a smart agent read and follow Dennis's book" question is answered yes (87/87 intent).
