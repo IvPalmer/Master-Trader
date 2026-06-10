@@ -66,7 +66,7 @@ why it could not be meaningfully "passed" or "failed".
 - At ≥ 20 closed trades: continue if PF ≥ 1.0 AND WR ≥ 60%
   (backtest: PF 1.62, WR 77.8%); else kill.
 - If < 10 closed trades by review date: frequency anomaly
-  (P ≈ 4.5% under backtest cadence) — investigate signal-rate mismatch
-  before extending.
+  (P ≈ 3.9% under backtest cadence, λ=16.2 over the 113-day window) —
+  investigate signal-rate mismatch before extending.
 - Surfaced daily by `strategy_health_report.py` (PRE-REGISTRATIONS section)
   so it cannot expire silently like the v1 gate did.
