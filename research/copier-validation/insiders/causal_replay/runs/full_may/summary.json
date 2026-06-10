@@ -1,0 +1,218 @@
+{
+  "meta": {
+    "window": [
+      "2026-05-10T00:00:00+00:00",
+      "2026-05-29T23:59:59+00:00"
+    ],
+    "n_candidates": 178,
+    "first_id": 1472,
+    "last_id": 1724
+  },
+  "n_candidates": 178,
+  "baseline_intent_types": {
+    "abstain": 29,
+    "sl_to": 79,
+    "close_partial": 35,
+    "close_full": 15,
+    "open": 20
+  },
+  "baseline_ledger": {
+    "closed": [
+      {
+        "symbol": "BTC",
+        "side": "short",
+        "opener": 1517,
+        "closed_at": 1550,
+        "R": 0.0
+      },
+      {
+        "symbol": "FARTCOIN",
+        "side": "long",
+        "opener": 1563,
+        "closed_at": 1584,
+        "R": 0.0
+      },
+      {
+        "symbol": "BTC",
+        "side": "short",
+        "opener": 1570,
+        "closed_at": 1590,
+        "R": 0.0
+      },
+      {
+        "symbol": "ETH",
+        "side": "long",
+        "opener": 1551,
+        "closed_at": 1605,
+        "R": 0.0
+      },
+      {
+        "symbol": "FARTCOIN",
+        "side": "long",
+        "opener": 1702,
+        "closed_at": 1715,
+        "R": 0.0
+      }
+    ],
+    "n_closed": 5,
+    "total_realized_R": 0.0
+  },
+  "llm_done": 178,
+  "llm_stopped_early": null,
+  "llm_intent_types": {
+    "close_full": 27,
+    "abstain": 3,
+    "close_partial": 39,
+    "open": 47,
+    "commentary": 49,
+    "sl_to": 7,
+    "open_partial": 6
+  },
+  "llm_audit_rejects": 0,
+  "llm_ledger": {
+    "closed": [
+      {
+        "symbol": "SOL",
+        "side": "short",
+        "opener": 1483,
+        "closed_at": 1493,
+        "R": -0.0391
+      },
+      {
+        "symbol": "ETH",
+        "side": "long",
+        "opener": 1499,
+        "closed_at": 1515,
+        "R": -0.1101
+      },
+      {
+        "symbol": "HYPE",
+        "side": "long",
+        "opener": 1527,
+        "closed_at": 1535,
+        "R": 0.0281
+      },
+      {
+        "symbol": "BTC",
+        "side": "short",
+        "opener": 1539,
+        "closed_at": 1550,
+        "R": -0.1397
+      },
+      {
+        "symbol": "FARTCOIN",
+        "side": "long",
+        "opener": 1564,
+        "closed_at": 1584,
+        "R": 0.0609
+      },
+      {
+        "symbol": "ETC",
+        "side": "short",
+        "opener": 1587,
+        "closed_at": 1597,
+        "R": 0.5392
+      },
+      {
+        "symbol": "ETH",
+        "side": "long",
+        "opener": 1569,
+        "closed_at": 1605,
+        "R": 0.2403
+      },
+      {
+        "symbol": "FARTCOIN",
+        "side": "long",
+        "opener": 1585,
+        "closed_at": 1606,
+        "R": 0.3896
+      },
+      {
+        "symbol": "BTC",
+        "side": "long",
+        "opener": 1561,
+        "closed_at": 1608,
+        "R": 0.6553
+      },
+      {
+        "symbol": "BTC",
+        "side": "short",
+        "opener": 1609,
+        "closed_at": 1611,
+        "R": 0.1
+      },
+      {
+        "symbol": "FF",
+        "side": "short",
+        "opener": 1614,
+        "closed_at": 1617,
+        "R": -0.5672
+      },
+      {
+        "symbol": "PUMP",
+        "side": "long",
+        "opener": 1546,
+        "closed_at": 1623,
+        "R": -0.2727
+      },
+      {
+        "symbol": "PUMP",
+        "side": "short",
+        "opener": 1624,
+        "closed_at": 1629,
+        "R": 0.7751
+      },
+      {
+        "symbol": "ETH",
+        "side": "short",
+        "opener": 1615,
+        "closed_at": 1636,
+        "R": 0.7827
+      },
+      {
+        "symbol": "NEAR",
+        "side": "short",
+        "opener": 1661,
+        "closed_at": 1665,
+        "R": -0.0676
+      },
+      {
+        "symbol": "LTC",
+        "side": "short",
+        "opener": 1676,
+        "closed_at": 1684,
+        "R": 0.2314
+      },
+      {
+        "symbol": "BTC",
+        "side": "long",
+        "opener": 1686,
+        "closed_at": 1694,
+        "R": -0.5068
+      },
+      {
+        "symbol": "FARTCOIN",
+        "side": "long",
+        "opener": 1687,
+        "closed_at": 1696,
+        "R": -0.7872
+      },
+      {
+        "symbol": "PUMP",
+        "side": "long",
+        "opener": 1699,
+        "closed_at": 1713,
+        "R": 0.1258
+      },
+      {
+        "symbol": "FARTCOIN",
+        "side": "long",
+        "opener": 1703,
+        "closed_at": 1715,
+        "R": 0.2092
+      }
+    ],
+    "n_closed": 20,
+    "total_realized_R": 1.6473
+  }
+}

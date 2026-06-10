@@ -1,0 +1,116 @@
+{
+  "BTC": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "ETH": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "ASTER": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "SOL": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "AAVE": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "SEI": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "LYN": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "TRADOOR": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "TAO": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "PENDLE": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "FARTCOIN": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "PIPPIN": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "BIO": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "APT": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "B": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "RIVER": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "NAORIS": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "LAB": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  },
+  "ZEC": {
+    "weex": 46100,
+    "weex_first": "2026-04-15T23:41",
+    "weex_last": "2026-05-18T00:00",
+    "binance": 46081
+  }
+}
