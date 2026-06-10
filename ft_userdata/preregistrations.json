@@ -1,0 +1,51 @@
+{
+  "_doc": [
+    "Pre-registered review windows, kill rules, and triggers for the bot fleet.",
+    "WHY THIS FILE EXISTS: two pre-registrations rotted silently in May 2026 —",
+    "the FF ARB 3rd-loss trigger (fired 2026-05-14, evaluated 26 days late) and",
+    "the CascadeFader 30-day dry-run gate (expired 2026-06-08 unevaluated) —",
+    "because they lived only in commit messages and session memory.",
+    "Every entry with status 'open' is surfaced in the daily health report",
+    "(strategy_health_report.py, PRE-REGISTRATIONS section) with an OVERDUE",
+    "marker once review_by passes. Closing an entry requires a human decision",
+    "recorded in 'resolution'. New pre-registrations MUST be added here, not",
+    "(only) in commit messages or memory."
+  ],
+  "preregistrations": [
+    {
+      "id": "ff-gate-v2-review",
+      "bot": "FundingFadeV1",
+      "status": "open",
+      "registered": "2026-05-19",
+      "review_by": "2026-08-17",
+      "min_closed_trades": 30,
+      "rules": [
+        "Rollback gate v2 if account MaxDD > 3.60% (1.5x backtest 2.40%)",
+        "Kill/demote if PF < 0.7 over 30+ closed trades since 2026-05-19",
+        "If <10 closed trades by review_by, the PF rule is NOT evaluable: review must instead compare gate-open time vs backtest expectation and decide extend/simplify, not auto-pass"
+      ],
+      "notes": "Original window said '90d or 75 trades, whichever first' — at the gate-v2 backtest rate (1.67 trades/wk) 75 trades takes ~10 months, so the trade arm was vacuous. Live rate since redeploy is ZERO trades in 21d (BTC below SMA50/200 — mostly the pre-existing v1 base gate). Audited 2026-06-09."
+    },
+    {
+      "id": "cascade-dry-run-gate-v2",
+      "bot": "CascadeFaderV1",
+      "status": "open",
+      "registered": "2026-06-09",
+      "review_by": "2026-09-30",
+      "min_closed_trades": 20,
+      "rules": [
+        "At >=20 closed trades: continue dry-run if PF >= 1.0 AND WR >= 60% (deployed-docstring backtest: PF 1.62, WR 77.8%); else kill",
+        "If <10 closed trades by review_by: frequency anomaly (P ~4.5% under backtest cadence 4.37 trades/month) — investigate signal-rate mismatch before extending"
+      ],
+      "notes": "Replaces the expired v1 gate ('>=5 trades in 30d', ended 2026-06-08 with 2 trades). v1 gate was mis-specified: only ~44% pass probability even if the backtest were perfect. Plumbing verified 2026-06-09: exactly 2 qualifying cascade candles occurred market-wide since deploy (both ZEC 2026-06-05) and the bot captured 2/2 with correct next-bar entries. See docs/cascade_gate_evaluation_2026-06-09.md."
+    },
+    {
+      "id": "ff-arb-3rd-loss-trigger",
+      "bot": "FundingFadeV1",
+      "status": "closed",
+      "registered": "2026-05-10",
+      "closed": "2026-06-09",
+      "resolution": "Trigger (3rd ARB stop-loss) fired 2026-05-14, evaluated 2026-06-09 (26 days late — the {duration} webhook bug had blinded the purpose-built pair-drift detector; fixed in 17acebc). Evaluation: qualifier 'while other pairs continue winning' NOT met — the 3rd ARB SL fell inside the fleet-wide 5-SL streak (TAO/BCH/SUI also stopped), so the loss is regime-wide, not ARB-idiosyncratic. No pair blacklist, per feedback_pairlist_strategy (never blacklist coins reactively). The original 'informed shorts' diagnosis was also a misread: post-extreme funding normalizing to Binance's +0.01% baseline clamp is the mechanical modal outcome, not evidence of informed flow. ARB stays in the whitelist; macro gate v2 is the regime defense."
+    }
+  ]
+}

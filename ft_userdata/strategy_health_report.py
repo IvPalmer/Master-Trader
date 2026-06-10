@@ -754,7 +754,74 @@ def compute_trends(current: list[dict], previous: Optional[dict]) -> dict:
 # Report Formatting
 # ---------------------------------------------------------------------------
 
-def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dict) -> str:
+# ---------------------------------------------------------------------------
+# Pre-registration checks
+# ---------------------------------------------------------------------------
+
+PREREG_FILE = Path(__file__).resolve().parent / "preregistrations.json"
+
+
+def check_preregistrations() -> list[str]:
+    """Surface pre-registered review windows/triggers in the daily report.
+
+    Two pre-registrations rotted silently in May 2026 — the FF ARB 3rd-loss
+    trigger (fired 2026-05-14, evaluated 26 days late) and the Cascade 30-day
+    dry-run gate (expired unevaluated) — because they lived only in commit
+    messages and session memory. Anything in preregistrations.json with
+    status "open" is reported daily, with an OVERDUE marker once review_by
+    passes, until a human closes it with a resolution.
+    """
+    try:
+        registry = json.loads(PREREG_FILE.read_text())
+    except FileNotFoundError:
+        return []
+    except (json.JSONDecodeError, OSError) as e:
+        return [f"  [PREREG] registry unreadable: {e}"]
+
+    lines: list[str] = []
+    today = datetime.now(timezone.utc).date()
+    for entry in registry.get("preregistrations", []):
+        if entry.get("status") != "open":
+            continue
+        eid = entry.get("id", "?")
+        registered = entry.get("registered", "?")
+        review_by = entry.get("review_by")
+        min_trades = entry.get("min_closed_trades")
+
+        closed_since = None
+        port = BOTS.get(entry.get("bot"), {}).get("port")
+        if port:
+            trades = get_trades_from_api(port)
+            reg_dt = _parse_date(f"{registered} 00:00:00")
+            if trades is not None and reg_dt is not None:
+                closed_since = sum(
+                    1 for t in trades
+                    if not t.get("is_open")
+                    and (_parse_date(t.get("close_date")) or reg_dt) > reg_dt
+                )
+
+        status_bits = []
+        if review_by:
+            days_left = (datetime.strptime(review_by, "%Y-%m-%d").date() - today).days
+            status_bits.append(
+                f"OVERDUE {-days_left}d — EVALUATE NOW" if days_left < 0
+                else f"review in {days_left}d"
+            )
+        if min_trades is not None:
+            shown = "?" if closed_since is None else str(closed_since)
+            evaluable = closed_since is not None and closed_since >= min_trades
+            status_bits.append(
+                f"{shown}/{min_trades} closed trades since {registered}"
+                + ("" if evaluable else " — rules not yet evaluable")
+            )
+        lines.append(f"  [{eid}] {' · '.join(status_bits) or 'open'}")
+        for rule in entry.get("rules", []):
+            lines.append(f"    rule: {rule}")
+    return lines
+
+
+def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dict,
+                           prereg_lines: Optional[list[str]] = None) -> str:
     """Format a structured Telegram report."""
     lines = []
     now = datetime.now(timezone.utc)
@@ -823,6 +890,12 @@ def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dic
         lines.append("RED FLAGS")
         for f in all_flags:
             lines.append(f)
+
+    # Pre-registered review windows / triggers (see preregistrations.json)
+    if prereg_lines:
+        lines.append("")
+        lines.append("PRE-REGISTRATIONS")
+        lines.extend(prereg_lines)
 
     # Per-pair drift section (last 30 days, only render if any drift)
     pair_drift_lines: list[str] = []
@@ -924,7 +997,8 @@ def main():
         return
 
     # Format report
-    report = format_telegram_report(bot_metrics, portfolio, trends)
+    prereg_lines = check_preregistrations()
+    report = format_telegram_report(bot_metrics, portfolio, trends, prereg_lines)
 
     if args.stdout:
         print(report)
