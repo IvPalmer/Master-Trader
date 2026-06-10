@@ -778,45 +778,57 @@ def check_preregistrations() -> list[str]:
     except (json.JSONDecodeError, OSError) as e:
         return [f"  [PREREG] registry unreadable: {e}"]
 
+    entries = registry.get("preregistrations", [])
+    if not isinstance(entries, list):
+        return ["  [PREREG] registry malformed: 'preregistrations' is not a list"]
+
     lines: list[str] = []
     today = datetime.now(timezone.utc).date()
-    for entry in registry.get("preregistrations", []):
-        if entry.get("status") != "open":
-            continue
-        eid = entry.get("id", "?")
-        registered = entry.get("registered", "?")
-        review_by = entry.get("review_by")
-        min_trades = entry.get("min_closed_trades")
+    for entry in entries:
+        # Per-entry guard: a malformed manual registry edit must degrade to a
+        # visible "skipped" line, never take the whole daily report down.
+        try:
+            if not isinstance(entry, dict) or entry.get("status") != "open":
+                continue
+            eid = entry.get("id", "?")
+            registered = entry.get("registered", "?")
+            review_by = entry.get("review_by")
+            min_trades = entry.get("min_closed_trades")
 
-        closed_since = None
-        port = BOTS.get(entry.get("bot"), {}).get("port")
-        if port:
-            trades = get_trades_from_api(port)
-            reg_dt = _parse_date(f"{registered} 00:00:00")
-            if trades is not None and reg_dt is not None:
-                closed_since = sum(
-                    1 for t in trades
-                    if not t.get("is_open")
-                    and (_parse_date(t.get("close_date")) or reg_dt) > reg_dt
+            closed_since = None
+            port = BOTS.get(entry.get("bot"), {}).get("port")
+            if port:
+                trades = get_trades_from_api(port)
+                reg_dt = _parse_date(f"{registered} 00:00:00")
+                if trades is not None and reg_dt is not None:
+                    closed_since = sum(
+                        1 for t in trades
+                        if not t.get("is_open")
+                        and (_parse_date(t.get("close_date")) or reg_dt) > reg_dt
+                    )
+
+            status_bits = []
+            if review_by:
+                days_left = (datetime.strptime(review_by, "%Y-%m-%d").date() - today).days
+                status_bits.append(
+                    f"OVERDUE {-days_left}d — EVALUATE NOW" if days_left < 0
+                    else f"review in {days_left}d"
                 )
-
-        status_bits = []
-        if review_by:
-            days_left = (datetime.strptime(review_by, "%Y-%m-%d").date() - today).days
-            status_bits.append(
-                f"OVERDUE {-days_left}d — EVALUATE NOW" if days_left < 0
-                else f"review in {days_left}d"
-            )
-        if min_trades is not None:
-            shown = "?" if closed_since is None else str(closed_since)
-            evaluable = closed_since is not None and closed_since >= min_trades
-            status_bits.append(
-                f"{shown}/{min_trades} closed trades since {registered}"
-                + ("" if evaluable else " — rules not yet evaluable")
-            )
-        lines.append(f"  [{eid}] {' · '.join(status_bits) or 'open'}")
-        for rule in entry.get("rules", []):
-            lines.append(f"    rule: {rule}")
+            if min_trades is not None:
+                shown = "?" if closed_since is None else str(closed_since)
+                evaluable = closed_since is not None and closed_since >= min_trades
+                status_bits.append(
+                    f"{shown}/{min_trades} closed trades since {registered}"
+                    + ("" if evaluable else " — rules not yet evaluable")
+                )
+            entry_lines = [f"  [{eid}] {' · '.join(status_bits) or 'open'}"]
+            rules = entry.get("rules") or []
+            for rule in (rules if isinstance(rules, list) else []):
+                entry_lines.append(f"    rule: {rule}")
+            lines.extend(entry_lines)
+        except Exception as e:  # noqa: BLE001 — report must survive bad entries
+            eid = entry.get("id", "?") if isinstance(entry, dict) else "?"
+            lines.append(f"  [PREREG] entry {eid} skipped (malformed): {e}")
     return lines
 
 
@@ -997,7 +1009,11 @@ def main():
         return
 
     # Format report
-    prereg_lines = check_preregistrations()
+    try:
+        prereg_lines = check_preregistrations()
+    except Exception as e:  # noqa: BLE001 — prereg section must never kill the report
+        log.error("check_preregistrations failed: %s", e)
+        prereg_lines = [f"  [PREREG] check failed: {e}"]
     report = format_telegram_report(bot_metrics, portfolio, trends, prereg_lines)
 
     if args.stdout:

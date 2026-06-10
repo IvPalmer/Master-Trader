@@ -35,7 +35,7 @@
       "min_closed_trades": 20,
       "rules": [
         "At >=20 closed trades: continue dry-run if PF >= 1.0 AND WR >= 60% (deployed-docstring backtest: PF 1.62, WR 77.8%); else kill",
-        "If <10 closed trades by review_by: frequency anomaly (P ~4.5% under backtest cadence 4.37 trades/month) — investigate signal-rate mismatch before extending"
+        "If <10 closed trades by review_by: frequency anomaly (P ~3.9% under backtest cadence 4.37 trades/month over the 113-day window) — investigate signal-rate mismatch before extending"
       ],
       "notes": "Replaces the expired v1 gate ('>=5 trades in 30d', ended 2026-06-08 with 2 trades). v1 gate was mis-specified: only ~44% pass probability even if the backtest were perfect. Plumbing verified 2026-06-09: exactly 2 qualifying cascade candles occurred market-wide since deploy (both ZEC 2026-06-05) and the bot captured 2/2 with correct next-bar entries. See docs/cascade_gate_evaluation_2026-06-09.md."
     },
