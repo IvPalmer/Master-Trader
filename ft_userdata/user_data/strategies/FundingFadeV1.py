@@ -50,6 +50,8 @@ Operational dependencies (gate v2):
 
 Alerting:
   - Log line "MISSING BTC funding feather — macro gate v2 FAIL-CLOSED" → page
+  - Log line "STALE BTC funding feather" + "FAIL-CLOSED" → page (feather exists
+    but last funding event is >24h behind the bar being evaluated)
   - Log line "BTC funding load failed" → investigate
   - Log line "BTC 30d funding mean loaded" → normal startup
   - Cron freshness: ft-funding-refresh runs every 4h; if last log >8h old,
@@ -123,6 +125,13 @@ class FundingFadeV1(IStrategy):
     # same value for every pair, no need to re-read per call).
     _btc_funding_30d_series = None
     _btc_funding_30d_mtime_ns = 0
+
+    # Max age of the BTC funding feather before the regime gate fail-closes.
+    # Funding posts every 8h and ft-funding-refresh runs every 4h, so 24h stale
+    # means ≥3 missed funding events / ≥6 missed cron runs — the file is dead,
+    # not late. Per-pair staleness warns at 12h (_STALE_FUNDING_HOURS) without
+    # blocking; the macro gate is a risk control and must not run on dead data.
+    _BTC_FUNDING_MAX_AGE_H = 24
 
     @informative("1h", "BTC/{stake}")
     def populate_indicators_btc_1h(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -210,12 +219,14 @@ class FundingFadeV1(IStrategy):
         Cached at class level — same for every pair, mtime-invalidated so live
         refresh via download_funding_rates.py propagates without restart.
 
-        Fail-closed: returns Series of NaN on missing feather or load failure.
-        Caller's gate logic must include `.notna()` check; with NaN here, the
-        regime gate's `macro_inputs_ok` becomes False and ALL entries are
-        blocked until BTC funding is restored. This is intentional — the new
-        risk-control feature should not be silently neutered by its own
-        dependency disappearing.
+        Fail-closed: returns Series of NaN on missing feather, load failure,
+        or staleness (bars more than _BTC_FUNDING_MAX_AGE_H beyond the last
+        funding event — see staleness mask below). Caller's gate logic must
+        include `.notna()` check; with NaN here, the regime gate's
+        `macro_inputs_ok` becomes False and ALL entries are blocked until BTC
+        funding is restored. This is intentional — the new risk-control
+        feature should not be silently neutered by its own dependency
+        disappearing or going stale.
         """
         path = FUNDING_DIR / "BTC_USDT-funding.feather"
         if not path.exists():
@@ -253,7 +264,31 @@ class FundingFadeV1(IStrategy):
         # (funding posts every 8h, so any 1h bar inherits the most recent value).
         dates = pd.to_datetime(dataframe["date"], utc=True) if "date" in dataframe.columns else dataframe.index
         aligned = cls._btc_funding_30d_series.reindex(dates, method="ffill")
-        return pd.Series(aligned.values, index=dataframe.index)
+
+        # Staleness mask: ffill must not extend past the feather's last funding
+        # event forever. Bars beyond last_event + _BTC_FUNDING_MAX_AGE_H get NaN
+        # → btc_funding_ok False → entries blocked. Without this, a dead
+        # ft-funding-refresh leaves the regime gate running on frozen data
+        # indefinitely (fail-open) while the contract above promises fail-closed.
+        if len(cls._btc_funding_30d_series.index) == 0:
+            return pd.Series(float("nan"), index=dataframe.index)
+        last_event = cls._btc_funding_30d_series.index[-1]
+        cutoff = last_event + pd.Timedelta(hours=self._BTC_FUNDING_MAX_AGE_H)
+        stale_mask = pd.DatetimeIndex(dates) > cutoff
+        values = aligned.values
+        if stale_mask.any():
+            values = values.copy()
+            values[stale_mask] = float("nan")
+            now = time.time()
+            last_warn = self._missing_funding_last_warn.get("__BTC_REGIME_STALE__", 0.0)
+            if now - last_warn >= self._MISSING_REWARN_INTERVAL_S:
+                logger.error(
+                    "STALE BTC funding feather (last event %s, max age %dh) — macro "
+                    "gate v2 FAIL-CLOSED for %d bar(s). Check ft-funding-refresh.",
+                    last_event, self._BTC_FUNDING_MAX_AGE_H, int(stale_mask.sum()),
+                )
+                self._missing_funding_last_warn["__BTC_REGIME_STALE__"] = now
+        return pd.Series(values, index=dataframe.index)
 
     # ── Funding rate loader ──────────────────────────────────
 
