@@ -743,3 +743,22 @@ button { font: inherit; }
 
 /* ── grow spacer ──────────────────────────────── */
 .grow { flex: 1; }
+
+/* Treatment B — booked vs riding */
+.ot2-row { padding:12px 4px 13px; border-top:1px solid var(--hairline); }
+.ot2-row:first-child { border-top:none; }
+.ot2-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:9px; }
+.ot2-pair { font-size:13.5px; font-weight:650; }
+.ot2-pnl { font-size:15px; font-weight:700; }
+.splitbar { height:22px; border-radius:7px; background:var(--surface-2); border:1px solid var(--border);
+            display:flex; overflow:hidden; }
+.booked-seg { background:linear-gradient(180deg,#15a16a,#0a8f5b); color:#fff; font-size:10px; font-weight:700;
+              display:flex; align-items:center; padding:0 8px; white-space:nowrap; overflow:hidden; }
+.ride-seg { flex:1; background:repeating-linear-gradient(90deg,var(--accent-soft),var(--accent-soft) 9px,#eaf4f7 9px,#eaf4f7 11px);
+            color:var(--accent-ink); font-size:10px; font-weight:700; display:flex; align-items:center; padding:0 8px; white-space:nowrap; }
+.ride-seg.loss { background:repeating-linear-gradient(90deg,var(--neg-soft),var(--neg-soft) 9px,#f7dad6 9px,#f7dad6 11px); color:var(--neg); }
+.ot2-foot { display:flex; align-items:center; justify-content:space-between; margin-top:8px; }
+.ot2-age { font-size:11px; color:var(--text-3); }
+.pill { display:inline-block; font-size:9.5px; font-weight:700; padding:2px 8px; border-radius:20px;
+        background:var(--pos-soft); color:var(--pos); }
+.pill.zero { background:var(--neg-soft); color:var(--neg); }
