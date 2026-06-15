@@ -613,30 +613,25 @@
               <div class="card-title">open trade status</div>
               <div class="card-sub">progress vs ROI target · stop distance</div>
             </div>
-            <div class="bot-detail-section">
-              <template x-for="ot in openTradesForBot(bot)" :key="ot.pair">
-                <div class="ot2-row">
-                  <div class="ot2-head">
-                    <span class="ot2-pair" x-text="ot.pair">—</span>
-                    <span class="ot2-pnl num" :class="(ot.profit_pct||0)>=0?'pos':'neg'" x-text="fmtPctSigned(ot.profit_pct)">—</span>
-                  </div>
-                  <div class="splitbar">
-                    <template x-if="(ot.booked_pct ?? null) !== null && ot.booked_pct > 0">
-                      <span class="booked-seg" :style="'width:'+ot.booked_pct+'%'" x-text="'booked '+Math.round(ot.booked_pct)+'%'"></span>
-                    </template>
-                    <span class="ride-seg" :class="(ot.profit_pct||0)<0?'loss':''"
-                          x-text="ot.booked_pct ? 'riding '+Math.round(ot.riding_pct)+'%' : '100% open'"></span>
-                  </div>
-                  <div class="ot2-foot">
-                    <template x-if="ot.tps_total">
-                      <span class="pill" :class="ot.tps_hit ? '' : 'zero'"
-                            x-text="ot.tps_hit+' / '+ot.tps_total+' TPs'+(ot.next_tp ? ' · next @ '+fmtRate(ot.next_tp) : '')"></span>
-                    </template>
-                    <span class="ot2-age" x-text="fmtMin(ot.ageMin)"></span>
-                  </div>
+            <div class="ot-list">
+                  <template x-for="ot in openTradesForBot(bot)" :key="ot.pair">
+                    <div class="arow" :class="(ot.profit_pct||0)<0 ? 'lossbar' : (ot.booked_pct ? '' : 'openbar')">
+                      <div class="afill" x-show="ot.booked_pct > 0" :style="'width:'+ot.booked_pct+'%'"></div>
+                      <div class="acontent">
+                        <span class="apair">
+                          <span x-text="(ot.pair||'').split('/')[0]">—</span>
+                          <span class="adir" :class="ot.is_short?'short':''" x-text="ot.is_short?'SHORT':'LONG'"></span>
+                        </span>
+                        <span class="abook" x-show="ot.booked_pct > 0" x-text="'booked '+Math.round(ot.booked_pct)+'%'"></span>
+                        <span class="aopen" :class="(ot.profit_pct||0)<0?'l':''" x-show="!ot.booked_pct" x-text="'100% open'"></span>
+                        <span class="aspacer"></span>
+                        <span class="atp" x-show="ot.tps_total" x-text="ot.tps_hit+'/'+ot.tps_total+(ot.next_tp ? ' → '+fmtRate(ot.next_tp) : '')"></span>
+                        <span class="apnl num" :class="(ot.profit_pct||0)>=0?'pos':'neg'" x-text="fmtPctSigned(ot.profit_pct)">—</span>
+                        <span class="aage" x-text="fmtMin(ot.ageMin)">—</span>
+                      </div>
+                    </div>
+                  </template>
                 </div>
-              </template>
-            </div>
           </div>
         </div>
 
@@ -847,55 +842,25 @@
             <div class="card-sub" x-text="(bot.open_trades?.length ?? 0) + ' open · ' + fmtUsd(bot.capital_at_risk?.abs_loss || 0) + ' at risk'">0 open</div>
           </div>
           <template x-if="bot.open_trades?.length">
-            <div>
-              <div style="max-height:320px;overflow-y:auto;">
-                <table class="ledger">
-                  <thead>
-                    <tr>
-                      <th>pair</th><th class="right">entry</th><th class="right">current</th>
-                      <th class="right">p&l</th><th class="right">opened</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <template x-for="t in bot.open_trades" :key="t.pair">
-                      <tr>
-                        <td class="label" x-text="t.pair"></td>
-                        <td class="right" x-text="fmtRate(t.open_rate)"></td>
-                        <td class="right" x-text="fmtRate(t.current_rate)"></td>
-                        <td class="right" :class="(t.profit_pct||0)>=0?'pos':'neg'"
-                            x-text="fmtPctSigned(t.profit_pct)+' · '+fmtUsdSigned(t.profit_abs)"></td>
-                        <td class="right"
-                            x-text="fmtAge(Math.max(0,Math.floor((Date.now()-toMs(t.open_timestamp||0))/1000)))+' ago'"></td>
-                      </tr>
-                    </template>
-                  </tbody>
-                </table>
-              </div>
-              <div class="bot-detail-section">
-                <template x-for="ot in openTradesForBot(bot)" :key="ot.pair">
-                  <div class="ot2-row">
-                    <div class="ot2-head">
-                      <span class="ot2-pair" x-text="ot.pair">—</span>
-                      <span class="ot2-pnl num" :class="(ot.profit_pct||0)>=0?'pos':'neg'" x-text="fmtPctSigned(ot.profit_pct)">—</span>
+            <div class="ot-list">
+                  <template x-for="ot in openTradesForBot(bot)" :key="ot.pair">
+                    <div class="arow" :class="(ot.profit_pct||0)<0 ? 'lossbar' : (ot.booked_pct ? '' : 'openbar')">
+                      <div class="afill" x-show="ot.booked_pct > 0" :style="'width:'+ot.booked_pct+'%'"></div>
+                      <div class="acontent">
+                        <span class="apair">
+                          <span x-text="(ot.pair||'').split('/')[0]">—</span>
+                          <span class="adir" :class="ot.is_short?'short':''" x-text="ot.is_short?'SHORT':'LONG'"></span>
+                        </span>
+                        <span class="abook" x-show="ot.booked_pct > 0" x-text="'booked '+Math.round(ot.booked_pct)+'%'"></span>
+                        <span class="aopen" :class="(ot.profit_pct||0)<0?'l':''" x-show="!ot.booked_pct" x-text="'100% open'"></span>
+                        <span class="aspacer"></span>
+                        <span class="atp" x-show="ot.tps_total" x-text="ot.tps_hit+'/'+ot.tps_total+(ot.next_tp ? ' → '+fmtRate(ot.next_tp) : '')"></span>
+                        <span class="apnl num" :class="(ot.profit_pct||0)>=0?'pos':'neg'" x-text="fmtPctSigned(ot.profit_pct)">—</span>
+                        <span class="aage" x-text="fmtMin(ot.ageMin)">—</span>
+                      </div>
                     </div>
-                    <div class="splitbar">
-                      <template x-if="(ot.booked_pct ?? null) !== null && ot.booked_pct > 0">
-                        <span class="booked-seg" :style="'width:'+ot.booked_pct+'%'" x-text="'booked '+Math.round(ot.booked_pct)+'%'"></span>
-                      </template>
-                      <span class="ride-seg" :class="(ot.profit_pct||0)<0?'loss':''"
-                            x-text="ot.booked_pct ? 'riding '+Math.round(ot.riding_pct)+'%' : '100% open'"></span>
-                    </div>
-                    <div class="ot2-foot">
-                      <template x-if="ot.tps_total">
-                        <span class="pill" :class="ot.tps_hit ? '' : 'zero'"
-                              x-text="ot.tps_hit+' / '+ot.tps_total+' TPs'+(ot.next_tp ? ' · next @ '+fmtRate(ot.next_tp) : '')"></span>
-                      </template>
-                      <span class="ot2-age" x-text="fmtMin(ot.ageMin)"></span>
-                    </div>
-                  </div>
-                </template>
-              </div>
-            </div>
+                  </template>
+                </div>
           </template>
           <div class="empty" x-show="!bot.open_trades?.length"><div class="icon">○</div> no open positions</div>
         </div>
