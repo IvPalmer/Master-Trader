@@ -4,41 +4,35 @@
  */
 
 :root {
-  /* surfaces — warm off-white, never pure white */
-  --bg-0:       #f5f4ee;
-  --bg-1:       #ece9e0;
-  --surface:    #fcfcfa;
-  --surface-2:  #f1efe8;
-  --surface-3:  #e7e3d8;
-  --border:     #ddd9cf;
-  --border-soft:#cbc6b8;
-  --hairline:   rgba(15, 23, 42, 0.08);
+  /* surfaces — warm off-white, layered */
+  --bg-0:#efede4; --bg-1:#e7e3d6; --surface:#fffefb; --surface-2:#f7f5ed; --surface-3:#f1eee3;
+  --border:#e7e3d6; --border-soft:#dcd7c8; --hairline:#efece1;
 
-  /* text — off-black, never pure black */
-  --text:       #0c121b;
-  --text-2:     #475569;
-  --text-3:     #64748b;
-  --text-faint: #94a3b8;
+  /* ink ramp — off-black, never pure */
+  --text:#12171f; --text-2:#56606e; --text-3:#9098a4; --text-faint:#b6bcc5;
 
   /* semantic */
-  --pos:        #059669;
-  --pos-soft:   rgba(5, 150, 105, 0.10);
-  --neg:        #dc2626;
-  --neg-soft:   rgba(220, 38, 38, 0.08);
-  --warn:       #d97706;
-  --warn-soft:  rgba(217, 119, 6, 0.10);
-  --info:       #2563eb;
-  --info-soft:  rgba(37, 99, 235, 0.08);
+  --pos:#0a8f5b; --pos-soft:#e2f3ea; --neg:#d2473a; --neg-soft:#fbe8e6;
+  --warn:#b07a16; --warn-soft:#f7eed8; --info:#0e87a3; --info-soft:#dff0f4;
 
-  /* brand accent — calibrated deep teal */
-  --accent:      #0891b2;
-  --accent-soft: rgba(8, 145, 178, 0.10);
-  --accent-2:    #7c3aed;
+  /* brand accent — deep teal */
+  --accent:#0e87a3; --accent-soft:#dff0f4; --accent-ink:#0a6276; --accent-2:#7c3aed;
+
+  /* elevation (3 tiers) */
+  --el1:0 1px 2px rgba(18,23,31,.05);
+  --el2:0 2px 5px rgba(18,23,31,.05), 0 10px 26px rgba(18,23,31,.055);
+  --el3:0 3px 8px rgba(18,23,31,.07), 0 18px 44px rgba(18,23,31,.08);
+
+  /* radius */
+  --r:14px; --r-sm:9px;
 
   /* type */
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
+
+/* tabular figures for any numeric value */
+.num, .vital-val, .metric-val, td.right, .trade-pnl { font-variant-numeric: tabular-nums; letter-spacing:-.01em; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
