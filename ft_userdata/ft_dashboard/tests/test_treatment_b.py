@@ -37,6 +37,15 @@ def test_inf_inputs_is_none():
     assert compute_booked_pct(1.0, float("inf")) is None
     assert compute_booked_pct(float("inf"), 1.0) is None
 
+def test_incomplete_entry_returns_none():
+    assert compute_booked_pct(0.143, 0.488, 0) is None
+def test_complete_entry_computes():
+    assert compute_booked_pct(0.143, 0.488, 1) == 70.7
+def test_entry_count_omitted_is_ungated():
+    assert compute_booked_pct(0.143, 0.488) == 70.7
+def test_entry_count_garbage_returns_none():
+    assert compute_booked_pct(0.143, 0.488, "x") is None
+
 
 import sqlite3
 from app import killers_tp_ladder

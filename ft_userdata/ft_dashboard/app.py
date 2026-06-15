@@ -152,7 +152,7 @@ STALE_THRESHOLD_S = 60
 FEE_DUST_PCT = 0.5
 
 
-def compute_booked_pct(amount, amount_requested):
+def compute_booked_pct(amount, amount_requested, nr_successful_entries=None):
     """Fraction of an open position already closed, as a percent (0..100).
 
     Derived from Freqtrade /status: original filled size (`amount_requested`)
@@ -162,11 +162,20 @@ def compute_booked_pct(amount, amount_requested):
     entry hasn't filled — the frontend renders a plain "open" bar then.
 
     NOTE: for a partially-filled limit entry (entry order still live),
-    amount < amount_requested before any TP fill, producing a false
-    booked_pct. Fleet bots use market/limit-in-zone entries that fill
-    near-immediately; guard on nr_of_successful_entries if limit entries
-    with slow fills are ever added.
+    amount < amount_requested before any TP fill, which would produce a false
+    booked_pct. The Killers copy-trader uses limit-in-zone entries (ordertype
+    limit, unfilledtimeout.entry 240min) so this is real, not hypothetical —
+    gated below on `nr_of_successful_entries` (0 until the entry fully fills).
+    Pass it from the call site; omit (default None) to leave the check off.
     """
+    # Entry not yet complete (e.g. a resting/partial limit entry) → booked is
+    # not meaningful yet; report None so the UI shows "100% open", not "booked".
+    if nr_successful_entries is not None:
+        try:
+            if float(nr_successful_entries) < 1:
+                return None
+        except (TypeError, ValueError):
+            return None
     try:
         ar = float(amount_requested) if amount_requested is not None else 0.0
         a = float(amount) if amount is not None else 0.0
@@ -681,7 +690,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
 
     open_trades_out = []
     for t in open_trades:
-        bp = compute_booked_pct(t.get("amount"), t.get("amount_requested"))
+        bp = compute_booked_pct(t.get("amount"), t.get("amount_requested"), t.get("nr_of_successful_entries"))
         row = {
             "trade_id": t.get("trade_id"),
             "pair": t.get("pair"),
