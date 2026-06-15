@@ -707,6 +707,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             "amount_requested": t.get("amount_requested"),
             "booked_pct": bp,
             "riding_pct": (None if bp is None else round(100.0 - bp, 1)),
+            "is_short": t.get("is_short"),
         }
         tp = tp_ladder.get(t.get("trade_id"))
         if tp:
