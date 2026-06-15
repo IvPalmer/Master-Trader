@@ -80,29 +80,19 @@ button { font: inherit; }
   display: flex; align-items: center; gap: 0.6rem;
   font-weight: 600; font-size: 14px; letter-spacing: -0.005em;
 }
-.brand-logo {
-  width: 22px; height: 22px; border-radius: 6px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  display: grid; place-items: center;
-  color: #fff; font-weight: 800; font-size: 12px;
-}
+.brand-logo { width:34px; height:34px; border-radius:10px; display:grid; place-items:center;
+              background:linear-gradient(145deg,#1c2531,#0c1118); color:#fff; font-weight:750; box-shadow:var(--el2); }
 .brand-name { color: var(--text); }
 .brand-name span { color: var(--text-3); font-weight: 400; }
 
 /* C2 fix: LIVE = green. Static dot when green. Pulse only on warn/err. */
-.status-pill {
-  display: inline-flex; align-items: center; gap: 0.5rem;
-  padding: 0.3rem 0.7rem; border-radius: 999px;
-  background: var(--pos-soft); color: var(--pos);
-  font-size: 11px; font-weight: 500;
-  border: 1px solid rgba(5, 150, 105, 0.2);
-}
+.status-pill { display:inline-flex; align-items:center; gap:7px; border-radius:20px; padding:5px 11px;
+               font-size:12px; font-weight:650; background:var(--pos-soft); color:var(--pos); }
 .status-pill.warn { background: var(--warn-soft); color: var(--warn); border-color: rgba(217, 119, 6, 0.2); }
 .status-pill.err  { background: var(--neg-soft); color: var(--neg); border-color: rgba(220, 38, 38, 0.2); }
-.status-pill .dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: currentColor;
-}
+.status-pill .dot { width:8px; height:8px; border-radius:50%; background:currentColor;
+                    animation:beat 2.2s infinite; }
+@keyframes beat { 0%{box-shadow:0 0 0 0 rgba(10,143,91,.5)} 70%{box-shadow:0 0 0 7px rgba(10,143,91,0)} 100%{box-shadow:0 0 0 0 rgba(10,143,91,0)} }
 .status-pill.warn .dot,
 .status-pill.err .dot {
   animation: pulse 2s ease-in-out infinite;
@@ -129,21 +119,13 @@ button { font: inherit; }
 .icon-btn:active { transform: translateY(1px); }
 
 /* ── tabs ──────────────────────────────────────── */
-.tabs {
-  display: flex; gap: 0.25rem; padding: 0 clamp(1rem, 2.5vw, 2rem);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-.tab {
-  padding: 0.85rem 1.25rem; background: none; border: none; cursor: pointer;
-  color: var(--text-3); font-size: 13px; font-weight: 500;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  transition: color 0.15s, border-color 0.15s;
-  display: inline-flex; align-items: center; gap: 0.5rem;
-}
-.tab:hover { color: var(--text-2); }
-.tab.on { color: var(--text); border-bottom-color: var(--accent); }
+.tabs { display:flex; gap:5px; flex-wrap:nowrap; overflow-x:auto; max-width:100%; scrollbar-width:thin;
+        background:var(--surface-3); border:1px solid var(--border); border-radius:12px; padding:4px; }
+.tab  { display:inline-flex; align-items:center; gap:7px; white-space:nowrap; flex:none;
+        border:none; background:transparent; border-radius:var(--r-sm); padding:8px 14px;
+        font-size:13px; font-weight:600; color:var(--text-2); cursor:pointer; transition:.15s; }
+.tab:hover { color:var(--text); }
+.tab.on { background:var(--surface); color:var(--text); box-shadow:var(--el1); }
 .tab .badge {
   font-size: 10px; padding: 0.1rem 0.45rem;
   border-radius: 999px; background: var(--surface-2);
@@ -164,26 +146,16 @@ button { font: inherit; }
 /* ═══════════════════════════════════════════════
    COMMAND BAR — the new incident surface
    ═══════════════════════════════════════════════ */
-.cmd-bar {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  overflow: hidden;
-}
-.cmd-bar.has-incidents {
-  border-color: rgba(220, 38, 38, 0.25);
-  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.08);
-}
+.cmd-bar { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); box-shadow:var(--el2);
+           overflow: hidden; }
+.cmd-bar.has-incidents { box-shadow:var(--el3); border-color:var(--warn-soft); }
 .cmd-bar-head {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.5rem 1rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
 }
-.cmd-bar-title {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--text-3);
-}
+.cmd-bar-title { font-size:11px; font-weight:700; letter-spacing:.13em; text-transform:uppercase; color:var(--warn); }
 .cmd-bar.has-incidents .cmd-bar-title { color: var(--neg); }
 .cmd-bar-clear {
   font-size: 11px; color: var(--text-faint);
@@ -205,11 +177,8 @@ button { font: inherit; }
 .cmd-row.amber .cmd-row-main { background: linear-gradient(90deg, rgba(217,119,6,0.04), transparent 30%); }
 .cmd-row.blue .cmd-row-main  { background: linear-gradient(90deg, rgba(37,99,235,0.04), transparent 30%); }
 
-.cmd-icon {
-  width: 28px; height: 28px; border-radius: 50%;
-  display: grid; place-items: center;
-  font-size: 14px; font-weight: 700; flex-shrink: 0;
-}
+.cmd-icon { width:30px; height:30px; border-radius:var(--r-sm); display:grid; place-items:center;
+            background:var(--warn-soft); color:var(--warn); font-size:14px; font-weight:700; flex-shrink:0; }
 .cmd-icon.red  { color: var(--neg);  background: var(--neg-soft); }
 .cmd-icon.amber { color: var(--warn); background: var(--warn-soft); }
 .cmd-icon.blue  { color: var(--info); background: var(--info-soft); }
@@ -222,15 +191,9 @@ button { font: inherit; }
 .cmd-reason { font-size: 11px; color: var(--text-3); margin-top: 1px; }
 
 .cmd-actions { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
-.cmd-btn {
-  display: inline-flex; align-items: center;
-  padding: 0.25rem 0.6rem; border-radius: 5px;
-  font-size: 11px; font-weight: 500; cursor: pointer;
-  background: var(--surface); border: 1px solid var(--border-soft);
-  color: var(--text-2);
-  transition: all 0.12s;
-  text-decoration: none;
-}
+.cmd-btn { border:1px solid var(--border); background:var(--surface-2); border-radius:8px; padding:6px 11px;
+           font-size:12px; font-weight:600; color:var(--text-2); cursor:pointer;
+           display:inline-flex; align-items:center; transition:all 0.12s; text-decoration:none; }
 .cmd-btn:hover { color: var(--text); border-color: var(--text-3); background: var(--surface-2); }
 .cmd-btn:active { transform: translateY(1px); }
 .cmd-btn-dim { color: var(--text-faint); }
@@ -258,40 +221,24 @@ button { font: inherit; }
 /* ═══════════════════════════════════════════════
    VITALS STRIP — compact fleet numbers
    ═══════════════════════════════════════════════ */
-.vitals-strip {
-  display: flex;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  overflow: hidden;
-  transition: opacity 0.2s;
-}
+.vitals-strip { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--border);
+                border:1px solid var(--border); border-radius:var(--r); overflow:hidden; box-shadow:var(--el2);
+                transition: opacity 0.2s; }
 /* When incidents exist, strip is secondary */
 .vitals-strip.secondary {
   opacity: 0.75;
   filter: saturate(0.7);
 }
-.vital-cell {
-  flex: 1;
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 0.55rem 0.85rem;
-  border-right: 1px solid var(--border);
-  background: transparent; border-top: none; border-bottom: none; border-left: none;
-  cursor: pointer;
-  transition: background 0.12s;
-  text-align: left;
-}
+.vital-cell { background:var(--surface); border:none; border-top:2px solid transparent; padding:14px 16px;
+              text-align:left; cursor:pointer; transition:.15s; }
 .vital-cell:last-child { border-right: none; }
 .vital-cell:hover { background: var(--surface-2); }
 .vital-cell:active { background: var(--surface-3); }
-.vital-label {
-  font-size: 10px; font-weight: 500; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--text-3);
-}
-.vital-val {
-  font-size: 16px; font-weight: 600; color: var(--text);
-  line-height: 1.2;
-}
+.vital-label { display:block; font-size:10.5px; font-weight:650; letter-spacing:.08em; text-transform:uppercase;
+               color:var(--text-3); margin-bottom:7px; }
+.vital-val { font-size:21px; font-weight:700; letter-spacing:-.025em; color:var(--text); line-height:1.2; }
+.vital-cell .vital-val { display:block; font-size:21px; font-weight:700; letter-spacing:-.025em; font-family:var(--font-sans); }
+.vital-cell.accent { border-top-color:var(--accent); }
 .vital-cell.accent .vital-label { color: var(--accent); }
 
 /* ─── last-closed-compact (replaces empty open-positions) ── */
