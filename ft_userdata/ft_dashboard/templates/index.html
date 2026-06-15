@@ -625,7 +625,7 @@
                       <span class="booked-seg" :style="'width:'+ot.booked_pct+'%'" x-text="'booked '+Math.round(ot.booked_pct)+'%'"></span>
                     </template>
                     <span class="ride-seg" :class="(ot.profit_pct||0)<0?'loss':''"
-                          x-text="(ot.booked_pct ?? null)===null ? '100% open' : 'riding '+Math.round(ot.riding_pct)+'%'"></span>
+                          x-text="ot.booked_pct ? 'riding '+Math.round(ot.riding_pct)+'%' : '100% open'"></span>
                   </div>
                   <div class="ot2-foot">
                     <template x-if="ot.tps_total">
@@ -868,7 +868,7 @@
                         <span class="booked-seg" :style="'width:'+ot.booked_pct+'%'" x-text="'booked '+Math.round(ot.booked_pct)+'%'"></span>
                       </template>
                       <span class="ride-seg" :class="(ot.profit_pct||0)<0?'loss':''"
-                            x-text="(ot.booked_pct ?? null)===null ? '100% open' : 'riding '+Math.round(ot.riding_pct)+'%'"></span>
+                            x-text="ot.booked_pct ? 'riding '+Math.round(ot.riding_pct)+'%' : '100% open'"></span>
                     </div>
                     <div class="ot2-foot">
                       <template x-if="ot.tps_total">
