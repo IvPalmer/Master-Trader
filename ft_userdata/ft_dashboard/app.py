@@ -143,6 +143,43 @@ CONCENTRATION_WARN, CONCENTRATION_DANGER = 0.40, 0.50
 # How long since last successful poll before a bot is considered stale.
 STALE_THRESHOLD_S = 60
 
+# Treatment B: a TP fill below this fraction of the position is treated as
+# fee-dust shrinkage, not a real partial exit.
+FEE_DUST_PCT = 0.5
+
+
+def compute_booked_pct(amount, amount_requested):
+    """Fraction of an open position already closed, as a percent (0..100).
+
+    Derived from Freqtrade /status: original filled size (`amount_requested`)
+    vs. what remains (`amount`). Correct ONLY for trades without position
+    adjustment (the Killers copy-trader blocks adjustment; other fleet bots
+    are single-exit). Returns None when the denominator is unknown or the
+    entry hasn't filled — the frontend renders a plain "open" bar then.
+
+    NOTE: for a partially-filled limit entry (entry order still live),
+    amount < amount_requested before any TP fill, producing a false
+    booked_pct. Fleet bots use market/limit-in-zone entries that fill
+    near-immediately; guard on nr_of_successful_entries if limit entries
+    with slow fills are ever added.
+    """
+    try:
+        ar = float(amount_requested) if amount_requested is not None else 0.0
+        a = float(amount) if amount is not None else 0.0
+    except (TypeError, ValueError):
+        return None
+    if ar <= 0 or a <= 0:
+        return None
+    pct = (ar - a) / ar * 100.0
+    if pct < 0:
+        pct = 0.0
+    elif pct > 100:
+        pct = 100.0
+    if pct < FEE_DUST_PCT:
+        pct = 0.0
+    return round(pct, 1)
+
+
 _cache: dict[str, Any] = {
     "last_poll_started_at": None,
     "last_poll_finished_at": None,
@@ -587,8 +624,11 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     no_baseline = bot.get("no_baseline", False)
     baseline = bot.get("baseline") if not no_baseline else None
 
-    open_trades_out = [
-        {
+    open_trades_out = []
+    for t in open_trades:
+        bp = compute_booked_pct(t.get("amount"), t.get("amount_requested"))
+        open_trades_out.append({
+            "trade_id": t.get("trade_id"),
             "pair": t.get("pair"),
             "open_rate": t.get("open_rate"),
             "current_rate": t.get("current_rate"),
@@ -600,9 +640,10 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             "stop_loss_abs": t.get("stop_loss_abs"),
             "stop_loss_pct": t.get("stop_loss_pct"),
             "amount": t.get("amount"),
-        }
-        for t in open_trades
-    ]
+            "amount_requested": t.get("amount_requested"),
+            "booked_pct": bp,
+            "riding_pct": (None if bp is None else round(100.0 - bp, 1)),
+        })
 
     return {
         "key": bot["key"], "name": bot["name"], "label": bot["label"],
