@@ -134,6 +134,9 @@ POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
 REQUEST_TIMEOUT = float(os.environ.get("REQUEST_TIMEOUT", "10"))
 OVERLAYS_DIR = Path(os.environ.get("OVERLAYS_DIR", "/overlays"))
 KILLERS_DB = Path(os.environ.get("KILLERS_DB", "/var/lib/killers/state.sqlite"))
+# Live killers-receiver SQLite (target_orders / positions) — separate DB from
+# the observer state.sqlite above. Empty => TP-ladder pill disabled (bar-only).
+KILLERS_RECEIVER_DB = os.environ.get("KILLERS_RECEIVER_DB", "")
 
 # Phase 5 / Gate constants
 GATE1_TRADES, GATE1_DAYS, GATE1_PAIRS = 30, 14, 5
@@ -181,6 +184,48 @@ def compute_booked_pct(amount, amount_requested):
     if pct < FEE_DUST_PCT:
         pct = 0.0
     return round(pct, 1)
+
+
+def killers_tp_ladder(db_path: str) -> dict[int, dict]:
+    """Map {ft_trade_id: {tps_total, tps_hit, next_tp}} for OPEN killers
+    positions, read from the live receiver.sqlite. Read-only, busy-timeout'd,
+    and fully guarded: any failure (missing/locked DB, query error) returns {}
+    so the caller degrades to a bar-only render and never fails the snapshot.
+    """
+    if not db_path or not Path(db_path).exists():
+        return {}
+    try:
+        conn = _sqlite.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
+        conn.row_factory = _sqlite.Row
+        conn.execute("PRAGMA busy_timeout=2000")
+        rows = conn.execute(
+            "SELECT p.ft_trade_id AS ftid, t.idx AS idx, t.price AS price, t.state AS state "
+            "FROM target_orders t JOIN positions p ON p.pos_id = t.pos_id "
+            "WHERE p.state = 'open' AND p.ft_trade_id IS NOT NULL "
+            "ORDER BY p.ft_trade_id, t.idx ASC"
+        ).fetchall()
+    except _sqlite.Error:
+        return {}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    by_trade: dict[int, list] = {}
+    for r in rows:
+        by_trade.setdefault(int(r["ftid"]), []).append(r)
+    out: dict[int, dict] = {}
+    for ftid, rungs in by_trade.items():
+        active = [x for x in rungs if x["state"] == "active"]
+        pending = [x for x in rungs if x["state"] == "pending"]
+        nxt = (active[0]["price"] if active else
+               pending[0]["price"] if pending else None)
+        out[ftid] = {
+            "tps_total": len(rungs),
+            "tps_hit": sum(1 for x in rungs if x["state"] == "filled"),
+            "next_tp": nxt,
+        }
+    return out
 
 
 _cache: dict[str, Any] = {
@@ -627,10 +672,17 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     no_baseline = bot.get("no_baseline", False)
     baseline = bot.get("baseline") if not no_baseline else None
 
+    tp_ladder = {}
+    if bot.get("key") == "killers-ft" and KILLERS_RECEIVER_DB:
+        try:
+            tp_ladder = killers_tp_ladder(KILLERS_RECEIVER_DB)
+        except Exception:
+            tp_ladder = {}
+
     open_trades_out = []
     for t in open_trades:
         bp = compute_booked_pct(t.get("amount"), t.get("amount_requested"))
-        open_trades_out.append({
+        row = {
             "trade_id": t.get("trade_id"),
             "pair": t.get("pair"),
             "open_rate": t.get("open_rate"),
@@ -646,7 +698,13 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             "amount_requested": t.get("amount_requested"),
             "booked_pct": bp,
             "riding_pct": (None if bp is None else round(100.0 - bp, 1)),
-        })
+        }
+        tp = tp_ladder.get(t.get("trade_id"))
+        if tp:
+            row["tps_total"] = tp["tps_total"]
+            row["tps_hit"] = tp["tps_hit"]
+            row["next_tp"] = tp["next_tp"]
+        open_trades_out.append(row)
 
     return {
         "key": bot["key"], "name": bot["name"], "label": bot["label"],
