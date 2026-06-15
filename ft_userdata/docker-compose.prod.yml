@@ -309,11 +309,15 @@ services:
       POLL_INTERVAL: "30"
       OVERLAYS_DIR: /overlays
       KILLERS_DB: /var/lib/killers/state.sqlite
+      KILLERS_RECEIVER_DB: /var/lib/killers-receiver/receiver.sqlite
     volumes:
       - ./overlays:/overlays:ro
       # killers_bot SQLite (read-only) so the dashboard can render the
       # observer-bot's state alongside the Freqtrade fleet.
       - /home/ubuntu/killers-bot/state.sqlite:/var/lib/killers/state.sqlite:ro
+      # live killers-receiver SQLite (target_orders) — read-only, for the
+      # TP-ladder pill. Distinct path from the observer state.sqlite above.
+      - killers_receiver_state:/var/lib/killers-receiver:ro
     deploy:
       resources:
         limits:

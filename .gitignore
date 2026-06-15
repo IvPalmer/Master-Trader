@@ -117,3 +117,4 @@ research/copier-validation/killers/btc_1h.json
 research/copier-validation/killers/replay_results.json
 research/copier-validation/killers/v2_results_*.json
 research/copier-validation/killers/__pycache__/
+.superpowers/
