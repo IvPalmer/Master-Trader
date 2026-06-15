@@ -614,6 +614,11 @@ function dash() {
             stop_is_posted: stopIsPosted,
             stoploss_pct: t.stop_loss_pct,
             duration_min: openMs ? Math.round((now - openMs) / 60000) : 0,
+            booked_pct: t.booked_pct ?? null,
+            riding_pct: t.riding_pct ?? null,
+            tps_total: t.tps_total ?? null,
+            tps_hit: t.tps_hit ?? null,
+            next_tp: t.next_tp ?? null,
           });
         }
       }

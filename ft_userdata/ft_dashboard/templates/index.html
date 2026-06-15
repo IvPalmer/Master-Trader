@@ -737,6 +737,21 @@
                     x-text="trade.is_open ? 'OPEN' : (trade.exit_reason || '—')">—</span>
             </div>
           </div>
+          <template x-if="trade.is_open">
+            <div class="splitbar" style="margin:0 12px 6px;">
+              <template x-if="trade.booked_pct > 0">
+                <span class="booked-seg" :style="'width:'+trade.booked_pct+'%'" x-text="'booked '+Math.round(trade.booked_pct)+'%'"></span>
+              </template>
+              <span class="ride-seg" :class="(trade.profit_pct||0)<0?'loss':''"
+                    x-text="trade.booked_pct ? 'riding '+Math.round(trade.riding_pct)+'%' : '100% open'"></span>
+            </div>
+          </template>
+          <template x-if="trade.is_open && trade.tps_total">
+            <div style="margin:0 12px 8px;">
+              <span class="pill" :class="trade.tps_hit ? '' : 'zero'"
+                    x-text="trade.tps_hit+' / '+trade.tps_total+' TPs'+(trade.next_tp ? ' · next @ '+fmtRate(trade.next_tp) : '')"></span>
+            </div>
+          </template>
           <div class="trade-card-detail">
             <span>entry <strong x-text="(trade.open_rate||0).toPrecision(5)">—</strong></span>
             <span class="sep">→</span>
