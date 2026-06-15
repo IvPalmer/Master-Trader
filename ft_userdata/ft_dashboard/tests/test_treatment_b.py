@@ -27,3 +27,12 @@ def test_amount_exceeds_requested_clamps_zero():
 
 def test_garbage_is_none():
     assert compute_booked_pct("x", "y") is None
+
+def test_nan_inputs_is_none():
+    assert compute_booked_pct(float("nan"), 1.0) is None
+    assert compute_booked_pct(1.0, float("nan")) is None
+    assert compute_booked_pct("nan", "1.0") is None
+
+def test_inf_inputs_is_none():
+    assert compute_booked_pct(1.0, float("inf")) is None
+    assert compute_booked_pct(float("inf"), 1.0) is None

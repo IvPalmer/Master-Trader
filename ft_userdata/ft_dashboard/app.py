@@ -20,6 +20,7 @@ import asyncio
 import csv
 import json
 import logging
+import math
 import os
 import re
 import time
@@ -143,7 +144,7 @@ CONCENTRATION_WARN, CONCENTRATION_DANGER = 0.40, 0.50
 # How long since last successful poll before a bot is considered stale.
 STALE_THRESHOLD_S = 60
 
-# Treatment B: a TP fill below this fraction of the position is treated as
+# Treatment B: a TP fill below this percent of the position is treated as
 # fee-dust shrinkage, not a real partial exit.
 FEE_DUST_PCT = 0.5
 
@@ -167,6 +168,8 @@ def compute_booked_pct(amount, amount_requested):
         ar = float(amount_requested) if amount_requested is not None else 0.0
         a = float(amount) if amount is not None else 0.0
     except (TypeError, ValueError):
+        return None
+    if not math.isfinite(a) or not math.isfinite(ar):
         return None
     if ar <= 0 or a <= 0:
         return None
