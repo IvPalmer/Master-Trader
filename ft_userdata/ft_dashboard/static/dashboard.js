@@ -8,24 +8,24 @@
  *  - chart-equity-<k> per-bot dry-run equity overlay
  */
 
-// Bug fix B7: re-derive palette from CSS tokens, not the old dark-theme constants
+// Palette mirrors styles.css tokens so charts match the page.
 const COLORS = {
-  surface:  '#fcfcfa',
-  surface2: '#f1efe8',
-  text:     '#0c121b',
-  text2:    '#475569',
-  text3:    '#64748b',
-  border:   '#ddd9cf',
-  hairline: 'rgba(15, 23, 42, 0.08)',
-  accent:   '#0891b2',
-  pos:      '#059669',
-  neg:      '#dc2626',
-  warn:     '#d97706',
-  info:     '#2563eb',
+  surface:  '#fffefb',
+  surface2: '#f7f5ed',
+  text:     '#12171f',
+  text2:    '#56606e',
+  text3:    '#9098a4',
+  border:   '#e7e3d6',
+  hairline: '#efece1',
+  accent:   '#0e87a3',
+  pos:      '#0a8f5b',
+  neg:      '#d2473a',
+  warn:     '#b07a16',
+  info:     '#0e87a3',
 };
 
 const ECHART_COMMON = {
-  textStyle: { fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 11, color: COLORS.text3 },
+  textStyle: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, color: COLORS.text3 },
   backgroundColor: 'transparent',
   grid: { left: 50, right: 18, top: 28, bottom: 30, containLabel: false },
   axisPointer: { lineStyle: { color: COLORS.border, width: 1 } },
@@ -788,7 +788,7 @@ function dash() {
           type: 'slider', xAxisIndex: 0,
           startValue: visibleStart, endValue: visibleEnd,
           height: 22, bottom: 12,
-          backgroundColor: COLORS.surface2, fillerColor: 'rgba(8, 145, 178, 0.12)',
+          backgroundColor: COLORS.surface2, fillerColor: 'rgba(14, 135, 163, 0.12)',
           borderColor: COLORS.border, handleSize: '120%',
           handleStyle: { color: COLORS.accent, borderColor: COLORS.accent },
           textStyle: { color: COLORS.text3, fontSize: 9 },
@@ -808,18 +808,18 @@ function dash() {
                 lineStyle: { color: COLORS.text2, type: 'solid', width: 1, opacity: 0.8 },
                 label: { show: true, formatter: 'entry ' + (trade.open_rate||0).toPrecision(5),
                          position: 'insideStartTop', color: COLORS.text2, fontSize: 10, padding: [2, 4],
-                         backgroundColor: 'rgba(252,252,250,0.9)', borderRadius: 2, borderColor: COLORS.border, borderWidth: 1 } },
+                         backgroundColor: 'rgba(255,254,251,0.9)', borderRadius: 2, borderColor: COLORS.border, borderWidth: 1 } },
               { yAxis: trade.close_rate,
                 lineStyle: { color: winColor, type: 'solid', width: 1, opacity: 0.8 },
                 label: { show: true, formatter: (trade.is_open ? 'now ' : (trade.is_win ? 'roi ' : 'sl ')) + (trade.close_rate||0).toPrecision(5),
                          position: 'insideEndTop', color: winColor, fontSize: 10, padding: [2, 4],
-                         backgroundColor: 'rgba(252,252,250,0.9)', borderRadius: 2, borderColor: winColor, borderWidth: 1 } },
+                         backgroundColor: 'rgba(255,254,251,0.9)', borderRadius: 2, borderColor: winColor, borderWidth: 1 } },
               ...(trade.stop_rate ? [{
                 yAxis: trade.stop_rate,
                 lineStyle: { color: COLORS.neg, type: 'dashed', width: 1, opacity: 0.35 },
                 label: { show: true, formatter: (trade.is_open ? (trade.stop_is_posted ? 'SL ' : 'stop ') + (trade.stop_rate||0).toPrecision(5) : 'stop ' + (trade.stoploss_pct||0).toFixed(1) + '%'),
                          position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, padding: [2, 4],
-                         backgroundColor: 'rgba(252,252,250,0.9)', borderRadius: 2, opacity: 0.8 },
+                         backgroundColor: 'rgba(255,254,251,0.9)', borderRadius: 2, opacity: 0.8 },
               }] : []),
             ],
           },
@@ -947,7 +947,7 @@ function dash() {
           { name: 'live equity', type: 'line', data: live, smooth: false, showSymbol: false,
             lineStyle: { color: COLORS.accent, width: 2 },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(8, 145, 178, 0.18)' }, { offset: 1, color: 'rgba(8, 145, 178, 0.0)' },
+              { offset: 0, color: 'rgba(14, 135, 163, 0.18)' }, { offset: 1, color: 'rgba(14, 135, 163, 0.0)' },
             ]) },
             itemStyle: { color: COLORS.accent },
             markPoint: {
@@ -991,18 +991,18 @@ function dash() {
           type: 'line', data: dd, showSymbol: false,
           lineStyle: { color: COLORS.neg, width: 1.5 },
           areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(220, 38, 38, 0.0)' }, { offset: 1, color: 'rgba(220, 38, 38, 0.22)' },
+            { offset: 0, color: 'rgba(210, 71, 58, 0.0)' }, { offset: 1, color: 'rgba(210, 71, 58, 0.22)' },
           ]) },
           markLine: {
             silent: true, symbol: 'none',
             data: [
               { yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 },
                 label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%',
-                         color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(252,252,250,0.9)', padding: [2,4], borderRadius: 2 } },
+                         color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2,4], borderRadius: 2 } },
               { yAxis: -(bot?.baseline?.max_dd_pct || 0),
                 lineStyle: { color: COLORS.text3, type: 'dotted', width: 1, opacity: 0.6 },
                 label: { show: true, position: 'insideEndBottom', formatter: 'backtest ' + (-(bot?.baseline?.max_dd_pct || 0)).toFixed(1) + '%',
-                         color: COLORS.text3, fontSize: 10, backgroundColor: 'rgba(252,252,250,0.9)', padding: [2,4], borderRadius: 2 } },
+                         color: COLORS.text3, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2,4], borderRadius: 2 } },
             ],
           },
         }],
@@ -1042,7 +1042,7 @@ function dash() {
         series: [{
           type: 'bar', data: [...pnls].reverse(),
           itemStyle: { color: p => Number(p.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] },
-          label: { show: true, position: 'right', formatter: p => '$' + Number(p.value).toFixed(2), color: COLORS.text2, fontSize: 10, fontFamily: 'JetBrains Mono' },
+          label: { show: true, position: 'right', formatter: p => '$' + Number(p.value).toFixed(2), color: COLORS.text2, fontSize: 10, fontFamily: '"Inter", system-ui, sans-serif' },
           barWidth: 14,
         }],
       }, true);
@@ -1084,10 +1084,10 @@ function dash() {
 
         const areas = [];
         if (entry != null && stop != null) {
-          areas.push([{ yAxis: stop, itemStyle: { color: 'rgba(220, 38, 38, 0.08)' } }, { yAxis: entry }]);
+          areas.push([{ yAxis: stop, itemStyle: { color: 'rgba(210, 71, 58, 0.08)' } }, { yAxis: entry }]);
         }
         if (entry != null && entry < yMax) {
-          areas.push([{ yAxis: entry, itemStyle: { color: 'rgba(5, 150, 105, 0.07)' } }, { yAxis: yMax }]);
+          areas.push([{ yAxis: entry, itemStyle: { color: 'rgba(10, 143, 91, 0.07)' } }, { yAxis: yMax }]);
         }
 
         // Bug fix B5: use actual stoploss from bot baseline
@@ -1096,8 +1096,8 @@ function dash() {
 
         const lines = [];
         const baseLabel = {
-          show: true, fontSize: 10, fontFamily: 'JetBrains Mono',
-          backgroundColor: 'rgba(252, 252, 250, 0.92)',
+          show: true, fontSize: 10, fontFamily: '"Inter", system-ui, sans-serif',
+          backgroundColor: 'rgba(255, 254, 251, 0.92)',
           padding: [3, 6], borderRadius: 2, borderWidth: 1,
         };
         if (entry != null) {
@@ -1159,7 +1159,7 @@ function dash() {
           { name: 'backtest expected', type: 'line', data: expected, showSymbol: false, lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.2 } },
           { name: 'live equity', type: 'line', data: live, showSymbol: false,
             lineStyle: { color: COLORS.info, width: 2 },
-            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(37, 99, 235, 0.18)' }, { offset: 1, color: 'rgba(37, 99, 235, 0.0)' }]) } },
+            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14, 135, 163, 0.18)' }, { offset: 1, color: 'rgba(14, 135, 163, 0.0)' }]) } },
         ],
       }, true);
     },
@@ -1196,7 +1196,7 @@ function dash() {
             { name: 'backtest expected', type: 'line', data: expected, showSymbol: false, lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.2 } },
             { name: 'live equity', type: 'line', data: live, showSymbol: false,
               lineStyle: { color: COLORS.info, width: 2 },
-              areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(37,99,235,0.18)' }, { offset: 1, color: 'rgba(37,99,235,0)' }]) } },
+              areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14,135,163,0.18)' }, { offset: 1, color: 'rgba(14,135,163,0)' }]) } },
           ],
         }, true);
       }
@@ -1214,8 +1214,8 @@ function dash() {
           series: [{
             type: 'line', data: dd, showSymbol: false,
             lineStyle: { color: COLORS.neg, width: 1.5 },
-            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(220,38,38,0)' }, { offset: 1, color: 'rgba(220,38,38,0.22)' }]) },
-            markLine: { silent: true, symbol: 'none', data: [{ yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%', color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(252,252,250,0.9)', padding: [2, 4], borderRadius: 2 } }] },
+            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(210,71,58,0)' }, { offset: 1, color: 'rgba(210,71,58,0.22)' }]) },
+            markLine: { silent: true, symbol: 'none', data: [{ yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%', color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2, 4], borderRadius: 2 } }] },
           }],
         }, true);
       }
@@ -1231,7 +1231,7 @@ function dash() {
           grid: { left: 70, right: 50, top: 12, bottom: 24 },
           xAxis: { type: 'value', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.5 } } },
           yAxis: { type: 'category', data: [...pairs].reverse(), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text2, fontSize: 11, formatter: v => String(v).split('/')[0] } },
-          series: [{ type: 'bar', data: [...pnls].reverse(), itemStyle: { color: p => Number(p.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] }, label: { show: true, position: 'right', formatter: p => '$' + Number(p.value).toFixed(2), color: COLORS.text2, fontSize: 10, fontFamily: 'JetBrains Mono' }, barWidth: 12 }],
+          series: [{ type: 'bar', data: [...pnls].reverse(), itemStyle: { color: p => Number(p.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] }, label: { show: true, position: 'right', formatter: p => '$' + Number(p.value).toFixed(2), color: COLORS.text2, fontSize: 10, fontFamily: '"Inter", system-ui, sans-serif' }, barWidth: 12 }],
         }, true);
       }
     },
