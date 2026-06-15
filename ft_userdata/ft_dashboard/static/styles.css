@@ -631,14 +631,6 @@ button { font: inherit; }
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 6px; border-left: 3px solid var(--accent);
 }
-.open-trade-row { display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0; border-bottom: 1px solid var(--hairline); font-size: 12px; }
-.open-trade-row:last-child { border-bottom: none; }
-.open-trade-pair { font-family: var(--font-mono); font-weight: 600; color: var(--text); min-width: 7rem; }
-.open-trade-progress { flex: 1; height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
-.open-trade-bar { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.3s; }
-.open-trade-bar.neg { background: var(--neg); }
-.open-trade-meta { color: var(--text-3); font-size: 11px; font-family: var(--font-mono); text-align: right; min-width: 6rem; }
-
 /* ── empty / loading ───────────────────────────── */
 .empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 34px 16px;
          color: var(--text-3); font-size: 14px; }

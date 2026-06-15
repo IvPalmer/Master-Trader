@@ -395,15 +395,9 @@ function dash() {
 
     openTradesForBot(bot) {
       return (bot.open_trades || []).map(t => {
-        const targetPct = bot.baseline?.roi_ladder?.[0] ?? 8;
-        // Bug fix B5: use actual stoploss from baseline, not hardcoded -5
-        const stopPct = Math.abs(bot.baseline?.stoploss ?? 5);
-        const currentPct = t.profit_pct ?? 0;
-        const totalRange = targetPct + stopPct;
-        const progress = totalRange > 0 ? Math.max(0, Math.min(100, ((currentPct + stopPct) / totalRange) * 100)) : 50;
         // Bug fix B3: use toMs() for age calculation
         const ageMin = t.open_timestamp ? Math.round((Date.now() - toMs(t.open_timestamp)) / 60000) : 0;
-        return { ...t, progress, ageMin, targetPct, stopPct };
+        return { ...t, ageMin };
       });
     },
 
