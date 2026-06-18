@@ -200,6 +200,9 @@ services:
       - dokploy-network
     environment:
       KILLERS_FT_BASE_URL: http://ft-insiders-scalp:8080
+      # Tag logs + Telegram alerts as insiders-scalp (not the killers default)
+      # so Dennis-channel skips don't masquerade as the live Killers bot.
+      KILLERS_BOT_LABEL: insiders-scalp
       KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
       KILLERS_DB: /var/lib/killers/receiver.sqlite
