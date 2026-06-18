@@ -21,6 +21,11 @@ Env vars:
   KILLERS_STAKE_USD         per-trade stake (default 20 — gives ~10 concurrent on $200)
   KILLERS_LEVERAGE          default leverage (default 5)
   KILLERS_MAX_OPEN          guardrail (default 10, matches max_open_trades)
+  KILLERS_BOT_LABEL         instance identity. When set, drives BOTH the logger
+                            name and the Telegram-alert prefix. When unset (or
+                            empty) each keeps its legacy default: logger
+                            "killers-receiver", alert "[killers-scalp]". The
+                            insiders forward-measurement instance sets "insiders-scalp".
 """
 from __future__ import annotations
 
@@ -42,7 +47,12 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s | %(message)s",
 )
-logger = logging.getLogger("killers-receiver")
+# Per-instance identity. The SAME image (killers-receiver:latest) runs as both
+# the live Killers copy-trader AND the Insiders/Dennis forward-measurement
+# instance. KILLERS_BOT_LABEL lets the insiders instance tag its logs and
+# Telegram alerts as "insiders-scalp" instead of masquerading as the Killers
+# bot. Unset → legacy defaults (logger "killers-receiver", alert "[killers-scalp]").
+logger = logging.getLogger(os.environ.get("KILLERS_BOT_LABEL") or "killers-receiver")
 
 
 # ── Config ─────────────────────────────────────────────────────────────────
@@ -61,6 +71,11 @@ class Config:
         self.stake_usd = float(os.environ.get("KILLERS_STAKE_USD", "20"))
         self.leverage = float(os.environ.get("KILLERS_LEVERAGE", "5"))
         self.max_open = int(os.environ.get("KILLERS_MAX_OPEN", "10"))
+        # Telegram-alert prefix identity (see logger note above). Default keeps
+        # the Killers tag; the insiders instance sets KILLERS_BOT_LABEL=insiders-scalp.
+        # `or` (not a default arg) so an empty string falls back too — matches
+        # the logger's empty-string handling and avoids "[]" alert prefixes.
+        self.bot_label = os.environ.get("KILLERS_BOT_LABEL") or "killers-scalp"
         # Where to ping for human-readable Telegram alerts. trade-webhook
         # already proxies to @elder_brain_bot; reusing its /test/notify keeps
         # one Telegram code path for the whole fleet. Empty string disables.
@@ -1749,7 +1764,7 @@ async def _notify_telegram(cfg: Config, text: str, session=None) -> None:
         logger.warning("telegram notify failed: %s", e)
 
 
-def _format_event_summary(payload: EventPayload, result: dict) -> Optional[str]:
+def _format_event_summary(cfg: Config, payload: EventPayload, result: dict) -> Optional[str]:
     """Compose a single-line Telegram-friendly summary, or None to skip.
 
     Keep it tight — feed reader will see this in @elder_brain_bot.
@@ -1769,7 +1784,7 @@ def _format_event_summary(payload: EventPayload, result: dict) -> Optional[str]:
     if action == "deduped":
         return None
 
-    head = "[killers-scalp]"
+    head = f"[{cfg.bot_label}]"
     if action == "force_enter":
         pos = result.get("pos_id", "?")
         ft  = (result.get("ft") or {}).get("status", "?")
@@ -1852,7 +1867,7 @@ async def handle_event(payload: EventPayload):
 
     _ingress_log_finish(conn, ingress_id, result, 200)
 
-    text = _format_event_summary(payload, result)
+    text = _format_event_summary(cfg, payload, result)
     _dedup_msg_id = payload.msg.get("id") if isinstance(payload.msg, dict) else None
     if text and _dedup_msg_id is not None and _dedup_msg_id in _notified_msg_ids:
         # Observer redelivery of the same message — already alerted; suppress repeat.

@@ -235,6 +235,14 @@ class _StubPayload:
         self.classification = classification
 
 
+class _StubCfg:
+    """_format_event_summary only reads cfg.bot_label."""
+    bot_label = "killers-scalp"
+
+
+_CFG = _StubCfg()
+
+
 def _open_cls():
     return {"kind": "open", "symbol": "HYPE", "direction": "LONG",
             "signal_id": 2144}
@@ -248,7 +256,7 @@ def test_alert_open_no_tps_crossed():
         "signal_targets": [59.5, 62.0, 65.0, 68.0],
         "remaining_targets": [59.5, 62.0, 65.0, 68.0],
     }
-    s = _format_event_summary(payload, result)
+    s = _format_event_summary(_CFG, payload, result)
     assert "📈" in s
     assert "OPEN" in s
     assert "HYPE" in s
@@ -265,7 +273,7 @@ def test_alert_open_some_tps_crossed():
         "signal_targets": [59.5, 62.0, 65.0, 68.0, 72.0, 77.0, 83.0, 90.0],
         "remaining_targets": [68.0, 72.0, 77.0, 83.0, 90.0],
     }
-    s = _format_event_summary(payload, result)
+    s = _format_event_summary(_CFG, payload, result)
     assert "3/8 TPs crossed" in s
     assert "next=68" in s
 
@@ -276,7 +284,7 @@ def test_alert_open_no_targets_parsed():
     result = {"action": "force_enter", "pos_id": 1,
               "ft": {"status": 200},
               "signal_targets": [], "remaining_targets": []}
-    s = _format_event_summary(payload, result)
+    s = _format_event_summary(_CFG, payload, result)
     assert "TPs" not in s
     assert "📈" in s and "OPEN" in s
 
@@ -286,7 +294,7 @@ def test_alert_all_targets_crossed_skip():
     result = {"action": "skipped", "reason": "all_targets_crossed",
               "mark": 95.0,
               "signal_targets": [59.5, 90.0]}
-    s = _format_event_summary(payload, result)
+    s = _format_event_summary(_CFG, payload, result)
     assert "🚫" in s
     assert "SKIPPED" in s
     assert "all TPs already crossed" in s
@@ -301,9 +309,51 @@ def test_alert_mark_fetch_failed_skip_uses_generic_format():
     result = {"action": "skipped",
               "reason": "mark_fetch_failed (target guard fail-closed)",
               "signal_targets": [59.5, 90.0]}
-    s = _format_event_summary(payload, result)
+    s = _format_event_summary(_CFG, payload, result)
     assert "⏭" in s  # generic skipped emoji
     assert "mark_fetch_failed" in s
+
+
+def test_alert_prefix_uses_default_bot_label():
+    """Unset KILLERS_BOT_LABEL → alerts keep the legacy [killers-scalp] tag."""
+    payload = _StubPayload(_open_cls())
+    result = {"action": "skipped", "reason": "entry_bounds_missing",
+              "max_slippage_pct": 3.0}
+    s = _format_event_summary(_StubCfg(), payload, result)
+    assert "[killers-scalp]" in s
+    assert "[insiders-scalp]" not in s
+
+
+def test_alert_prefix_follows_bot_label_override():
+    """Insiders instance sets bot_label=insiders-scalp → alerts must NOT
+    masquerade as the live Killers bot (the mislabel bug)."""
+    class _InsidersCfg:
+        bot_label = "insiders-scalp"
+    payload = _StubPayload(_open_cls())
+    result = {"action": "skipped", "reason": "entry_bounds_missing",
+              "max_slippage_pct": 3.0}
+    s = _format_event_summary(_InsidersCfg(), payload, result)
+    assert "[insiders-scalp]" in s
+    assert "[killers-scalp]" not in s
+
+
+def test_config_bot_label_env_driven():
+    """Config.bot_label reads KILLERS_BOT_LABEL, defaulting to killers-scalp."""
+    import os
+    from app.main import Config
+    saved = os.environ.get("KILLERS_BOT_LABEL")
+    try:
+        os.environ.pop("KILLERS_BOT_LABEL", None)
+        assert Config().bot_label == "killers-scalp"
+        os.environ["KILLERS_BOT_LABEL"] = "insiders-scalp"
+        assert Config().bot_label == "insiders-scalp"
+        os.environ["KILLERS_BOT_LABEL"] = ""  # empty → falls back, no "[]" tag
+        assert Config().bot_label == "killers-scalp"
+    finally:
+        if saved is None:
+            os.environ.pop("KILLERS_BOT_LABEL", None)
+        else:
+            os.environ["KILLERS_BOT_LABEL"] = saved
 
 
 if __name__ == "__main__":
