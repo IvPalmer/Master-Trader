@@ -136,7 +136,9 @@ def test_system_endpoint():
         r = client.get("/system")
     assert r.status_code == 200
     body = r.json()
-    assert body["instance"] == "killers"
+    # instance now mirrors the bot_label identity (KILLERS_BOT_LABEL); default
+    # instance keeps the killers-scalp tag, insiders sets insiders-scalp.
+    assert body["instance"] == "killers-scalp"
     assert body["active_positions_count"] == 0
 
 

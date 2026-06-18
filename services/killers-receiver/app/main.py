@@ -1534,6 +1534,7 @@ async def system_state():
     """Operator dashboard summary. `pending_events_count` non-zero means
     one or more partial-closes crashed mid-flight; check /events/pending."""
     conn: sqlite3.Connection = app.state.conn
+    cfg: Config = app.state.cfg
     open_count = conn.execute(
         "SELECT COUNT(*) FROM positions WHERE state IN ('open', 'requested')"
     ).fetchone()[0]
@@ -1557,7 +1558,7 @@ async def system_state():
         except Exception:
             pass
     return {
-        "instance": "killers",
+        "instance": cfg.bot_label,
         "active_positions_count": open_count,
         "pending_events_count": pending,
         "oldest_pending_age_sec": oldest_age_sec,
