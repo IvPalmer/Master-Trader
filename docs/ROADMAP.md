@@ -2,15 +2,13 @@
 goal: Grow crypto trading capital through evidence-gated Freqtrade bots without blowing up.
 owner: operator
 lead: master-trader-lead
-status: draft
-next: Run a read-only live gate audit from the VPS DB/dashboard and record FundingFade trade count, FF gate-v2 status, Cascade gate status, Keltner activation gates, and backup receipts in docs/.
-decisions_needed:
-  - "Classifier cost path: model downgrade, dedup/cache, local 7B structured classifier, Gemini fallback, and whether Claude remains audit-only."
-  - "FundingFade gate-v2 outcome: continue, rollback, or demote at >=30 closed trades or the 2026-08-17 review."
-  - "Keltner live promotion: require all activation gates green for 3 consecutive days plus operator acknowledgement; no auto-flip."
-  - "Hyperliquid ShortKeltner path: testnet-only plumbing versus one forced $20 mainnet micro-trade with operator-owned keys and stop-fill verification."
+status: active
+next: Run a read-only live gate audit from the VPS DB/dashboard and record FundingFade trade count, FF
+  gate-v2 status, Cascade gate status, Keltner activation gates, and backup receipts in docs/.
+decisions_needed: []
 blocked_by:
-  - "Operator approval for any strategy promotion, live-bot deployment, key change, or fund movement."
+- Operator approval required for ANY live switch, strategy promotion, key change, or fund movement (standing
+  D1).
 ---
 
 ## Open tasks
@@ -33,6 +31,12 @@ The VPS docs place the live stack under `/home/ubuntu/master-trader/`, with `ft-
 Fleet records say `ft-funding-fade` is live with real money and a 19-pair static whitelist; `trade-webhook` feeds `/srv/lake/raw/trades/` and Telegram; Grafana is gated at `master-trader.grooveops.dev`.
 The 2026-07-03 restore drill restored the master-trader SQLite artifact with `integrity_check: ok`; the drill noted 17 trades and did not prove a full scratch-VM rebuild.
 Recent git history is mostly dashboard and receiver work, including open-trade display, TP-ladder enrichment, and receiver bot-label fixes.
+
+## Decisions (2026-07-04, HQ with operator veto)
+
+- **D1 NO LIVE SWITCHES (operator, standing):** Keltner does NOT go live regardless of gate status; Hyperliquid stays testnet-only plumbing (no mainnet micro-trade). Both frozen until the operator explicitly changes this posture in writing.
+- **D2 Classifier cost:** dedup-cache + downgrade to haiku first (it's pure classification with likely duplicate inputs; both changes are reversible and stack). Local-7B deferred — infra-heavy for the savings left after caching. Claude stays audit-only.
+- **D3 FundingFade gate-v2:** review trigger confirmed — ≥30 closed trades or 2026-08-17, whichever first.
 
 ## Path forward
 
