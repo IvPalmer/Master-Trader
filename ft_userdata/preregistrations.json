@@ -199,7 +199,7 @@
   {
    "id": "listing-reaction-study-2026-07",
    "bot": null,
-   "status": "open",
+   "status": "closed",
    "registered": "2026-07-13",
    "hypothesis": "Binance listing announcements move the announced token within minutes; a retail bot reacting at t+60s (our TG/announcement extraction infra) captures part of the move on venues where the token already trades (HL perp or Binance spot)",
    "method": "Collect 12-24mo of Binance listing/Will-List announcements (announcement CMS API); for each announced token tradable at announcement time (HL perp preferred, else Binance spot), measure net return paths: entry t+60s taker, exits at three FIXED horizons {+30min, +4h, +24h}; fees HL taker 4.5bps or Binance spot 7.5bps per side; report full distribution, both sample halves, per-venue",
@@ -209,7 +209,10 @@
     "effect not concentrated: top-decile events < 60% of total"
    ],
    "kill": "criteria fail -> lane closed; passing authorizes a reaction-bot design study (execution latency measurement) only",
-   "notes": "Measurement of a documented effect at fixed horizons \u2014 not a sweep. Announcement TIMESTAMP fidelity is critical: use CMS publish time; flag any event where listing trade-open predates announcement."
+   "notes": "Measurement of a documented effect at fixed horizons \u2014 not a sweep. Announcement TIMESTAMP fidelity is critical: use CMS publish time; flag any event where listing trade-open predates announcement.",
+   "closed": "2026-07-13",
+   "resolution": "FAIL all 3 criteria at +4h (n=51 leak-excluded events, 24mo): median \u22122.10%, halves \u22123.43%/\u22121.22%, top-decile 73% concentration. Long-reaction lane CLOSED. HL venue inconclusive-by-data (1m retention ~3-5 days). Measured set = futures-listing announcements for already-spot-listed tokens; buying them is systematically NEGATIVE (\u22127.01% median at +24h, 27.5% positive).",
+   "forward_hypothesis_recorded": "INVERTED effect: shorting futures-listing announcements (literature-consistent \u2014 derivative listing enables shorts, overpricing corrects). MUST NOT be validated on this sample (discovered here). If pursued: new prereg, FORWARD events only, venue = HL perp where available (Binance futures CVM-blocked). Execution note: our TG/announcement infra can react in seconds; effect persists 24h so latency is not critical."
   }
  ]
 }
