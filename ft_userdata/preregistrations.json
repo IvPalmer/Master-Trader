@@ -145,6 +145,20 @@
     "minimum evidence: >=5 closed paper episodes OR >=300 active position-hours by review, else shadow CONTINUES (inconclusive, not fail)"
    ],
    "notes": "Codex-amended (8 points, thread 019f598a). Pilot notional $1000x3 = mechanism validation, not P&L; scaling is a separate operator decision. Depth capture included so scale claims are testable later."
+  },
+  {
+   "id": "killers-fill-realism-2026-07",
+   "bot": "KillersScalpV1",
+   "status": "open",
+   "registered": "2026-07-13",
+   "context": "Operator reports dry record ~+20% P&L with high WR. Historical verdict (2026-05-28/06-06): channel unprofitable at REAL prices, edge dies at fill, do-not-fund. Dry-run grants limit fills at touch = optimistic. This audit re-prices the forward dry record under executable-fill rules.",
+   "method": "Per dry fill (entries, TP-ladder partials): fetch Binance futures 1m klines for the window; STRICT scenario = limit fill counts at posted price only if 1m price strictly trades through (long entry L: low < L; short/TP sells: high > TP); TOUCH scenario = touch counts (current dry behavior, upper bound). SL/market exits re-priced taker with 0.05% adverse slippage. Recompute P&L/WR/DD per scenario over the full dry period.",
+   "frozen_verdict_rule": [
+    "STRICT re-priced P&L >= +10% over the dry period AND WR >= 55% -> forward record contradicts historical validation -> open a separate preregistered tuning study (still dry; funding remains a distinct later decision)",
+    "STRICT re-priced P&L <= 0 -> dry-run fill optimism confirmed forward; do-not-fund RECONFIRMED; no tuning study",
+    "0 < STRICT P&L < +10% -> inconclusive; continue measuring, no tuning, revisit at next review"
+   ],
+   "notes": "Rule committed BEFORE the fill decomposition is computed. Insiders bot audited with same method, reported informationally (no frozen rule \u2014 smaller record)."
   }
  ]
 }
