@@ -250,8 +250,15 @@ services:
           if [ "$$attempt" -gt 3 ]; then
             echo "[funding-refresh] all 3 retries failed; will retry next cycle"
           fi
-          echo "[funding-refresh] $$(date -u +%FT%TZ) sleeping 4h"
-          sleep 14400
+          # Hourly at :10, aligned to funding events (00:00/08:00/16:00 UTC).
+          # A drifted 4h grid let bots trade on ~10h-old funding (ADA 2026-07-11
+          # entered on a signal the fresh event had already invalidated).
+          # Hourly caps staleness at ~70min past any event.
+          now=$$(date -u +%s)
+          slot=$$(( now / 3600 * 3600 + 600 ))
+          if [ "$$now" -ge "$$slot" ]; then slot=$$(( slot + 3600 )); fi
+          echo "[funding-refresh] $$(date -u +%FT%TZ) sleeping until next :10 ($$(( slot - now ))s)"
+          sleep $$(( slot - now ))
         done
   metrics-exporter:
     build:

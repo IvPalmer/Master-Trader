@@ -43,7 +43,7 @@ Operational dependencies (gate v2):
   - BTC informative 1h history (Freqtrade fetches via @informative decorator
     using `startup_candle_count = 720`). Partial data → `btc_history_ok` False
     → all entries BLOCKED for affected bars.
-  - BTC_USDT-funding.feather refreshed daily by ft-funding-refresh service
+  - BTC_USDT-funding.feather refreshed hourly at :10 by ft-funding-refresh service
     (cron in docker-compose.prod.yml). Missing or stale → fail-closed
     (all entries blocked, ERROR log every 4h).
   - Per-pair funding feathers used by the original signal (unchanged behavior).
@@ -54,7 +54,7 @@ Alerting:
     but last funding event is >24h behind the bar being evaluated)
   - Log line "BTC funding load failed" → investigate
   - Log line "BTC 30d funding mean loaded" → normal startup
-  - Cron freshness: ft-funding-refresh runs every 4h; if last log >8h old,
+  - Cron freshness: ft-funding-refresh runs hourly at :10; if last log >2h old,
     investigate.
 """
 
@@ -127,8 +127,8 @@ class FundingFadeV1(IStrategy):
     _btc_funding_30d_mtime_ns = 0
 
     # Max age of the BTC funding feather before the regime gate fail-closes.
-    # Funding posts every 8h and ft-funding-refresh runs every 4h, so 24h stale
-    # means ≥3 missed funding events / ≥6 missed cron runs — the file is dead,
+    # Funding posts every 8h and ft-funding-refresh runs hourly, so 24h stale
+    # means ≥3 missed funding events / ≥24 missed cron runs — the file is dead,
     # not late. Per-pair staleness warns at 12h (_STALE_FUNDING_HOURS) without
     # blocking; the macro gate is a risk control and must not run on dead data.
     _BTC_FUNDING_MAX_AGE_H = 24
@@ -346,10 +346,11 @@ class FundingFadeV1(IStrategy):
             logger.warning("Funding load failed for %s: %s — will retry next bar", pair, e)
             return pd.Series(np.nan, index=dataframe.index)
 
-    # Binance publishes every 8h (00/08/16 UTC). With a 4h incremental cron,
-    # healthy staleness-at-signal-time ≤ 5h (4h cron + 1h candle). A threshold of
-    # 12h catches (a) a missed cron run, (b) a silent download failure, (c) the
-    # end-time/day-boundary bug in the downloader, well before 24h stale.
+    # Binance publishes every 8h (00/08/16 UTC). With the hourly :10 cron,
+    # healthy staleness-at-signal-time ≤ ~9.2h (8h event cadence + ~70min fetch
+    # lag). A threshold of 12h catches (a) missed cron runs, (b) a silent
+    # download failure, (c) the end-time/day-boundary bug in the downloader,
+    # well before 24h stale.
     _STALE_FUNDING_HOURS = 12
 
     def _warn_if_funding_stale(self, pair: str, dataframe: DataFrame) -> None:
