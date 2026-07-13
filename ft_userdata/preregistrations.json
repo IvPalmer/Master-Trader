@@ -89,7 +89,7 @@
   {
    "id": "hl-carry-study-2026-07",
    "bot": null,
-   "status": "open",
+   "status": "phase1-closed",
    "registered": "2026-07-13",
    "codex_verdict": "APPROVED round-2 (thread 019f598a), 2 amendments incorporated",
    "hypothesis": "Persistently positive HL hourly funding is capturable delta-neutral: short HL perp + spot hedge (T1 Binance spot / T2 HL spot), at realistic mixed fees",
@@ -114,7 +114,8 @@
    ],
    "kill_scope": "failure kills THIS declared carry implementation, not the structural lane (codex amendment)",
    "universe_framing": "current deployable universe replay (top ~20 HL perps with Binance spot twins); survivorship acknowledged; NOT a clean historical edge claim",
-   "notes": "Binance futures CVM-blocked for operator -> perp-perp topology rejected at design. 1b rider study (HL hourly-funding extreme fade, one fixed config) is EXPLORATORY: can only produce a dry-run candidate. Basis drift from candles = approximate; book-data shadow phase required before any dry-run."
+   "notes": "Binance futures CVM-blocked for operator -> perp-perp topology rejected at design. 1b rider study (HL hourly-funding extreme fade, one fixed config) is EXPLORATORY: can only produce a dry-run candidate. Basis drift from candles = approximate; book-data shadow phase required before any dry-run.",
+   "phase1_resolution": "T1 formal PASS all 6 criteria (26 episodes/12mo, +$103.73, capital yield 14.42%/yr avg-deployed vs 2.31%/yr provisioned-peak) \u2014 MARGINAL: verdict denominator-sensitive (11.84% under alt formula), 21/26 episodes on 4h-approximated basis, per-episode basis risk dominates carry (hand-traced episode lost -$10.36). T2 structurally empty (no HL spot for majors). Rider 1b DEAD (PF 0.96, 305 trades). NO BOT BUILD \u2014 graduates to shadow phase only. Artifacts: VPS research/hl_carry_2026-07/, 99-file HASHES.txt"
   },
   {
    "id": "cascade-fill-stress-2026-07",
@@ -127,6 +128,21 @@
    "notes": "Diagnostic/kill study; codex-approved as properly adversarial.",
    "closed": "2026-07-13",
    "resolution": "VERDICT: BACKTEST CASE UNRELIABLE (frozen rule met). PF 1.423 base -> 1.168 @0.25% slip -> 0.984 @0.5% -> 0.931 adversarial (10-min chase model). Monotone steep degradation; even 25bps entry slippage erases most of the edge. Replayer validated (regime shape matches lab; hand-trace verified; N gap vs lab attributed to data vintage + max-3 cap dropping ~47% of clustered signals). RECOMMENDATION: demote/retire CascadeFaderV1 dry bot at next review \u2014 its validated backtest case does not survive realistic entry fills. Artifacts: VPS research/cascade_fill_stress_2026-07/, script sha256 82af7720..."
+  },
+  {
+   "id": "hl-carry-shadow-2026-07",
+   "bot": null,
+   "status": "open",
+   "registered": "2026-07-13",
+   "review_by": "2026-08-17",
+   "design": "Shadow monitor on VPS (stdlib python, systemd user unit): minute-level executable BBO+top-of-book size both legs (HL l2Book + metaAndAssetCtxs; Binance spot bookTicker), hourly settled-funding fetch; paper tracker runs the FROZEN study config with: conservative maker-fill (HL short entry posted at best ask, deemed filled only when a later best BID >= posted level i.e. price traded through), Binance spot leg taker-at-ask, funding accrues only from next settlement after entry, max-3 concurrency with FROZEN ranking (highest trailing-24h funding at signal), executable-BBO basis (never mark).",
+   "authorizes_dry_run_only_if_ALL": [
+    "trajectory yield >= 12%/yr on avg-deployed denominator (provisioned-peak yield reported alongside, always both)",
+    "realized executable basis drift consistent with study assumption (no systematic adverse gap)",
+    "conservative maker-fill rate high enough that realistic_default fee scenario holds (else re-evaluate at taker)",
+    "minimum evidence: >=5 closed paper episodes OR >=300 active position-hours by review, else shadow CONTINUES (inconclusive, not fail)"
+   ],
+   "notes": "Codex-amended (8 points, thread 019f598a). Pilot notional $1000x3 = mechanism validation, not P&L; scaling is a separate operator decision. Depth capture included so scale claims are testable later."
   }
  ]
 }
