@@ -119,12 +119,14 @@
   {
    "id": "cascade-fill-stress-2026-07",
    "bot": "CascadeFaderV1",
-   "status": "open",
+   "status": "closed",
    "registered": "2026-07-13",
    "trigger": "dry entry chased +4.8% in 10min vs assumed next-bar-open fill (C4 anomaly, oos_retest_2026-07)",
    "design": "1m path-aware replay of lab config (TP3%/SL-8%/48h timeout, 13 pairs, 2023-01->2026-07): uniform entry-slippage ladder {0.25,0.5,1,2,4}% AND adversarial variant (fill at next-1m HIGH; skip trade if next-1m high > signal close +5% = unfilled-cancel model). Fee 0.075%/side. Reconciliation run at 0% slippage must approximate lab metrics (PF~1.6) or the replayer is broken.",
    "verdict_rule": "PF < 1.2 at 0.5% uniform slippage OR at adversarial variant -> Cascade backtest case declared UNRELIABLE; recommend demote at next review",
-   "notes": "Diagnostic/kill study; codex-approved as properly adversarial."
+   "notes": "Diagnostic/kill study; codex-approved as properly adversarial.",
+   "closed": "2026-07-13",
+   "resolution": "VERDICT: BACKTEST CASE UNRELIABLE (frozen rule met). PF 1.423 base -> 1.168 @0.25% slip -> 0.984 @0.5% -> 0.931 adversarial (10-min chase model). Monotone steep degradation; even 25bps entry slippage erases most of the edge. Replayer validated (regime shape matches lab; hand-trace verified; N gap vs lab attributed to data vintage + max-3 cap dropping ~47% of clustered signals). RECOMMENDATION: demote/retire CascadeFaderV1 dry bot at next review \u2014 its validated backtest case does not survive realistic entry fills. Artifacts: VPS research/cascade_fill_stress_2026-07/, script sha256 82af7720..."
   }
  ]
 }
