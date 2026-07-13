@@ -85,6 +85,46 @@
     "F2 FF freshness guard: shadow-log then deploy at next natural FF restart",
     "2026-08-17 review: FF gate-open-time fallback binds (1 signal / 310 gate-open hours vs 1.67/wk claimed)"
    ]
+  },
+  {
+   "id": "hl-carry-study-2026-07",
+   "bot": null,
+   "status": "open",
+   "registered": "2026-07-13",
+   "codex_verdict": "APPROVED round-2 (thread 019f598a), 2 amendments incorporated",
+   "hypothesis": "Persistently positive HL hourly funding is capturable delta-neutral: short HL perp + spot hedge (T1 Binance spot / T2 HL spot), at realistic mixed fees",
+   "config_declared": {
+    "entry": "trailing-24h HL funding annualized >= 40%/yr (settled data only, effective next settlement)",
+    "exit": "trailing-12h annualized < 10%/yr",
+    "max_concurrent_pairs": 3,
+    "fee_scenarios": {
+     "optimistic": "maker+maker",
+     "realistic_default": "HL maker 1.5bps + Binance spot taker 7.5bps",
+     "pessimistic": "taker+taker"
+    },
+    "no_sweep": "single hand-picked config; accepted risk documented"
+   },
+   "pass_criteria_all_required": [
+    "median episode net > 0 at realistic-default fees",
+    "positive net in BOTH sample halves",
+    "net yield >= 12%/yr on REQUIRED CAPITAL (collateral both legs + 50% liq buffer)",
+    "no single pair > 50% of PnL",
+    "break-even hours <= 1/3 median episode duration",
+    ">= 10 closed episodes, else inconclusive unless clearly negative after costs"
+   ],
+   "kill_scope": "failure kills THIS declared carry implementation, not the structural lane (codex amendment)",
+   "universe_framing": "current deployable universe replay (top ~20 HL perps with Binance spot twins); survivorship acknowledged; NOT a clean historical edge claim",
+   "notes": "Binance futures CVM-blocked for operator -> perp-perp topology rejected at design. 1b rider study (HL hourly-funding extreme fade, one fixed config) is EXPLORATORY: can only produce a dry-run candidate. Basis drift from candles = approximate; book-data shadow phase required before any dry-run."
+  },
+  {
+   "id": "cascade-fill-stress-2026-07",
+   "bot": "CascadeFaderV1",
+   "status": "open",
+   "registered": "2026-07-13",
+   "trigger": "dry entry chased +4.8% in 10min vs assumed next-bar-open fill (C4 anomaly, oos_retest_2026-07)",
+   "design": "1m path-aware replay of lab config (TP3%/SL-8%/48h timeout, 13 pairs, 2023-01->2026-07): uniform entry-slippage ladder {0.25,0.5,1,2,4}% AND adversarial variant (fill at next-1m HIGH; skip trade if next-1m high > signal close +5% = unfilled-cancel model). Fee 0.075%/side. Reconciliation run at 0% slippage must approximate lab metrics (PF~1.6) or the replayer is broken.",
+   "verdict_rule": "PF < 1.2 at 0.5% uniform slippage OR at adversarial variant -> Cascade backtest case declared UNRELIABLE; recommend demote at next review",
+   "notes": "Diagnostic/kill study; codex-approved as properly adversarial."
   }
  ]
 }
