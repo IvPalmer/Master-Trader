@@ -145,6 +145,74 @@
     "minimum evidence: >=5 closed paper episodes OR >=300 active position-hours by review, else shadow CONTINUES (inconclusive, not fail)"
    ],
    "notes": "Codex-amended (8 points, thread 019f598a). Pilot notional $1000x3 = mechanism validation, not P&L; scaling is a separate operator decision. Depth capture included so scale claims are testable later."
+  },
+  {
+   "id": "killers-fill-realism-2026-07",
+   "bot": "KillersScalpV1",
+   "status": "closed",
+   "registered": "2026-07-13",
+   "context": "Operator reports dry record ~+20% P&L with high WR. Historical verdict (2026-05-28/06-06): channel unprofitable at REAL prices, edge dies at fill, do-not-fund. Dry-run grants limit fills at touch = optimistic. This audit re-prices the forward dry record under executable-fill rules.",
+   "method": "Per dry fill (entries, TP-ladder partials): fetch Binance futures 1m klines for the window; STRICT scenario = limit fill counts at posted price only if 1m price strictly trades through (long entry L: low < L; short/TP sells: high > TP); TOUCH scenario = touch counts (current dry behavior, upper bound). SL/market exits re-priced taker with 0.05% adverse slippage. Recompute P&L/WR/DD per scenario over the full dry period.",
+   "frozen_verdict_rule": [
+    "STRICT re-priced P&L >= +10% over the dry period AND WR >= 55% -> forward record contradicts historical validation -> open a separate preregistered tuning study (still dry; funding remains a distinct later decision)",
+    "STRICT re-priced P&L <= 0 -> dry-run fill optimism confirmed forward; do-not-fund RECONFIRMED; no tuning study",
+    "0 < STRICT P&L < +10% -> inconclusive; continue measuring, no tuning, revisit at next review"
+   ],
+   "notes": "Rule committed BEFORE the fill decomposition is computed. Insiders bot audited with same method, reported informationally (no frozen rule \u2014 smaller record).",
+   "closed": "2026-07-13",
+   "resolution": "VERDICT: NO PROMOTION / NO TUNING AUTHORIZED / CONTINUE MEASUREMENT UNDER RULE GAP. Fills FAITHFUL (0 phantom/touch-only in 88; all 46 TP fills tick-verified trade-through) \u2014 but faithful to trade-through mechanics only, not proof of live copyability (queue/latency untested). STRICT totals: +21.10% headline = banked +3.15% (closed \u221255.55 + booked partials +61.85) + FLOATING +17.95% on 9 leveraged runners; stop-at-risk \u221224.2%; closed WR 6.2%. Rule gap: success branch conjunctive (P&L>=10 AND WR>=55) did not fire, no branch covered high-floating/terrible-WR \u2014 recorded as prereg design defect. COPY-FIDELITY DEFECT: observer classified channel signal-update ('#2154 KITE close at first target') as chat -> ignored -> \u2212$9.42 loss where channel exited in profit. KITE = sensitivity example only, NOT credited back.",
+   "prospective_rule_patch": [
+    "Promotion metrics use BANKED realized P&L only; floating rider P&L reported separately, always with stop-at-risk",
+    "WR criteria apply to closed trades / completed campaigns, never mark-to-market runners",
+    "Open-risk-at-stop must stay below a fixed threshold for any promotion discussion"
+   ],
+   "followups": [
+    "FIX observer classifier: add signal-update kind (SIGNAL ID header + adjust/close instructions) -> receiver action; then REPROCESS full historical corpus with the new class before concluding net benefit (may also cut runners early)",
+    "Headline metric discipline: banked + floating + stop-at-risk, every report",
+    "Judgment when the 9 riders resolve or at 2026-08-17 review"
+   ]
+  },
+  {
+   "id": "tsmom-weekly-study-2026-07",
+   "bot": null,
+   "status": "closed",
+   "registered": "2026-07-13",
+   "hypothesis": "Canonical slow TSMOM (long/flat, weekly) on crypto majors adds risk-adjusted value vs passive HODL \u2014 a categorically different species from the dead 1h trend lane",
+   "config_declared": {
+    "universe": "BTC ETH BNB SOL XRP ADA AVAX LINK LTC DOGE vs USDT (current-universe replay, survivorship acknowledged)",
+    "signal": "84d (12-week) trailing return > 0 -> long, else flat (spot-only, no shorts)",
+    "rebalance": "weekly Monday 00:00 UTC, equal weight across long assets, idle in stables",
+    "fees": "7.5bps per side per rebalance trade",
+    "window": "max common daily history (BTC/ETH from 2017 where available, others from listing)",
+    "no_sweep": "one canonical literature config; NO parameter exploration"
+   },
+   "pass_criteria_all_required": [
+    "portfolio Sharpe > HODL-BTC Sharpe on same window",
+    "maxDD < 0.6x HODL-BTC maxDD",
+    "positive return in >=60% of calendar years",
+    "2024-01->now subperiod return > 0 (the chop test)"
+   ],
+   "kill": "any criterion fails -> lane closed for this config; passing authorizes a dry-run sleeve design only",
+   "closed": "2026-07-13",
+   "resolution": "KILLED \u2014 2/4 frozen criteria failed. Sharpe 0.785 > HODL 0.721 (pass) and 6/10 years positive (pass), BUT maxDD 89.6% vs required <49% (rode the 2021->2022 top-to-bottom; 84d filter lags turns) and 2024->now subperiod -21.7% vs HODL +41% (chop). Lifetime edge concentrated in 2021 (+777%) = regime luck signature. Lane closed for this config. Note: subagent's own codex env was broken; adjudication is mechanical against frozen criteria (no discretion involved). Artifacts: VPS research/tsmom_2026-07/."
+  },
+  {
+   "id": "listing-reaction-study-2026-07",
+   "bot": null,
+   "status": "closed",
+   "registered": "2026-07-13",
+   "hypothesis": "Binance listing announcements move the announced token within minutes; a retail bot reacting at t+60s (our TG/announcement extraction infra) captures part of the move on venues where the token already trades (HL perp or Binance spot)",
+   "method": "Collect 12-24mo of Binance listing/Will-List announcements (announcement CMS API); for each announced token tradable at announcement time (HL perp preferred, else Binance spot), measure net return paths: entry t+60s taker, exits at three FIXED horizons {+30min, +4h, +24h}; fees HL taker 4.5bps or Binance spot 7.5bps per side; report full distribution, both sample halves, per-venue",
+   "pass_criteria": [
+    "median net > 0 at the t+60s -> +4h horizon across >= 20 qualifying events",
+    "positive median in BOTH sample halves",
+    "effect not concentrated: top-decile events < 60% of total"
+   ],
+   "kill": "criteria fail -> lane closed; passing authorizes a reaction-bot design study (execution latency measurement) only",
+   "notes": "Measurement of a documented effect at fixed horizons \u2014 not a sweep. Announcement TIMESTAMP fidelity is critical: use CMS publish time; flag any event where listing trade-open predates announcement.",
+   "closed": "2026-07-13",
+   "resolution": "FAIL all 3 criteria at +4h (n=51 leak-excluded events, 24mo): median \u22122.10%, halves \u22123.43%/\u22121.22%, top-decile 73% concentration. Long-reaction lane CLOSED. HL venue inconclusive-by-data (1m retention ~3-5 days). Measured set = futures-listing announcements for already-spot-listed tokens; buying them is systematically NEGATIVE (\u22127.01% median at +24h, 27.5% positive).",
+   "forward_hypothesis_recorded": "INVERTED effect: shorting futures-listing announcements (literature-consistent \u2014 derivative listing enables shorts, overpricing corrects). MUST NOT be validated on this sample (discovered here). If pursued: new prereg, FORWARD events only, venue = HL perp where available (Binance futures CVM-blocked). Execution note: our TG/announcement infra can react in seconds; effect persists 24h so latency is not critical."
   }
  ]
 }

@@ -677,6 +677,35 @@ async def ft_force_exit_limit(cfg: Config, trade_id: int, amount: float,
             return {"status": r.status, "body": txt}
 
 
+async def ft_cancel_open_order(cfg: Config, trade_id: int,
+                               session=None) -> dict:
+    """DELETE /api/v1/trades/{tradeid}/open-order — cancel the trade's current
+    open order (Freqtrade allows exactly one open exit order per trade, so this
+    clears whatever resting TP-ladder limit is live before we post a new
+    consolidated exit).
+
+    No prior cancel path existed in this codebase — the phase-2 cascade relied
+    on FT implicitly cancelling the previous exit when a new /forceexit arrives.
+    The signal_update `close_at_target_1` path wants an EXPLICIT cancel first so
+    the ladder limit is provably gone before the consolidated TP1 limit is
+    posted. Uses Freqtrade's documented cancel endpoint.
+
+    Returns `{status, body}` like the other REST helpers. A 404/no-open-order is
+    NOT fatal for the caller (nothing to cancel is fine) — the caller decides.
+    """
+    url = f"{cfg.ft_base}/api/v1/trades/{trade_id}/open-order"
+    timeout = aiohttp.ClientTimeout(total=10)
+    if session is not None:
+        async with session.delete(url, timeout=timeout) as r:
+            txt = await r.text()
+            return {"status": r.status, "body": txt}
+    auth = aiohttp.BasicAuth(cfg.ft_user, cfg.ft_pass)
+    async with aiohttp.ClientSession() as s:
+        async with s.delete(url, auth=auth, timeout=timeout) as r:
+            txt = await r.text()
+            return {"status": r.status, "body": txt}
+
+
 async def ft_open_trades(cfg: Config, session=None) -> Optional[list[dict]]:
     """Return the list of open trades from FT, or None on transport
     failure. Returning `None` (not `[]`) is important so the position
@@ -2482,6 +2511,355 @@ async def _process_event(payload: EventPayload):
                 "pct_closed_of_original": close_pp_of_original,
                 "pct_open_after": new_pct_open,
                 "kind": kind}
+
+    if kind == "signal_update":
+        # A mid-trade PLAN CHANGE to an open setup (e.g. "we are adjusting the
+        # $KITE setup to close at first target"). Distinct from close_partial
+        # (a target-hit report) and close_full (a plain close): the channel is
+        # telling us to CHANGE the exit plan of a live position. Missing this
+        # class cost −$9.42 on KITE #2154 (classified `chat` → ignored).
+        if not symbol:
+            return {"action": "skipped", "reason": "missing symbol on signal_update"}
+        instruction = cls.get("instruction") or "other"
+
+        pos, match_reason = find_active_position(conn, signal_id, symbol)
+        if match_reason == "ambiguous":
+            logger.warning(
+                "[SIGNAL_UPDATE AMBIG] msg_id=%d signal=#%s sym=%s — refusing to act",
+                msg_id, signal_id, symbol)
+            return {"action": "skipped", "reason": "ambiguous_signal_update"}
+        if not pos or not pos.get("ft_trade_id"):
+            return {"action": "skipped",
+                    "reason": f"no_active_position ({match_reason})"}
+
+        # tighten_sl / other → no executable primitive. Log LOUDLY (mirrors the
+        # move_sl deferral) so the operator sees a plan change we could not act
+        # on. No claim row: nothing was executed, and a future redelivery should
+        # still surface the same WARNING.
+        if instruction in ("tighten_sl", "other"):
+            logger.warning(
+                "[SIGNAL_UPDATE NO-OP] msg_id=%d pos_id=%d instruction=%s "
+                "raw=%r — no executable primitive (logged only)",
+                msg_id, pos["pos_id"], instruction, cls.get("raw_instruction"))
+            return {"action": "logged",
+                    "reason": "no executable primitive",
+                    "instruction": instruction,
+                    "pos_id": pos["pos_id"], "kind": kind}
+
+        # Atomic dedupe-claim BEFORE any await (same UNIQUE(pos_id,msg_id,kind)
+        # gate as the close branch). Prevents a redelivered signal_update from
+        # double-firing FT.
+        claim_payload = json.dumps({
+            "ft_trade_id": pos["ft_trade_id"],
+            "instruction": instruction,
+            "pending": True,
+        })
+        claim = conn.execute(
+            "INSERT OR IGNORE INTO events "
+            "(pos_id, msg_id, event_at, kind, payload, response) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (pos["pos_id"], msg_id, datetime.now(timezone.utc).isoformat(),
+             kind, claim_payload, json.dumps({"status": "pending"})),
+        )
+        if claim.rowcount == 0:
+            logger.info(
+                "[SIGNAL_UPDATE DUPE] msg_id=%d pos_id=%d instruction=%s — "
+                "already claimed", msg_id, pos["pos_id"], instruction)
+            return {"action": "deduped", "pos_id": pos["pos_id"], "kind": kind}
+
+        ft_session = getattr(app.state, "ft_session", None)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        async def _full_market_close() -> tuple[dict, bool]:
+            """Full market close + local bookkeeping (close_reason=
+            signal_update_close). Mirrors the close_full path: mark position
+            closed and cancel any resting ladder rows."""
+            resp = await ft_force_exit(cfg, pos["ft_trade_id"], pct=None,
+                                       session=ft_session)
+            conn.execute(
+                "UPDATE events SET response = ? "
+                "WHERE pos_id = ? AND msg_id = ? AND kind = ?",
+                (json.dumps(resp), pos["pos_id"], msg_id, kind))
+            ok = 200 <= resp["status"] < 300
+            if ok:
+                conn.execute(
+                    "UPDATE positions SET state='closed', pct_open=0, "
+                    "close_msg_id=?, close_date=?, close_reason=?, "
+                    "last_event_at=? WHERE pos_id=?",
+                    (msg_id, str(msg.get("date")), "signal_update_close",
+                     now_iso, pos["pos_id"]))
+                conn.execute(
+                    "UPDATE target_orders SET state='cancelled', "
+                    "notes=COALESCE(notes,'') || ' | signal-update-close', "
+                    "last_check_at=? WHERE pos_id=? AND state IN ('pending','active')",
+                    (now_iso, pos["pos_id"]))
+                logger.info(
+                    "[SIGNAL_UPDATE close] pos_id=%d signal=#%s %s ft_trade_id=%d "
+                    "→ full market close (reason=signal_update_close)",
+                    pos["pos_id"], signal_id, symbol, pos["ft_trade_id"])
+            else:
+                logger.error(
+                    "[SIGNAL_UPDATE close FAILED] pos_id=%d ft_trade_id=%d "
+                    "ft_status=%d body=%s — state NOT mutated",
+                    pos["pos_id"], pos["ft_trade_id"], resp["status"],
+                    resp.get("body", "")[:200])
+            return resp, ok
+
+        if instruction == "close_full_now":
+            resp, ok = await _full_market_close()
+            return {"action": "force_exit" if ok else "force_exit_failed",
+                    "pos_id": pos["pos_id"], "ft": resp,
+                    "instruction": instruction, "kind": kind,
+                    "close_reason": "signal_update_close"}
+
+        # instruction == "close_at_target_1"
+        # ── Resolve TP1 price ─────────────────────────────────────────────
+        # Prefer the lowest-idx target_orders rung not yet filled/cancelled;
+        # fall back to the persisted targets_remaining ladder (phase-2 off).
+        tp_row = conn.execute(
+            "SELECT price FROM target_orders WHERE pos_id=? "
+            "AND state NOT IN ('filled','cancelled') ORDER BY idx ASC LIMIT 1",
+            (pos["pos_id"],)).fetchone()
+        tp1: Optional[float] = None
+        if tp_row is not None:
+            tp1 = float(tp_row["price"])
+        else:
+            try:
+                rem = json.loads(pos.get("targets_remaining") or "[]")
+            except (TypeError, ValueError):
+                rem = []
+            if rem:
+                try:
+                    tp1 = float(rem[0])
+                except (TypeError, ValueError):
+                    tp1 = None
+        if tp1 is None or tp1 <= 0:
+            logger.warning(
+                "[SIGNAL_UPDATE close_at_target_1] pos_id=%d signal=#%s %s — "
+                "cannot resolve TP1 price (no target rows / targets_remaining); "
+                "leaving position untouched", pos["pos_id"], signal_id, symbol)
+            conn.execute(
+                "UPDATE events SET response = ? "
+                "WHERE pos_id = ? AND msg_id = ? AND kind = ?",
+                (json.dumps({"status": "skipped", "reason": "tp1_unresolvable"}),
+                 pos["pos_id"], msg_id, kind))
+            return {"action": "skipped", "reason": "tp1_unresolvable",
+                    "pos_id": pos["pos_id"], "kind": kind}
+
+        direction = (pos.get("direction") or "long").lower()
+        # ── Fetch current mark + remaining base amount from FT ────────────
+        trade = await ft_get_trade(cfg, pos["ft_trade_id"], session=ft_session)
+        mark: Optional[float] = None
+        remaining_amount: Optional[float] = None
+        if trade is not None:
+            cr = trade.get("current_rate")
+            try:
+                mark = float(cr) if cr is not None else None
+            except (TypeError, ValueError):
+                mark = None
+            amt = trade.get("amount")
+            try:
+                remaining_amount = float(amt) if amt is not None else None
+            except (TypeError, ValueError):
+                remaining_amount = None
+        if mark is None:
+            # Fall back to the Binance public mark helper (best-effort).
+            mark = await get_binance_mark_price(
+                symbol, session=getattr(app.state, "public_session", None))
+        if mark is None:
+            logger.warning(
+                "[SIGNAL_UPDATE close_at_target_1] pos_id=%d %s — mark "
+                "unavailable; deferring (event stays pending)",
+                pos["pos_id"], symbol)
+            conn.execute(
+                "UPDATE events SET response = ? "
+                "WHERE pos_id = ? AND msg_id = ? AND kind = ?",
+                (json.dumps({"status": "pending",
+                             "deferred_reason": "mark_unavailable"}),
+                 pos["pos_id"], msg_id, kind))
+            return {"action": "deferred", "reason": "mark_unavailable",
+                    "pos_id": pos["pos_id"], "kind": kind}
+
+        # Already at/beyond TP1 (long: mark>=tp1*0.999, short: mark<=tp1*1.001)
+        # → the favorable price is here, close now at market.
+        at_target = (mark >= tp1 * 0.999 if direction == "long"
+                     else mark <= tp1 * 1.001)
+        if at_target:
+            logger.info(
+                "[SIGNAL_UPDATE close_at_target_1] pos_id=%d %s mark=%.8g at/beyond "
+                "TP1=%.8g → market close now", pos["pos_id"], symbol, mark, tp1)
+            resp, ok = await _full_market_close()
+            return {"action": "force_exit" if ok else "force_exit_failed",
+                    "pos_id": pos["pos_id"], "ft": resp,
+                    "instruction": instruction, "kind": kind,
+                    "close_reason": "signal_update_close",
+                    "tp1": tp1, "mark": mark, "path": "market_at_target"}
+
+        # Mark below TP1: cancel the resting ladder limit(s), then post a single
+        # consolidated LIMIT exit for the FULL remaining amount at TP1. When it
+        # fills, the whole position closes at the signaler's first target.
+        if remaining_amount is None or remaining_amount <= 0:
+            logger.warning(
+                "[SIGNAL_UPDATE close_at_target_1] pos_id=%d %s — remaining base "
+                "amount unavailable from FT; deferring", pos["pos_id"], symbol)
+            conn.execute(
+                "UPDATE events SET response = ? "
+                "WHERE pos_id = ? AND msg_id = ? AND kind = ?",
+                (json.dumps({"status": "pending",
+                             "deferred_reason": "amount_unavailable"}),
+                 pos["pos_id"], msg_id, kind))
+            return {"action": "deferred", "reason": "amount_unavailable",
+                    "pos_id": pos["pos_id"], "kind": kind}
+
+        lock = _phase2_lock()
+        if lock is not None:
+            await lock.acquire()
+        try:
+            # 1. Cancel the live resting ladder limit (best-effort; a 4xx
+            #    "no open order" is fine — nothing to cancel). Coerce raised
+            #    network errors to status-0: a timed-out DELETE may still have
+            #    been accepted by FT, so we must continue into the consolidated
+            #    post + fallback state machine rather than escape with the
+            #    ladder possibly gone.
+            try:
+                cancel_resp = await ft_cancel_open_order(
+                    cfg, pos["ft_trade_id"], session=ft_session)
+            except Exception as e:  # noqa: BLE001 — must not escape mid-sequence
+                logger.warning(
+                    "[SIGNAL_UPDATE close_at_target_1] pos_id=%d cancel raised "
+                    "%s — continuing into consolidated-post fallback",
+                    pos["pos_id"], e)
+                cancel_resp = {"status": 0, "error": str(e)}
+            logger.info(
+                "[SIGNAL_UPDATE close_at_target_1] pos_id=%d cancel open-order "
+                "status=%d", pos["pos_id"], cancel_resp.get("status", 0))
+            # 2. Retire every existing ladder row so the cascade / reconciler
+            #    re-arm guards see NO pending rung to place over our consolidated
+            #    exit (_adopt_or_post_next_tp only acts on 'pending' rows; the
+            #    reconciler's unarmed query only fires when NO rows exist).
+            conn.execute(
+                "UPDATE target_orders SET state='cancelled', "
+                "notes=COALESCE(notes,'') || ' | superseded by signal_update TP1', "
+                "last_check_at=? WHERE pos_id=? AND state IN ('pending','active')",
+                (now_iso, pos["pos_id"]))
+            # 3. Post the consolidated full-remaining limit at TP1. Coerce a
+            #    raised network/timeout error into a status-0 dict so an
+            #    exception can never bypass the retry/market-close fallback and
+            #    leave the event 'pending' after the cancel already fired.
+            async def _post_tp1_limit() -> dict:
+                try:
+                    return await ft_force_exit_limit(
+                        cfg, pos["ft_trade_id"], amount=remaining_amount,
+                        price=tp1, session=ft_session)
+                except Exception as e:  # noqa: BLE001 — must not escape post-cancel
+                    logger.error(
+                        "[SIGNAL_UPDATE close_at_target_1] pos_id=%d %s "
+                        "limit post raised %r", pos["pos_id"], symbol, e)
+                    return {"status": 0, "body": f"exception: {e!r}"}
+
+            resp = await _post_tp1_limit()
+            ok = 200 <= resp["status"] < 300
+            if not ok:
+                # The resting limit was already cancelled and every ladder row
+                # retired, so the position currently has NO exit order. Retry
+                # the consolidated limit exactly ONCE before any fallback — a
+                # transient FT hiccup shouldn't escalate straight to a market
+                # close.
+                logger.warning(
+                    "[SIGNAL_UPDATE close_at_target_1 RETRY] pos_id=%d %s "
+                    "consolidated limit post failed ft_status=%d body=%s — "
+                    "retrying once after 2s", pos["pos_id"], symbol,
+                    resp["status"], resp.get("body", "")[:200])
+                await asyncio.sleep(2)
+                resp = await _post_tp1_limit()
+                ok = 200 <= resp["status"] < 300
+            new_order_id = None
+            actual_amount = remaining_amount
+            mkt_resp: Optional[dict] = None
+            if ok:
+                trade2 = await ft_get_trade(cfg, pos["ft_trade_id"],
+                                            session=ft_session)
+                if trade2 is not None:
+                    found = _find_open_limit_exit_at_price(
+                        trade2.get("orders") or [], tp1,
+                        is_short=bool(trade2.get("is_short")))
+                    if found is not None:
+                        new_order_id = found.get("order_id")
+                        try:
+                            actual_amount = float(found.get("amount")
+                                                  or remaining_amount)
+                        except (TypeError, ValueError):
+                            actual_amount = remaining_amount
+                next_idx = (conn.execute(
+                    "SELECT COALESCE(MAX(idx), -1) + 1 FROM target_orders "
+                    "WHERE pos_id=?", (pos["pos_id"],)).fetchone()[0])
+                conn.execute(
+                    "INSERT INTO target_orders (pos_id, idx, price, amount, "
+                    "state, ft_order_id, placed_at, last_check_at, notes) "
+                    "VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?)",
+                    (pos["pos_id"], next_idx, tp1, round(actual_amount, 8),
+                     new_order_id, now_iso, now_iso,
+                     "signal_update close_at_target_1 (full remaining)"))
+                logger.info(
+                    "[SIGNAL_UPDATE close_at_target_1] pos_id=%d %s POSTED "
+                    "consolidated limit amount=%.8g price=%.8g ft_order_id=%s",
+                    pos["pos_id"], symbol, actual_amount, tp1, new_order_id)
+                final_status = "limit_posted"
+            else:
+                # Both limit posts failed → the position is uncovered. A below-
+                # TP1 MARKET close is within the "close at first target"
+                # instruction's intent; leaving the position with no exit order
+                # is NOT. Force the full-remaining market close now.
+                logger.error(
+                    "[SIGNAL_UPDATE close_at_target_1 FAILED] pos_id=%d %s "
+                    "consolidated limit post failed twice ft_status=%d body=%s "
+                    "— position uncovered, forcing MARKET close",
+                    pos["pos_id"], symbol, resp["status"],
+                    resp.get("body", "")[:200])
+                try:
+                    mkt_resp, mkt_ok = await _full_market_close()
+                except Exception as e:  # noqa: BLE001 — must reach terminal state
+                    logger.error(
+                        "[SIGNAL_UPDATE close_at_target_1] pos_id=%d %s market "
+                        "close raised %r", pos["pos_id"], symbol, e)
+                    mkt_resp, mkt_ok = {"status": 0, "body": f"exception: {e!r}"}, False
+                if mkt_ok:
+                    final_status = "limit_failed_market_closed"
+                    logger.warning(
+                        "[SIGNAL_UPDATE close_at_target_1 LIMIT_FAILED_MARKET_"
+                        "CLOSED] pos_id=%d %s ft_trade_id=%d — TP1 limit "
+                        "unpostable; closed FULL remaining at MARKET (below "
+                        "TP1) to keep the position covered. ft_status=%d",
+                        pos["pos_id"], symbol, pos["ft_trade_id"],
+                        mkt_resp["status"])
+                else:
+                    final_status = "UNCOVERED_POSITION_ALERT"
+                    logger.critical(
+                        "[SIGNAL_UPDATE UNCOVERED_POSITION_ALERT] pos_id=%d %s "
+                        "ft_trade_id=%d — limit post failed twice AND market "
+                        "close failed (ft_status=%d). POSITION HAS NO EXIT "
+                        "ORDER — MANUAL INTERVENTION REQUIRED.",
+                        pos["pos_id"], symbol, pos["ft_trade_id"],
+                        mkt_resp["status"])
+        finally:
+            if lock is not None:
+                lock.release()
+
+        # The event MUST reach a terminal status here — the cancel has already
+        # executed, so leaving it 'pending' would both hide an uncovered
+        # position and let dedupe block any redelivery.
+        conn.execute(
+            "UPDATE events SET response = ? "
+            "WHERE pos_id = ? AND msg_id = ? AND kind = ?",
+            (json.dumps({"status": final_status,
+                         "tp1": tp1, "cancel_status": cancel_resp.get("status"),
+                         "ft": resp, "market_close_ft": mkt_resp}),
+             pos["pos_id"], msg_id, kind))
+        return {"action": final_status,
+                "pos_id": pos["pos_id"], "ft": resp,
+                "instruction": instruction, "kind": kind,
+                "tp1": tp1, "mark": mark, "path": "limit_at_tp1",
+                "ft_order_id": new_order_id}
 
     if kind == "move_sl":
         # MVP: log only. Freqtrade lacks a clean REST hook for mid-trade SL

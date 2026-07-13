@@ -20,7 +20,7 @@ You are classifying ONE Telegram message from the "Binance Killers VIP" trading 
 
 Schema (all fields required, use null where not applicable):
   id          : int — the msg_id below
-  kind        : one of "open" | "close_full" | "close_partial" | "move_sl" | "increase" | "chat"
+  kind        : one of "open" | "close_full" | "close_partial" | "move_sl" | "increase" | "signal_update" | "chat"
   signal_id   : int|null — extract from #NNNN whenever it appears in the text
   symbol      : str|null — e.g. "BTC", "ETH", "ZRX" (strip $ prefix and /USDT suffix)
   direction   : "long"|"short"|null
@@ -32,6 +32,10 @@ Schema (all fields required, use null where not applicable):
   applies_to  : list|null — for multi-coin actions
   confidence  : number — 0.0 to 1.0
   notes       : str — free text (target hits, realized %, etc)
+  instruction     : str|null — for kind="signal_update" ONLY. One of
+                    "close_at_target_1" | "close_full_now" | "tighten_sl" | "other".
+  raw_instruction : str|null — for kind="signal_update" ONLY. The verbatim
+                    sentence that carries the plan change.
 
 FORMAT — Binance Killers VIP
 
@@ -55,6 +59,29 @@ CLOSE / TARGET-HIT update (cumulative):
   - bare `CLOSE` (resolve symbol from context if possible; signal_id=null)
   - `stop loss hit` / `Stop Loss Triggered` (close_full, signal_id from context)
   - explicit final-closure language
+
+SIGNAL_UPDATE — a mid-trade PLAN CHANGE to an already-open setup that is
+NEITHER a target-hit report (close_partial) NOR a plain CLOSE (close_full):
+  📍SIGNAL ID: #2154📍 COIN: $KITE/USDT | We are adjusting the $KITE setup to
+  close at first target. Price is moving in our favor, be ready to take profit.
+  → kind="signal_update", signal_id=2154, symbol="KITE",
+    instruction="close_at_target_1",
+    raw_instruction="We are adjusting the $KITE setup to close at first target."
+
+  Classify as signal_update when the message carries a SIGNAL ID header (or an
+  unambiguous coin reference resolvable from the reply chain) AND an instruction
+  that CHANGES the plan of an open position:
+    - "close at first target" / "close at target 1" / "exit at TP1"
+        → instruction="close_at_target_1"
+    - "close now" / "close immediately" / "exit at market" / "get out now"
+        → instruction="close_full_now"
+    - "move / tighten stop loss" (to a numeric level or breakeven)
+        → instruction="tighten_sl"
+    - any other plan-changing management directive
+        → instruction="other"
+  It is NOT signal_update when the text is a target-hit announcement
+  ("Target 1: 0.531✅ 15% profit" → close_partial) or a final closure/SL-hit
+  ("CLOSE", "Stop Loss Triggered" → close_full).
 
 Other:
   - `VIP MARKET/TRADES UPDATE`, `VIP UPDATE: $X` with commentary → chat.
@@ -88,7 +115,7 @@ You are classifying ONE Telegram message from Dennis's "Market Mastery" crypto c
 
 Schema (all fields required, use null where not applicable):
   id          : int — the msg_id below
-  kind        : one of "open" | "close_full" | "close_partial" | "move_sl" | "increase" | "chat"
+  kind        : one of "open" | "close_full" | "close_partial" | "move_sl" | "increase" | "signal_update" | "chat"
   signal_id   : int|null — Dennis does NOT use signal IDs; almost always null
   symbol      : str|null — e.g. "BTC", "WLD", "LAB" (strip $ prefix and /USDT suffix)
   direction   : "long"|"short"|null
@@ -100,6 +127,10 @@ Schema (all fields required, use null where not applicable):
   applies_to  : list|null — for multi-coin actions
   confidence  : number — 0.0 to 1.0
   notes       : str — free text (list ALL TPs here, realized %, context)
+  instruction     : str|null — for kind="signal_update" ONLY. One of
+                    "close_at_target_1" | "close_full_now" | "tighten_sl" | "other".
+  raw_instruction : str|null — for kind="signal_update" ONLY. The verbatim
+                    sentence that carries the plan change.
 
 FORMAT — Dennis / Market Mastery
 
@@ -121,6 +152,15 @@ MANAGEMENT (resolve the symbol from the reply chain / most recent open if absent
   "TP1 hit ✅" / "first target hit" / "closed half / 50%" → close_partial (pct if stated).
   "closed", "out of <SYM>", "stopped out", "SL hit" → close_full.
   "added", "scaling in", "DCA here" → increase.
+
+SIGNAL_UPDATE (a plan change to an already-open call, resolved from the reply
+chain / most recent open — NOT a target-hit report, NOT a plain close):
+  "adjusting the $WLD setup, let's close at first target" → kind="signal_update",
+    symbol="WLD", instruction="close_at_target_1",
+    raw_instruction="adjusting the $WLD setup, let's close at first target".
+  Instruction mapping: "close at first target"/"exit TP1" → "close_at_target_1";
+  "close now"/"exit at market"/"get out" → "close_full_now"; "move/tighten SL" →
+  "tighten_sl"; other plan-changing directive → "other".
 
 CHAT (the MAJORITY — default here when unsure):
   market commentary, "Setup Summary" / analysis posts that explain a view with NO
