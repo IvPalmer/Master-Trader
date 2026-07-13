@@ -72,7 +72,19 @@
     "repo_commit_at_registration": "177cdd1",
     "fees_live_measured": "0.075%/side (BNB discount)",
     "ff_live_baseline": "19 closed, PF 1.06, ex-ZEC PF ~0.55"
-   }
+   },
+   "phase_a_executed": "2026-07-13",
+   "results_doc": "docs/audits/2026-07-13-oos-retest-results.md",
+   "epochs": {
+    "keltner_static18": "2026-07-13T04:48:04Z",
+    "cascade_48h_timeout": "2026-07-13T04:48:04Z",
+    "shortkeltner_hl_nan_warn": "2026-07-13T04:48:34Z"
+   },
+   "followups": [
+    "cascade-fill-model-stress-test before trusting any Cascade backtest number",
+    "F2 FF freshness guard: shadow-log then deploy at next natural FF restart",
+    "2026-08-17 review: FF gate-open-time fallback binds (1 signal / 310 gate-open hours vs 1.67/wk claimed)"
+   ]
   }
  ]
 }
