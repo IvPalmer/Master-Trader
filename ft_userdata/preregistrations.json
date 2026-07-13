@@ -175,7 +175,7 @@
   {
    "id": "tsmom-weekly-study-2026-07",
    "bot": null,
-   "status": "open",
+   "status": "closed",
    "registered": "2026-07-13",
    "hypothesis": "Canonical slow TSMOM (long/flat, weekly) on crypto majors adds risk-adjusted value vs passive HODL \u2014 a categorically different species from the dead 1h trend lane",
    "config_declared": {
@@ -192,7 +192,9 @@
     "positive return in >=60% of calendar years",
     "2024-01->now subperiod return > 0 (the chop test)"
    ],
-   "kill": "any criterion fails -> lane closed for this config; passing authorizes a dry-run sleeve design only"
+   "kill": "any criterion fails -> lane closed for this config; passing authorizes a dry-run sleeve design only",
+   "closed": "2026-07-13",
+   "resolution": "KILLED \u2014 2/4 frozen criteria failed. Sharpe 0.785 > HODL 0.721 (pass) and 6/10 years positive (pass), BUT maxDD 89.6% vs required <49% (rode the 2021->2022 top-to-bottom; 84d filter lags turns) and 2024->now subperiod -21.7% vs HODL +41% (chop). Lifetime edge concentrated in 2021 (+777%) = regime luck signature. Lane closed for this config. Note: subagent's own codex env was broken; adjudication is mechanical against frozen criteria (no discretion involved). Artifacts: VPS research/tsmom_2026-07/."
   },
   {
    "id": "listing-reaction-study-2026-07",
