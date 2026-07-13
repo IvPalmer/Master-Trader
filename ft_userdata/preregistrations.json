@@ -216,10 +216,12 @@
   },
   {
    "id": "hl-carry-extension-2026-07",
-   "status": "open",
+   "status": "closed",
    "registered": "2026-07-13",
    "design": "SAME frozen config as hl-carry-study-2026-07 (40%/yr entry, 10%/yr exit, max 3, T1 topology, realistic-default fees) applied to (a) maximum available HL funding history (back to HL launch, not just 12mo) and (b) an EXTENDED universe: next ~20 most-liquid HL perps with Binance spot twins beyond the 20 majors. Purpose: more episodes -> tighter yield estimate NOW instead of waiting for forward episodes. Same pass criteria as phase 1; results reported per-universe-tier (majors vs mid-caps) separately.",
-   "notes": "Extension study, not a new config \u2014 no parameter changes. Mid-cap tier carries higher funding but worse hedge liquidity; report spread/impact caveats explicitly."
+   "notes": "Extension study, not a new config \u2014 no parameter changes. Mid-cap tier carries higher funding but worse hedge liquidity; report spread/impact caveats explicitly.",
+   "closed": "2026-07-13",
+   "resolution": "PASS 6/6 BOTH TIERS over 3.17yr (2023-05->2026-07): MAJORS 104 episodes, +$995.85, capital yield 17.50%/yr, no-pair-max DOGE 28.7%; MIDCAP (top-20 HL perps w/ Binance spot, dayNtlVlm-ranked) 90 episodes, +$1365.45, 26.55%/yr, JTO 24.9%. Robust to return-basis accounting (both still 6/6). Episode rate ~33/yr/tier. CAVEATS: majors 2024 carried ~77% of net (2026 partial weak: 5 ep +$4.84 majors / 10 ep +$35 midcap \u2014 current regime is thin, exactly what the shadow measures); pre-2024-04 basis via 1d-candle approximation; midcap spread flags ZRO/TRB/ASTER/APT/ETHFI (11.6-26.2bps full spread vs 7.5bps assumed \u2014 hedge cost understated up to ~3.5bps/fill if taken); 1h-clean window still <10 episodes; T2 still structurally empty. CONSEQUENCE: yield estimate upgraded from 26-episode knife-edge to 194-episode 6/6; execution realism remains gated by hl-carry-shadow-2026-07 (unchanged authorization chain). Shadow universe extended to include the midcap tier same day."
   },
   {
    "id": "listing-short-forward-2026-07",
