@@ -263,7 +263,6 @@ services:
           memory: 128M
     depends_on:
       - keltnerbouncev1
-      - cascadefaderv1
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
@@ -326,7 +325,6 @@ services:
       - traefik.http.middlewares.master-trader-https-redirect.redirectscheme.permanent=true
     depends_on:
       - keltnerbouncev1
-      - cascadefaderv1
 networks:
   default: null
   dokploy-network:
