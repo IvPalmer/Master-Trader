@@ -89,6 +89,21 @@ class ShortKeltnerV2HL(IStrategy):
             & (dataframe["btc_usdc_sma50_slope_1h"] < 0)
             & (dataframe["btc_usdc_close_1h"] < dataframe["btc_usdc_sma200_1d"])
         ).astype(int)
+
+        # Fail-closed observability: NaN gate inputs force btc_bear to 0,
+        # indistinguishable from a legitimately closed gate. HL serves limited
+        # history, so a short informative fetch would silently zero entries
+        # forever. Warn while the condition persists.
+        last = dataframe.iloc[-1]
+        gate_cols = ["btc_usdc_close_1h", "btc_usdc_sma50_1h",
+                     "btc_usdc_sma200_1h", "btc_usdc_sma200_1d"]
+        nan_cols = [c for c in gate_cols if pd.isna(last[c])]
+        if nan_cols:
+            logger.warning(
+                "ShortKeltnerV2HL %s: macro-gate inputs NaN at last bar (%s) — "
+                "btc_bear forced 0, entries blocked. Check BTC/USDC informative depth.",
+                metadata["pair"], ", ".join(nan_cols),
+            )
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:

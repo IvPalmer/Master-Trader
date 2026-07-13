@@ -102,8 +102,12 @@ class CascadeFaderV1(IStrategy):
 
     timeframe = "1h"
     process_only_new_candles = True
-    use_exit_signal = False
-    exit_profit_only = True
+    # use_exit_signal must be True for custom_exit (48h timeout) to run;
+    # populate_exit_trend emits no signals, so the timeout is the only exit
+    # beyond ROI/SL. exit_profit_only must be False or underwater timeouts
+    # would be suppressed — the lab config exits at ANY price at 48h.
+    use_exit_signal = True
+    exit_profit_only = False
     exit_profit_offset = 0.005
 
     # 30-day volume SMA needs 720 hourly candles
@@ -139,5 +143,16 @@ class CascadeFaderV1(IStrategy):
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # Exits handled by ROI ladder + stoploss
+        # Exits handled by ROI ladder + stoploss + 48h timeout below
         return dataframe
+
+    def custom_exit(self, pair, trade, current_time, current_rate, current_profit, **kwargs):
+        # Lab-validated config includes an unconditional 48h timeout exit at any
+        # price (10% of lab exits). The ROI ladder's "2880": 0.0 rung only exits
+        # at >=breakeven, letting underwater trades ride to SL — a distribution
+        # the lab never validated. Verified firing on 2024 control backtest
+        # (oos_retest_2026-07). Deployed 2026-07-13 = new measurement epoch.
+        hours = (current_time - trade.open_date_utc).total_seconds() / 3600
+        if hours >= 48:
+            return "timeout_48h"
+        return None
