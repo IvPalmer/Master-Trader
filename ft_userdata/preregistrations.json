@@ -29,7 +29,7 @@
   {
    "id": "cascade-dry-run-gate-v2",
    "bot": "CascadeFaderV1",
-   "status": "open",
+   "status": "closed",
    "registered": "2026-06-09",
    "review_by": "2026-09-30",
    "min_closed_trades": 20,
@@ -37,7 +37,9 @@
     "At >=20 closed trades: continue dry-run if PF >= 1.0 AND WR >= 60% (deployed-docstring backtest: PF 1.62, WR 77.8%); else kill",
     "If <10 closed trades by review_by: frequency anomaly (P ~3.9% under backtest cadence 4.37 trades/month over the 113-day window) \u2014 investigate signal-rate mismatch before extending"
    ],
-   "notes": "Replaces the expired v1 gate ('>=5 trades in 30d', ended 2026-06-08 with 2 trades). v1 gate was mis-specified: only ~44% pass probability even if the backtest were perfect. Plumbing verified 2026-06-09: exactly 2 qualifying cascade candles occurred market-wide since deploy (both ZEC 2026-06-05) and the bot captured 2/2 with correct next-bar entries. See docs/cascade_gate_evaluation_2026-06-09.md."
+   "notes": "Replaces the expired v1 gate ('>=5 trades in 30d', ended 2026-06-08 with 2 trades). v1 gate was mis-specified: only ~44% pass probability even if the backtest were perfect. Plumbing verified 2026-06-09: exactly 2 qualifying cascade candles occurred market-wide since deploy (both ZEC 2026-06-05) and the bot captured 2/2 with correct next-bar entries. See docs/cascade_gate_evaluation_2026-06-09.md.",
+   "closed": "2026-07-13",
+   "resolution": "Bot RETIRED 2026-07-13 by operator decision after cascade-fill-stress-2026-07 verdict (backtest case unreliable: PF 0.98 @0.5% slippage, 0.93 adversarial). Dry record at retirement: 2 closed, 1W/1L, -$3.29. Strategy/config/DB retained, revivable."
   },
   {
    "id": "ff-arb-3rd-loss-trigger",
@@ -85,6 +87,64 @@
     "F2 FF freshness guard: shadow-log then deploy at next natural FF restart",
     "2026-08-17 review: FF gate-open-time fallback binds (1 signal / 310 gate-open hours vs 1.67/wk claimed)"
    ]
+  },
+  {
+   "id": "hl-carry-study-2026-07",
+   "bot": null,
+   "status": "phase1-closed",
+   "registered": "2026-07-13",
+   "codex_verdict": "APPROVED round-2 (thread 019f598a), 2 amendments incorporated",
+   "hypothesis": "Persistently positive HL hourly funding is capturable delta-neutral: short HL perp + spot hedge (T1 Binance spot / T2 HL spot), at realistic mixed fees",
+   "config_declared": {
+    "entry": "trailing-24h HL funding annualized >= 40%/yr (settled data only, effective next settlement)",
+    "exit": "trailing-12h annualized < 10%/yr",
+    "max_concurrent_pairs": 3,
+    "fee_scenarios": {
+     "optimistic": "maker+maker",
+     "realistic_default": "HL maker 1.5bps + Binance spot taker 7.5bps",
+     "pessimistic": "taker+taker"
+    },
+    "no_sweep": "single hand-picked config; accepted risk documented"
+   },
+   "pass_criteria_all_required": [
+    "median episode net > 0 at realistic-default fees",
+    "positive net in BOTH sample halves",
+    "net yield >= 12%/yr on REQUIRED CAPITAL (collateral both legs + 50% liq buffer)",
+    "no single pair > 50% of PnL",
+    "break-even hours <= 1/3 median episode duration",
+    ">= 10 closed episodes, else inconclusive unless clearly negative after costs"
+   ],
+   "kill_scope": "failure kills THIS declared carry implementation, not the structural lane (codex amendment)",
+   "universe_framing": "current deployable universe replay (top ~20 HL perps with Binance spot twins); survivorship acknowledged; NOT a clean historical edge claim",
+   "notes": "Binance futures CVM-blocked for operator -> perp-perp topology rejected at design. 1b rider study (HL hourly-funding extreme fade, one fixed config) is EXPLORATORY: can only produce a dry-run candidate. Basis drift from candles = approximate; book-data shadow phase required before any dry-run.",
+   "phase1_resolution": "T1 formal PASS all 6 criteria (26 episodes/12mo, +$103.73, capital yield 14.42%/yr avg-deployed vs 2.31%/yr provisioned-peak) \u2014 MARGINAL: verdict denominator-sensitive (11.84% under alt formula), 21/26 episodes on 4h-approximated basis, per-episode basis risk dominates carry (hand-traced episode lost -$10.36). T2 structurally empty (no HL spot for majors). Rider 1b DEAD (PF 0.96, 305 trades). NO BOT BUILD \u2014 graduates to shadow phase only. Artifacts: VPS research/hl_carry_2026-07/, 99-file HASHES.txt"
+  },
+  {
+   "id": "cascade-fill-stress-2026-07",
+   "bot": "CascadeFaderV1",
+   "status": "closed",
+   "registered": "2026-07-13",
+   "trigger": "dry entry chased +4.8% in 10min vs assumed next-bar-open fill (C4 anomaly, oos_retest_2026-07)",
+   "design": "1m path-aware replay of lab config (TP3%/SL-8%/48h timeout, 13 pairs, 2023-01->2026-07): uniform entry-slippage ladder {0.25,0.5,1,2,4}% AND adversarial variant (fill at next-1m HIGH; skip trade if next-1m high > signal close +5% = unfilled-cancel model). Fee 0.075%/side. Reconciliation run at 0% slippage must approximate lab metrics (PF~1.6) or the replayer is broken.",
+   "verdict_rule": "PF < 1.2 at 0.5% uniform slippage OR at adversarial variant -> Cascade backtest case declared UNRELIABLE; recommend demote at next review",
+   "notes": "Diagnostic/kill study; codex-approved as properly adversarial.",
+   "closed": "2026-07-13",
+   "resolution": "VERDICT: BACKTEST CASE UNRELIABLE (frozen rule met). PF 1.423 base -> 1.168 @0.25% slip -> 0.984 @0.5% -> 0.931 adversarial (10-min chase model). Monotone steep degradation; even 25bps entry slippage erases most of the edge. Replayer validated (regime shape matches lab; hand-trace verified; N gap vs lab attributed to data vintage + max-3 cap dropping ~47% of clustered signals). RECOMMENDATION: demote/retire CascadeFaderV1 dry bot at next review \u2014 its validated backtest case does not survive realistic entry fills. Artifacts: VPS research/cascade_fill_stress_2026-07/, script sha256 82af7720..."
+  },
+  {
+   "id": "hl-carry-shadow-2026-07",
+   "bot": null,
+   "status": "open",
+   "registered": "2026-07-13",
+   "review_by": "2026-08-17",
+   "design": "Shadow monitor on VPS (stdlib python, systemd user unit): minute-level executable BBO+top-of-book size both legs (HL l2Book + metaAndAssetCtxs; Binance spot bookTicker), hourly settled-funding fetch; paper tracker runs the FROZEN study config with: conservative maker-fill (HL short entry posted at best ask, deemed filled only when a later best BID >= posted level i.e. price traded through), Binance spot leg taker-at-ask, funding accrues only from next settlement after entry, max-3 concurrency with FROZEN ranking (highest trailing-24h funding at signal), executable-BBO basis (never mark).",
+   "authorizes_dry_run_only_if_ALL": [
+    "trajectory yield >= 12%/yr on avg-deployed denominator (provisioned-peak yield reported alongside, always both)",
+    "realized executable basis drift consistent with study assumption (no systematic adverse gap)",
+    "conservative maker-fill rate high enough that realistic_default fee scenario holds (else re-evaluate at taker)",
+    "minimum evidence: >=5 closed paper episodes OR >=300 active position-hours by review, else shadow CONTINUES (inconclusive, not fail)"
+   ],
+   "notes": "Codex-amended (8 points, thread 019f598a). Pilot notional $1000x3 = mechanism validation, not P&L; scaling is a separate operator decision. Depth capture included so scale claims are testable later."
   }
  ]
 }
