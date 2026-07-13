@@ -213,6 +213,29 @@
    "closed": "2026-07-13",
    "resolution": "FAIL all 3 criteria at +4h (n=51 leak-excluded events, 24mo): median \u22122.10%, halves \u22123.43%/\u22121.22%, top-decile 73% concentration. Long-reaction lane CLOSED. HL venue inconclusive-by-data (1m retention ~3-5 days). Measured set = futures-listing announcements for already-spot-listed tokens; buying them is systematically NEGATIVE (\u22127.01% median at +24h, 27.5% positive).",
    "forward_hypothesis_recorded": "INVERTED effect: shorting futures-listing announcements (literature-consistent \u2014 derivative listing enables shorts, overpricing corrects). MUST NOT be validated on this sample (discovered here). If pursued: new prereg, FORWARD events only, venue = HL perp where available (Binance futures CVM-blocked). Execution note: our TG/announcement infra can react in seconds; effect persists 24h so latency is not critical."
+  },
+  {
+   "id": "hl-carry-extension-2026-07",
+   "status": "closed",
+   "registered": "2026-07-13",
+   "design": "SAME frozen config as hl-carry-study-2026-07 (40%/yr entry, 10%/yr exit, max 3, T1 topology, realistic-default fees) applied to (a) maximum available HL funding history (back to HL launch, not just 12mo) and (b) an EXTENDED universe: next ~20 most-liquid HL perps with Binance spot twins beyond the 20 majors. Purpose: more episodes -> tighter yield estimate NOW instead of waiting for forward episodes. Same pass criteria as phase 1; results reported per-universe-tier (majors vs mid-caps) separately.",
+   "notes": "Extension study, not a new config \u2014 no parameter changes. Mid-cap tier carries higher funding but worse hedge liquidity; report spread/impact caveats explicitly.",
+   "closed": "2026-07-13",
+   "resolution": "PASS 6/6 BOTH TIERS over 3.17yr (2023-05->2026-07): MAJORS 104 episodes, +$995.85, capital yield 17.50%/yr, no-pair-max DOGE 28.7%; MIDCAP (top-20 HL perps w/ Binance spot, dayNtlVlm-ranked) 90 episodes, +$1365.45, 26.55%/yr, JTO 24.9%. Robust to return-basis accounting (both still 6/6). Episode rate ~33/yr/tier. CAVEATS: majors 2024 carried ~77% of net (2026 partial weak: 5 ep +$4.84 majors / 10 ep +$35 midcap \u2014 current regime is thin, exactly what the shadow measures); pre-2024-04 basis via 1d-candle approximation; midcap spread flags ZRO/TRB/ASTER/APT/ETHFI (11.6-26.2bps full spread vs 7.5bps assumed \u2014 hedge cost understated up to ~3.5bps/fill if taken); 1h-clean window still <10 episodes; T2 still structurally empty. CONSEQUENCE: yield estimate upgraded from 26-episode knife-edge to 194-episode 6/6; execution realism remains gated by hl-carry-shadow-2026-07 (unchanged authorization chain). Shadow universe extended to include the midcap tier same day."
+  },
+  {
+   "id": "listing-short-forward-2026-07",
+   "status": "open",
+   "registered": "2026-07-13",
+   "hypothesis": "SHORT the announced token on HL at t+60s after a Binance futures-listing announcement; exit at +4h and +24h (both reported). Inverse of the FAILED long study; effect observed retrospectively (median -7%/24h, n=51) but MUST be validated on FORWARD events only.",
+   "design": "Passive monitor on VPS polls Binance CMS catalog-48 every 60s; on futures-listing announcement for a token with a live HL perp: record announcement ts, HL bid/ask at t+60s (executable short entry), and price path snapshots to +24h. PAPER only. Frozen exits +4h/+24h, HL taker fees 4.5bps/side.",
+   "pass_criteria": [
+    ">=8 forward events with HL perp available",
+    "median net short return > 0 at +4h or +24h (declare which BEFORE unblinding: +24h is primary per retrospective persistence)",
+    "positive in >= 60% of events"
+   ],
+   "review_by": "2026-09-15",
+   "notes": "Retrospective sample is the HYPOTHESIS SOURCE and is quarantined from validation. Passing authorizes a dry-run reaction bot design only. MONITOR DEPLOYED 2026-07-13 (systemd listing-monitor, bootstrap-safe, resumable). Return formula codex-verified. Unblind note: forward BBO-based numbers are execution-realistic and SYSTEMATICALLY MORE CONSERVATIVE than the retrospective 1m-close numbers (bid/ask crossing + spread + fees vs optimistic candle closes) \u2014 retrospective is optimistic reference only."
   }
  ]
 }
