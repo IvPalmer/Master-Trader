@@ -233,7 +233,7 @@
     "positive in >= 60% of events"
    ],
    "review_by": "2026-09-15",
-   "notes": "Retrospective sample is the HYPOTHESIS SOURCE and is quarantined from validation. Passing authorizes a dry-run reaction bot design only."
+   "notes": "Retrospective sample is the HYPOTHESIS SOURCE and is quarantined from validation. Passing authorizes a dry-run reaction bot design only. MONITOR DEPLOYED 2026-07-13 (systemd listing-monitor, bootstrap-safe, resumable). Return formula codex-verified. Unblind note: forward BBO-based numbers are execution-realistic and SYSTEMATICALLY MORE CONSERVATIVE than the retrospective 1m-close numbers (bid/ask crossing + spread + fees vs optimistic candle closes) \u2014 retrospective is optimistic reference only."
   }
  ]
 }
