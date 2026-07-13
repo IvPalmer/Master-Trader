@@ -171,6 +171,43 @@
     "Headline metric discipline: banked + floating + stop-at-risk, every report",
     "Judgment when the 9 riders resolve or at 2026-08-17 review"
    ]
+  },
+  {
+   "id": "tsmom-weekly-study-2026-07",
+   "bot": null,
+   "status": "open",
+   "registered": "2026-07-13",
+   "hypothesis": "Canonical slow TSMOM (long/flat, weekly) on crypto majors adds risk-adjusted value vs passive HODL \u2014 a categorically different species from the dead 1h trend lane",
+   "config_declared": {
+    "universe": "BTC ETH BNB SOL XRP ADA AVAX LINK LTC DOGE vs USDT (current-universe replay, survivorship acknowledged)",
+    "signal": "84d (12-week) trailing return > 0 -> long, else flat (spot-only, no shorts)",
+    "rebalance": "weekly Monday 00:00 UTC, equal weight across long assets, idle in stables",
+    "fees": "7.5bps per side per rebalance trade",
+    "window": "max common daily history (BTC/ETH from 2017 where available, others from listing)",
+    "no_sweep": "one canonical literature config; NO parameter exploration"
+   },
+   "pass_criteria_all_required": [
+    "portfolio Sharpe > HODL-BTC Sharpe on same window",
+    "maxDD < 0.6x HODL-BTC maxDD",
+    "positive return in >=60% of calendar years",
+    "2024-01->now subperiod return > 0 (the chop test)"
+   ],
+   "kill": "any criterion fails -> lane closed for this config; passing authorizes a dry-run sleeve design only"
+  },
+  {
+   "id": "listing-reaction-study-2026-07",
+   "bot": null,
+   "status": "open",
+   "registered": "2026-07-13",
+   "hypothesis": "Binance listing announcements move the announced token within minutes; a retail bot reacting at t+60s (our TG/announcement extraction infra) captures part of the move on venues where the token already trades (HL perp or Binance spot)",
+   "method": "Collect 12-24mo of Binance listing/Will-List announcements (announcement CMS API); for each announced token tradable at announcement time (HL perp preferred, else Binance spot), measure net return paths: entry t+60s taker, exits at three FIXED horizons {+30min, +4h, +24h}; fees HL taker 4.5bps or Binance spot 7.5bps per side; report full distribution, both sample halves, per-venue",
+   "pass_criteria": [
+    "median net > 0 at the t+60s -> +4h horizon across >= 20 qualifying events",
+    "positive median in BOTH sample halves",
+    "effect not concentrated: top-decile events < 60% of total"
+   ],
+   "kill": "criteria fail -> lane closed; passing authorizes a reaction-bot design study (execution latency measurement) only",
+   "notes": "Measurement of a documented effect at fixed horizons \u2014 not a sweep. Announcement TIMESTAMP fidelity is critical: use CMS publish time; flag any event where listing trade-open predates announcement."
   }
  ]
 }
