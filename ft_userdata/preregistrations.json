@@ -149,7 +149,7 @@
   {
    "id": "killers-fill-realism-2026-07",
    "bot": "KillersScalpV1",
-   "status": "open",
+   "status": "closed",
    "registered": "2026-07-13",
    "context": "Operator reports dry record ~+20% P&L with high WR. Historical verdict (2026-05-28/06-06): channel unprofitable at REAL prices, edge dies at fill, do-not-fund. Dry-run grants limit fills at touch = optimistic. This audit re-prices the forward dry record under executable-fill rules.",
    "method": "Per dry fill (entries, TP-ladder partials): fetch Binance futures 1m klines for the window; STRICT scenario = limit fill counts at posted price only if 1m price strictly trades through (long entry L: low < L; short/TP sells: high > TP); TOUCH scenario = touch counts (current dry behavior, upper bound). SL/market exits re-priced taker with 0.05% adverse slippage. Recompute P&L/WR/DD per scenario over the full dry period.",
@@ -158,7 +158,19 @@
     "STRICT re-priced P&L <= 0 -> dry-run fill optimism confirmed forward; do-not-fund RECONFIRMED; no tuning study",
     "0 < STRICT P&L < +10% -> inconclusive; continue measuring, no tuning, revisit at next review"
    ],
-   "notes": "Rule committed BEFORE the fill decomposition is computed. Insiders bot audited with same method, reported informationally (no frozen rule \u2014 smaller record)."
+   "notes": "Rule committed BEFORE the fill decomposition is computed. Insiders bot audited with same method, reported informationally (no frozen rule \u2014 smaller record).",
+   "closed": "2026-07-13",
+   "resolution": "VERDICT: NO PROMOTION / NO TUNING AUTHORIZED / CONTINUE MEASUREMENT UNDER RULE GAP. Fills FAITHFUL (0 phantom/touch-only in 88; all 46 TP fills tick-verified trade-through) \u2014 but faithful to trade-through mechanics only, not proof of live copyability (queue/latency untested). STRICT totals: +21.10% headline = banked +3.15% (closed \u221255.55 + booked partials +61.85) + FLOATING +17.95% on 9 leveraged runners; stop-at-risk \u221224.2%; closed WR 6.2%. Rule gap: success branch conjunctive (P&L>=10 AND WR>=55) did not fire, no branch covered high-floating/terrible-WR \u2014 recorded as prereg design defect. COPY-FIDELITY DEFECT: observer classified channel signal-update ('#2154 KITE close at first target') as chat -> ignored -> \u2212$9.42 loss where channel exited in profit. KITE = sensitivity example only, NOT credited back.",
+   "prospective_rule_patch": [
+    "Promotion metrics use BANKED realized P&L only; floating rider P&L reported separately, always with stop-at-risk",
+    "WR criteria apply to closed trades / completed campaigns, never mark-to-market runners",
+    "Open-risk-at-stop must stay below a fixed threshold for any promotion discussion"
+   ],
+   "followups": [
+    "FIX observer classifier: add signal-update kind (SIGNAL ID header + adjust/close instructions) -> receiver action; then REPROCESS full historical corpus with the new class before concluding net benefit (may also cut runners early)",
+    "Headline metric discipline: banked + floating + stop-at-risk, every report",
+    "Judgment when the 9 riders resolve or at 2026-08-17 review"
+   ]
   }
  ]
 }
