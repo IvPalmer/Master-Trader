@@ -761,6 +761,127 @@ def compute_trends(current: list[dict], previous: Optional[dict]) -> dict:
 PREREG_FILE = Path(__file__).resolve().parent / "preregistrations.json"
 
 
+def _closed_equity_maxdd(
+    trades: list, starting_capital: float, since: Optional[str] = None
+) -> Optional[dict]:
+    """Max drawdown of the closed-trade equity curve, peak-relative.
+
+    Mirrors freqtrade's own /profit `max_drawdown` so a trigger threshold that
+    was calibrated against a backtest number is compared against the same
+    quantity. Realized P&L only: open positions are mark-to-market noise, and
+    the backtest figures these thresholds derive from are closed-basis too.
+
+    `since` (a YYYY-MM-DD string) re-baselines the measurement: equity at the
+    boundary still carries P&L banked before it, but the running peak restarts
+    there. Without that reset a drawdown from a peak set *before* a rule was
+    registered gets attributed to the thing the rule is measuring — for
+    FundingFadeV1 the full-run peak predates gate-v2 registration by nine days.
+
+    Dates are ISO-8601, so lexicographic comparison is chronological; a trade
+    closing on the boundary date itself counts as in-scope.
+    """
+    if not trades or not starting_capital or starting_capital <= 0:
+        return None
+    closed = sorted(
+        (t for t in trades if not t.get("is_open") and t.get("close_date")),
+        key=lambda t: t["close_date"],
+    )
+    if since:
+        equity = starting_capital + sum(
+            t.get("profit_abs") or 0.0 for t in closed if t["close_date"] < since
+        )
+        closed = [t for t in closed if t["close_date"] >= since]
+    else:
+        equity = starting_capital
+    if not closed:
+        return None
+
+    peak = equity
+    max_ratio = 0.0
+    max_abs = 0.0
+    trough_date = None
+    for t in closed:
+        equity += t.get("profit_abs") or 0.0
+        peak = max(peak, equity)
+        ratio = (peak - equity) / peak if peak > 0 else 0.0
+        if ratio > max_ratio:
+            max_ratio, max_abs, trough_date = ratio, peak - equity, t["close_date"]
+    return {"ratio": max_ratio, "abs": max_abs, "peak": peak, "trough_date": trough_date}
+
+
+def _evaluate_dd_triggers(
+    entry: dict, trades: list, starting_capital: float
+) -> list[str]:
+    """Evaluate a pre-registration's structured drawdown triggers.
+
+    The free-text `rules` list stays the human-readable record; `triggers` is
+    the machine-checkable subset. Added 2026-07-31 after the FundingFadeV1
+    MaxDD trigger fired on 07-29 and the daily report kept printing "rules not
+    yet evaluable" — that phrase was about the trade-count-gated PF rule and
+    said nothing about the standing drawdown trigger next to it.
+
+    `basis` picks the denominator, and `both` — the conservative default for a
+    rule whose wording does not pin one — breaches on whichever reading is
+    worse. Unbreached triggers still print their headroom: a silent trigger is
+    indistinguishable from an unevaluated one, which is the bug being fixed.
+    """
+    triggers = entry.get("triggers")
+    if not isinstance(triggers, list):
+        return []
+
+    lines: list[str] = []
+    for trig in triggers:
+        try:
+            if not isinstance(trig, dict):
+                continue
+            tid = trig.get("id", "?")
+            if trig.get("metric") != "max_drawdown_pct":
+                lines.append(
+                    f"    trigger {tid}: metric {trig.get('metric')!r} not "
+                    "auto-evaluated — check by hand"
+                )
+                continue
+
+            threshold = float(trig.get("threshold"))
+            op = trig.get("op", ">")
+            basis = trig.get("basis", "both")
+
+            readings = {}
+            if basis in ("full_run", "both"):
+                readings["full-run"] = _closed_equity_maxdd(trades, starting_capital)
+            if basis in ("since_registered", "both"):
+                readings[f"since {entry.get('registered')}"] = _closed_equity_maxdd(
+                    trades, starting_capital, since=entry.get("registered")
+                )
+            readings = {k: v for k, v in readings.items() if v}
+            if not readings:
+                lines.append(f"    trigger {tid}: no closed-trade data — not evaluated")
+                continue
+
+            label, worst = max(readings.items(), key=lambda kv: kv[1]["ratio"])
+            pct = worst["ratio"] * 100
+            breached = pct > threshold if op == ">" else pct >= threshold
+
+            detail = " · ".join(
+                f"{k} {v['ratio'] * 100:.2f}%" for k, v in readings.items()
+            )
+            if breached:
+                lines.append(
+                    f"    TRIGGER {tid}: BREACHED — MaxDD {pct:.2f}% {op} "
+                    f"{threshold:.2f}% ({label}, worst point {worst['trough_date']}) "
+                    f"→ ACTION: {trig.get('action', 'see rules')}"
+                )
+                lines.append(f"      readings: {detail}")
+            else:
+                lines.append(
+                    f"    trigger {tid}: MaxDD {pct:.2f}% vs {threshold:.2f}% "
+                    f"limit ({detail}) — ok"
+                )
+        except Exception as e:  # noqa: BLE001 — one bad trigger must not hide the rest
+            lines.append(f"    trigger {trig.get('id', '?')} skipped (malformed): {e}")
+    return lines
+
+
 def check_preregistrations() -> list[str]:
     """Surface pre-registered review windows/triggers in the daily report.
 
@@ -796,6 +917,7 @@ def check_preregistrations() -> list[str]:
             min_trades = entry.get("min_closed_trades")
 
             closed_since = None
+            trades = None
             port = BOTS.get(entry.get("bot"), {}).get("port")
             if port:
                 trades = get_trades_from_api(port)
@@ -822,6 +944,28 @@ def check_preregistrations() -> list[str]:
                     + ("" if evaluable else " — rules not yet evaluable")
                 )
             entry_lines = [f"  [{eid}] {' · '.join(status_bits) or 'open'}"]
+
+            # Structured triggers first: a BREACHED line is the one thing in
+            # this block that demands action today, so it must not sit below
+            # the free-text rules.
+            if entry.get("triggers") and port and trades is not None:
+                balance = fetch_json(port, "balance") or {}
+                starting_capital = balance.get("starting_capital")
+                if starting_capital:
+                    entry_lines.extend(
+                        _evaluate_dd_triggers(entry, trades, starting_capital)
+                    )
+                else:
+                    entry_lines.append(
+                        "    triggers NOT evaluated: /balance gave no "
+                        "starting_capital — drawdown rules are unchecked"
+                    )
+            elif entry.get("triggers"):
+                entry_lines.append(
+                    "    triggers NOT evaluated: no trade data for this bot — "
+                    "drawdown rules are unchecked"
+                )
+
             rules = entry.get("rules") or []
             for rule in (rules if isinstance(rules, list) else []):
                 entry_lines.append(f"    rule: {rule}")

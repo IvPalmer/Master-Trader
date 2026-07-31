@@ -21,8 +21,15 @@ try:
     import pandas as pd
     import freqtrade  # noqa: F401 — availability probe only
 except ImportError:
-    print("SKIP: freqtrade not installed (run inside a freqtrade container)")
-    sys.exit(0)
+    # Bare sys.exit() here would abort pytest's whole collection pass with an
+    # INTERNALERROR, not skip this file. Skip properly under pytest; exit
+    # cleanly when run as a standalone script inside a container.
+    if __name__ == "__main__":
+        print("SKIP: freqtrade not installed (run inside a freqtrade container)")
+        sys.exit(0)
+    import pytest
+
+    pytest.skip("freqtrade not installed", allow_module_level=True)
 
 for p in ("/freqtrade/user_data/strategies", "ft_userdata/user_data/strategies"):
     if Path(p).is_dir():
