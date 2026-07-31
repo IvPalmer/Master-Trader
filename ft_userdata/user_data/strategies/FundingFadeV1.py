@@ -46,12 +46,19 @@ Operational dependencies (gate v2):
   - BTC_USDT-funding.feather refreshed hourly at :10 by ft-funding-refresh service
     (cron in docker-compose.prod.yml). Missing or stale → fail-closed
     (all entries blocked, ERROR log every 4h).
-  - Per-pair funding feathers used by the original signal (unchanged behavior).
+  - Per-pair funding feathers used by the original signal. Since guard F2
+    (2026-07-31) these fail-closed too: a bar whose resolved funding event is
+    more than _STALE_FUNDING_HOURS old gets NaN funding → no entry for that
+    pair. Measured per bar, so historical outage gaps inside a feather are
+    caught, not just a feed that died at the end. Previously this path only
+    warned while forward-filling indefinitely.
 
 Alerting:
   - Log line "MISSING BTC funding feather — macro gate v2 FAIL-CLOSED" → page
   - Log line "STALE BTC funding feather" + "FAIL-CLOSED" → page (feather exists
     but last funding event is >24h behind the bar being evaluated)
+  - Log line "STALE funding for <pair>" + "FAIL-CLOSED" → page (guard F2; that
+    pair stops producing entries until the refresh recovers)
   - Log line "BTC funding load failed" → investigate
   - Log line "BTC 30d funding mean loaded" → normal startup
   - Cron freshness: ft-funding-refresh runs hourly at :10; if last log >2h old,
@@ -129,8 +136,9 @@ class FundingFadeV1(IStrategy):
     # Max age of the BTC funding feather before the regime gate fail-closes.
     # Funding posts every 8h and ft-funding-refresh runs hourly, so 24h stale
     # means ≥3 missed funding events / ≥24 missed cron runs — the file is dead,
-    # not late. Per-pair staleness warns at 12h (_STALE_FUNDING_HOURS) without
-    # blocking; the macro gate is a risk control and must not run on dead data.
+    # not late. The per-pair signal feather blocks earlier, at 12h
+    # (_STALE_FUNDING_HOURS, guard F2); the macro gate is a coarser risk control
+    # and tolerates more lag before it must stop running on dead data.
     _BTC_FUNDING_MAX_AGE_H = 24
 
     @informative("1h", "BTC/{stake}")
@@ -327,7 +335,7 @@ class FundingFadeV1(IStrategy):
         mtime_ns = path.stat().st_mtime_ns
         cached = self._funding_cache.get(pair)
         if cached and cached[0] == mtime_ns and cached[1] is not None:
-            return self._align_to_dataframe(cached[1], dataframe)
+            return self._align_to_dataframe(cached[1], dataframe, pair)
 
         try:
             fdf = pd.read_feather(path)
@@ -339,7 +347,7 @@ class FundingFadeV1(IStrategy):
                 "Funding data loaded for %s: %d rows, latest %s (mtime %d)",
                 pair, len(fdf), latest, mtime_ns,
             )
-            return self._align_to_dataframe(fdf, dataframe)
+            return self._align_to_dataframe(fdf, dataframe, pair)
         except Exception as e:
             # Do NOT cache the failure. Next call retries the read so a transient
             # filesystem hiccup (mid-write, NFS glitch) doesn't poison signals.
@@ -351,6 +359,13 @@ class FundingFadeV1(IStrategy):
     # lag). A threshold of 12h catches (a) missed cron runs, (b) a silent
     # download failure, (c) the end-time/day-boundary bug in the downloader,
     # well before 24h stale.
+    #
+    # Since guard F2 this threshold BLOCKS entries, it no longer only warns (see
+    # _align_to_dataframe). The ~2.8h of headroom over the healthy ceiling is
+    # deliberate: it must not fire during normal operation. Note this is a
+    # pipeline-death detector — it is NOT set low enough to catch the 2026-07-11
+    # ADA trade (10h stale at signal), which the hourly :10 refresh prevents at
+    # the source. Lowering it under ~9.2h would block healthy entries.
     _STALE_FUNDING_HOURS = 12
 
     def _warn_if_funding_stale(self, pair: str, dataframe: DataFrame) -> None:
@@ -369,7 +384,7 @@ class FundingFadeV1(IStrategy):
                 pair, latest_funding, latest_bar,
             )
 
-    def _align_to_dataframe(self, funding_df, dataframe) -> pd.Series:
+    def _align_to_dataframe(self, funding_df, dataframe, pair: str = "?") -> pd.Series:
         if funding_df is None or funding_df.empty:
             return pd.Series(np.nan, index=dataframe.index)
         pair_ts = dataframe["date"].apply(lambda x: x.timestamp()).values
@@ -381,4 +396,51 @@ class FundingFadeV1(IStrategy):
         # value, creating lookahead at the start of backtests.
         idx = np.searchsorted(funding_ts, pair_ts, side="right") - 1
         result = np.where(idx >= 0, funding_rates[np.clip(idx, 0, len(funding_rates) - 1)], np.nan)
+
+        # Guard F2 (2026-07-31): per-pair staleness fail-closed.
+        #
+        # searchsorted forward-fills the last known funding rate into every
+        # later bar, with no horizon. If ft-funding-refresh dies, that turns a
+        # frozen number into a live entry signal — the strategy would keep
+        # evaluating funding_below_mean against data that no longer exists.
+        # Until now only _warn_if_funding_stale noticed, and it merely logged:
+        # the macro gate failed closed while the per-pair *signal* feather —
+        # the input that actually opens the position — failed open.
+        #
+        # Staleness is measured per bar against the funding event that bar
+        # actually resolved to, NOT against the feather's final event. Those
+        # differ whenever the refresh died and later recovered: the feather
+        # then holds events after the outage, so a "beyond last event" cutoff
+        # would wave the whole gap through while every bar inside it still
+        # carries a funding rate hours or days out of date. Backtests and the
+        # OOS calibration runs read exactly those historical gaps.
+        #
+        # Bars whose selected event is older than _STALE_FUNDING_HOURS get NaN,
+        # so `funding_rate < roll_mean - roll_std` is False and
+        # funding_below_mean is 0 → no entry. Bars predating all funding are
+        # already NaN above and stay that way (NaN comparison is False).
+        # Threshold rationale is at the _STALE_FUNDING_HOURS definition: it
+        # detects a dead refresh pipeline and sits above the ~9.2h healthy
+        # ceiling, so normal operation is never blocked.
+        selected_ts = np.where(
+            idx >= 0, funding_ts[np.clip(idx, 0, len(funding_ts) - 1)], np.nan
+        )
+        stale_mask = (pair_ts - selected_ts) > self._STALE_FUNDING_HOURS * 3600
+        if stale_mask.any():
+            result[stale_mask] = np.nan
+            now = time.time()
+            warn_key = f"__PAIR_STALE__{pair}"
+            last_warn = self._missing_funding_last_warn.get(warn_key, 0.0)
+            if now - last_warn >= self._MISSING_REWARN_INTERVAL_S:
+                logger.error(
+                    "STALE funding for %s (latest event %s, max age %dh) — "
+                    "entries FAIL-CLOSED for %d bar(s), worst %.1fh stale. "
+                    "Check ft-funding-refresh.",
+                    pair,
+                    pd.to_datetime(funding_ts[-1], unit="s", utc=True),
+                    self._STALE_FUNDING_HOURS,
+                    int(stale_mask.sum()),
+                    float(np.nanmax(pair_ts - selected_ts)) / 3600,
+                )
+                self._missing_funding_last_warn[warn_key] = now
         return pd.Series(result, index=dataframe.index)

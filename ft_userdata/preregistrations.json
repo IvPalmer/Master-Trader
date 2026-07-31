@@ -9,7 +9,20 @@
   "(strategy_health_report.py, PRE-REGISTRATIONS section) with an OVERDUE",
   "marker once review_by passes. Closing an entry requires a human decision",
   "recorded in 'resolution'. New pre-registrations MUST be added here, not",
-  "(only) in commit messages or memory."
+  "(only) in commit messages or memory.",
+  "",
+  "'rules' is free text for humans. 'triggers' is the machine-checkable subset",
+  "the daily report actually evaluates: {id, metric, basis, op, threshold,",
+  "action}. Only metric 'max_drawdown_pct' is auto-evaluated today; basis is",
+  "'full_run', 'since_registered', or 'both' (breaches on the worse reading —",
+  "the conservative default when the rule's wording does not pin a denominator).",
+  "Anything expressible as a trigger SHOULD be one: on 2026-07-29 a drawdown",
+  "trigger fired and went unseen for two days because it lived only in 'rules'.",
+  "",
+  "Never edit a rule in place. Changing what a pre-registration commits to",
+  "requires an entry in 'amendments' recording the reason — that is the whole",
+  "point of pre-registering. Disagreeing with a past rule is legitimate;",
+  "disagreeing with it silently is not."
  ],
  "preregistrations": [
   {
@@ -24,7 +37,47 @@
     "Kill/demote if PF < 0.7 over 30+ closed trades since 2026-05-19",
     "If <10 closed trades by review_by, the PF rule is NOT evaluable: review must instead compare gate-open time vs backtest expectation and decide extend/simplify, not auto-pass"
    ],
-   "notes": "Original window said '90d or 75 trades, whichever first' \u2014 at the gate-v2 backtest rate (1.67 trades/wk) 75 trades takes ~10 months, so the trade arm was vacuous. Live rate since redeploy is ZERO trades in 21d (BTC below SMA50/200 \u2014 mostly the pre-existing v1 base gate). Audited 2026-06-09."
+   "triggers": [
+    {
+     "id": "maxdd-registry-3.60",
+     "metric": "max_drawdown_pct",
+     "basis": "both",
+     "op": ">",
+     "threshold": 3.6,
+     "action": "Rollback gate v2 (registry text) \u2014 SUPERSEDED by amendment 2026-07-31, do not execute without operator sign-off"
+    },
+    {
+     "id": "maxdd-commit-3.84",
+     "metric": "max_drawdown_pct",
+     "basis": "both",
+     "op": ">",
+     "threshold": 3.84,
+     "action": "Demote to regime-halt-only (commit 34ec07b text) \u2014 SUPERSEDED by amendment 2026-07-31, do not execute without operator sign-off"
+    },
+    {
+     "id": "maxdd-kill-8pct",
+     "metric": "max_drawdown_pct",
+     "basis": "both",
+     "op": ">",
+     "threshold": 8.0,
+     "action": "Kill (commit 34ec07b text) \u2014 breaches on the full-run reading only; see amendment 2026-07-31"
+    }
+   ],
+   "amendments": [
+    {
+     "date": "2026-07-31",
+     "reason": "Trigger fired 2026-07-29 04:19 UTC (LTC stop-loss close) and was not noticed for two days: the daily health report evaluated this entry only by closed-trade count and review date, so it printed 'rules not yet evaluable' \u2014 true of the PF rule, silent on the standing drawdown trigger. Fixed same day (_evaluate_dd_triggers in strategy_health_report.py); the 'triggers' block above is what it now reads.",
+     "conflict_found": "Two texts disagree on BOTH threshold and action. Commit 34ec07b (2026-05-19, the actual pre-declaration): 'Demote to regime-halt-only if live MaxDD > 3.84% (1.5x backtest). Kill if DD > 8% or 5+ consecutive losses or PF < 0.7 over 30+ trades.' This registry entry (added 2026-06-09): 'Rollback gate v2 if account MaxDD > 3.60%.' The registry silently changed the number AND the action, in opposite directions \u2014 'demote to regime-halt-only' keeps the restrictive filter (bot trades less), 'rollback gate v2' removes it (bot trades more). 3.84% is also arithmetically odd: the commit says '1.5x backtest' but 1.5 x 2.40 = 3.60, so 3.84 (=1.6x) looks like the original slip and 3.60 like a correction that overreached into the action clause. RESOLUTION: both texts are recorded as separate triggers above; neither is discarded. All three thresholds are breached.",
+     "measurement": "Closed-equity MaxDD, freqtrade /profit basis. Full-run 8.60% (peak $86.46 on 2026-05-10 -> trough $79.03 on 2026-07-29; abs $7.43). Gate-v2-era only (peak re-baselined at 2026-05-19 equity $82.60) 4.32%, same trough date. Starting capital $80.65; bot-owned equity $78.91 at audit. NOTE: the '$200 live' figure in older session notes is wrong \u2014 the API reports ~$80.",
+     "decision": "THREE pre-committed actions are in scope and NONE was executed. (a) 'Rollback gate v2' at 3.60% (registry) \u2014 breached, not executed. (b) 'Demote to regime-halt-only' at 3.84% (34ec07b) \u2014 breached, not executed. (c) 'KILL if DD > 8%' (34ec07b) \u2014 breached on the full-run reading (8.60%), NOT breached on the gate-v2-era reading (4.32%); not executed. Instead FundingFadeV1 was PAUSED: no new entries, open positions still fully managed (exits, ROI, stoploss and timeouts all run in PAUSED state \u2014 verified in freqtrade 2026.3 source, exit_positions() is unconditional in FreqtradeBot.process() and only entry is gated on state == RUNNING). The pause was also made durable in FundingFadeV1.live.json (initial_state running -> paused), because PAUSED is in-memory only and any restart, redeploy or VPS reboot would otherwise have silently resumed live trading.",
+     "kill_arm_override": "STATED PLAINLY BECAUSE IT WOULD BE EASY TO BURY: pausing is a WEAKER action than the kill this pre-registration commits to. The kill arm fired and was overridden, not satisfied. It is an open override requiring operator sign-off, and it is live NOW \u2014 it is not deferred to 2026-08-17 and must not be treated as resolved by the pause. Two things make the override defensible rather than an evasion, and neither makes it automatic: (1) the kill arm's denominator is genuinely ambiguous in the same way the demote arm's is \u2014 it fires at 8.60% full-run but not at 4.32% gate-v2-era, and the full-run figure includes a drawdown whose peak (2026-05-10) predates the pre-registration by nine days, so the clause is being read against a window it was not written for; (2) with the bot paused and the position book down to one trade running to its own stoploss, the practical gap between pause and kill is capital allocation, not risk taken. If the operator wants the pre-commitment honoured literally, the action is to kill: stop the container and withdraw the allocation. That decision is his, and declining to make it is itself a decision that should be recorded here. The other two kill sub-clauses did NOT fire: max consecutive losses within the gate-v2 era is 3, not 5 (the full-run streak of 7 spans the May window that predates the declaration), and the PF arm needs 30+ closed trades against 6 actual.",
+     "rationale": "This covers the two gate arms only; the kill arm is dealt with separately in kill_arm_override. Both gate actions LOOSEN the gate. That made sense when written: the rule is a falsification clause \u2014 gate v2 promised MaxDD 2.40%, so exceeding 1.5x means the filter did not deliver and you stop paying its cost in trade scarcity. But it was written 2026-05-19, BEFORE the OOS retest of 2026-07-13 established that the problem is not gate tightness: the gate was open 23.4% of the OOS window (backtest era 33.3%) and those 310 gate-open hours produced ONE funding signal against a claimed 1.67/wk. The signal decayed, not the gate. Executing either action today would put real money on a LOOSER version of a strategy with live gate-v2-era PF 0.078 (1W/5L, every loss a full -5% stop) and no demonstrated OOS edge. Corroboration that this is structural and not a small-N artifact: hl-carry-shadow-2026-07 has recorded ZERO episodes in 18 days because max trailing-24h funding across 40 coins is 10.95%/yr against a 40%/yr entry \u2014 the same funding-yield compression, on a different venue, measured by a different instrument.",
+     "statistical_honesty": "N=6 closed trades since registration cannot establish that the edge is dead; the confidence interval is very wide, and the 2026-07-12 ADA loss was a known funding-freshness fault since fixed. The honest characterization is 'severe adverse live evidence and payoff realization inconsistent with the backtest, too few independent trades for a reliable edge estimate'. The pause is justified by the drawdown trigger and the OOS signal-scarcity finding, NOT by a claim that N=6 proves anything.",
+     "open_for_operator": "TWO open items, different clocks. (1) OPEN NOW, not deferrable: sign off on or reject the kill-arm override described in kill_arm_override. The pause does not settle it \u2014 'the bot is paused so nothing fires' is true of the two gate-loosening actions and FALSE of the kill. (2) Deferrable to 2026-08-17: which text is authoritative for the demote/rollback arms (34ec07b vs registry). That one genuinely can wait, because both candidate actions loosen a gate on a paused bot and neither can fire while it stays paused.",
+     "provenance": "The pause was first applied at 2026-07-31 03:29:46 UTC by an unintended state-changing API call during this audit (a POST issued while probing endpoint availability), not by a deliberate decision. It was reported to the operator immediately with a revert command offered; the operator reviewed the finding and confirmed the pause as the intended action in the same session. Recorded because a governance file must not launder how its own state came about."
+    }
+   ],
+   "notes": "Original window said '90d or 75 trades, whichever first' \u2014 at the gate-v2 backtest rate (1.67 trades/wk) 75 trades takes ~10 months, so the trade arm was vacuous. Live rate since redeploy is ZERO trades in 21d (BTC below SMA50/200 \u2014 mostly the pre-existing v1 base gate). Audited 2026-06-09. PAUSED 2026-07-31 \u2014 see amendments."
   },
   {
    "id": "cascade-dry-run-gate-v2",
@@ -84,7 +137,7 @@
    },
    "followups": [
     "cascade-fill-model-stress-test before trusting any Cascade backtest number",
-    "F2 FF freshness guard: shadow-log then deploy at next natural FF restart",
+    "F2 FF freshness guard: DONE 2026-07-31. Per-pair funding now fails closed at _STALE_FUNDING_HOURS (12h) in _align_to_dataframe, matching the macro gate; previously it only warned while forward-filling frozen funding into live bars indefinitely. The 'shadow-log first' stage was COLLAPSED: it existed to avoid changing entry behaviour mid-measurement on a running bot, and FF is paused (see ff-gate-v2-review amendment), so there is no live measurement to disturb. The guard logs every blocked bar, which preserves the shadow stage's visibility. Threshold is a pipeline-death detector and deliberately sits above the ~9.2h healthy ceiling — it does NOT catch the 10h-stale 2026-07-11 ADA trade, which the hourly :10 refresh prevents at the source. Tests: tests/test_ff_per_pair_funding_staleness.py",
     "2026-08-17 review: FF gate-open-time fallback binds (1 signal / 310 gate-open hours vs 1.67/wk claimed)"
    ]
   },
