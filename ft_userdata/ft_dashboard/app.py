@@ -45,6 +45,8 @@ BOTS: list[dict[str, Any]] = [
         "name": "FundingFadeV1",
         "label": "funding-fade",
         "url": "http://ft-funding-fade:8080",
+        "account_group": "binance-spot",
+        "strategy_kind": "autonomous-quant",
         "baseline": {
             "annual_return_pct": 18.4, "profit_factor": 1.29, "win_rate": 0.657,
             "max_dd_pct": 19.6, "trades_per_year": 131, "worst_trade_pct": -5.0,
@@ -56,40 +58,42 @@ BOTS: list[dict[str, Any]] = [
         "name": "KeltnerBounceV1",
         "label": "keltner-bounce",
         "url": "http://ft-keltner-bounce:8080",
+        "account_group": "binance-spot",
+        "strategy_kind": "autonomous-quant",
         "baseline": {
             "annual_return_pct": 15.6, "profit_factor": 1.58, "win_rate": 0.64,
             "max_dd_pct": 12.9, "trades_per_year": 46, "worst_trade_pct": -5.0,
             "starting_equity_in_csv": 200.0,
         },
     },
+    # OITrendPullback is a forward-only spot strategy. Its OI gate depends on
+    # live Binance Futures public data, so there is no transferable historical
+    # baseline yet. It shares the same Binance spot wallet as Funding/Keltner.
     {
-        "key": "cascade",
-        "name": "CascadeFaderV1",
-        "label": "cascade-fader",
-        "url": "http://ft-cascade-fader:8080",
-        "baseline": {
-            "annual_return_pct": 17.0, "profit_factor": 1.76, "win_rate": 0.84,
-            "max_dd_pct": 0.51, "trades_per_year": 46, "worst_trade_pct": -8.0,
-            "starting_equity_in_csv": 200.0,
-        },
+        "key": "oi-trend",
+        "name": "OITrendPullbackV1",
+        "label": "oi-trend-pullback",
+        "url": "http://ft-oi-trend-pullback:8080",
+        "account_group": "binance-spot",
+        "strategy_kind": "autonomous-quant",
+        "observational": True,
+        "no_baseline": True,
+        "baseline": None,
     },
-    # ShortKeltnerV2 Binance dry-run (port 8100) RETIRED 2026-05-29 — going
-    # HL-only for the short (Binance futures are CVM-banned for BR anyway).
-    # Code kept in git (ShortKeltnerV2.py/.json) — it's the only backtestable
-    # version since HL serves no history. Only the HL forward bot runs live.
+    # The original HL dry-run remains available for historical audit, but the
+    # fleet dashboard must follow the fresh, independently funded live epoch.
     {
         "key": "short-keltner-hl",
         "name": "ShortKeltnerV2HL",
         "label": "short-keltner-hl",
-        "url": "http://ft-short-keltner-hl:8080",
+        "url": "http://ft-short-keltner-hl-live:8080",
+        "container": "ft-short-keltner-hl-live",
+        "freqtrade_ui": None,
+        "account_group": "hyperliquid-short-keltner",
+        "strategy_kind": "autonomous-quant",
         "venue": "hyperliquid",
-        # DRY-RUN on Hyperliquid (self-custody DEX perps, USDC-margined). Same
-        # logic as short-keltner, forward-only: HL serves NO historical OHLCV so
-        # it cannot be backtested — this is the on-venue OOS measurement codex
-        # required before any capital. No baseline transfers from the Binance
-        # backtest (HL funding is oracle/premium-based and inverts vs Binance).
-        # Observational; no keys, no capital. Standalone container (not in this
-        # compose). See docs/hyperliquid_short_validation_2026-05-29.md.
+        # Fresh $40 live account; the old $200 dry-run epoch is intentionally
+        # excluded so its P&L cannot leak into real-money fleet totals.
         "observational": True,
         "no_baseline": True,
         "baseline": None,
@@ -99,6 +103,8 @@ BOTS: list[dict[str, Any]] = [
         "name": "KillersScalpV1",
         "label": "killers-scalp",
         "url": "http://ft-killers-scalp:8080",
+        "account_group": "hyperliquid-killers",
+        "strategy_kind": "copy-trader",
         # Copy-trader of the Binance Killers VIP private channel, executed on
         # Hyperliquid because Binance Futures is unavailable to the operator.
         # Forward/live evolution uses posted stops and fixed stop-risk sizing.
@@ -123,6 +129,8 @@ BOTS: list[dict[str, Any]] = [
         "name": "InsidersScalp",
         "label": "insiders-scalp",
         "url": "http://ft-insiders-scalp:8080",
+        "account_group": "hyperliquid-insiders",
+        "strategy_kind": "copy-trader",
         "venue": "hyperliquid",
         "observational": True,
         "no_baseline": True,
@@ -568,7 +576,9 @@ def _bot_links(bot: dict, open_trades: list[dict], per_pair: list[dict]) -> dict
     back to the top-profit closed pair.  Futures pairs get `.P` suffix.
     """
     label = bot.get("label", bot["key"])
-    freqtrade_ui = f"https://{label}.master-trader.grooveops.dev/"
+    freqtrade_ui = bot.get(
+        "freqtrade_ui", f"https://{label}.master-trader.grooveops.dev/"
+    )
 
     # Pick candidate pair for TradingView link.
     tv_pair: str | None = None
@@ -595,7 +605,7 @@ def _bot_links(bot: dict, open_trades: list[dict], per_pair: list[dict]) -> dict
     return {
         "freqtrade_ui": freqtrade_ui,
         "tradingview_top_pair": tv_url,
-        "logs_hint": f"docker logs ft-{label} --tail 50",
+        "logs_hint": f"docker logs {bot.get('container', f'ft-{label}')} --tail 50",
     }
 
 
@@ -774,6 +784,10 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "capital_at_risk": _capital_at_risk(open_trades),
         "concentration": _concentration(per_pair, closed_pnl),
         "observational": bot.get("observational", False),
+        "no_baseline": no_baseline,
+        "account_group": bot.get("account_group", bot["key"]),
+        "strategy_kind": bot.get("strategy_kind", "autonomous-quant"),
+        "venue": bot.get("venue", "binance"),
         # Gates: null for no-baseline bots, observational marker for copy-traders
         # with soft gating, full gate objects for quant-validated bots.
         "gate1": (None if no_baseline
