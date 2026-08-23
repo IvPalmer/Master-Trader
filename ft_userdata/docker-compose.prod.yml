@@ -56,6 +56,27 @@ services:
       - /bin/sh
       - -c
       - sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1
+
+  oi-trend-pullback:
+    image: freqtradeorg/freqtrade:stable
+    restart: always
+    container_name: ft-oi-trend-pullback
+    environment: *a1
+    volumes:
+      - ft_user_data:/freqtrade/user_data
+      - ./user_data/configs:/freqtrade/user_data/configs:ro
+      - ./user_data/strategies:/freqtrade/user_data/strategies
+    ports:
+      - 127.0.0.1:8102:8080
+    healthcheck: *a2
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    entrypoint:
+      - /bin/sh
+      - -c
+      - sleep 80 && exec freqtrade trade --logfile /freqtrade/user_data/logs/OITrendPullbackV1.log --config /freqtrade/user_data/configs/OITrendPullbackV1.live.json --strategy OITrendPullbackV1
   # cascadefaderv1: RETIRED 2026-07-13. Fill-stress study (prereg
   # cascade-fill-stress-2026-07): PF 1.42 at ideal fills collapses to 0.98 at
   # 0.5% entry slippage / 0.93 adversarial — the edge was a next-bar-open fill
@@ -88,9 +109,12 @@ services:
       KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
       KILLERS_DB: /var/lib/killers/receiver.sqlite
-      KILLERS_STAKE_USD: "20"
-      KILLERS_LEVERAGE: "5"
-      KILLERS_MAX_OPEN: "10"
+      KILLERS_RISK_USD: "1"
+      KILLERS_MIN_MARGIN_USD: "5"
+      KILLERS_MAX_MARGIN_USD: "10"
+      KILLERS_MAX_LEVERAGE: "3"
+      KILLERS_REQUIRE_POSTED_SL: "true"
+      KILLERS_MAX_OPEN: "5"
       # Posted-SL hard-stop mode ON (2026-06-06): force-exit a position once
       # mark breaches the signal's posted SL, instead of riding to the channel's
       # close / liquidation. Per research/killers_sl_replay this halves the loss
@@ -123,6 +147,7 @@ services:
       # left intact (*a1) because Binance futures dry-run needs them to load
       # leverage brackets/markets; the explicit flag is what closes the go-live path.
       FREQTRADE__DRY_RUN: "true"
+      SIGNAL_RECEIVER_URL: http://killers-receiver:8089
     volumes:
       - ft_user_data:/freqtrade/user_data
       - ./user_data/configs:/freqtrade/user_data/configs:ro
@@ -151,6 +176,7 @@ services:
     environment:
       <<: *a1
       FREQTRADE__DRY_RUN: "true"   # go-live guard (env overrides config)
+      SIGNAL_RECEIVER_URL: http://insiders-receiver:8089
     volumes:
       - ft_user_data:/freqtrade/user_data
       - ./user_data/configs:/freqtrade/user_data/configs:ro
@@ -181,12 +207,16 @@ services:
       - dokploy-network
     environment:
       KILLERS_FT_BASE_URL: http://ft-insiders-scalp:8080
+      KILLERS_BOT_LABEL: insiders-scalp
       KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
       KILLERS_DB: /var/lib/killers/receiver.sqlite
-      KILLERS_STAKE_USD: "20"
-      KILLERS_LEVERAGE: "5"
-      KILLERS_MAX_OPEN: "10"
+      KILLERS_RISK_USD: "1"
+      KILLERS_MIN_MARGIN_USD: "5"
+      KILLERS_MAX_MARGIN_USD: "10"
+      KILLERS_MAX_LEVERAGE: "3"
+      KILLERS_REQUIRE_POSTED_SL: "true"
+      KILLERS_MAX_OPEN: "5"
       KILLERS_POSTED_SL: "true"
       KILLERS_NOTIFY_URL: http://trade-webhook:8088/test/notify
     volumes:

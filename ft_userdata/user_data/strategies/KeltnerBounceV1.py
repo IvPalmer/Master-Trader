@@ -25,6 +25,7 @@ Generated 2026-04-16.
 """
 
 import logging
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -45,7 +46,11 @@ class KeltnerBounceV1(IStrategy):
         "1440": 0.02,
     }
 
-    stoploss = -0.07
+    # Live v2: the forward sample showed that losing trades never recovered
+    # after reaching the old -7% floor, while winners had materially smaller
+    # adverse excursions.  A 6% floor reduces the repeated full-stop loss
+    # without turning this into a tight intraday stop.
+    stoploss = -0.06
     trailing_stop = True
     trailing_stop_positive = 0.03
     trailing_stop_positive_offset = 0.05
@@ -66,6 +71,20 @@ class KeltnerBounceV1(IStrategy):
     vol_multiplier = 1.75
     vol_sma_period = 20
     btc_sma_period = 50
+
+    @property
+    def protections(self):
+        """Keep a bad cluster from consuming all of the shared spot wallet."""
+        return [
+            {"method": "CooldownPeriod", "stop_duration_candles": 2},
+            {
+                "method": "StoplossGuard",
+                "lookback_period_candles": 72,
+                "trade_limit": 2,
+                "stop_duration_candles": 24,
+                "only_per_pair": False,
+            },
+        ]
 
     @informative("1h", "BTC/{stake}")
     def populate_indicators_btc_1h(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -108,6 +127,25 @@ class KeltnerBounceV1(IStrategy):
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # Exits handled by ROI, stoploss, and trailing stop
         return dataframe
+
+    def custom_exit(
+        self,
+        pair: str,
+        trade,
+        current_time: datetime,
+        current_rate: float,
+        current_profit: float,
+        **kwargs,
+    ):
+        """Release capital from failed bounces instead of parking it for weeks.
+
+        Winners are still free to run through ROI/trailing.  This only closes a
+        trade that remains underwater after five full days.
+        """
+        age_hours = (current_time - trade.open_date_utc).total_seconds() / 3600
+        if age_hours >= 120 and current_profit < 0:
+            return "v2_stale_bounce"
+        return None
 
 
 # ── Helpers ────────────────────────────────────────────────

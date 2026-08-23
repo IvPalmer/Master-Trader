@@ -67,6 +67,7 @@ Alerting:
 
 import logging
 import time
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -91,7 +92,7 @@ class FundingFadeV1(IStrategy):
         "1440": 0.02,
     }
 
-    stoploss = -0.05
+    stoploss = -0.045
     trailing_stop = False
     use_custom_stoploss = False
 
@@ -110,6 +111,19 @@ class FundingFadeV1(IStrategy):
     vol_sma_period = 20
     btc_sma50_period = 50
     btc_sma200_period = 200
+
+    @property
+    def protections(self):
+        return [
+            {"method": "CooldownPeriod", "stop_duration_candles": 4},
+            {
+                "method": "StoplossGuard",
+                "lookback_period_candles": 96,
+                "trade_limit": 2,
+                "stop_duration_candles": 36,
+                "only_per_pair": False,
+            },
+        ]
 
     # Macro gate v2 params (frozen 2026-05-19)
     btc_sma50_slope_lookback_bars = 24       # 24 × 1h = 1 day
@@ -161,6 +175,14 @@ class FundingFadeV1(IStrategy):
             dataframe["funding_rate"] < (roll_mean - roll_std)
         ).astype(int)
 
+        # Do not buy the first falling candle merely because funding is
+        # extreme.  The extreme persists between settlements, giving the
+        # strategy several candles to wait for the first price reversal.
+        dataframe["price_reversal"] = (
+            (dataframe["close"] > dataframe["open"])
+            & (dataframe["close"] > dataframe["close"].shift(1))
+        ).astype(int)
+
         # ADX
         dataframe["adx"] = ta.ADX(dataframe, timeperiod=14)
 
@@ -206,6 +228,7 @@ class FundingFadeV1(IStrategy):
         dataframe.loc[
             (
                 (dataframe["funding_below_mean"] == 1)
+                & (dataframe["price_reversal"] == 1)
                 & (dataframe["adx"] > self.adx_threshold)
                 & (dataframe["volume"] > self.vol_multiplier * dataframe["vol_sma"])
                 & (dataframe["btc_gate"] == 1)
@@ -218,6 +241,23 @@ class FundingFadeV1(IStrategy):
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # Exits handled entirely by ROI + stoploss
         return dataframe
+
+    def custom_exit(
+        self,
+        pair: str,
+        trade,
+        current_time: datetime,
+        current_rate: float,
+        current_profit: float,
+        **kwargs,
+    ):
+        """End stale funding episodes and recycle the small live allocation."""
+        age_hours = (current_time - trade.open_date_utc).total_seconds() / 3600
+        if age_hours >= 96 and current_profit < 0:
+            return "v2_failed_reversion"
+        if age_hours >= 168 and current_profit < 0.01:
+            return "v2_expired_episode"
+        return None
 
     # ── BTC 30d funding rate (for regime halt) ────────────────────────────
 

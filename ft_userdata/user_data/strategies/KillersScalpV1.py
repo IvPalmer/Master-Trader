@@ -16,11 +16,21 @@ classifier + receiver own all signal logic. The Freqtrade layer is
 pure execution + bookkeeping. Same pattern as the insiders-scalp
 template (services/insiders-receiver/).
 """
+import json
+import logging
+import os
+import time
+import urllib.error
+import urllib.request
 from datetime import datetime
 from typing import Optional
 
-from freqtrade.strategy import IStrategy
+from freqtrade.strategy import IStrategy, stoploss_from_absolute
 from pandas import DataFrame
+
+
+logger = logging.getLogger(__name__)
+RECEIVER_URL = os.getenv("SIGNAL_RECEIVER_URL", "http://killers-receiver:8089")
 
 
 class KillersScalpV1(IStrategy):
@@ -30,19 +40,20 @@ class KillersScalpV1(IStrategy):
     can_short = True        # futures: shorts allowed
     process_only_new_candles = True
 
-    # ROI / stoploss are unused (closes driven by REST), but Freqtrade
-    # requires both. Set permissive so we never auto-close.
+    # Channel exits still drive normal closes. V2 adds a catastrophe floor
+    # plus the receiver's per-signal posted stop as an exchange-managed stop.
     minimal_roi = {"0": 100}        # 100x profit before ROI exit (never hit)
-    stoploss = -0.99                # -99% stoploss (never hit)
+    stoploss = -0.07
     trailing_stop = False
-    use_custom_stoploss = False
+    use_custom_stoploss = True
     use_exit_signal = False         # explicit: REST drives all exits
     exit_profit_only = False
 
     # Default leverage. Receiver may override per-trade via force_enter.
-    leverage_amount = 5.0
+    leverage_amount = 3.0
 
     startup_candle_count = 10
+    _sl_cache: dict = {}
 
     # ── pass-through indicators / signals ──────────────────────────────
 
@@ -74,3 +85,47 @@ class KillersScalpV1(IStrategy):
     ) -> float:
         """Cap leverage at the configured default."""
         return min(self.leverage_amount, max_leverage)
+
+    def custom_stoploss(
+        self, pair, trade, current_time, current_rate, current_profit, **kwargs
+    ):
+        """Pull the signal's posted SL from the receiver with a short cache."""
+        now = time.time()
+        cached = self._sl_cache.get(trade.id)
+        if cached and now - cached[0] < 30:
+            return cached[1]
+        try:
+            request = urllib.request.Request(
+                f"{RECEIVER_URL}/position/by_ft_id/{trade.id}",
+                headers={"Accept": "application/json"},
+            )
+            with urllib.request.urlopen(request, timeout=0.5) as response:
+                payload = json.load(response)
+            sl_price = payload.get("current_sl")
+            if not isinstance(sl_price, (int, float)) or sl_price <= 0:
+                return None
+            sl_price = float(sl_price)
+            if (not trade.is_short and sl_price >= current_rate) or (
+                trade.is_short and sl_price <= current_rate
+            ):
+                logger.warning(
+                    "Ignoring wrong-side receiver SL %s at rate %s for trade %s",
+                    sl_price, current_rate, trade.id,
+                )
+                return None
+            relative = stoploss_from_absolute(
+                stop_rate=sl_price,
+                current_rate=current_rate,
+                is_short=trade.is_short,
+                leverage=trade.leverage or 1.0,
+            )
+            if relative is not None:
+                self._sl_cache[trade.id] = (now, relative)
+            return relative
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                logger.warning("Receiver SL HTTP %s for trade %s", exc.code, trade.id)
+            return None
+        except Exception as exc:
+            logger.info("Receiver SL fallback for trade %s: %s", trade.id, exc)
+            return None

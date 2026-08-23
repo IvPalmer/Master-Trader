@@ -21,9 +21,10 @@
         "emergency_exit": "market",
         "force_exit": "market",
         "force_entry": "market",
-        "stoploss": "market",
-        "stoploss_on_exchange": false,
-        "stoploss_on_exchange_interval": 60
+        "stoploss": "limit",
+        "stoploss_on_exchange": true,
+        "stoploss_on_exchange_interval": 60,
+        "stoploss_on_exchange_limit_ratio": 0.985
     },
     "entry_pricing": {
         "price_side": "same",
@@ -210,8 +211,8 @@
         "password": "OVERRIDE_VIA_ENV"
     },
     "bot_name": "FundingFadeLive",
-    "_initial_state_note": "PAUSED 2026-07-31: pre-registered MaxDD trigger breached 2026-07-29 (see preregistrations.json ff-gate-v2-review amendments). PAUSED is in-memory only, so 'running' here meant any restart, redeploy or VPS reboot would silently resume LIVE trading. Open positions are still fully managed while paused (exits/ROI/stoploss run; only entries are gated). Revert to 'running' only as part of the 2026-08-17 review decision.",
-    "initial_state": "paused",
+    "_initial_state_note": "Resumed 2026-08-23 as a $15 x 2 micro-live V2 epoch: reversal confirmation, stale-episode exits, tighter stop and cluster protection.",
+    "initial_state": "running",
     "force_entry_enable": false,
     "internals": {
         "process_throttle_secs": 5
