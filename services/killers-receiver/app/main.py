@@ -68,8 +68,17 @@ class Config:
         self.db_path = os.environ.get(
             "KILLERS_DB", "/var/lib/killers/receiver.sqlite"
         )
-        self.stake_usd = float(os.environ.get("KILLERS_STAKE_USD", "20"))
-        self.leverage = float(os.environ.get("KILLERS_LEVERAGE", "5"))
+        # V2 sizes from the signal's posted stop. Legacy fixed values remain
+        # readable for rollback and for a deliberately SL-optional deployment.
+        self.stake_usd = float(os.environ.get("KILLERS_STAKE_USD", "10"))
+        self.leverage = float(os.environ.get("KILLERS_LEVERAGE", "2"))
+        self.risk_usd = float(os.environ.get("KILLERS_RISK_USD", "1"))
+        self.min_margin_usd = float(os.environ.get("KILLERS_MIN_MARGIN_USD", "5"))
+        self.max_margin_usd = float(os.environ.get("KILLERS_MAX_MARGIN_USD", "10"))
+        self.max_leverage = float(os.environ.get("KILLERS_MAX_LEVERAGE", "3"))
+        self.require_posted_sl = os.environ.get(
+            "KILLERS_REQUIRE_POSTED_SL", "true"
+        ).lower() in ("true", "1", "yes")
         self.max_open = int(os.environ.get("KILLERS_MAX_OPEN", "10"))
         # Telegram-alert prefix identity (see logger note above). Default keeps
         # the Killers tag; the insiders instance sets KILLERS_BOT_LABEL=insiders-scalp.
@@ -493,12 +502,9 @@ def compute_stake(
 ) -> tuple[float, float, Optional[float]]:
     """Return (stake_usd, leverage, sl_distance_pct).
 
-    Sizing model (matches the other dry-run bots' risk-budget rule):
-      sl_distance_pct = |entry_mid - sl| / entry_mid
-      stake_usd is constant per trade (default $20 → max 10 concurrent on $200);
-      leverage is constant default 5x.
-    Future: tighten sizing to per-trade-risk ($1 risk / sl_distance), like
-    insiders-receiver. For MVP just use fixed stake + fixed leverage.
+    V2 sizing model:
+      loss_at_stop ~= margin * leverage * sl_distance_pct
+      target loss is KILLERS_RISK_USD, with margin and leverage capped.
     """
     sl = classification.get("sl")
     entry_range = classification.get("entry_range") or []
@@ -520,7 +526,19 @@ def compute_stake(
     if entry_mid and isinstance(sl, (int, float)):
         sl_dist = abs(entry_mid - float(sl)) / entry_mid if entry_mid else None
 
-    return cfg.stake_usd, cfg.leverage, sl_dist
+    if not sl_dist or sl_dist <= 0:
+        return cfg.stake_usd, cfg.leverage, None
+
+    max_margin = max(cfg.min_margin_usd, cfg.max_margin_usd)
+    raw_leverage = cfg.risk_usd / (max_margin * sl_dist)
+    if raw_leverage < 1.0:
+        leverage = 1.0
+        stake = cfg.risk_usd / sl_dist
+    else:
+        leverage = min(raw_leverage, cfg.max_leverage)
+        stake = cfg.risk_usd / (sl_dist * leverage)
+    stake = min(max_margin, max(cfg.min_margin_usd, stake))
+    return round(stake, 2), round(leverage, 2), sl_dist
 
 
 # ── Freqtrade REST calls ───────────────────────────────────────────────────
@@ -1433,9 +1451,10 @@ async def lifespan(app: FastAPI):
     # 2026-05-28 19:21 incident pattern (per codex 019e7030 review).
     app.state.phase2_lock = asyncio.Lock()
     logger.info(
-        "receiver up ft=%s db=%s stake=$%.0f lev=%.1fx max_open=%d "
+        "receiver up ft=%s db=%s risk=$%.2f margin=$%.0f..$%.0f lev<=%.1fx max_open=%d "
         "max_slippage=%.1f%% limit_in_zone=%s active_tp=%s posted_sl=%s reconcile_sec=%d",
-        cfg.ft_base, cfg.db_path, cfg.stake_usd, cfg.leverage, cfg.max_open,
+        cfg.ft_base, cfg.db_path, cfg.risk_usd, cfg.min_margin_usd,
+        cfg.max_margin_usd, cfg.max_leverage, cfg.max_open,
         cfg.max_entry_slippage_pct, cfg.entry_limit_in_zone, cfg.active_tp_limits,
         cfg.posted_sl, cfg.target_reconcile_sec,
     )
@@ -1483,6 +1502,28 @@ async def list_positions():
         "SELECT * FROM positions ORDER BY pos_id DESC LIMIT 100"
     )]
     return {"count": len(rows), "positions": rows}
+
+
+@app.get("/position/by_ft_id/{ft_trade_id}")
+async def position_by_ft_id(ft_trade_id: int):
+    """Expose the receiver's authoritative SL to Freqtrade custom_stoploss."""
+    conn: sqlite3.Connection = app.state.conn
+    row = conn.execute(
+        "SELECT pos_id, symbol, direction, state, sl_abs, ft_trade_id "
+        "FROM positions WHERE ft_trade_id=? AND state IN ('open','requested') "
+        "ORDER BY pos_id DESC LIMIT 1",
+        (ft_trade_id,),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="position not found")
+    return {
+        "position_id": row["pos_id"],
+        "symbol": row["symbol"],
+        "direction": row["direction"],
+        "state": row["state"],
+        "current_sl": row["sl_abs"],
+        "ft_trade_id": row["ft_trade_id"],
+    }
 
 
 @app.get("/target_orders")
@@ -2002,14 +2043,37 @@ async def _process_event(payload: EventPayload):
         if active >= cfg.max_open:
             return {"action": "skipped", "reason": f"max_open ({cfg.max_open})"}
 
+        direction = cls["direction"].lower()
+        if direction not in ("long", "short"):
+            return {"action": "skipped", "reason": "bad_direction"}
+
         stake, leverage, sl_dist = compute_stake(cls, cfg)
         # Absolute posted SL price — stored for the KILLERS_POSTED_SL hard-stop
         # mode (off by default). None when the signal carried no parseable SL.
         _sl_raw = cls.get("sl")
         sl_abs = float(_sl_raw) if isinstance(_sl_raw, (int, float)) and _sl_raw > 0 else None
-        direction = cls["direction"].lower()
-        if direction not in ("long", "short"):
-            return {"action": "skipped", "reason": "bad_direction"}
+        if cfg.require_posted_sl and sl_abs is None:
+            return {"action": "skipped", "reason": "posted_sl_required"}
+
+        entry_range = cls.get("entry_range") or []
+        entry_value = cls.get("entry")
+        entry_mid = None
+        if isinstance(entry_range, (list, tuple)) and len(entry_range) == 2:
+            try:
+                entry_mid = (float(entry_range[0]) + float(entry_range[1])) / 2
+            except (TypeError, ValueError):
+                entry_mid = None
+        elif isinstance(entry_value, (int, float)):
+            entry_mid = float(entry_value)
+        if cfg.require_posted_sl and not entry_mid:
+            return {"action": "skipped", "reason": "entry_bounds_missing"}
+        if cfg.require_posted_sl and entry_mid:
+            wrong_side = (
+                (direction == "long" and sl_abs >= entry_mid)
+                or (direction == "short" and sl_abs <= entry_mid)
+            )
+            if wrong_side:
+                return {"action": "skipped", "reason": "posted_sl_wrong_side"}
 
         # Target-aware guard: parse the TARGETS ladder from the raw signal
         # text, fetch the live Binance mark price, and refuse to open if all
@@ -2862,10 +2926,61 @@ async def _process_event(payload: EventPayload):
                 "ft_order_id": new_order_id}
 
     if kind == "move_sl":
-        # MVP: log only. Freqtrade lacks a clean REST hook for mid-trade SL
-        # adjustment; would need a strategy custom_stoploss + side-channel
-        # signal table. Defer to Phase 2.
-        return {"action": "logged", "reason": "move_sl not executed in MVP"}
+        if not symbol:
+            return {"action": "skipped", "reason": "missing symbol on move_sl"}
+        pos, match_reason = find_active_position(conn, signal_id, symbol)
+        if not pos or not pos.get("ft_trade_id"):
+            return {"action": "skipped", "reason": f"no_active_position ({match_reason})"}
+
+        requested = cls.get("sl")
+        new_sl = None
+        if isinstance(requested, (int, float)) and requested > 0:
+            new_sl = float(requested)
+        elif isinstance(requested, str) and requested.lower() in (
+            "breakeven", "break_even", "entry", "be",
+        ):
+            trade = await ft_get_trade(
+                cfg, int(pos["ft_trade_id"]),
+                session=getattr(app.state, "ft_session", None),
+            )
+            if trade:
+                raw_open = trade.get("open_rate") or trade.get("open_rate_requested")
+                if isinstance(raw_open, (int, float)) and raw_open > 0:
+                    new_sl = float(raw_open)
+        if new_sl is None:
+            return {"action": "skipped", "reason": "move_sl_unparseable"}
+
+        mark = await get_binance_mark_price(
+            symbol, session=getattr(app.state, "public_session", None),
+        )
+        if mark is None:
+            return {"action": "skipped", "reason": "move_sl_mark_unavailable"}
+        direction = pos["direction"].lower()
+        if (direction == "long" and new_sl >= mark) or (
+            direction == "short" and new_sl <= mark
+        ):
+            return {"action": "skipped", "reason": "move_sl_wrong_side"}
+
+        old_sl = pos.get("sl_abs")
+        if old_sl is not None:
+            old_sl = float(old_sl)
+            loosens = (
+                (direction == "long" and new_sl < old_sl)
+                or (direction == "short" and new_sl > old_sl)
+            )
+            if loosens:
+                return {"action": "skipped", "reason": "move_sl_would_loosen"}
+
+        conn.execute(
+            "UPDATE positions SET sl_abs=?, last_event_at=? WHERE pos_id=?",
+            (new_sl, datetime.now(timezone.utc).isoformat(), pos["pos_id"]),
+        )
+        logger.info(
+            "[MOVE SL] pos_id=%d %s %s old=%s new=%s",
+            pos["pos_id"], symbol, direction.upper(), old_sl, new_sl,
+        )
+        return {"action": "stop_updated", "pos_id": pos["pos_id"],
+                "old_sl": old_sl, "new_sl": new_sl}
 
     if kind == "increase":
         return {"action": "logged", "reason": "increase not executed in MVP"}

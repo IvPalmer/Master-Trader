@@ -1,0 +1,77 @@
+{
+  "dry_run": false,
+  "cancel_open_orders_on_exit": true,
+  "trading_mode": "spot",
+  "margin_mode": "",
+  "stake_currency": "USDT",
+  "stake_amount": 10,
+  "tradable_balance_ratio": 0.99,
+  "fiat_display_currency": "",
+  "max_open_trades": 1,
+  "amount_reserve_percent": 0.05,
+  "unfilledtimeout": {
+    "entry": 10,
+    "exit": 10,
+    "exit_timeout_count": 0,
+    "unit": "minutes"
+  },
+  "order_types": {
+    "entry": "limit",
+    "exit": "limit",
+    "emergency_exit": "market",
+    "force_exit": "market",
+    "force_entry": "market",
+    "stoploss": "limit",
+    "stoploss_on_exchange": true,
+    "stoploss_on_exchange_interval": 60,
+    "stoploss_on_exchange_limit_ratio": 0.985
+  },
+  "entry_pricing": {
+    "price_side": "same",
+    "use_order_book": true,
+    "order_book_top": 1,
+    "price_last_balance": 0.0,
+    "check_depth_of_market": {"enabled": false, "bids_to_ask_delta": 1}
+  },
+  "exit_pricing": {"price_side": "same", "use_order_book": true, "order_book_top": 1},
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "ccxt_config": {},
+    "ccxt_async_config": {},
+    "pair_whitelist": [
+      "ETH/USDT", "SOL/USDT", "BNB/USDT", "SUI/USDT",
+      "XRP/USDT", "ADA/USDT", "AVAX/USDT", "LINK/USDT"
+    ],
+    "pair_blacklist": [".*BULL/USDT", ".*BEAR/USDT", ".*UP/USDT", ".*DOWN/USDT"]
+  },
+  "pairlists": [{"method": "StaticPairList"}],
+  "webhook": {
+    "enabled": true,
+    "url": "http://trade-webhook:8088/freqtrade/event",
+    "format": "json",
+    "webhookentry": {"type": "entry", "bot_name": "OITrendPullbackV1", "pair": "{pair}", "stake_amount": "{stake_amount}", "open_rate": "{open_rate}", "direction": "{direction}"},
+    "webhookentryfill": {"type": "entry_fill", "bot_name": "OITrendPullbackV1", "pair": "{pair}", "stake_amount": "{stake_amount}", "open_rate": "{open_rate}", "direction": "{direction}"},
+    "webhookexit": {"type": "exit", "bot_name": "OITrendPullbackV1", "pair": "{pair}", "profit_ratio": "{profit_ratio}", "profit_amount": "{profit_amount}", "exit_reason": "{exit_reason}", "direction": "{direction}"},
+    "webhookexitfill": {"type": "exit_fill", "bot_name": "OITrendPullbackV1", "pair": "{pair}", "profit_ratio": "{profit_ratio}", "profit_amount": "{profit_amount}", "exit_reason": "{exit_reason}", "direction": "{direction}"},
+    "webhookstatus": {"type": "status", "bot_name": "OITrendPullbackV1", "status": "{status}"}
+  },
+  "telegram": {"enabled": false, "token": "", "chat_id": ""},
+  "api_server": {
+    "enabled": true,
+    "listen_ip_address": "0.0.0.0",
+    "listen_port": 8080,
+    "verbosity": "error",
+    "enable_openapi": true,
+    "jwt_secret_key": "OVERRIDE_VIA_ENV",
+    "CORS_origins": ["http://localhost:8102"],
+    "username": "OVERRIDE_VIA_ENV",
+    "password": "OVERRIDE_VIA_ENV"
+  },
+  "bot_name": "OITrendPullbackLive",
+  "initial_state": "running",
+  "force_entry_enable": false,
+  "internals": {"process_throttle_secs": 5},
+  "db_url": "sqlite:////freqtrade/user_data/tradesv3.live.OITrendPullbackV1.sqlite"
+}

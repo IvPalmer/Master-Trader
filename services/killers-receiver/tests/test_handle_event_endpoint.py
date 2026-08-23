@@ -277,6 +277,30 @@ def test_ingress_endpoint_lists_recent():
     assert 44442 in msg_ids
 
 
+def test_position_by_ft_id_exposes_posted_stop():
+    with _client() as (client, m):
+        import sqlite3
+        conn = sqlite3.connect(os.environ["KILLERS_DB"])
+        conn.execute(
+            "INSERT INTO positions (signal_id, symbol, pair, direction, state, "
+            "open_msg_id, open_date, sl_abs, ft_trade_id) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (12, "BTC", "BTC/USDT:USDT", "long", "open", 88881,
+             "2026-08-23T12:00:00+00:00", 75000.0, 321),
+        )
+        conn.commit()
+        conn.close()
+        response = client.get("/position/by_ft_id/321")
+    assert response.status_code == 200
+    assert response.json()["current_sl"] == 75000.0
+
+
+def test_position_by_ft_id_returns_404_for_unknown_trade():
+    with _client() as (client, _m):
+        response = client.get("/position/by_ft_id/999999")
+    assert response.status_code == 404
+
+
 if __name__ == "__main__":
     funcs = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     failed = []

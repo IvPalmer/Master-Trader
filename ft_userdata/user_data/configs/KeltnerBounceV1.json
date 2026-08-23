@@ -1,14 +1,14 @@
 {
-  "dry_run": true,
+  "dry_run": false,
   "dry_run_wallet": 200,
   "cancel_open_orders_on_exit": true,
   "trading_mode": "spot",
   "margin_mode": "",
   "stake_currency": "USDT",
-  "stake_amount": "unlimited",
+  "stake_amount": 10,
   "tradable_balance_ratio": 0.99,
   "fiat_display_currency": "",
-  "max_open_trades": 3,
+  "max_open_trades": 2,
   "amount_reserve_percent": 0.05,
   "unfilledtimeout": {
     "entry": 10,
@@ -22,9 +22,10 @@
     "emergency_exit": "market",
     "force_exit": "market",
     "force_entry": "market",
-    "stoploss": "market",
-    "stoploss_on_exchange": false,
-    "stoploss_on_exchange_interval": 60
+    "stoploss": "limit",
+    "stoploss_on_exchange": true,
+    "stoploss_on_exchange_interval": 60,
+    "stoploss_on_exchange_limit_ratio": 0.985
   },
   "entry_pricing": {
     "price_side": "same",
@@ -186,5 +187,5 @@
   "internals": {
     "process_throttle_secs": 5
   },
-  "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.KeltnerBounceV1.sqlite"
+  "db_url": "sqlite:////freqtrade/user_data/tradesv3.live.KeltnerBounceV1.sqlite"
 }
