@@ -497,12 +497,13 @@ function dash() {
     get selectedExpectancy() {
       const bot = this.selectedEquityBot;
       if (bot) {
+        const sample = bot.expectancy?.sample || bot.stats?.closed_trade_count || 0;
         return {
-          sample: bot.expectancy?.sample || bot.stats?.closed_trade_count || 0,
-          avgWin: bot.expectancy?.avg_win ?? null,
-          avgLoss: bot.expectancy?.avg_loss ?? null,
-          payoff: bot.expectancy?.payoff ?? null,
-          perTrade: bot.expectancy?.expectancy ?? null,
+          sample,
+          avgWin: sample ? (bot.expectancy?.avg_win ?? null) : null,
+          avgLoss: sample ? (bot.expectancy?.avg_loss ?? null) : null,
+          payoff: sample ? (bot.expectancy?.payoff ?? null) : null,
+          perTrade: sample ? (bot.expectancy?.expectancy ?? null) : null,
         };
       }
       return {
