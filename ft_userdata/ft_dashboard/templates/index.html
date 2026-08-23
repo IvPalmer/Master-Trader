@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css?v=18">
+<link rel="stylesheet" href="/static/styles.css?v=19">
 <script defer
         src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
         integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
@@ -156,7 +156,98 @@
       </button>
     </div>
 
-    <!-- ── C: Equity + open positions ── -->
+    <!-- ── C: Every live bot, one operational scan ── -->
+    <section class="fleet-board" aria-label="Live bot status">
+      <div class="fleet-board-head">
+        <div>
+          <h1 class="fleet-board-title">live fleet</h1>
+          <p class="fleet-board-sub">
+            <span x-text="liveBots.length">0</span> bots across
+            <span x-text="liveVenueCount">0</span> venues and
+            <span x-text="liveAccountCount">0</span> accounts
+          </p>
+        </div>
+        <span class="fleet-board-poll">status refreshed <span x-text="lastPollLabel">never</span></span>
+      </div>
+
+      <div class="fleet-roster">
+        <section class="venue-roster" x-show="binanceLiveBots.length" x-cloak>
+          <div class="venue-roster-head">
+            <div>
+              <span class="venue-roster-title">Binance spot</span>
+              <span class="venue-roster-note">shared wallet</span>
+            </div>
+            <span class="venue-roster-count" x-text="binanceLiveBots.length + ' bots'">0 bots</span>
+          </div>
+          <div class="bot-roster-list">
+            <template x-for="bot in binanceLiveBots" :key="'roster:'+bot.key">
+              <button class="bot-roster-row" @click="setTab('bot:'+bot.key)" :aria-label="'Open ' + bot.label + ' detail'">
+                <span class="bot-state" :class="botStatus(bot).cls">
+                  <span class="bot-state-dot"></span>
+                  <span x-text="botStatus(bot).label">running</span>
+                </span>
+                <span class="bot-roster-identity">
+                  <strong x-text="bot.label">bot</strong>
+                  <span x-text="strategyKindLabel(bot) + ' · ' + botActivity(bot)">strategy</span>
+                </span>
+                <span class="bot-roster-stat">
+                  <span class="bot-roster-k" x-text="botCapitalLabel(bot)">capital</span>
+                  <span class="bot-roster-v num" x-text="fmtUsd(bot.wallet?.bot_owned)">—</span>
+                </span>
+                <span class="bot-roster-stat">
+                  <span class="bot-roster-k">p&amp;l</span>
+                  <span class="bot-roster-v num" :class="(bot.pnl?.all_coin || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.all_coin)">—</span>
+                </span>
+                <span class="bot-roster-stat">
+                  <span class="bot-roster-k">open</span>
+                  <span class="bot-roster-v num" x-text="bot.open_trades?.length || 0">0</span>
+                </span>
+                <span class="bot-roster-open">view</span>
+              </button>
+            </template>
+          </div>
+        </section>
+
+        <section class="venue-roster" x-show="hyperliquidLiveBots.length" x-cloak>
+          <div class="venue-roster-head">
+            <div>
+              <span class="venue-roster-title">Hyperliquid perps</span>
+              <span class="venue-roster-note">dedicated accounts</span>
+            </div>
+            <span class="venue-roster-count" x-text="hyperliquidLiveBots.length + ' bots'">0 bots</span>
+          </div>
+          <div class="bot-roster-list">
+            <template x-for="bot in hyperliquidLiveBots" :key="'roster:'+bot.key">
+              <button class="bot-roster-row" @click="setTab('bot:'+bot.key)" :aria-label="'Open ' + bot.label + ' detail'">
+                <span class="bot-state" :class="botStatus(bot).cls">
+                  <span class="bot-state-dot"></span>
+                  <span x-text="botStatus(bot).label">running</span>
+                </span>
+                <span class="bot-roster-identity">
+                  <strong x-text="bot.label">bot</strong>
+                  <span x-text="strategyKindLabel(bot) + ' · ' + botActivity(bot)">strategy</span>
+                </span>
+                <span class="bot-roster-stat">
+                  <span class="bot-roster-k" x-text="botCapitalLabel(bot)">capital</span>
+                  <span class="bot-roster-v num" x-text="fmtUsd(bot.wallet?.bot_owned)">—</span>
+                </span>
+                <span class="bot-roster-stat">
+                  <span class="bot-roster-k">p&amp;l</span>
+                  <span class="bot-roster-v num" :class="(bot.pnl?.all_coin || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.all_coin)">—</span>
+                </span>
+                <span class="bot-roster-stat">
+                  <span class="bot-roster-k">open</span>
+                  <span class="bot-roster-v num" x-text="bot.open_trades?.length || 0">0</span>
+                </span>
+                <span class="bot-roster-open">view</span>
+              </button>
+            </template>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ── D: Equity + open positions ── -->
     <div class="grid grid-12">
       <div class="card col-8">
         <div class="card-head">
@@ -672,9 +763,13 @@
       </div>
     </template>
 
-    <div class="empty" x-show="!dryRunBots.length">
-      <div class="icon">○</div>
-      no dry-run bots configured
+    <div class="empty-state-card" x-show="!dryRunBots.length">
+      <span class="empty-state-mark" aria-hidden="true"></span>
+      <div>
+        <strong>no bots waiting in dry-run</strong>
+        <p>The entire configured fleet is deployed live. New candidates will appear here for forward validation.</p>
+      </div>
+      <button class="cmd-btn" @click="setTab('live')">return to live fleet</button>
     </div>
 
   </main>
@@ -770,6 +865,8 @@
       <div class="empty" x-show="!filteredTrades.length">
         <div class="icon">∅</div>
         <span x-text="tradesView === 'open' ? 'no open positions' : 'no closed trades yet'">no closed trades yet</span>
+        <button class="cmd-btn" x-show="tradesView === 'open' && closedTrades.length" x-cloak
+                @click="setTradesView('closed')">view <span x-text="closedTrades.length">0</span> closed trades</button>
       </div>
     </div>
 
@@ -779,38 +876,50 @@
   <template x-for="bot in allBots" :key="'detail:'+bot.key">
     <main class="tab-panel" x-show="tab===('bot:'+bot.key)" x-cloak>
 
-      <!-- A: 1-line identity strip (replaces 6-tile dossier) -->
+      <!-- A: operational identity and current status -->
       <div class="bot-identity-strip">
-        <div class="bis-main">
-          <span class="bis-name" x-text="bot.label">—</span>
-          <span class="bis-tag tag" :class="bot.dry_run ? 'dry' : 'live'" x-text="bot.dry_run ? 'dry-run' : 'live'"></span>
-          <span class="bis-tag tag" x-show="bot.is_futures" x-cloak style="background:var(--accent-soft);color:var(--accent);border-color:rgba(8,145,178,0.3);">futures</span>
-          <span class="bis-sep">·</span>
-          <span class="bis-strategy dim" x-text="bot.name">—</span>
-          <span class="bis-sep dim">·</span>
-          <span class="bis-days dim" x-text="bot.days_running + 'd'">0d</span>
-          <span class="bis-sep dim">·</span>
-          <span class="bis-pairs dim" x-text="(bot.whitelist_size || '?') + ' pairs'">? pairs</span>
-          <span class="bis-sep dim">·</span>
-          <span class="bis-inline-stats">
-            <span class="num" :class="(bot.pnl?.all_coin || 0) >= 0 ? 'pos' : 'neg'"
-                  x-text="fmtUsdSigned(bot.pnl?.all_coin)">—</span>
-            <span class="dim">p&l</span>
-            <span class="num" x-text="fmtUsd(bot.wallet?.bot_owned)">—</span>
-            <span class="dim">wallet</span>
-            <span class="num" x-text="bot.stats?.closed_trade_count ?? 0">0</span>
-            <span class="dim">trades</span>
+        <div class="bis-lead">
+          <div class="bis-title-line">
+            <span class="bis-name" x-text="bot.label">—</span>
+            <span class="bot-state" :class="botStatus(bot).cls">
+              <span class="bot-state-dot"></span>
+              <span x-text="botStatus(bot).label">running</span>
+            </span>
+          </div>
+          <p class="bis-context">
+            <span x-text="bot.name">—</span><span aria-hidden="true">·</span>
+            <span x-text="strategyKindLabel(bot)">strategy</span><span aria-hidden="true">·</span>
+            <span x-text="venueLabel(bot)">venue</span><span aria-hidden="true">·</span>
+            <span x-text="accountLabel(bot)">account</span>
+          </p>
+        </div>
+        <div class="bis-summary">
+          <span class="bis-stat">
+            <span class="bis-stat-k" x-text="botCapitalLabel(bot)">capital</span>
+            <strong class="num" x-text="fmtUsd(bot.wallet?.bot_owned)">—</strong>
+          </span>
+          <span class="bis-stat">
+            <span class="bis-stat-k">p&l</span>
+            <strong class="num" :class="(bot.pnl?.all_coin || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.all_coin)">—</strong>
+          </span>
+          <span class="bis-stat">
+            <span class="bis-stat-k">open</span>
+            <strong class="num" x-text="bot.open_trades?.length || 0">0</strong>
+          </span>
+          <span class="bis-stat bis-stat-wide">
+            <span class="bis-stat-k">activity</span>
+            <strong x-text="botActivity(bot)">scanning</strong>
           </span>
         </div>
         <div class="bis-actions">
-          <template x-if="bot.links?.ui">
-            <a class="icon-btn" :href="bot.links.ui" target="_blank" rel="noopener">↗ freqtrade ui</a>
+          <template x-if="bot.links?.freqtrade_ui">
+            <a class="icon-btn" :href="bot.links.freqtrade_ui" target="_blank" rel="noopener">open freqtrade ui</a>
           </template>
         </div>
       </div>
 
       <!-- B: Current situation cluster (3 panels side by side) -->
-      <div class="grid grid-12">
+      <div class="grid grid-12" x-show="botHasHistory(bot)" x-cloak>
 
         <!-- Last trade trace -->
         <div class="card col-4">
@@ -890,8 +999,21 @@
         </div>
       </div>
 
+      <div class="bot-waiting" x-show="!botHasHistory(bot)" x-cloak>
+        <span class="bot-waiting-signal" aria-hidden="true"></span>
+        <div class="bot-waiting-copy">
+          <strong>live and scanning</strong>
+          <p><span x-text="bot.label">This bot</span> is connected to <span x-text="venueLabel(bot)">its venue</span>. No position has opened or closed in this live epoch yet.</p>
+        </div>
+        <div class="bot-waiting-facts">
+          <span><strong class="num" x-text="bot.whitelist_size || 0">0</strong> pairs watched</span>
+          <span><strong class="num" x-text="fmtUsd(bot.wallet?.bot_owned)">—</strong> capital</span>
+          <span><strong class="num" x-text="fmtUsd(bot.capital_at_risk?.abs_loss || 0)">$0.00</strong> at risk</span>
+        </div>
+      </div>
+
       <!-- C: Equity + drawdown side by side -->
-      <div class="grid grid-12">
+      <div class="grid grid-12" x-show="botHasHistory(bot)" x-cloak>
         <div class="card col-8">
           <div class="card-head">
             <div class="card-title">equity curve</div>
@@ -909,7 +1031,7 @@
       </div>
 
       <!-- D: p&l by pair + expectancy -->
-      <div class="grid grid-12">
+      <div class="grid grid-12" x-show="botHasHistory(bot)" x-cloak>
         <div class="card col-5">
           <div class="card-head">
             <div class="card-title">p&l by pair</div>
@@ -933,7 +1055,7 @@
       </div>
 
       <!-- E: Recent trades ledger -->
-      <div class="card card-body flush">
+      <div class="card card-body flush" x-show="botHasHistory(bot)" x-cloak>
         <div class="card-head">
           <div>
             <div class="card-title">recent trades</div>
@@ -984,6 +1106,6 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=31"></script>
+<script src="/static/dashboard.js?v=32"></script>
 </body>
 </html>

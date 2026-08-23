@@ -4,6 +4,7 @@
  */
 
 :root {
+  --p-density: 1;
   /* surfaces — warm off-white, layered */
   --bg-0:#efede4; --bg-1:#e7e3d6; --surface:#fffefb; --surface-2:#f7f5ed; --surface-3:#f1eee3;
   --border:#e7e3d6; --border-soft:#dcd7c8; --hairline:#efece1;
@@ -241,6 +242,102 @@ button { font: inherit; }
 .vital-cell.accent { border-top-color:var(--accent); }
 .vital-cell.accent .vital-label { color: var(--accent); }
 
+/* ── live fleet roster ── */
+.fleet-board {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--el2);
+  overflow: hidden;
+}
+.fleet-board-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem;
+  padding: calc(0.85rem * var(--p-density)) 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.fleet-board-title {
+  font-size: 15px; font-weight: 700; line-height: 1.25; letter-spacing: -.015em;
+}
+.fleet-board-sub, .fleet-board-poll {
+  color: var(--text-2); font-size: 11px;
+}
+.fleet-board-sub { margin-top: 2px; }
+.fleet-board-poll { white-space: nowrap; }
+.fleet-roster {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.venue-roster + .venue-roster { border-left: 1px solid var(--border); }
+.venue-roster-head {
+  min-height: 44px; padding: 0.55rem 0.85rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+}
+.venue-roster-title {
+  display: block; color: var(--text); font-size: 12px; font-weight: 650;
+}
+.venue-roster-note, .venue-roster-count {
+  color: var(--text-2); font-size: 10.5px;
+}
+.bot-roster-row {
+  width: 100%; min-height: 64px; padding: calc(0.65rem * var(--p-density)) 0.8rem;
+  display: grid; grid-template-columns: 69px minmax(145px, 1fr) 81px 72px 38px 28px;
+  align-items: center; gap: 0.7rem;
+  border: 0; border-bottom: 1px solid var(--hairline); background: var(--surface);
+  color: var(--text); text-align: left; cursor: pointer;
+  transition: background .14s ease-out;
+}
+.bot-roster-row:last-child { border-bottom: 0; }
+.bot-roster-row:hover { background: var(--surface-2); }
+.bot-roster-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.bot-state {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text-2); font-size: 9.5px; font-weight: 700; letter-spacing: .055em;
+  text-transform: uppercase; white-space: nowrap;
+}
+.bot-state-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: currentColor; }
+.bot-state.running { color: var(--pos); }
+.bot-state.stale { color: var(--warn); }
+.bot-state.offline { color: var(--neg); }
+.bot-roster-identity { display: flex; flex-direction: column; min-width: 0; }
+.bot-roster-identity strong {
+  overflow: hidden; color: var(--text); font-size: 12.5px; font-weight: 650;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.bot-roster-identity > span {
+  overflow: hidden; color: var(--text-2); font-size: 10.5px;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.bot-roster-stat { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
+.bot-roster-k {
+  color: var(--text-2); font-size: 8.5px; font-weight: 600; letter-spacing: .055em;
+  text-transform: uppercase; white-space: nowrap;
+}
+.bot-roster-v { color: var(--text); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.bot-roster-v.pos { color: var(--pos); }
+.bot-roster-v.neg { color: var(--neg); }
+.bot-roster-open { color: var(--accent); font-size: 10px; font-weight: 600; text-align: right; }
+
+@media (max-width: 1120px) {
+  .fleet-roster { grid-template-columns: 1fr; }
+  .venue-roster + .venue-roster { border-left: 0; border-top: 1px solid var(--border); }
+  .bot-roster-row { grid-template-columns: 76px minmax(180px, 1fr) 110px 90px 55px 35px; }
+}
+@media (max-width: 650px) {
+  .fleet-board-head { align-items: flex-start; }
+  .fleet-board-poll { display: none; }
+  .bot-roster-row {
+    grid-template-columns: 72px repeat(3, minmax(52px, 1fr)) 28px;
+    grid-template-rows: auto auto; gap: 0.35rem 0.55rem;
+    min-height: 82px; padding: 0.65rem 0.7rem;
+  }
+  .bot-roster-row > .bot-state { grid-column: 1; grid-row: 1 / span 2; align-self: start; padding-top: 2px; }
+  .bot-roster-identity { grid-column: 2 / 5; grid-row: 1; }
+  .bot-roster-row > .bot-roster-stat:nth-child(3) { grid-column: 2; grid-row: 2; align-items: flex-start; }
+  .bot-roster-row > .bot-roster-stat:nth-child(4) { grid-column: 3; grid-row: 2; align-items: flex-start; }
+  .bot-roster-row > .bot-roster-stat:nth-child(5) { grid-column: 4; grid-row: 2; align-items: flex-start; }
+  .bot-roster-open { grid-column: 5; grid-row: 1; }
+}
+
 /* ─── last-closed-compact (replaces empty open-positions) ── */
 .last-closed-compact {
   padding: 1rem 1.1rem;
@@ -351,31 +448,62 @@ button { font: inherit; }
    BOT IDENTITY STRIP (per-bot detail tab)
    ═══════════════════════════════════════════════ */
 .bot-identity-strip {
-  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: 0.75rem 1rem;
+  display: grid; grid-template-columns: minmax(220px, 1fr) auto auto;
+  align-items: center; gap: 1.25rem;
+  padding: 0.9rem 1rem;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px;
-  flex-wrap: wrap;
+  border-radius: var(--r); box-shadow: var(--el2);
 }
-.bis-main {
-  display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap;
-}
+.bis-lead { min-width: 0; }
+.bis-title-line { display: flex; align-items: center; gap: 0.65rem; }
 .bis-name {
-  font-size: 15px; font-weight: 700; color: var(--text);
+  overflow: hidden; color: var(--text); font-size: 16px; font-weight: 720;
+  text-overflow: ellipsis; white-space: nowrap;
 }
-.bis-tag {
-  font-size: 10px; font-weight: 500; padding: 0.15rem 0.5rem;
-  border-radius: 4px;
+.bis-context {
+  display: flex; flex-wrap: wrap; gap: 0.25rem 0.45rem; margin-top: 3px;
+  color: var(--text-2); font-size: 10.5px;
 }
-.bis-sep { color: var(--border-soft); }
-.bis-strategy { font-size: 12px; }
-.bis-days, .bis-pairs { font-size: 12px; }
-.bis-inline-stats {
-  display: inline-flex; align-items: center; gap: 0.35rem;
-  font-size: 12px;
+.bis-summary { display: grid; grid-template-columns: repeat(4, auto); gap: 1.25rem; }
+.bis-stat { display: flex; flex-direction: column; min-width: 58px; }
+.bis-stat-k {
+  color: var(--text-2); font-size: 8.5px; font-weight: 600; letter-spacing: .055em;
+  text-transform: uppercase;
 }
-.bis-inline-stats .num { font-size: 13px; }
+.bis-stat strong { color: var(--text); font-size: 11px; font-weight: 650; white-space: nowrap; }
+.bis-stat strong.pos { color: var(--pos); }
+.bis-stat strong.neg { color: var(--neg); }
+.bis-stat-wide { min-width: 132px; }
 .bis-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+
+.bot-waiting {
+  display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.25rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--el2);
+}
+.bot-waiting-signal {
+  width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--pos);
+  box-shadow: 0 0 0 5px var(--pos-soft);
+}
+.bot-waiting-copy { flex: 1; min-width: 0; }
+.bot-waiting-copy strong { color: var(--text); font-size: 13px; }
+.bot-waiting-copy p { max-width: 70ch; margin-top: 2px; color: var(--text-2); font-size: 11px; }
+.bot-waiting-facts { display: flex; gap: 1.25rem; color: var(--text-2); font-size: 10.5px; white-space: nowrap; }
+.bot-waiting-facts strong { color: var(--text); font-size: 11px; }
+
+@media (max-width: 960px) {
+  .bot-identity-strip { grid-template-columns: 1fr auto; }
+  .bis-summary { grid-column: 1 / -1; grid-row: 2; width: 100%; justify-content: space-between; }
+  .bis-actions { grid-column: 2; grid-row: 1; }
+  .bot-waiting { align-items: flex-start; flex-wrap: wrap; }
+  .bot-waiting-facts { width: 100%; padding-left: 26px; flex-wrap: wrap; }
+}
+@media (max-width: 600px) {
+  .bot-identity-strip { grid-template-columns: 1fr; }
+  .bis-summary { grid-column: 1; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+  .bis-stat-wide { grid-column: 1 / -1; }
+  .bis-actions { grid-column: 1; grid-row: 3; }
+  .bot-waiting-facts { padding-left: 0; gap: 0.75rem; }
+}
 
 /* ═══════════════════════════════════════════════
    TRADES TAB enhancements
@@ -635,6 +763,21 @@ button { font: inherit; }
 .empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 34px 16px;
          color: var(--text-3); font-size: 14px; }
 .empty .icon { font-size: 28px; opacity: .6; }
+.empty-state-card {
+  min-height: 150px; padding: 1.25rem;
+  display: flex; align-items: center; justify-content: center; gap: 1rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--el2);
+}
+.empty-state-mark {
+  width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-radius: 50%;
+  box-shadow: 0 0 0 5px var(--accent-soft);
+}
+.empty-state-card > div { max-width: 56ch; }
+.empty-state-card strong { color: var(--text); font-size: 13px; }
+.empty-state-card p { margin-top: 2px; color: var(--text-2); font-size: 11px; }
+@media (max-width: 600px) {
+  .empty-state-card { align-items: flex-start; flex-direction: column; }
+}
 
 /* ── footer ───────────────────────────────────── */
 .foot {
