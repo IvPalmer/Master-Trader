@@ -15,7 +15,7 @@
     "OITrendPullbackV1": {"port": 8102, "timeframe": "1h", "type": "oi-trend-pullback", "active": true},
     "FundingShortV1": {"port": null, "timeframe": "1h", "type": "bear-short", "active": false, "trading_mode": "futures", "_note": "killed 2026-04-18, port 8097 reused by CascadeFaderV1"},
     "CascadeFaderV1": {"port": null, "timeframe": "1h", "type": "cascade-fader", "active": false, "_note": "retired 2026-07-13 — fill-stress study: PF 0.98 @0.5% slippage, backtest case unreliable (cascade-fill-stress-2026-07)"},
-    "KillersScalpV1": {"port": 8099, "timeframe": "5m", "type": "copy-trader", "active": false, "trading_mode": "futures", "_note": "V2 forward execution is running dry with posted stops and $1 stop-risk sizing; live waits for Binance Futures funding."},
-    "InsidersScalpV1": {"port": 8098, "timeframe": "5m", "type": "copy-trader", "active": false, "trading_mode": "futures", "_note": "V2 forward execution is running dry with posted stops and $1 stop-risk sizing; live waits for Binance Futures funding."}
+    "KillersScalpV1": {"port": 8099, "timeframe": "5m", "type": "copy-trader", "active": false, "trading_mode": "futures", "venue": "hyperliquid", "_note": "V2 forward execution is configured for Hyperliquid with posted stops and $1 stop-risk sizing; live waits for an isolated subaccount, API wallet, and USDC."},
+    "InsidersScalpV1": {"port": 8098, "timeframe": "5m", "type": "copy-trader", "active": false, "trading_mode": "futures", "venue": "hyperliquid", "_note": "V2 forward execution is configured for Hyperliquid with posted stops and $1 stop-risk sizing; live waits for an isolated subaccount, API wallet, and USDC."}
   }
 }
