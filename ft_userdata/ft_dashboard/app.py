@@ -819,15 +819,36 @@ async def _poll_loop():
                 for bot, r in zip(BOTS, results):
                     if isinstance(r, Exception):
                         # Overwrite the cached snapshot so callers don't see
-                        # last successful run as still 'reachable'.
+                        # last successful run as still 'reachable'. Preserve
+                        # the last measurements and deployment metadata so the
+                        # UI can keep the bot visible while clearly marking it
+                        # offline instead of silently removing its tab/row.
                         msg = str(r)
+                        previous = _cache["bots"].get(bot["key"], {})
                         _cache["errors"][bot["key"]] = msg
                         _cache["bots"][bot["key"]] = {
+                            **previous,
                             "key": bot["key"], "name": bot["name"], "label": bot["label"],
+                            "dry_run": previous.get("dry_run", False),
+                            "account_group": bot.get("account_group", bot["key"]),
+                            "strategy_kind": bot.get("strategy_kind", "autonomous-quant"),
+                            "venue": bot.get("venue", "binance"),
                             "reachable": False, "error": msg,
                         }
                     else:
-                        _cache["bots"][bot["key"]] = r
+                        if r.get("reachable"):
+                            _cache["bots"][bot["key"]] = r
+                        else:
+                            previous = _cache["bots"].get(bot["key"], {})
+                            _cache["bots"][bot["key"]] = {
+                                **previous,
+                                "key": bot["key"], "name": bot["name"], "label": bot["label"],
+                                "dry_run": previous.get("dry_run", False),
+                                "account_group": bot.get("account_group", bot["key"]),
+                                "strategy_kind": bot.get("strategy_kind", "autonomous-quant"),
+                                "venue": bot.get("venue", "binance"),
+                                "reachable": False, "error": r.get("error", "unreachable"),
+                            }
                         if r.get("reachable"):
                             _cache["errors"].pop(bot["key"], None)
                             _cache["last_reachable_at"][bot["key"]] = time.time()

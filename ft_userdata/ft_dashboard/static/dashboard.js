@@ -117,19 +117,30 @@ function dash() {
     // ─── derived ───
     get bots() { return Object.values(this.raw.bots || {}); },
     get liveBots() {
-      return this.bots.filter(b => b.reachable && b.dry_run === false)
-        .sort((a, b) => a.label.localeCompare(b.label));
+      return this.bots.filter(b => b.dry_run === false)
+        .sort((a, b) => (a.label||'').localeCompare(b.label||''));
     },
     get dryRunBots() {
-      return this.bots.filter(b => b.reachable && b.dry_run === true)
+      return this.bots.filter(b => b.dry_run === true)
         .sort((a, b) => (a.label||'').localeCompare(b.label||''));
     },
     get allBots() {
-      return this.bots.filter(b => b.reachable)
-        .sort((a, b) => {
+      return [...this.bots].sort((a, b) => {
           if (a.dry_run !== b.dry_run) return a.dry_run ? 1 : -1;
           return (a.label||'').localeCompare(b.label||'');
         });
+    },
+    get liveAccountCount() {
+      return new Set(this.liveBots.map(b => b.account_group || b.key)).size;
+    },
+    get liveVenueCount() {
+      return new Set(this.liveBots.map(b => b.venue || 'binance')).size;
+    },
+    get binanceLiveBots() {
+      return this.liveBots.filter(b => (b.venue || 'binance') === 'binance');
+    },
+    get hyperliquidLiveBots() {
+      return this.liveBots.filter(b => b.venue === 'hyperliquid');
     },
 
     // ─── fleet-aggregated hero stats (Bug fix B2: defensive chaining throughout) ───
@@ -377,6 +388,42 @@ function dash() {
       if (age < 60) return Math.round(age) + 's ago';
       if (age < 3600) return Math.round(age / 60) + 'm ago';
       return Math.round(age / 3600) + 'h ago';
+    },
+
+    isBotStale(bot) {
+      const stale = this.raw.status?.stale_bots || [];
+      return stale.some(item => (typeof item === 'string' ? item : (item.key || item.bot_key)) === bot.key);
+    },
+    botStatus(bot) {
+      if (!bot?.reachable) return { label: 'offline', cls: 'offline' };
+      if (this.isBotStale(bot)) return { label: 'stale', cls: 'stale' };
+      return { label: 'running', cls: 'running' };
+    },
+    botActivity(bot) {
+      const open = bot?.open_trades?.length || 0;
+      if (open) return `managing ${open} open position${open === 1 ? '' : 's'}`;
+      const last = this.lastClosedTrade(bot);
+      if (last?.close_timestamp) {
+        const age = Math.max(0, Math.floor((Date.now() - toMs(last.close_timestamp)) / 1000));
+        return `last trade ${this.fmtAge(age)} ago`;
+      }
+      if ((bot?.days_running ?? 0) < 1) return 'fresh live epoch · scanning';
+      return 'scanning · waiting for signal';
+    },
+    venueLabel(bot) {
+      return bot?.venue === 'hyperliquid' ? 'Hyperliquid perps' : 'Binance spot';
+    },
+    accountLabel(bot) {
+      return bot?.account_group === 'binance-spot' ? 'shared wallet' : 'dedicated account';
+    },
+    strategyKindLabel(bot) {
+      return bot?.strategy_kind === 'copy-trader' ? 'copy-trader' : 'autonomous quant';
+    },
+    botCapitalLabel(bot) {
+      return bot?.account_group === 'binance-spot' ? 'shared capital' : 'bot capital';
+    },
+    botHasHistory(bot) {
+      return (bot?.stats?.closed_trade_count || 0) > 0 || (bot?.open_trades?.length || 0) > 0;
     },
 
     // ─── last closed trade for a bot ───
