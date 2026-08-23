@@ -83,8 +83,8 @@ class KillersScalpV1(IStrategy):
         entry_tag: Optional[str] = None,
         **kwargs,
     ) -> float:
-        """Cap leverage at the configured default."""
-        return min(self.leverage_amount, max_leverage)
+        """Honor receiver-requested leverage while enforcing the V2 cap."""
+        return min(max(1.0, proposed_leverage), self.leverage_amount, max_leverage)
 
     def custom_stoploss(
         self, pair, trade, current_time, current_rate, current_profit, **kwargs
