@@ -153,6 +153,7 @@ services:
       FREQTRADE__EXCHANGE__WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
       FREQTRADE__EXCHANGE__PRIVATE_KEY: ${HYPERLIQUID_KILLERS_PRIVATE_KEY:-}
       FREQTRADE__DRY_RUN: ${HYPERLIQUID_KILLERS_DRY_RUN:-true}
+      FREQTRADE__DB_URL: sqlite:////freqtrade/user_data/tradesv3.live.KillersScalpV1.hyperliquid.sqlite
       SIGNAL_RECEIVER_URL: http://killers-receiver:8089
     volumes:
       - ft_user_data:/freqtrade/user_data
@@ -183,6 +184,7 @@ services:
       FREQTRADE__EXCHANGE__WALLET_ADDRESS: ${HYPERLIQUID_INSIDERS_WALLET_ADDRESS:-}
       FREQTRADE__EXCHANGE__PRIVATE_KEY: ${HYPERLIQUID_INSIDERS_PRIVATE_KEY:-}
       FREQTRADE__DRY_RUN: ${HYPERLIQUID_INSIDERS_DRY_RUN:-true}
+      FREQTRADE__DB_URL: sqlite:////freqtrade/user_data/tradesv3.live.InsidersScalpV2.hyperliquid.sqlite
       SIGNAL_RECEIVER_URL: http://insiders-receiver:8089
     volumes:
       - ft_user_data:/freqtrade/user_data
