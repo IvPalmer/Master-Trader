@@ -1,14 +1,14 @@
 {
-  "_WARNING": "LIVE REAL-MONEY $20 MICRO-TEST (dry_run=false). BTC/ETH/SOL only, forced (force_entry_enable) — a controlled plumbing test per codex, NOT an autonomous alt run. Inert until walletAddress + privateKey are filled on the VPS copy (NOT in git). privateKey MUST be a Hyperliquid AGENT/API wallet key (can trade, cannot withdraw) — NEVER the master wallet key. Max loss = the USDC funded (~$20). See docs/hyperliquid_golive_runbook.md.",
+  "_WARNING": "LIVE REAL-MONEY CONFIG (dry_run=false). BTC/ETH/SOL only. Run on a dedicated Hyperliquid master account funded with 40 USDC and sign with that account's agent/API wallet key. Never place the master private key on the VPS. See docs/hyperliquid_golive_runbook.md.",
   "dry_run": false,
   "cancel_open_orders_on_exit": true,
   "trading_mode": "futures",
   "margin_mode": "isolated",
   "stake_currency": "USDC",
-  "stake_amount": 15,
-  "tradable_balance_ratio": 0.9,
+  "stake_amount": 18,
+  "tradable_balance_ratio": 0.95,
   "fiat_display_currency": "",
-  "max_open_trades": 1,
+  "max_open_trades": 2,
   "amount_reserve_percent": 0.05,
   "unfilledtimeout": { "entry": 10, "exit": 10, "exit_timeout_count": 0, "unit": "minutes" },
   "order_types": {
