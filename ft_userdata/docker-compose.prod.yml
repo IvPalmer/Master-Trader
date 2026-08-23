@@ -84,9 +84,10 @@ services:
   # git + volume, revivable. See docs/audits/2026-07-13-oos-retest-results.md.
 
   # ── killers (binance killers VIP copy-trader) ───────────────────────────
-  # RESTORED 2026-05-31 as a DRY-RUN measurement instrument only. The channel's
-  # signals are price-verified unprofitable (−$511/−$1536 backtest, live PF
-  # 0.011, codex "do-not-fund VERY HIGH" 2026-05-28). NO real capital, ever.
+  # V2 forward executor. Historical results remain mixed/concentrated, but the
+  # profitable warden epoch justifies continued evolution: posted-stop risk
+  # sizing, <=3x leverage, active TP ladder, and stop updates are now enforced.
+  # It remains dry only because the Binance Futures wallet is currently empty.
   # Observer (host Telethon unit) intentionally NOT auto-started — shares
   # Palmer's personal Telegram session with the insiders work; restart only
   # after coordinating + a Telethon upgrade.
@@ -133,19 +134,16 @@ services:
       - ft-killers-scalp
 
   ft-killers-scalp:
-    # Freqtrade Futures dry-run bot. Pass-through strategy: all entries +
-    # exits driven by killers-receiver via REST. $200 dry wallet, max 10
-    # concurrent positions, leverage default 5x (matches channel's 3-5x).
+    # Freqtrade Futures forward bot. Pass-through strategy: all entries +
+    # exits driven by killers-receiver via REST. Dry until Futures is funded;
+    # receiver sizes $1 risk at the posted stop, max five positions / 3x.
     image: freqtradeorg/freqtrade:stable
     restart: always
     container_name: ft-killers-scalp
     environment:
       <<: *a1
-      # Belt-and-suspenders go-live guard (codex P1, 2026-05-31): env overrides
-      # config, so even a stray dry_run:false edit to KillersScalpV1.json cannot
-      # make this do-not-fund measurement instrument trade real capital. Keys are
-      # left intact (*a1) because Binance futures dry-run needs them to load
-      # leverage brackets/markets; the explicit flag is what closes the go-live path.
+      # Explicitly dry while the Futures balance is zero. Remove this override
+      # only in the same deployment that funds/reconciles a fresh live DB.
       FREQTRADE__DRY_RUN: "true"
       SIGNAL_RECEIVER_URL: http://killers-receiver:8089
     volumes:
@@ -165,17 +163,14 @@ services:
       - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KillersScalpV1.log --config /freqtrade/user_data/configs/KillersScalpV1.json --strategy KillersScalpV1
 
   ft-insiders-scalp:
-    # Freqtrade Futures dry-run — Insiders Scalp FORWARD MEASUREMENT (Dennis's
-    # free channel). Reuses the validated killers pass-through strategy
-    # (KillersScalpV1, REST-driven); insiders-receiver drives entries/exits with
-    # limit-in-zone + posted-SL. Do-not-fund measurement instrument: settling
-    # "does copying Dennis's free signals pay" with a live forward verdict.
+    # Insiders Scalp V2 forward executor (Dennis's free channel). Reuses the
+    # hardened pass-through layer and remains dry while Futures has no balance.
     image: freqtradeorg/freqtrade:stable
     restart: always
     container_name: ft-insiders-scalp
     environment:
       <<: *a1
-      FREQTRADE__DRY_RUN: "true"   # go-live guard (env overrides config)
+      FREQTRADE__DRY_RUN: "true"   # zero Futures balance; see Killers note
       SIGNAL_RECEIVER_URL: http://insiders-receiver:8089
     volumes:
       - ft_user_data:/freqtrade/user_data
