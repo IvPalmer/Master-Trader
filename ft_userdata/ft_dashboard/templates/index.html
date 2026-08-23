@@ -1026,11 +1026,11 @@
             <div class="card-sub" x-text="(bot.expectancy?.sample || bot.stats?.closed_trade_count || 0) + ' trade sample'"></div>
           </div>
           <div class="kv">
-            <span class="k">avg win</span>   <span class="v pos" x-text="fmtUsdSigned(bot.expectancy?.avg_win)"></span>
-            <span class="k">avg loss</span>  <span class="v neg" x-text="fmtUsdSigned(bot.expectancy?.avg_loss)"></span>
+            <span class="k">avg win</span>   <span class="v pos" x-text="(bot.expectancy?.sample || bot.stats?.closed_trade_count || 0) ? fmtUsdSigned(bot.expectancy?.avg_win) : '—'"></span>
+            <span class="k">avg loss</span>  <span class="v neg" x-text="(bot.expectancy?.sample || bot.stats?.closed_trade_count || 0) ? fmtUsdSigned(bot.expectancy?.avg_loss) : '—'"></span>
             <span class="k">payoff</span>    <span class="v" x-text="bot.expectancy?.payoff != null ? bot.expectancy.payoff.toFixed(2) : '—'"></span>
             <span class="k">per trade</span> <span class="v" :class="(bot.expectancy?.expectancy||0)>=0?'pos':'neg'"
-                                               x-text="fmtUsdSigned(bot.expectancy?.expectancy)"></span>
+                                               x-text="(bot.expectancy?.sample || bot.stats?.closed_trade_count || 0) ? fmtUsdSigned(bot.expectancy?.expectancy) : '—'"></span>
             <span class="k">profit factor</span> <span class="v" x-text="fmtPF(bot.stats?.profit_factor)"></span>
           </div>
         </div>
@@ -1088,6 +1088,6 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=34"></script>
+<script src="/static/dashboard.js?v=35"></script>
 </body>
 </html>
