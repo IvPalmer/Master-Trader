@@ -110,7 +110,9 @@ services:
       # would 401 against rotated creds.
       KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
-      KILLERS_DB: /var/lib/killers/receiver.sqlite
+      # Fresh Hyperliquid epoch; the former Binance dry database remains in
+      # the volume as receiver.sqlite for historical audit.
+      KILLERS_DB: /var/lib/killers/receiver-hyperliquid.sqlite
       KILLERS_RISK_USD: "1"
       KILLERS_MIN_MARGIN_USD: "5"
       KILLERS_MAX_MARGIN_USD: "10"
@@ -213,7 +215,7 @@ services:
       KILLERS_BOT_LABEL: insiders-scalp
       KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
-      KILLERS_DB: /var/lib/killers/receiver.sqlite
+      KILLERS_DB: /var/lib/killers/receiver-hyperliquid.sqlite
       KILLERS_RISK_USD: "1"
       KILLERS_MIN_MARGIN_USD: "5"
       KILLERS_MAX_MARGIN_USD: "10"
@@ -330,7 +332,7 @@ services:
       POLL_INTERVAL: "30"
       OVERLAYS_DIR: /overlays
       KILLERS_DB: /var/lib/killers/state.sqlite
-      KILLERS_RECEIVER_DB: /var/lib/killers-receiver/receiver.sqlite
+      KILLERS_RECEIVER_DB: /var/lib/killers-receiver/receiver-hyperliquid.sqlite
     volumes:
       - ./overlays:/overlays:ro
       # killers_bot SQLite (read-only) so the dashboard can render the

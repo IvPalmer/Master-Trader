@@ -197,5 +197,5 @@
     "internals": {
         "process_throttle_secs": 5
     },
-    "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.InsidersScalpV2.sqlite"
+    "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.InsidersScalpV2.hyperliquid.sqlite"
 }
