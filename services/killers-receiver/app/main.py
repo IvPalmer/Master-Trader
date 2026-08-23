@@ -141,10 +141,10 @@ class Config:
 
 # ── Symbol mapping ─────────────────────────────────────────────────────────
 
-# Channel uses bare symbols (BTC, ETH). Freqtrade futures uses BTC/USDT:USDT.
-# Aliases are reserved for non-1:1 mappings only — leave plain SYM → SYM as
-# identity (no entry). 1000-prefixed alts on Binance Futures are the actual
-# perp pair, so we map small-denom names to them.
+# Channel uses bare symbols (BTC, ETH). The execution venue is selected with
+# KILLERS_EXECUTION_VENUE: Binance uses BTC/USDT:USDT while Hyperliquid uses
+# BTC/USDC:USDC.  Keep venue aliases separate: the same meme perp is named
+# 1000PEPE on Binance and kPEPE (normalised by CCXT to KPEPE) on Hyperliquid.
 SYMBOL_ALIASES = {
     "PEPE":   "1000PEPE",
     "SHIB":   "1000SHIB",
@@ -153,11 +153,46 @@ SYMBOL_ALIASES = {
     "GOLD":   "XAUT",        # channel typo correction
 }
 
+HYPERLIQUID_SYMBOL_ALIASES = {
+    "PEPE": "kPEPE",
+    "1000PEPE": "kPEPE",
+    "KPEPE": "kPEPE",
+    "SHIB": "kSHIB",
+    "1000SHIB": "kSHIB",
+    "KSHIB": "kSHIB",
+    "FLOKI": "kFLOKI",
+    "1000FLOKI": "kFLOKI",
+    "KFLOKI": "kFLOKI",
+    "BONK": "kBONK",
+    "1000BONK": "kBONK",
+    "KBONK": "kBONK",
+    "GOLD": "PAXG",
+    "RNDR": "RENDER",
+    "MATIC": "POL",
+}
 
-def to_freqtrade_pair(symbol: str) -> Optional[str]:
-    """`BTC` → `BTC/USDT:USDT`. None for unmappable."""
+
+def execution_venue() -> str:
+    """Return the configured derivative execution venue (safe default: Binance)."""
+    venue = os.environ.get("KILLERS_EXECUTION_VENUE", "binance").strip().lower()
+    return venue if venue in ("binance", "hyperliquid") else "binance"
+
+
+def to_hyperliquid_coin(symbol: str) -> Optional[str]:
+    """Map a channel symbol to Hyperliquid's public API coin name."""
     if not symbol:
         return None
+    upper = symbol.upper()
+    return HYPERLIQUID_SYMBOL_ALIASES.get(upper, upper)
+
+
+def to_freqtrade_pair(symbol: str) -> Optional[str]:
+    """Map a channel symbol to the configured venue's CCXT perp pair."""
+    if not symbol:
+        return None
+    if execution_venue() == "hyperliquid":
+        coin = to_hyperliquid_coin(symbol)
+        return f"{coin.upper()}/USDC:USDC" if coin else None
     sym = SYMBOL_ALIASES.get(symbol.upper(), symbol.upper())
     return f"{sym}/USDT:USDT"
 
@@ -292,6 +327,59 @@ async def _parse_binance_mark(r, binance_sym: str) -> Optional[float]:
     if not math.isfinite(p) or p <= 0:
         return None
     return p
+
+
+async def get_hyperliquid_mark_price(symbol: str,
+                                     session=None) -> Optional[float]:
+    """Fetch Hyperliquid's current perp midpoint from the public info API.
+
+    Hyperliquid's lightweight ``allMids`` endpoint is the best execution
+    reference for the receiver's entry-slippage and wrong-side-stop guards.
+    It requires no wallet and keeps all derivative price checks on the same
+    venue that will execute the order.
+    """
+    coin = to_hyperliquid_coin(symbol)
+    if not coin:
+        return None
+    url = "https://api.hyperliquid.xyz/info"
+    timeout = aiohttp.ClientTimeout(total=3)
+    try:
+        if session is not None:
+            ctx = session.post(url, json={"type": "allMids"}, timeout=timeout)
+            async with ctx as r:
+                return await _parse_hyperliquid_mid(r, coin)
+        async with aiohttp.ClientSession(timeout=timeout) as s:
+            async with s.post(url, json={"type": "allMids"}) as r:
+                return await _parse_hyperliquid_mid(r, coin)
+    except Exception as e:
+        logger.warning("hyperliquid midpoint fetch error %s: %s", coin, e)
+        return None
+
+
+async def _parse_hyperliquid_mid(r, coin: str) -> Optional[float]:
+    if r.status != 200:
+        logger.warning("hyperliquid midpoint HTTP %d for %s", r.status, coin)
+        return None
+    data = await r.json()
+    if not isinstance(data, dict):
+        return None
+    raw = data.get(coin)
+    if raw is None:
+        return None
+    try:
+        price = float(raw)
+    except (TypeError, ValueError):
+        return None
+    import math
+    return price if math.isfinite(price) and price > 0 else None
+
+
+async def get_execution_mark_price(symbol: str,
+                                   session=None) -> Optional[float]:
+    """Fetch price from the venue that will execute this receiver's orders."""
+    if execution_venue() == "hyperliquid":
+        return await get_hyperliquid_mark_price(symbol, session=session)
+    return await get_binance_mark_price(symbol, session=session)
 
 
 # ── Position graph (SQLite) ─────────────────────────────────────────────────
@@ -1230,7 +1318,7 @@ async def _check_posted_sl(cfg: Config, conn: sqlite3.Connection, ft_session=Non
         sl = pos["sl_abs"]
         if not isinstance(sl, (int, float)) or sl <= 0:
             continue
-        mark = await get_binance_mark_price(pos["symbol"])  # own public session
+        mark = await get_execution_mark_price(pos["symbol"])  # own public session
         if mark is None:
             continue  # fail-open: never force a false exit on missing data
         if not _posted_sl_breached(pos["direction"], mark, sl):
@@ -2102,7 +2190,7 @@ async def _process_event(payload: EventPayload):
             or cfg.max_entry_slippage_pct > 0
         )
         if needs_mark:
-            mark = await get_binance_mark_price(
+            mark = await get_execution_mark_price(
                 symbol, session=getattr(app.state, "public_session", None),
             )
             if mark is None:
@@ -2727,8 +2815,8 @@ async def _process_event(payload: EventPayload):
             except (TypeError, ValueError):
                 remaining_amount = None
         if mark is None:
-            # Fall back to the Binance public mark helper (best-effort).
-            mark = await get_binance_mark_price(
+            # Fall back to the configured venue's public price (best-effort).
+            mark = await get_execution_mark_price(
                 symbol, session=getattr(app.state, "public_session", None))
         if mark is None:
             logger.warning(
@@ -2950,7 +3038,7 @@ async def _process_event(payload: EventPayload):
         if new_sl is None:
             return {"action": "skipped", "reason": "move_sl_unparseable"}
 
-        mark = await get_binance_mark_price(
+        mark = await get_execution_mark_price(
             symbol, session=getattr(app.state, "public_session", None),
         )
         if mark is None:

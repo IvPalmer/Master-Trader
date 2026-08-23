@@ -82,6 +82,7 @@ BOTS: list[dict[str, Any]] = [
         "name": "ShortKeltnerV2HL",
         "label": "short-keltner-hl",
         "url": "http://ft-short-keltner-hl:8080",
+        "venue": "hyperliquid",
         # DRY-RUN on Hyperliquid (self-custody DEX perps, USDC-margined). Same
         # logic as short-keltner, forward-only: HL serves NO historical OHLCV so
         # it cannot be backtested — this is the on-venue OOS measurement codex
@@ -98,30 +99,31 @@ BOTS: list[dict[str, Any]] = [
         "name": "KillersScalpV1",
         "label": "killers-scalp",
         "url": "http://ft-killers-scalp:8080",
-        # Copy-trader of the Binance Killers VIP private channel. RESTORED
-        # 2026-05-31 as a DRY-RUN measurement instrument ONLY — the channel's
-        # signals are price-verified unprofitable (−$511/−$1536 backtest, live
-        # PF 0.011, codex "do-not-fund VERY HIGH" 2026-05-28). No real capital,
-        # ever. Observational + no_baseline: a pass-through copy-trader of an
-        # external signaler, not a quant strategy with a validated backtest
-        # baseline, so gate comparisons are meaningless. baseline/gates null.
+        # Copy-trader of the Binance Killers VIP private channel, executed on
+        # Hyperliquid because Binance Futures is unavailable to the operator.
+        # Forward/live evolution uses posted stops and fixed stop-risk sizing.
+        # It remains no_baseline because an external signal stream is not a
+        # deterministic quant strategy; the dashboard should show realised
+        # performance without comparing it to an invented backtest baseline.
+        "venue": "hyperliquid",
         "observational": True,
         "no_baseline": True,
         "baseline": None,
     },
     # insiders-scalp RETIRED 2026-05-29: copier edge negative (−8.7%/−13%,
-    # Dennis path defunct). REVIVED 2026-06-06 as a forward-measurement DRY-RUN
-    # only — same copy-trader plumbing as killers, fed by the observer fan-out of
+    # Dennis path defunct). REVIVED 2026-06-06 as a forward measurement using
+    # the same copy-trader plumbing as killers, fed by the observer fan-out of
     # Dennis's free "Market Mastery" channel. The earlier −8.7%/−13% verdict was
     # a backtest of his PAID path; this is a live, falsifiable re-test on real
     # prices. Observational + no_baseline for the same reason as killers-ft: a
     # pass-through copy-trader of an external signaler, not a quant strategy with
-    # a validated backtest baseline. No real capital, ever. baseline/gates null.
+    # a validated backtest baseline. Execution venue is Hyperliquid.
     {
         "key": "insiders-ft",
         "name": "InsidersScalp",
         "label": "insiders-scalp",
         "url": "http://ft-insiders-scalp:8080",
+        "venue": "hyperliquid",
         "observational": True,
         "no_baseline": True,
         "baseline": None,
@@ -570,21 +572,25 @@ def _bot_links(bot: dict, open_trades: list[dict], per_pair: list[dict]) -> dict
 
     # Pick candidate pair for TradingView link.
     tv_pair: str | None = None
-    is_futures = False  # KillersScalp uses futures
+    is_futures = False
     if open_trades:
         best_open = max(open_trades, key=lambda t: t.get("stake_amount") or 0)
         tv_pair = best_open.get("pair")
         # Detect futures by checking the pair string or bot name
-        is_futures = "killers" in bot["key"].lower()
+        is_futures = bot.get("venue") == "hyperliquid" or "killers" in bot["key"].lower()
     elif per_pair:
         tv_pair = per_pair[0]["pair"]
-        is_futures = "killers" in bot["key"].lower()
+        is_futures = bot.get("venue") == "hyperliquid" or "killers" in bot["key"].lower()
 
     tv_url: str | None = None
     if tv_pair:
-        symbol = tv_pair.replace("/", "")
-        suffix = ".P" if is_futures else ""
-        tv_url = f"https://www.tradingview.com/chart/?symbol=BINANCE:{symbol}{suffix}"
+        base = tv_pair.split("/", 1)[0]
+        if bot.get("venue") == "hyperliquid" and is_futures:
+            tv_url = f"https://www.tradingview.com/chart/?symbol=HYPERLIQUID:{base}USD"
+        else:
+            symbol = tv_pair.replace("/", "")
+            suffix = ".P" if is_futures else ""
+            tv_url = f"https://www.tradingview.com/chart/?symbol=BINANCE:{symbol}{suffix}"
 
     return {
         "freqtrade_ui": freqtrade_ui,
