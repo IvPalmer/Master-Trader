@@ -487,7 +487,31 @@ function dash() {
       return this.selectedEquityBot?.stats?.winrate ?? this.hero.winRate;
     },
     get selectedProfitFactor() {
-      return this.selectedEquityBot?.stats?.profit_factor ?? this.hero.profitFactor;
+      return this.selectedEquityBot
+        ? this.selectedEquityBot.stats?.profit_factor
+        : this.hero.profitFactor;
+    },
+    get selectedConcentration() {
+      return this.selectedEquityBot?.concentration || (this.selectedEquityBot ? null : this.hero.concentration);
+    },
+    get selectedExpectancy() {
+      const bot = this.selectedEquityBot;
+      if (bot) {
+        return {
+          sample: bot.expectancy?.sample || bot.stats?.closed_trade_count || 0,
+          avgWin: bot.expectancy?.avg_win ?? null,
+          avgLoss: bot.expectancy?.avg_loss ?? null,
+          payoff: bot.expectancy?.payoff ?? null,
+          perTrade: bot.expectancy?.expectancy ?? null,
+        };
+      }
+      return {
+        sample: this.hero.expectancySample,
+        avgWin: this.hero.avgWin,
+        avgLoss: this.hero.avgLoss,
+        payoff: this.hero.payoff,
+        perTrade: this.hero.expectancyPerTrade,
+      };
     },
     get fleetPerformanceData() {
       const trades = this.liveBots
