@@ -137,12 +137,34 @@ button { font: inherit; }
 .tab .badge.badge-dry  { background: var(--surface-2); color: var(--text-3); border-color: var(--border-soft); }
 .tab.on .badge.badge-live { background: var(--pos-soft); color: var(--pos); border-color: rgba(5, 150, 105, 0.35); }
 .tab.on .badge.badge-dry  { background: var(--surface-3); color: var(--text-2); border-color: var(--border-soft); }
+.tab-context { margin-left: auto; }
+.tab-context .badge.running { background: var(--pos-soft); color: var(--pos); }
+.tab-context .badge.stale { background: var(--warn-soft); color: var(--warn); }
+.tab-context .badge.offline { background: var(--neg-soft); color: var(--neg); }
 
 /* ── content area ──────────────────────────────── */
 .tab-panel {
   padding: clamp(1rem, 2vw, 1.5rem) clamp(1rem, 2.5vw, 2rem);
   display: flex; flex-direction: column; gap: 1.25rem;
 }
+
+/* ── portfolio overview ── */
+.portfolio-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem;
+  padding: 0.35rem 0 0.15rem;
+}
+.portfolio-head h1 { font-size: 24px; line-height: 1.15; letter-spacing: -.025em; }
+.portfolio-head p { margin-top: 4px; color: var(--text-2); font-size: 12px; }
+.portfolio-health {
+  display: flex; align-items: center; gap: 0.75rem; padding-bottom: 2px;
+  color: var(--pos);
+}
+.portfolio-health.warn { color: var(--warn); }
+.portfolio-health.err { color: var(--neg); }
+.portfolio-health .bot-state-dot { width: 9px; height: 9px; }
+.portfolio-health > div { display: flex; flex-direction: column; align-items: flex-end; }
+.portfolio-health strong { font-size: 12px; font-weight: 650; }
+.portfolio-health > div > span { color: var(--text-2); font-size: 10.5px; }
 
 /* ═══════════════════════════════════════════════
    COMMAND BAR — the new incident surface
@@ -263,32 +285,95 @@ button { font: inherit; }
 }
 .fleet-board-sub { margin-top: 2px; }
 .fleet-board-poll { white-space: nowrap; }
-.fleet-roster {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+
+/* Full-width comparison table: primary decision surface on Overview. */
+.bot-table-wrap { width: 100%; overflow-x: auto; scrollbar-width: thin; }
+.bot-table { width: 100%; min-width: 1180px; border-collapse: collapse; }
+.bot-table th {
+  padding: 0.55rem 0.8rem; background: var(--surface-2); border-bottom: 1px solid var(--border);
+  color: var(--text-2); font-size: 9px; font-weight: 650; letter-spacing: .06em;
+  text-align: left; text-transform: uppercase; white-space: nowrap;
 }
-.venue-roster + .venue-roster { border-left: 1px solid var(--border); }
-.venue-roster-head {
-  min-height: 44px; padding: 0.55rem 0.85rem;
-  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
-  background: var(--surface-2); border-bottom: 1px solid var(--border);
+.bot-table th.right, .bot-table td.right { text-align: right; }
+.bot-table td {
+  padding: 0.72rem 0.8rem; border-bottom: 1px solid var(--hairline);
+  color: var(--text); font-size: 11px; vertical-align: middle; white-space: nowrap;
 }
-.venue-roster-title {
-  display: block; color: var(--text); font-size: 12px; font-weight: 650;
+.bot-table tbody tr:last-child td { border-bottom: 0; }
+.bot-table tbody tr { cursor: pointer; transition: background .14s ease-out; }
+.bot-table tbody tr:hover { background: var(--surface-2); }
+.bot-table tbody tr.selected { background: var(--accent-soft); }
+.bot-table tbody tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.bot-table-name {
+  display: grid; grid-template-columns: 68px minmax(125px, 1fr); gap: 1px 0.65rem;
+  min-width: 225px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer;
 }
-.venue-roster-note, .venue-roster-count {
-  color: var(--text-2); font-size: 10.5px;
+.bot-table-name .bot-state { grid-row: 1 / 3; align-self: center; }
+.bot-table-name strong { font-size: 12px; font-weight: 680; }
+.bot-table-name > span:last-child { color: var(--text-2); font-size: 10px; }
+.table-primary, .table-secondary { display: block; }
+.table-primary { color: var(--text); font-weight: 550; }
+.table-secondary, .table-activity { color: var(--text-2); font-size: 10px; }
+.table-activity { display: block; max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+.table-open {
+  border: 0; background: transparent; color: var(--accent); font-size: 10px; font-weight: 650; cursor: pointer;
 }
-.bot-roster-row {
-  width: 100%; min-height: 64px; padding: calc(0.65rem * var(--p-density)) 0.8rem;
-  display: grid; grid-template-columns: 69px minmax(145px, 1fr) 81px 72px 38px 28px;
-  align-items: center; gap: 0.7rem;
-  border: 0; border-bottom: 1px solid var(--hairline); background: var(--surface);
-  color: var(--text); text-align: left; cursor: pointer;
-  transition: background .14s ease-out;
+.table-open:hover { text-decoration: underline; }
+
+/* Selected performance workspace. */
+.performance-card .card-head { align-items: flex-start; }
+.curve-switcher {
+  display: flex; justify-content: flex-end; gap: 3px; max-width: 70%;
+  overflow-x: auto; padding: 3px; background: var(--surface-3); border-radius: 9px;
+  scrollbar-width: thin;
 }
-.bot-roster-row:last-child { border-bottom: 0; }
-.bot-roster-row:hover { background: var(--surface-2); }
-.bot-roster-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.curve-switcher button {
+  flex: none; min-height: 30px; padding: 0.3rem 0.62rem;
+  border: 0; border-radius: 7px; background: transparent; color: var(--text-2);
+  font-size: 10.5px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.curve-switcher button:hover { color: var(--text); }
+.curve-switcher button.on { background: var(--surface); color: var(--accent-ink); box-shadow: var(--el1); }
+.curve-switcher button:focus-visible, .table-open:focus-visible, .bot-table-name:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.chart-shell { position: relative; }
+.chart-empty {
+  position: absolute; inset: 52px 0 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px; pointer-events: none;
+  background: rgba(255,254,251,.74);
+}
+.chart-empty strong { color: var(--text); font-size: 12px; }
+.chart-empty span { color: var(--text-2); font-size: 10.5px; }
+.selection-summary { display: flex; flex-direction: column; }
+.selection-status {
+  display: flex; flex-direction: column; gap: 4px; padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--hairline); color: var(--text-2); font-size: 10.5px;
+}
+.selection-kv {
+  display: grid; grid-template-columns: 1fr auto; gap: 0.55rem 1rem;
+  padding: 0.9rem 1.1rem; font-size: 11px;
+}
+.selection-kv > span { color: var(--text-2); }
+.selection-kv > strong { text-align: right; font-size: 11px; font-weight: 620; }
+.selection-action { margin-top: auto; padding: 0.85rem 1.1rem; border-top: 1px solid var(--hairline); }
+.selection-action .cmd-btn { width: 100%; justify-content: center; }
+
+@media (max-width: 1100px) {
+  .portfolio-head { align-items: flex-start; }
+  .vitals-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .performance-card .card-head { flex-direction: column; }
+  .curve-switcher { justify-content: flex-start; max-width: 100%; width: 100%; }
+}
+@media (max-width: 720px) {
+  .portfolio-head { flex-direction: column; gap: 0.75rem; }
+  .portfolio-health > div { align-items: flex-start; }
+  .vitals-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vital-cell { padding: 11px 12px; }
+  .vital-cell .vital-val { font-size: 18px; }
+  .fleet-board-head { align-items: flex-start; flex-direction: column; }
+  .fleet-board-poll { white-space: normal; }
+}
 .bot-state {
   display: inline-flex; align-items: center; gap: 6px;
   color: var(--text-2); font-size: 9.5px; font-weight: 700; letter-spacing: .055em;
@@ -298,60 +383,6 @@ button { font: inherit; }
 .bot-state.running { color: var(--pos); }
 .bot-state.stale { color: var(--warn); }
 .bot-state.offline { color: var(--neg); }
-.bot-roster-identity { display: flex; flex-direction: column; min-width: 0; }
-.bot-roster-identity strong {
-  overflow: hidden; color: var(--text); font-size: 12.5px; font-weight: 650;
-  text-overflow: ellipsis; white-space: nowrap;
-}
-.bot-roster-identity > span {
-  overflow: hidden; color: var(--text-2); font-size: 10.5px;
-  text-overflow: ellipsis; white-space: nowrap;
-}
-.bot-roster-stat { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; }
-.bot-roster-k {
-  color: var(--text-2); font-size: 8.5px; font-weight: 600; letter-spacing: .055em;
-  text-transform: uppercase; white-space: nowrap;
-}
-.bot-roster-v { color: var(--text); font-size: 11px; font-weight: 600; white-space: nowrap; }
-.bot-roster-v.pos { color: var(--pos); }
-.bot-roster-v.neg { color: var(--neg); }
-.bot-roster-open { color: var(--accent); font-size: 10px; font-weight: 600; text-align: right; }
-
-@media (max-width: 1120px) {
-  .fleet-roster { grid-template-columns: 1fr; }
-  .venue-roster + .venue-roster { border-left: 0; border-top: 1px solid var(--border); }
-  .bot-roster-row { grid-template-columns: 76px minmax(180px, 1fr) 110px 90px 55px 35px; }
-}
-@media (max-width: 650px) {
-  .fleet-board-head { align-items: flex-start; }
-  .fleet-board-poll { display: none; }
-  .bot-roster-row {
-    grid-template-columns: 72px repeat(3, minmax(52px, 1fr)) 28px;
-    grid-template-rows: auto auto; gap: 0.35rem 0.55rem;
-    min-height: 82px; padding: 0.65rem 0.7rem;
-  }
-  .bot-roster-row > .bot-state { grid-column: 1; grid-row: 1 / span 2; align-self: start; padding-top: 2px; }
-  .bot-roster-identity { grid-column: 2 / 5; grid-row: 1; }
-  .bot-roster-row > .bot-roster-stat:nth-child(3) { grid-column: 2; grid-row: 2; align-items: flex-start; }
-  .bot-roster-row > .bot-roster-stat:nth-child(4) { grid-column: 3; grid-row: 2; align-items: flex-start; }
-  .bot-roster-row > .bot-roster-stat:nth-child(5) { grid-column: 4; grid-row: 2; align-items: flex-start; }
-  .bot-roster-open { grid-column: 5; grid-row: 1; }
-}
-
-/* ─── last-closed-compact (replaces empty open-positions) ── */
-.last-closed-compact {
-  padding: 1rem 1.1rem;
-  display: flex; flex-direction: column; gap: 0;
-}
-.lcc-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 0.35rem 0; border-bottom: 1px solid var(--hairline);
-  font-size: 12px;
-}
-.lcc-row:last-child { border-bottom: none; }
-.lcc-k { color: var(--text-3); font-size: 11px; }
-.lcc-v { font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
-.lcc-v.dim { color: var(--text-3); }
 
 /* ═══════════════════════════════════════════════
    GRADUATION BOARD (dry-run tab)
