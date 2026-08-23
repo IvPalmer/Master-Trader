@@ -43,7 +43,7 @@ function dash() {
     pollInterval: 30,
     tab: '',
     clock: '—',
-    equityBot: null,
+    equityBot: 'fleet',
     // Dry-run drawer: which bot's inline dossier shows under the grad table.
     // Single selection so the table controls the view rather than stacking dossiers.
     selectedDryBot: null,
@@ -70,7 +70,7 @@ function dash() {
       setInterval(() => this.tickClock(), 1000);
       this.fetchKillersSL();
       this.refresh().then(() => {
-        this.equityBot = this.liveBots[0]?.key || null;
+        this.equityBot = 'fleet';
         // Default the dry-run drawer to whichever bot is closest to graduation.
         // Falls back to first dry bot if no closest-to-gate ranking is available.
         this.selectedDryBot = this.closestToGate?.key || this.dryRunBots[0]?.key || null;
@@ -97,6 +97,25 @@ function dash() {
     setTab(t) {
       this.tab = t;
       location.hash = t === 'live' ? '' : t;
+    },
+
+    openPositionsTab() {
+      this.tradesView = 'open';
+      this.tradesFilter = 'all';
+      this.setTab('trades');
+    },
+    openTradesHistory() {
+      this.tradesView = 'closed';
+      this.tradesFilter = 'all';
+      this.setTab('trades');
+    },
+    setEquityBot(key) {
+      this.equityBot = key || 'fleet';
+      this.$nextTick(() => {
+        this.renderEquity();
+        this.renderDrawdown();
+        this.renderPerPair();
+      });
     },
 
     setTradesFilter(f) { this.tradesFilter = f; this.$nextTick(() => this.renderCharts()); },
@@ -130,6 +149,10 @@ function dash() {
           return (a.label||'').localeCompare(b.label||'');
         });
     },
+    get activeBot() {
+      if (!this.tab.startsWith('bot:')) return null;
+      return this.raw.bots?.[this.tab.slice(4)] || null;
+    },
     get liveAccountCount() {
       return new Set(this.liveBots.map(b => b.account_group || b.key)).size;
     },
@@ -162,8 +185,9 @@ function dash() {
       const totalWins = live.reduce((s, b) => s + (b.stats?.winning_trades ?? 0), 0);
       const totalLosses = live.reduce((s, b) => s + (b.stats?.losing_trades ?? 0), 0);
       const winRate = (totalWins + totalLosses) ? totalWins / (totalWins + totalLosses) : 0;
-      const grossProfit = live.reduce((s, b) => s + (b.stats?.gross_profit ?? 0), 0);
-      const grossLoss = live.reduce((s, b) => s + Math.abs(b.stats?.gross_loss ?? 0), 0);
+      const aggregateClosed = live.flatMap(b => b.recent_trades || []).filter(t => !t.is_open);
+      const grossProfit = aggregateClosed.reduce((s, t) => s + Math.max(0, Number(t.profit_abs || 0)), 0);
+      const grossLoss = aggregateClosed.reduce((s, t) => s + Math.abs(Math.min(0, Number(t.profit_abs || 0))), 0);
       const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : null;
       const totalRealizedPnl = live.reduce((s, b) => s + (b.pnl?.closed ?? 0), 0);
       const expectancyPerTrade = closedTrades > 0 ? totalRealizedPnl / closedTrades : null;
@@ -203,7 +227,7 @@ function dash() {
         concentration = live[0]?.concentration ?? null;
       }
 
-      const allRecentTrades = live.flatMap(b => b.recent_trades || []).filter(t => !t.is_open);
+      const allRecentTrades = aggregateClosed;
       const wins = allRecentTrades.filter(t => (t.profit_abs || 0) > 0);
       const losses = allRecentTrades.filter(t => (t.profit_abs || 0) < 0);
       const avgWin = wins.length ? wins.reduce((s, t) => s + t.profit_abs, 0) / wins.length : null;
@@ -424,6 +448,70 @@ function dash() {
     },
     botHasHistory(bot) {
       return (bot?.stats?.closed_trade_count || 0) > 0 || (bot?.open_trades?.length || 0) > 0;
+    },
+    get selectedEquityBot() {
+      return this.equityBot === 'fleet' ? null : (this.raw.bots?.[this.equityBot] || null);
+    },
+    get equitySelectionLabel() {
+      return this.selectedEquityBot?.label || 'fleet';
+    },
+    get equityTitle() {
+      return this.selectedEquityBot ? `${this.selectedEquityBot.label} equity curve` : 'portfolio equity curve';
+    },
+    get equitySubtitle() {
+      const bot = this.selectedEquityBot;
+      if (!bot) return 'realized portfolio equity across every live strategy';
+      if (bot.baseline?.annual_return_pct) return 'live equity vs scaled backtest expectation';
+      return 'forward live equity · no synthetic backtest baseline';
+    },
+    get equityHasHistory() {
+      return this.selectedEquityBot
+        ? (this.selectedEquityBot.stats?.closed_trade_count || 0) > 0
+        : this.hero.closedTrades > 0;
+    },
+    get selectedPnl() {
+      return this.selectedEquityBot?.pnl?.all_coin ?? this.hero.totalPnl;
+    },
+    get selectedReturn() {
+      return this.selectedEquityBot?.pnl?.all_pct ?? this.hero.totalPct;
+    },
+    get selectedMaxDrawdown() {
+      return this.selectedEquityBot
+        ? (this.selectedEquityBot.stats?.max_drawdown || 0) * 100
+        : this.hero.drawdownMaxPct;
+    },
+    get selectedClosedTrades() {
+      return this.selectedEquityBot?.stats?.closed_trade_count ?? this.hero.closedTrades;
+    },
+    get selectedWinRate() {
+      return this.selectedEquityBot?.stats?.winrate ?? this.hero.winRate;
+    },
+    get selectedProfitFactor() {
+      return this.selectedEquityBot?.stats?.profit_factor ?? this.hero.profitFactor;
+    },
+    get fleetPerformanceData() {
+      const trades = this.liveBots
+        .flatMap(bot => (bot.recent_trades || [])
+          .filter(t => !t.is_open && t.close_timestamp)
+          .map(t => ({ ...t, _bot: bot.key })))
+        .sort((a, b) => toMs(a.close_timestamp) - toMs(b.close_timestamp));
+      if (!trades.length) return { live: [], drawdown: [], trades: [] };
+
+      const start = this.hero.walletStart || this.hero.walletNow || 0;
+      let equity = start;
+      const firstTs = toMs(trades[0].close_timestamp);
+      const live = [[Math.max(0, firstTs - 1000), Number(start.toFixed(4))]];
+      const drawdown = [[Math.max(0, firstTs - 1000), 0]];
+      let peak = start;
+      for (const trade of trades) {
+        equity += Number(trade.profit_abs || 0);
+        peak = Math.max(peak, equity);
+        const dd = peak > 0 ? (equity - peak) / peak * 100 : 0;
+        const ts = toMs(trade.close_timestamp);
+        live.push([ts, Number(equity.toFixed(4))]);
+        drawdown.push([ts, Number(dd.toFixed(4))]);
+      }
+      return { live, drawdown, trades };
     },
 
     // ─── last closed trade for a bot ───
@@ -935,32 +1023,36 @@ function dash() {
     },
 
     async renderEquity() {
-      const key = this.equityBot || this.liveBots[0]?.key;
-      if (!key) return;
-      const data = await this._fetchEquity(key);
+      const key = this.equityBot || 'fleet';
+      const isFleet = key === 'fleet';
+      const fleetData = isFleet ? this.fleetPerformanceData : null;
+      const data = isFleet ? fleetData : await this._fetchEquity(key);
       const chart = this._ensureChart('chart-equity');
       if (!chart) return;
-      const bot = this.raw.bots[key];
+      const bot = isFleet ? null : this.raw.bots[key];
       const live = (data?.live || []).map(p => [new Date(p[0]), p[1]]);
       const startTs = data?.bot_start_ts_ms || (live[0]?.[0]?.getTime() ?? Date.now());
-      // Bug fix B2: defensive wallet access
-      const startCap = data?.starting_capital ?? bot?.wallet?.starting_capital ?? 200;
+      const startCap = isFleet
+        ? (this.hero.walletStart || this.hero.walletNow || 0)
+        : (data?.starting_capital ?? bot?.wallet?.starting_capital ?? 0);
       const annual = bot?.baseline?.annual_return_pct ?? 0;
       const lastLiveTs = live.length ? live[live.length - 1][0].getTime() : Date.now();
       const horizon = Math.max(lastLiveTs, Date.now()) + 12 * 3600 * 1000;
       const expected = [];
-      for (let i = 0; i <= 80; i++) {
-        const ts = startTs + (horizon - startTs) * i / 80;
-        const days = (ts - startTs) / 86400000;
-        const eq = startCap * Math.pow(1 + annual / 100, days / 365);
-        expected.push([new Date(ts), Number(eq.toFixed(4))]);
+      if (!isFleet && annual) {
+        for (let i = 0; i <= 80; i++) {
+          const ts = startTs + (horizon - startTs) * i / 80;
+          const days = (ts - startTs) / 86400000;
+          const eq = startCap * Math.pow(1 + annual / 100, days / 365);
+          expected.push([new Date(ts), Number(eq.toFixed(4))]);
+        }
       }
       const liveByTs = new Map(live.map(([d, v]) => [d.getTime(), v]));
       const winMarks = [];
       const lossMarks = [];
       // toMs() normalises s vs ms — marks otherwise land off-curve when
       // close_timestamp is seconds but equity x-axis is ms.
-      const sortedClosed = (bot?.recent_trades || [])
+      const sortedClosed = (isFleet ? (fleetData?.trades || []) : (bot?.recent_trades || []))
         .filter(t => !t.is_open && t.close_timestamp)
         .sort((a, b) => toMs(a.close_timestamp) - toMs(b.close_timestamp));
       let runningEquity = startCap;
@@ -981,9 +1073,13 @@ function dash() {
           valueFormatter: v => v != null ? '$' + Number(v).toFixed(2) : '—',
         },
         legend: {
-          data: ['live equity', 'backtest expected'],
+          data: expected.length ? ['live equity', 'backtest expected'] : ['live equity'],
           top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 11 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3,
         },
+        graphic: live.length > 1 ? [] : [{
+          type: 'text', left: 'center', top: 'middle', silent: true,
+          style: { text: 'Collecting live trades', fill: COLORS.text3, font: '500 12px Inter' },
+        }],
         grid: { left: 60, right: 18, top: 32, bottom: 30 },
         xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { show: false } },
         yAxis: {
@@ -993,8 +1089,8 @@ function dash() {
           splitLine: { lineStyle: { color: COLORS.hairline, type: 'dashed' } },
         },
         series: [
-          { name: 'backtest expected', type: 'line', data: expected, showSymbol: false,
-            lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.4, opacity: 0.7 }, itemStyle: { color: COLORS.text3 }, z: 1 },
+          ...(expected.length ? [{ name: 'backtest expected', type: 'line', data: expected, showSymbol: false,
+            lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.4, opacity: 0.7 }, itemStyle: { color: COLORS.text3 }, z: 1 }] : []),
           { name: 'live equity', type: 'line', data: live, smooth: false, showSymbol: false,
             lineStyle: { color: COLORS.accent, width: 2 },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -1013,15 +1109,16 @@ function dash() {
     },
 
     async renderDrawdown() {
-      const key = this.equityBot || this.liveBots[0]?.key;
-      if (!key) return;
-      let data = this._equityData[key];
-      if (!data) data = await this._fetchEquity(key);
+      const key = this.equityBot || 'fleet';
+      const isFleet = key === 'fleet';
+      let data = isFleet ? this.fleetPerformanceData : this._equityData[key];
+      if (!isFleet && !data) data = await this._fetchEquity(key);
       const chart = this._ensureChart('chart-drawdown');
       if (!chart) return;
-      const bot = this.raw.bots[key];
+      const bot = isFleet ? null : this.raw.bots[key];
       const dd = (data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
-      const ddCap = -(bot?.baseline?.max_dd_pct || 20) * 1.5;
+      const baselineDd = isFleet ? this.hero.drawdownBacktest : (bot?.baseline?.max_dd_pct || 0);
+      const ddCap = baselineDd ? -baselineDd * 1.5 : Math.min(-5, Math.floor((this.selectedMaxDrawdown || 0) * -1.5));
       chart.setOption({
         ...ECHART_COMMON, animation: false,
         tooltip: {
@@ -1046,15 +1143,15 @@ function dash() {
           ]) },
           markLine: {
             silent: true, symbol: 'none',
-            data: [
+            data: baselineDd ? [
               { yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 },
                 label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%',
                          color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2,4], borderRadius: 2 } },
-              { yAxis: -(bot?.baseline?.max_dd_pct || 0),
+              { yAxis: -baselineDd,
                 lineStyle: { color: COLORS.text3, type: 'dotted', width: 1, opacity: 0.6 },
-                label: { show: true, position: 'insideEndBottom', formatter: 'backtest ' + (-(bot?.baseline?.max_dd_pct || 0)).toFixed(1) + '%',
+                label: { show: true, position: 'insideEndBottom', formatter: 'reference ' + (-baselineDd).toFixed(1) + '%',
                          color: COLORS.text3, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2,4], borderRadius: 2 } },
-            ],
+            ] : [],
           },
         }],
       }, true);
@@ -1064,7 +1161,8 @@ function dash() {
       const chart = this._ensureChart('chart-perpair');
       if (!chart) return;
       const pairMap = {};
-      for (const b of this.liveBots) {
+      const scope = this.selectedEquityBot ? [this.selectedEquityBot] : this.liveBots;
+      for (const b of scope) {
         for (const pp of (b.per_pair || [])) {
           if (!pairMap[pp.pair]) pairMap[pp.pair] = 0;
           pairMap[pp.pair] += Number(pp.pnl || 0);
@@ -1074,13 +1172,19 @@ function dash() {
         .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
         .slice(0, 10);
       if (!rows.length) {
-        chart.setOption({ ...ECHART_COMMON, series: [], xAxis: { type: 'value' }, yAxis: { type: 'category', data: [] } }, true);
+        chart.setOption({
+          ...ECHART_COMMON,
+          graphic: [{ type: 'text', left: 'center', top: 'middle', silent: true,
+            style: { text: 'No closed trades yet', fill: COLORS.text3, font: '500 12px Inter' } }],
+          series: [], xAxis: { type: 'value', show: false }, yAxis: { type: 'category', data: [], show: false },
+        }, true);
         return;
       }
       const pairs = rows.map(r => r[0]);
       const pnls = rows.map(r => Number(r[1]).toFixed(2));
       chart.setOption({
         ...ECHART_COMMON, animation: false,
+        graphic: [],
         tooltip: {
           trigger: 'axis', axisPointer: { type: 'shadow' },
           backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1,
@@ -1231,20 +1335,24 @@ function dash() {
         const lastLiveTs = live.length ? live[live.length-1][0].getTime() : Date.now();
         const horizon  = Math.max(lastLiveTs, Date.now()) + 12*3600*1000;
         const expected = [];
-        for (let i = 0; i <= 80; i++) {
-          const ts   = startTs + (horizon - startTs) * i / 80;
-          const days = (ts - startTs) / 86400000;
-          expected.push([new Date(ts), startCap * Math.pow(1 + annual/100, days/365)]);
+        if (annual) {
+          for (let i = 0; i <= 80; i++) {
+            const ts   = startTs + (horizon - startTs) * i / 80;
+            const days = (ts - startTs) / 86400000;
+            expected.push([new Date(ts), startCap * Math.pow(1 + annual/100, days/365)]);
+          }
         }
         equityChart.setOption({
           ...ECHART_COMMON, animation: false,
           tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: v => v != null ? '$' + Number(v).toFixed(2) : '—' },
-          legend: { data: ['live equity', 'backtest expected'], top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 11 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
+          legend: { data: expected.length ? ['live equity', 'backtest expected'] : ['live equity'], top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 11 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
+          graphic: live.length > 1 ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
+            style: { text: 'Collecting live trades', fill: COLORS.text3, font: '500 12px Inter' } }],
           grid: { left: 60, right: 18, top: 32, bottom: 30 },
           xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { show: false } },
           yAxis: { type: 'value', scale: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.hairline, type: 'dashed' } } },
           series: [
-            { name: 'backtest expected', type: 'line', data: expected, showSymbol: false, lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.2 } },
+            ...(expected.length ? [{ name: 'backtest expected', type: 'line', data: expected, showSymbol: false, lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.2 } }] : []),
             { name: 'live equity', type: 'line', data: live, showSymbol: false,
               lineStyle: { color: COLORS.info, width: 2 },
               areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14,135,163,0.18)' }, { offset: 1, color: 'rgba(14,135,163,0)' }]) } },
@@ -1255,9 +1363,12 @@ function dash() {
       const ddChart = this._ensureChart('chart-detail-dd-' + key);
       if (ddChart) {
         const dd    = (data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
-        const ddCap = -(bot.baseline?.max_dd_pct || 20) * 1.5;
+        const baselineDd = bot.baseline?.max_dd_pct || 0;
+        const ddCap = baselineDd ? -baselineDd * 1.5 : -5;
         ddChart.setOption({
           ...ECHART_COMMON, animation: false,
+          graphic: dd.length > 1 ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
+            style: { text: 'No drawdown yet', fill: COLORS.text3, font: '500 12px Inter' } }],
           tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: v => v != null ? Number(v).toFixed(2) + '%' : '—' },
           grid: { left: 50, right: 18, top: 22, bottom: 30 },
           xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 } },
@@ -1266,7 +1377,7 @@ function dash() {
             type: 'line', data: dd, showSymbol: false,
             lineStyle: { color: COLORS.neg, width: 1.5 },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(210,71,58,0)' }, { offset: 1, color: 'rgba(210,71,58,0.22)' }]) },
-            markLine: { silent: true, symbol: 'none', data: [{ yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%', color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2, 4], borderRadius: 2 } }] },
+            markLine: { silent: true, symbol: 'none', data: baselineDd ? [{ yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%', color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2, 4], borderRadius: 2 } }] : [] },
           }],
         }, true);
       }
@@ -1278,6 +1389,8 @@ function dash() {
         const pnls  = rows.map(r => Number(r.pnl).toFixed(2));
         pairChart.setOption({
           ...ECHART_COMMON, animation: false,
+          graphic: rows.length ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
+            style: { text: 'No pair performance yet', fill: COLORS.text3, font: '500 12px Inter' } }],
           tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: v => '$' + Number(v).toFixed(2) },
           grid: { left: 70, right: 50, top: 12, bottom: 24 },
           xAxis: { type: 'value', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.5 } } },
