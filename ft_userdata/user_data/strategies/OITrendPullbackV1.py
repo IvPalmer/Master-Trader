@@ -88,6 +88,12 @@ class OITrendPullbackV1(IStrategy):
             )
             if baseline and baseline > 0:
                 self._oi_growth[pair] = oi / baseline - 1.0
+        valid = sum(oi is not None for _, oi in results)
+        ready = sum(pair in self._oi_growth for pair in pairs)
+        logger.info(
+            "OI snapshot: valid=%d/%d growth_ready=%d (entries fail-closed until ready)",
+            valid, len(pairs), ready,
+        )
 
     @staticmethod
     def _fetch_oi(pair: str) -> tuple[str, float | None]:
@@ -144,4 +150,3 @@ class OITrendPullbackV1(IStrategy):
             "exit_long",
         ] = 1
         return dataframe
-
