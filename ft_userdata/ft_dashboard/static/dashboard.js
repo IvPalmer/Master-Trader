@@ -135,11 +135,18 @@ function dash() {
     // ─── fleet-aggregated hero stats (Bug fix B2: defensive chaining throughout) ───
     get hero() {
       const live = this.liveBots;
-      // Bug fix B2: defensive access on wallet
-      const start = live.reduce((s, b) => s + (b.wallet?.starting_capital ?? 0), 0);
-      const owned = live.reduce((s, b) => s + (b.wallet?.bot_owned ?? 0), 0);
-      const walletNow = (live.length && owned > 0) ? owned : start;
-      const totalPnl = walletNow - start;
+      // Several strategies may share one exchange account. Count deployable
+      // capital once per account_group while still adding every strategy's P&L.
+      // Without this, Funding/Keltner/OI triple-count the same Binance wallet.
+      const accounts = new Map();
+      for (const b of live) {
+        const group = b.account_group || b.key;
+        const owned = b.wallet?.bot_owned ?? b.wallet?.starting_capital ?? 0;
+        accounts.set(group, Math.max(accounts.get(group) ?? 0, owned));
+      }
+      const walletNow = [...accounts.values()].reduce((s, v) => s + v, 0);
+      const totalPnl = live.reduce((s, b) => s + (b.pnl?.all_coin ?? 0), 0);
+      const start = walletNow - totalPnl;
       const closedTrades = live.reduce((s, b) => s + (b.stats?.closed_trade_count ?? 0), 0);
       const totalWins = live.reduce((s, b) => s + (b.stats?.winning_trades ?? 0), 0);
       const totalLosses = live.reduce((s, b) => s + (b.stats?.losing_trades ?? 0), 0);
@@ -147,9 +154,7 @@ function dash() {
       const grossProfit = live.reduce((s, b) => s + (b.stats?.gross_profit ?? 0), 0);
       const grossLoss = live.reduce((s, b) => s + Math.abs(b.stats?.gross_loss ?? 0), 0);
       const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : null;
-      const totalRealizedPnl = live.reduce((s, b) => {
-        return s + (b.stats?.profit_all ?? b.pnl?.all_abs ?? 0);
-      }, 0);
+      const totalRealizedPnl = live.reduce((s, b) => s + (b.pnl?.closed ?? 0), 0);
       const expectancyPerTrade = closedTrades > 0 ? totalRealizedPnl / closedTrades : null;
       const ddMax = live.length ? Math.max(...live.map(b => (b.stats?.max_drawdown ?? 0) * 100)) : 0;
       const ddCurrentPerBot = live.map(b => {

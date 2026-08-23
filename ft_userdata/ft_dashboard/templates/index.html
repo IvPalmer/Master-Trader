@@ -126,7 +126,7 @@
     <!-- ── B: Fleet vitals strip (compact, secondary when incidents exist) ── -->
     <div class="vitals-strip" :class="attentionItems.length > 0 ? 'secondary' : ''">
       <button class="vital-cell" @click="document.getElementById('chart-equity')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">wallet</span>
+        <span class="vital-label">bot capital</span>
         <span class="vital-val num" x-text="fmtUsd(hero.walletNow)">—</span>
       </button>
       <button class="vital-cell accent" @click="document.getElementById('chart-equity')?.scrollIntoView({behavior:'smooth'})">
@@ -869,7 +869,7 @@
         <div class="card col-4">
           <div class="card-head">
             <div class="card-title" x-text="(bot.observational || bot.no_baseline) ? 'performance' : 'live vs backtest'">live vs backtest</div>
-            <div class="card-sub" x-text="(bot.observational || bot.no_baseline) ? 'copy-trader · no backtest baseline' : 'deviation from expected · all-time'">deviation from expected · all-time</div>
+            <div class="card-sub" x-text="(bot.observational || bot.no_baseline) ? (bot.strategy_kind === 'copy-trader' ? 'copy-trader · fresh live epoch' : 'autonomous quant · forward live epoch') : 'deviation from expected · all-time'">deviation from expected · all-time</div>
           </div>
           <div class="kv">
             <span class="k">p&l</span>
@@ -984,6 +984,6 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=30"></script>
+<script src="/static/dashboard.js?v=31"></script>
 </body>
 </html>

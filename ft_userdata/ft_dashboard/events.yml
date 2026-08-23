@@ -49,3 +49,23 @@
   ts: "2026-05-25T00:00:00Z"
   label: "killers-scalp added (copy-trader)"
   kind: milestone
+
+- bot: fleet
+  ts: "2026-08-23T22:55:00Z"
+  label: "Hyperliquid live fleet activated"
+  kind: milestone
+
+- bot: killers-ft
+  ts: "2026-08-23T22:55:00Z"
+  label: "live epoch · 98 USDC"
+  kind: deploy
+
+- bot: insiders-ft
+  ts: "2026-08-23T22:55:00Z"
+  label: "live epoch · 50 USDC"
+  kind: deploy
+
+- bot: short-keltner-hl
+  ts: "2026-08-23T22:55:00Z"
+  label: "live epoch · 40 USDC"
+  kind: deploy
