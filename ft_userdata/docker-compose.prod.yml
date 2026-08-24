@@ -369,6 +369,7 @@ services:
       OVERLAYS_DIR: /overlays
       KILLERS_DB: /var/lib/killers/state.sqlite
       KILLERS_RECEIVER_DB: /var/lib/killers-receiver/receiver-hyperliquid.sqlite
+      LINEAGE_DB_DIR: /var/lib/freqtrade-history
     volumes:
       - ./overlays:/overlays:ro
       # killers_bot SQLite (read-only) so the dashboard can render the
@@ -377,6 +378,10 @@ services:
       # live killers-receiver SQLite (target_orders) — read-only, for the
       # TP-ladder pill. Distinct path from the observer state.sqlite above.
       - killers_receiver_state:/var/lib/killers-receiver:ro
+      # Retired dry-run epochs are chart lineage only. They are mounted
+      # read-only and never participate in live wallet/P&L aggregation.
+      - ft_user_data:/var/lib/freqtrade-history:ro
+      - /home/ubuntu/hl_validation/user_data/tradesv3.dryrun.ShortKeltnerV2HL.sqlite:/var/lib/freqtrade-history/tradesv3.dryrun.ShortKeltnerV2HL.sqlite:ro
     deploy:
       resources:
         limits:

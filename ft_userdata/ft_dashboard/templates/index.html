@@ -1190,7 +1190,7 @@
         <div class="card col-8">
           <div class="card-head">
             <div class="card-title">equity curve</div>
-            <div class="card-sub" x-text="bot.baseline ? 'live equity vs backtest expectation' : 'forward live equity · collecting trades'">forward live equity</div>
+            <div class="card-sub" x-text="bot.lineage ? 'dry-run lineage → normalized live performance' : (bot.baseline ? 'live equity vs backtest expectation' : 'forward live equity · collecting trades')">forward live equity</div>
           </div>
           <div class="chart tall" :id="'chart-detail-equity-'+bot.key"></div>
         </div>
@@ -1279,6 +1279,6 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=37"></script>
+<script src="/static/dashboard.js?v=38"></script>
 </body>
 </html>

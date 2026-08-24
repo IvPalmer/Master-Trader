@@ -23,6 +23,7 @@ import logging
 import math
 import os
 import re
+import sqlite3 as _sqlite
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
@@ -60,6 +61,14 @@ BOTS: list[dict[str, Any]] = [
         "url": "http://ft-keltner-bounce:8080",
         "account_group": "binance-spot",
         "strategy_kind": "autonomous-quant",
+        "lineage": {
+            "legacy_db": "tradesv3.dryrun.KeltnerBounceV1.sqlite",
+            "legacy_starting_capital": 200.0,
+            "transition_ts_ms": 1787509045565,
+            "transition_label": "live + strategy v2",
+            "legacy_label": "Binance spot dry-run",
+            "live_label": "Binance spot live",
+        },
         "baseline": {
             "annual_return_pct": 15.6, "profit_factor": 1.58, "win_rate": 0.64,
             "max_dd_pct": 12.9, "trades_per_year": 46, "worst_trade_pct": -5.0,
@@ -80,8 +89,8 @@ BOTS: list[dict[str, Any]] = [
         "no_baseline": True,
         "baseline": None,
     },
-    # The original HL dry-run remains available for historical audit, but the
-    # fleet dashboard must follow the fresh, independently funded live epoch.
+    # The original HL dry-run remains available as visual strategy lineage,
+    # while fleet accounting follows the fresh, independently funded epoch.
     {
         "key": "short-keltner-hl",
         "name": "ShortKeltnerV2HL",
@@ -92,8 +101,16 @@ BOTS: list[dict[str, Any]] = [
         "account_group": "hyperliquid-short-keltner",
         "strategy_kind": "autonomous-quant",
         "venue": "hyperliquid",
-        # Fresh $40 live account; the old $200 dry-run epoch is intentionally
-        # excluded so its P&L cannot leak into real-money fleet totals.
+        "lineage": {
+            "legacy_db": "tradesv3.dryrun.ShortKeltnerV2HL.sqlite",
+            "legacy_starting_capital": 200.0,
+            "transition_ts_ms": 1787525718059,
+            "transition_label": "live + 40 USDC account",
+            "legacy_label": "Hyperliquid dry-run",
+            "live_label": "Hyperliquid live",
+        },
+        # Fresh $40 live account; the old $200 dry-run curve is normalized for
+        # continuity but excluded from every real-money fleet total.
         "observational": True,
         "no_baseline": True,
         "baseline": None,
@@ -112,6 +129,14 @@ BOTS: list[dict[str, Any]] = [
         # deterministic quant strategy; the dashboard should show realised
         # performance without comparing it to an invented backtest baseline.
         "venue": "hyperliquid",
+        "lineage": {
+            "legacy_db": "tradesv3.dryrun.KillersScalpV1.sqlite",
+            "legacy_starting_capital": 200.0,
+            "transition_ts_ms": 1787525892246,
+            "transition_label": "live + Hyperliquid + risk v2",
+            "legacy_label": "Binance futures dry-run",
+            "live_label": "Hyperliquid live",
+        },
         "observational": True,
         "no_baseline": True,
         "baseline": None,
@@ -132,6 +157,14 @@ BOTS: list[dict[str, Any]] = [
         "account_group": "hyperliquid-insiders",
         "strategy_kind": "copy-trader",
         "venue": "hyperliquid",
+        "lineage": {
+            "legacy_db": "tradesv3.dryrun.InsidersScalpV2.sqlite",
+            "legacy_starting_capital": 200.0,
+            "transition_ts_ms": 1787525892212,
+            "transition_label": "live + Hyperliquid executor",
+            "legacy_label": "Binance futures dry-run",
+            "live_label": "Hyperliquid live",
+        },
         "observational": True,
         "no_baseline": True,
         "baseline": None,
@@ -144,6 +177,7 @@ POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
 REQUEST_TIMEOUT = float(os.environ.get("REQUEST_TIMEOUT", "10"))
 OVERLAYS_DIR = Path(os.environ.get("OVERLAYS_DIR", "/overlays"))
 KILLERS_DB = Path(os.environ.get("KILLERS_DB", "/var/lib/killers/state.sqlite"))
+LINEAGE_DB_DIR = Path(os.environ.get("LINEAGE_DB_DIR", "/var/lib/freqtrade-history"))
 # Live killers-receiver SQLite (target_orders / positions) — separate DB from
 # the observer state.sqlite above. Empty => TP-ladder pill disabled (bar-only).
 KILLERS_RECEIVER_DB = os.environ.get("KILLERS_RECEIVER_DB", "")
@@ -788,6 +822,10 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "account_group": bot.get("account_group", bot["key"]),
         "strategy_kind": bot.get("strategy_kind", "autonomous-quant"),
         "venue": bot.get("venue", "binance"),
+        # Public transition metadata only. The DB path is deliberately kept
+        # server-side; the equity endpoint exposes the sanitized curve data.
+        "lineage": ({k: v for k, v in bot.get("lineage", {}).items()
+                     if k != "legacy_db"} if bot.get("lineage") else None),
         # Gates: null for no-baseline bots, observational marker for copy-traders
         # with soft gating, full gate objects for quant-validated bots.
         "gate1": (None if no_baseline
@@ -968,6 +1006,108 @@ def _bot_meta(key: str) -> dict | None:
     return None
 
 
+def _legacy_equity_curve(meta: dict) -> dict | None:
+    """Load a closed-trade dry-run curve for a bot's historical lineage.
+
+    Legacy databases are mounted read-only. Open trades are deliberately
+    excluded: they belong to the retired execution epoch and must never leak
+    unrealized P&L into the rebased live segment.
+    """
+    lineage = meta.get("lineage") or {}
+    db_name = lineage.get("legacy_db")
+    if not db_name:
+        return None
+    db_path = LINEAGE_DB_DIR / db_name
+    if not db_path.exists() or db_path.stat().st_size == 0:
+        return None
+
+    try:
+        conn = _sqlite.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
+        rows = conn.execute(
+            "SELECT CAST(strftime('%s', close_date) AS INTEGER) * 1000, "
+            "       close_profit_abs "
+            "FROM trades "
+            "WHERE is_open = 0 AND close_date IS NOT NULL "
+            "ORDER BY close_date ASC"
+        ).fetchall()
+        first_open = conn.execute(
+            "SELECT CAST(strftime('%s', MIN(open_date)) AS INTEGER) * 1000 FROM trades"
+        ).fetchone()[0]
+        conn.close()
+    except _sqlite.Error as exc:
+        log.warning("lineage db %s: %s", db_path.name, exc)
+        return None
+
+    # Freeze the retired epoch at the production cutover. Some validation
+    # containers intentionally keep running; their later trades are a parallel
+    # experiment, not part of the single dry-run → live lineage shown here.
+    transition_ts = int(lineage.get("transition_ts_ms") or 0)
+    if transition_ts:
+        rows = [row for row in rows if row[0] and int(row[0]) < transition_ts]
+    if not rows:
+        return None
+    starting = float(lineage.get("legacy_starting_capital") or 200.0)
+    equity = starting
+    curve: list[list] = [[int(first_open or rows[0][0] - 1000), round(equity, 4)]]
+    for ts, pnl in rows:
+        if not ts:
+            continue
+        equity += float(pnl or 0.0)
+        curve.append([int(ts), round(equity, 4)])
+    return {
+        "curve": curve,
+        "ending_equity": round(equity, 4),
+        "closed_trades": len(rows),
+    }
+
+
+def _lineage_payload(meta: dict, snap: dict) -> dict | None:
+    """Join legacy dry-run and live returns without mixing account dollars.
+
+    The live segment is rebased onto the last dry-run equity point. Portfolio
+    totals continue using the untouched real-money curve from `snap`.
+    """
+    legacy = _legacy_equity_curve(meta)
+    config = meta.get("lineage") or {}
+    if not legacy or not config:
+        return None
+
+    transition_ts = int(config["transition_ts_ms"])
+    legacy_curve = [list(point) for point in legacy["curve"]]
+    legacy_end = float(legacy["ending_equity"])
+    if legacy_curve[-1][0] < transition_ts - 1:
+        legacy_curve.append([transition_ts - 1, round(legacy_end, 4)])
+
+    live_actual = snap.get("equity_live") or []
+    live_start = float((snap.get("wallet") or {}).get("starting_capital") or 0.0)
+    live_curve: list[list] = []
+    if live_start > 0:
+        scale = legacy_end / live_start
+        for ts, equity in live_actual:
+            live_curve.append([int(ts), round(float(equity) * scale, 4)])
+    if not live_curve:
+        live_curve = [[transition_ts, round(legacy_end, 4)]]
+    elif live_curve[0][0] > transition_ts:
+        live_curve.insert(0, [transition_ts, round(legacy_end, 4)])
+
+    joined = legacy_curve + [point for point in live_curve if point[0] >= transition_ts]
+    return {
+        "legacy": legacy_curve,
+        "live": live_curve,
+        "drawdown": _drawdown_curve(joined),
+        "transition": {
+            "ts": transition_ts,
+            "label": config.get("transition_label", "live transition"),
+        },
+        "legacy_label": config.get("legacy_label", "dry-run"),
+        "live_label": config.get("live_label", "live · rebased"),
+        "basis": float(config.get("legacy_starting_capital") or 200.0),
+        "legacy_closed_trades": legacy["closed_trades"],
+        "legacy_ending_equity": legacy["ending_equity"],
+        "normalized": True,
+    }
+
+
 @app.get("/api/equity/{bot_key}")
 async def api_equity(bot_key: str):
     """Live cumulative equity + scaled backtest expected curve.
@@ -1011,12 +1151,14 @@ async def api_equity(bot_key: str):
         except Exception as exc:
             log.warning("overlay parse %s: %s", csv_path.name, exc)
 
+    lineage = _lineage_payload(meta, snap)
     return JSONResponse({
         "starting_capital": starting,
         "live": snap.get("equity_live", []),
         "drawdown": snap.get("drawdown_curve", []),
         "expected": expected,
         "bot_start_ts_ms": bot_start_ts_ms,
+        "lineage": lineage,
     })
 
 
@@ -1027,10 +1169,6 @@ _PAIR_RE = re.compile(r"^[A-Z0-9]{2,15}/(USDT|USDC|BTC|ETH|BUSD)(:[A-Z0-9]{2,8})
 # ── killers_bot observer state ────────────────────────────────────────────
 # Observer-only bot listening to Binance Killers VIP channel. Not a
 # Freqtrade instance — has its own SQLite. Mounted read-only at KILLERS_DB.
-
-import sqlite3 as _sqlite
-
-
 
 @app.get("/api/killers/state")
 async def api_killers_state():

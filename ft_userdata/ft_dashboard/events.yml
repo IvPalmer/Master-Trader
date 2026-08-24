@@ -55,6 +55,11 @@
   label: "Hyperliquid live fleet activated"
   kind: milestone
 
+- bot: keltner
+  ts: "2026-08-23T18:17:25Z"
+  label: "live + strategy v2"
+  kind: gate
+
 - bot: killers-ft
   ts: "2026-08-23T22:55:00Z"
   label: "live epoch · 98 USDC"

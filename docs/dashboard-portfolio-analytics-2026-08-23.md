@@ -19,6 +19,23 @@ The front-facing dashboard at `master-trader.grooveops.dev` has two complementar
 - Strategy contribution sums P&L by bot. Pair contribution sums P&L for the same pair across bots.
 - Profit factor, average win/loss, payoff, equity, and pair contribution use the dashboard's available recent-trade snapshots (currently up to 30 trades per bot). Closed-trade count and win rate come from each bot's aggregate Freqtrade statistics. If histories grow beyond the snapshot window, expanding the backend history endpoint is required for exact all-time portfolio curves and PF.
 
+## Dry-run → live strategy lineage
+
+Keltner Bounce, Killers Scalp, Insiders Scalp, and Short Keltner retain their
+closed-trade dry-run curves as historical strategy lineage. In each bot's
+selected Overview curve and detail tab, the dry-run segment ends at its last
+known equity and the new live segment begins at the same visual level. A dashed
+vertical marker names the production/strategy cutover.
+
+The joined curve is normalized, not an account statement. Live returns are
+rebased onto the final dry-run equity so continuity and post-update slope can be
+compared despite different account sizes. All fleet cards, portfolio capital,
+P&L, exposure, and risk continue to use only actual live wallets and trades.
+Open trades from retired dry-run databases are excluded. The databases are
+mounted read-only into the dashboard container. If a validation container keeps
+running in parallel, trades closed after the production cutover are also
+excluded so the historical segment remains frozen at the handoff.
+
 ## Chart lifecycle safeguard
 
 ECharts must not be initialized while an Alpine `x-show` panel is hidden. A hidden initialization can create a full-width canvas whose internal coordinate grid remains only a few pixels wide; resizing that canvas alone does not reliably repair the plot.
@@ -43,6 +60,7 @@ This behavior applies to Overview, Portfolio, Trades, Validation, and per-bot de
 - Verified consolidated production values and account deduplication.
 - Dashboard container healthy after deployment.
 - Trading bot containers were not restarted; dashboard deployment used `--no-deps` and targeted only `ft-dashboard`.
+- Dry-run lineage tests verify closed-only history, live rebasing, and missing-database fallback.
 
 ## Deployment
 
