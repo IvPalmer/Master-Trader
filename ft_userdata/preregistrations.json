@@ -303,7 +303,7 @@
     "binance_spot": ["FundingFadeV1", "KeltnerBounceV1", "OITrendPullbackV1"],
     "hyperliquid_futures": ["KillersScalpV1", "InsidersScalpV2", "ShortKeltnerV2HLlive"],
     "capital_policy": "Bounded strategy allocations; no requirement to deploy all available capital; monthly deposits may be allocated after observation.",
-    "execution_epoch": "The initial live curves begin at the 2026-08-23 live/strategy-update transition. FundingFade V2 writes to a fresh live DB and retains its former 24-trade live DB as frozen pre-V2 lineage; Keltner's live DB was empty at cutover. FundingFade and Keltner lab baselines are labelled stale-pre-v2 and excluded from current gates. OITrendPullback, Killers, and Insiders start distinct round-3 measurement epochs at 2026-08-24T18:00:51Z after their executable entry/exit or risk-sizing contract changed; no affected bot had a live trade at that cutover."
+    "execution_epoch": "The initial live curves begin at the 2026-08-23 live/strategy-update transition. FundingFade V2 writes to a fresh live DB and retains its former 24-trade live DB as frozen pre-V2 lineage; Keltner's live DB was empty at cutover. FundingFade and Keltner lab baselines are labelled stale-pre-v2 and excluded from current gates. OITrendPullback, Killers, and Insiders start distinct round-3 measurement epochs at their exact executable-ready timestamps after their entry/exit or risk-sizing contract changed; no affected bot had a live trade at its cutover."
    },
    "supersedes": [
     "The historical Killers/Insiders do-not-fund conclusion is retained as evidence but no longer acts as an absolute deployment prohibition.",
@@ -326,7 +326,11 @@
     {
      "date": "2026-08-24",
      "reason": "Round-3 remediation changed the measurement object after the initial 2026-08-23 live cutover. OITrendPullback moved its EMA50 price exit from the dataframe exit signal to custom_exit so it cannot veto a valid same-candle entry; Killers and Insiders moved to post-mark risk sizing with a below-minimum stake rejection backstop. Their current dashboard epochs were rebased instead of combining unlike strategy/execution contracts in the September review.",
-     "effective_at": "2026-08-24T18:00:51Z",
+     "effective_at": {
+      "KillersScalpV1": "2026-08-24T16:32:41.248Z",
+      "InsidersScalpV2": "2026-08-24T16:32:41.684Z",
+      "OITrendPullbackV1": "2026-08-24T18:08:52.845Z"
+     },
      "affected_bots": ["OITrendPullbackV1", "KillersScalpV1", "InsidersScalpV2"],
      "cutover_state": "Zero open and zero closed live trades for every affected bot; no observation was discarded."
     }

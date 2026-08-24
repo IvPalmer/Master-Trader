@@ -119,6 +119,12 @@ def test_ff_and_keltner_historical_baselines_are_explicitly_stale():
 def test_round3_bots_use_the_post_change_measurement_epoch():
     bots = {bot["key"]: bot for bot in app.BOTS}
 
-    assert bots["oi-trend"]["epoch_start_ts_ms"] == app.ROUND3_EPOCH_TS_MS
-    for key in ("killers-ft", "insiders-ft"):
-        assert bots[key]["lineage"]["transition_ts_ms"] == app.ROUND3_EPOCH_TS_MS
+    assert bots["oi-trend"]["epoch_start_ts_ms"] == app.OI_ROUND3_EPOCH_TS_MS
+    assert (
+        bots["killers-ft"]["lineage"]["transition_ts_ms"]
+        == app.KILLERS_ROUND3_EPOCH_TS_MS
+    )
+    assert (
+        bots["insiders-ft"]["lineage"]["transition_ts_ms"]
+        == app.INSIDERS_ROUND3_EPOCH_TS_MS
+    )
