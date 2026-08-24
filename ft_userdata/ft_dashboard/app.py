@@ -250,7 +250,11 @@ def killers_tp_ladder(db_path: str) -> dict[int, dict]:
     if not db_path or not Path(db_path).exists():
         return {}
     try:
-        conn = _sqlite.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
+        # `immutable=1` prevents SQLite from trying to create WAL/SHM state in
+        # the read-only Docker mount. These are frozen historical snapshots.
+        conn = _sqlite.connect(
+            f"file:{db_path}?mode=ro&immutable=1", uri=True, timeout=2.0
+        )
         conn.row_factory = _sqlite.Row
         conn.execute("PRAGMA busy_timeout=2000")
         rows = conn.execute(
