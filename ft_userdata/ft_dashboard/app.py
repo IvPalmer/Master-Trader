@@ -102,7 +102,9 @@ BOTS: list[dict[str, Any]] = [
         "strategy_kind": "autonomous-quant",
         "venue": "hyperliquid",
         "lineage": {
-            "legacy_db": "tradesv3.dryrun.ShortKeltnerV2HL.sqlite",
+            # Separate host bind: this DB lives outside the shared Freqtrade
+            # volume, so it is mounted at an absolute read-only path.
+            "legacy_db": "/var/lib/short-keltner-history.sqlite",
             "legacy_starting_capital": 200.0,
             "transition_ts_ms": 1787525718059,
             "transition_label": "live + 40 USDC account",
