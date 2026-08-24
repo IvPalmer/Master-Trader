@@ -96,7 +96,7 @@ def test_oi_uses_nearest_eligible_baseline_and_expires_failures():
     assert "BTC/USDT" not in strategy._oi_growth_updated
 
 
-def test_oi_price_exit_remains_available_when_oi_is_stale():
+def test_oi_price_exit_uses_custom_exit_without_same_candle_entry_veto():
     pd = pytest.importorskip("pandas")
     module = _load_strategy("OITrendPullbackV1.py")
     strategy = module.OITrendPullbackV1.__new__(module.OITrendPullbackV1)
@@ -108,9 +108,25 @@ def test_oi_price_exit_remains_available_when_oi_is_stale():
         }
     )
 
-    result = strategy.populate_exit_trend(frame, {})
+    result = strategy.populate_exit_trend(frame.copy(), {})
 
-    assert result["exit_long"].fillna(0).tolist() == [1.0, 1.0, 0.0]
+    # No dataframe exit signal: Freqtrade may admit an EMA20 reclaim below
+    # EMA50 instead of silently vetoing enter_long on the same candle.
+    assert result["exit_long"].tolist() == [0, 0, 0]
+
+    # Existing positions retain the price-only exit even with stale OI.
+    strategy.dp = SimpleNamespace(
+        get_analyzed_dataframe=lambda pair, timeframe: (frame.iloc[:1], None)
+    )
+    assert strategy.custom_exit(
+        "BTC/USDT", SimpleNamespace(), None, 99.0, -0.01
+    ) == "ema50_break"
+    strategy.dp = SimpleNamespace(
+        get_analyzed_dataframe=lambda pair, timeframe: (frame.iloc[-1:], None)
+    )
+    assert strategy.custom_exit(
+        "BTC/USDT", SimpleNamespace(), None, 101.0, 0.01
+    ) is None
 
 
 def test_killers_stop_is_absolute_recomputed_and_after_fill_aware():
