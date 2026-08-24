@@ -186,12 +186,37 @@ class OITrendPullbackV1(IStrategy):
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        # OI confirms entry quality; it must never be required for the
-        # price-risk exit. A stale/public-feed outage should suppress new
-        # entries without trapping an existing position above only the hard
-        # stop, trailing stop, and ROI schedule.
-        dataframe.loc[
-            dataframe["close"] < dataframe["ema50"],
-            "exit_long",
-        ] = 1
+        # Keep dataframe exits empty. Freqtrade rejects an entry whenever the
+        # same candle also has exit_long=1. A valid EMA20 reclaim can happen
+        # below EMA50, so the EMA50 risk exit belongs in custom_exit(), where
+        # it applies only to positions that are already open.
+        dataframe["exit_long"] = 0
         return dataframe
+
+    def custom_exit(
+        self,
+        pair: str,
+        trade,
+        current_time: datetime,
+        current_rate: float,
+        current_profit: float,
+        **kwargs,
+    ) -> str | None:
+        """Exit an existing long after a candle closes below EMA50.
+
+        OI is deliberately absent from this path: stale public OI blocks new
+        entries but must never disable management of an open position.
+        """
+        if not self.dp:
+            return None
+        dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
+        if dataframe is None or dataframe.empty:
+            return None
+        candle = dataframe.iloc[-1]
+        close = candle.get("close")
+        ema50 = candle.get("ema50")
+        if close is None or ema50 is None:
+            return None
+        if np.isfinite(close) and np.isfinite(ema50) and float(close) < float(ema50):
+            return "ema50_break"
+        return None

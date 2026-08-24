@@ -40,6 +40,11 @@ from fastapi.templating import Jinja2Templates
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("ft-dashboard")
 
+# Round-3 changed the executable measurement object for OITrendPullback and
+# both signal receivers. No affected bot had an open or closed live trade at
+# this cutover, so rebasing their current epochs loses no live observation.
+ROUND3_EPOCH_TS_MS = 1787594451000  # 2026-08-24T18:00:51Z
+
 BOTS: list[dict[str, Any]] = [
     {
         "key": "fundingfade",
@@ -101,7 +106,7 @@ BOTS: list[dict[str, Any]] = [
         "url": "http://ft-oi-trend-pullback:8080",
         "account_group": "binance-spot",
         "strategy_kind": "autonomous-quant",
-        "epoch_start_ts_ms": 1787509045565,
+        "epoch_start_ts_ms": ROUND3_EPOCH_TS_MS,
         "observational": True,
         "no_baseline": True,
         "baseline": None,
@@ -151,8 +156,8 @@ BOTS: list[dict[str, Any]] = [
         "lineage": {
             "legacy_db": "tradesv3.dryrun.KillersScalpV1.sqlite",
             "legacy_starting_capital": 200.0,
-            "transition_ts_ms": 1787525892246,
-            "transition_label": "live + Hyperliquid + risk v2",
+            "transition_ts_ms": ROUND3_EPOCH_TS_MS,
+            "transition_label": "live + post-mark risk sizing",
             "legacy_label": "Binance futures dry-run",
             "live_label": "Hyperliquid live",
         },
@@ -179,8 +184,8 @@ BOTS: list[dict[str, Any]] = [
         "lineage": {
             "legacy_db": "tradesv3.dryrun.InsidersScalpV2.sqlite",
             "legacy_starting_capital": 200.0,
-            "transition_ts_ms": 1787525892212,
-            "transition_label": "live + Hyperliquid executor",
+            "transition_ts_ms": ROUND3_EPOCH_TS_MS,
+            "transition_label": "live + post-mark risk sizing",
             "legacy_label": "Binance futures dry-run",
             "live_label": "Hyperliquid live",
         },

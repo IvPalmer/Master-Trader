@@ -38,6 +38,8 @@ claim of proven profitability.
 | Production execution engine used mutable `freqtrade:stable` | All seven production Freqtrade services are pinned to the exact multi-architecture digest deployed and verified as Freqtrade 2026.7: `sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486`. A restart can no longer change callback or execution semantics implicitly. |
 | FundingFade V2 shared its DB and dashboard gates with 24 pre-V2 trades; Keltner's empty V2 DB still showed its pre-V2 lab baseline as current | FundingFade V2 writes to `tradesv3.live.FundingFadeV1.v2.sqlite`; the former 24-trade live DB is immutable lineage. Both FundingFade and Keltner expose `baseline_status=stale-pre-v2`, exclude those baselines from gates/expected deltas, and retain them only as labelled historical context. |
 | Equity seed could precede older DB points in array order | Every bot uses a persistent epoch start, pre-epoch trades are filtered, and live equity points are returned chronologically. Restarts no longer redefine the analytical epoch. |
+| The OI EMA50 dataframe exit could silently veto a valid entry on the same candle | The EMA50 condition now runs in `custom_exit`, which only evaluates existing positions. `populate_exit_trend` stays zero, while the exit remains independent of OI freshness. |
+| Round-3 code changes were being measured under round-2 epoch timestamps | OITrendPullback, Killers, and Insiders now begin current measurement epochs at `2026-08-24T18:00:51Z`. The registration records the amendment and why these three curves were rebased. Every affected live DB was empty at cutover. |
 
 ## Stop architecture
 
@@ -63,6 +65,9 @@ actual reduce-only stop order exists at the venue.
   baseline is stale context, not data contamination and not an active gate.
 - Explicit epoch timestamps, rather than the latest process restart time,
   bound live equity and measurement duration.
+- OITrendPullback, Killers, and Insiders use a separate round-3 epoch because
+  their executable exit/entry or risk-sizing contract changed on 2026-08-24.
+  FundingFade, Keltner, and ShortKeltner retain their original cutovers.
 - ShortKeltner's historical curve is copied with SQLite backup semantics to
   `tradesv3.snapshot.ShortKeltnerV2HL.pre-live.sqlite`.
 - Historical dry curves stop at the recorded transition timestamp.
@@ -158,8 +163,8 @@ The four residuals from the follow-up review were deployed on 2026-08-24 from
 
 - Pre-deploy: all six Freqtrade books and both receiver state databases had
   zero open/requested positions.
-- Tests: 150 killers-receiver, 27 dashboard, and 12 root remediation contracts
-  passed (189 unique tests across the three suites).
+- Tests: 150 killers-receiver, 27 dashboard, and 11 root remediation contracts
+  passed (188 unique tests across the three suites).
 - All six trading containers resolve to image ID
   `sha256:c19fdf05c17cf3ad11017aa3fae40ea2ea5f9de2e3580d11f5ce9ba157685cc8`,
   Freqtrade 2026.7, from the pinned repository digest recorded above.
