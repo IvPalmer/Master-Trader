@@ -468,12 +468,13 @@ function dash() {
     get equitySubtitle() {
       const bot = this.selectedEquityBot;
       if (!bot) return 'realized portfolio equity across every live strategy';
+      if (bot.lineage) return 'dry-run lineage → normalized live performance';
       if (bot.baseline?.annual_return_pct) return 'live equity vs scaled backtest expectation';
       return 'forward live equity · no synthetic backtest baseline';
     },
     get equityHasHistory() {
       return this.selectedEquityBot
-        ? (this.selectedEquityBot.stats?.closed_trade_count || 0) > 0
+        ? Boolean(this.selectedEquityBot.lineage) || (this.selectedEquityBot.stats?.closed_trade_count || 0) > 0
         : this.hero.closedTrades > 0;
     },
     get selectedPnl() {
@@ -1195,7 +1196,11 @@ function dash() {
       const chart = this._ensureChart('chart-equity');
       if (!chart) return;
       const bot = isFleet ? null : this.raw.bots[key];
-      const live = (data?.live || []).map(p => [new Date(p[0]), p[1]]);
+      const lineage = !isFleet ? data?.lineage : null;
+      const legacyName = lineage?.legacy_label || 'dry-run';
+      const liveName = lineage ? `${lineage.live_label} · normalized` : 'live equity';
+      const legacy = (lineage?.legacy || []).map(p => [new Date(p[0]), p[1]]);
+      const live = (lineage?.live || data?.live || []).map(p => [new Date(p[0]), p[1]]);
       const startTs = data?.bot_start_ts_ms || (live[0]?.[0]?.getTime() ?? Date.now());
       const startCap = isFleet
         ? (this.hero.walletStart || this.hero.walletNow || 0)
@@ -1204,7 +1209,7 @@ function dash() {
       const lastLiveTs = live.length ? live[live.length - 1][0].getTime() : Date.now();
       const horizon = Math.max(lastLiveTs, Date.now()) + 12 * 3600 * 1000;
       const expected = [];
-      if (!isFleet && annual) {
+      if (!isFleet && annual && !lineage) {
         for (let i = 0; i <= 80; i++) {
           const ts = startTs + (horizon - startTs) * i / 80;
           const days = (ts - startTs) / 86400000;
@@ -1220,9 +1225,12 @@ function dash() {
       const sortedClosed = (isFleet ? (fleetData?.trades || []) : (bot?.recent_trades || []))
         .filter(t => !t.is_open && t.close_timestamp)
         .sort((a, b) => toMs(a.close_timestamp) - toMs(b.close_timestamp));
-      let runningEquity = startCap;
+      const liveActualStart = Number(data?.starting_capital || 0);
+      const lineageScale = lineage && liveActualStart > 0
+        ? Number(lineage.legacy_ending_equity || 0) / liveActualStart : 1;
+      let runningEquity = lineage ? Number(lineage.legacy_ending_equity || 0) : startCap;
       for (const t of sortedClosed) {
-        runningEquity += Number(t.profit_abs || 0);
+        runningEquity += Number(t.profit_abs || 0) * lineageScale;
         const tsMs = toMs(t.close_timestamp);
         const y = liveByTs.get(tsMs) ?? runningEquity;
         const m = { coord: [tsMs, y], pair: t.pair, pct: t.profit_pct };
@@ -1238,10 +1246,10 @@ function dash() {
           valueFormatter: v => v != null ? '$' + Number(v).toFixed(2) : '—',
         },
         legend: {
-          data: expected.length ? ['live equity', 'backtest expected'] : ['live equity'],
+          data: lineage ? [legacyName, liveName] : (expected.length ? ['live equity', 'backtest expected'] : ['live equity']),
           top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 11 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3,
         },
-        graphic: live.length > 1 ? [] : [{
+        graphic: (legacy.length + live.length) > 1 ? [] : [{
           type: 'text', left: 'center', top: 'middle', silent: true,
           style: { text: 'Collecting live trades', fill: COLORS.text3, font: '500 12px Inter' },
         }],
@@ -1254,9 +1262,11 @@ function dash() {
           splitLine: { lineStyle: { color: COLORS.hairline, type: 'dashed' } },
         },
         series: [
+          ...(lineage ? [{ name: legacyName, type: 'line', data: legacy, showSymbol: false,
+            lineStyle: { color: COLORS.text3, width: 1.7 }, itemStyle: { color: COLORS.text3 }, z: 1 }] : []),
           ...(expected.length ? [{ name: 'backtest expected', type: 'line', data: expected, showSymbol: false,
             lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.4, opacity: 0.7 }, itemStyle: { color: COLORS.text3 }, z: 1 }] : []),
-          { name: 'live equity', type: 'line', data: live, smooth: false, showSymbol: false,
+          { name: liveName, type: 'line', data: live, smooth: false, showSymbol: false,
             lineStyle: { color: COLORS.accent, width: 2 },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
               { offset: 0, color: 'rgba(14, 135, 163, 0.18)' }, { offset: 1, color: 'rgba(14, 135, 163, 0.0)' },
@@ -1268,7 +1278,16 @@ function dash() {
                 ...winMarks.map(m => ({ coord: m.coord, itemStyle: { color: COLORS.pos, borderColor: COLORS.surface, borderWidth: 1.5 }, label: { show: false }, tooltip: { formatter: () => `${m.pair} · +${m.pct?.toFixed(2)}%` } })),
                 ...lossMarks.map(m => ({ coord: m.coord, itemStyle: { color: COLORS.neg, borderColor: COLORS.surface, borderWidth: 1.5 }, label: { show: false }, tooltip: { formatter: () => `${m.pair} · ${m.pct?.toFixed(2)}%` } })),
               ],
-            }, z: 2 },
+            },
+            markLine: lineage ? {
+              silent: true, symbol: 'none',
+              data: [{ xAxis: lineage.transition.ts,
+                lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.4 },
+                label: { show: true, position: 'insideEndTop', formatter: lineage.transition.label,
+                  color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)',
+                  padding: [3, 5], borderRadius: 3 } }],
+            } : undefined,
+            z: 2 },
         ],
       }, true);
     },
@@ -1281,7 +1300,8 @@ function dash() {
       const chart = this._ensureChart('chart-drawdown');
       if (!chart) return;
       const bot = isFleet ? null : this.raw.bots[key];
-      const dd = (data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
+      const lineage = !isFleet ? data?.lineage : null;
+      const dd = (lineage?.drawdown || data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
       const baselineDd = isFleet ? this.hero.drawdownBacktest : (bot?.baseline?.max_dd_pct || 0);
       const ddCap = baselineDd ? -baselineDd * 1.5 : Math.min(-5, Math.floor((this.selectedMaxDrawdown || 0) * -1.5));
       chart.setOption({
@@ -1308,7 +1328,12 @@ function dash() {
           ]) },
           markLine: {
             silent: true, symbol: 'none',
-            data: baselineDd ? [
+            data: [
+              ...(lineage ? [{ xAxis: lineage.transition.ts,
+                lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.2 },
+                label: { show: true, position: 'insideEndTop', formatter: lineage.transition.label,
+                  color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)', padding: [2,4], borderRadius: 2 } }] : []),
+              ...(baselineDd ? [
               { yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 },
                 label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%',
                          color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2,4], borderRadius: 2 } },
@@ -1316,7 +1341,8 @@ function dash() {
                 lineStyle: { color: COLORS.text3, type: 'dotted', width: 1, opacity: 0.6 },
                 label: { show: true, position: 'insideEndBottom', formatter: 'reference ' + (-baselineDd).toFixed(1) + '%',
                          color: COLORS.text3, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2,4], borderRadius: 2 } },
-            ] : [],
+              ] : []),
+            ],
           },
         }],
       }, true);
@@ -1612,11 +1638,15 @@ function dash() {
         // Bug fix B2: defensive wallet access
         const startCap = data?.starting_capital ?? bot.wallet?.starting_capital ?? 200;
         const annual   = bot.baseline?.annual_return_pct ?? 0;
-        const live     = (data?.live || []).map(p => [new Date(p[0]), p[1]]);
+        const lineage  = data?.lineage;
+        const legacyName = lineage?.legacy_label || 'dry-run';
+        const liveName = lineage ? `${lineage.live_label} · normalized` : 'live equity';
+        const legacy   = (lineage?.legacy || []).map(p => [new Date(p[0]), p[1]]);
+        const live     = (lineage?.live || data?.live || []).map(p => [new Date(p[0]), p[1]]);
         const lastLiveTs = live.length ? live[live.length-1][0].getTime() : Date.now();
         const horizon  = Math.max(lastLiveTs, Date.now()) + 12*3600*1000;
         const expected = [];
-        if (annual) {
+        if (annual && !lineage) {
           for (let i = 0; i <= 80; i++) {
             const ts   = startTs + (horizon - startTs) * i / 80;
             const days = (ts - startTs) / 86400000;
@@ -1626,24 +1656,31 @@ function dash() {
         equityChart.setOption({
           ...ECHART_COMMON, animation: false,
           tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: v => v != null ? '$' + Number(v).toFixed(2) : '—' },
-          legend: { data: expected.length ? ['live equity', 'backtest expected'] : ['live equity'], top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 11 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
-          graphic: live.length > 1 ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
+          legend: { data: lineage ? [legacyName, liveName] : (expected.length ? ['live equity', 'backtest expected'] : ['live equity']), top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 11 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
+          graphic: (legacy.length + live.length) > 1 ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
             style: { text: 'Collecting live trades', fill: COLORS.text3, font: '500 12px Inter' } }],
           grid: { left: 60, right: 18, top: 32, bottom: 30 },
           xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { show: false } },
           yAxis: { type: 'value', scale: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.hairline, type: 'dashed' } } },
           series: [
+            ...(lineage ? [{ name: legacyName, type: 'line', data: legacy, showSymbol: false,
+              lineStyle: { color: COLORS.text3, width: 1.7 } }] : []),
             ...(expected.length ? [{ name: 'backtest expected', type: 'line', data: expected, showSymbol: false, lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.2 } }] : []),
-            { name: 'live equity', type: 'line', data: live, showSymbol: false,
+            { name: liveName, type: 'line', data: live, showSymbol: false,
               lineStyle: { color: COLORS.info, width: 2 },
-              areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14,135,163,0.18)' }, { offset: 1, color: 'rgba(14,135,163,0)' }]) } },
+              areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14,135,163,0.18)' }, { offset: 1, color: 'rgba(14,135,163,0)' }]) },
+              markLine: lineage ? { silent: true, symbol: 'none', data: [{ xAxis: lineage.transition.ts,
+                lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.4 },
+                label: { show: true, position: 'insideEndTop', formatter: lineage.transition.label,
+                  color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)', padding: [3,5], borderRadius: 3 } }] } : undefined },
           ],
         }, true);
       }
 
       const ddChart = this._ensureChart('chart-detail-dd-' + key);
       if (ddChart) {
-        const dd    = (data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
+        const lineage = data?.lineage;
+        const dd    = (lineage?.drawdown || data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
         const baselineDd = bot.baseline?.max_dd_pct || 0;
         const ddCap = baselineDd ? -baselineDd * 1.5 : -5;
         ddChart.setOption({
@@ -1658,7 +1695,10 @@ function dash() {
             type: 'line', data: dd, showSymbol: false,
             lineStyle: { color: COLORS.neg, width: 1.5 },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(210,71,58,0)' }, { offset: 1, color: 'rgba(210,71,58,0.22)' }]) },
-            markLine: { silent: true, symbol: 'none', data: baselineDd ? [{ yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%', color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2, 4], borderRadius: 2 } }] : [] },
+            markLine: { silent: true, symbol: 'none', data: [
+              ...(lineage ? [{ xAxis: lineage.transition.ts, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.2 }, label: { show: true, position: 'insideEndTop', formatter: lineage.transition.label, color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)', padding: [2,4], borderRadius: 2 } }] : []),
+              ...(baselineDd ? [{ yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%', color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2, 4], borderRadius: 2 } }] : []),
+            ] },
           }],
         }, true);
       }
