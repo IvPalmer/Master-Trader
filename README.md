@@ -1,6 +1,6 @@
 # Master Trader — Multi-Bot Algorithmic Trading System
 
-A self-improving multi-strategy crypto trading system built on [Freqtrade](https://www.freqtrade.io/). Runs 4 concurrent bots with automated health monitoring, backtesting validation, parameter optimization, and capital rebalancing.
+A self-improving multi-strategy crypto trading system built on [Freqtrade](https://www.freqtrade.io/). Runs 6 live bots with automated health monitoring, backtesting validation, parameter optimization, and capital rebalancing.
 
 ## Architecture
 
@@ -190,6 +190,8 @@ Palmer uses a custom Telegram bot (`claude-assistant`) that:
 To replicate: set up any webhook receiver that accepts the payload format above, or just enable Freqtrade's native Telegram integration.
 
 ## Repository Structure
+
+Current operator-dashboard behavior, consolidated portfolio semantics, chart lifecycle safeguards, and the dashboard-only deployment procedure are documented in [docs/dashboard-portfolio-analytics-2026-08-23.md](docs/dashboard-portfolio-analytics-2026-08-23.md).
 
 ```
 research/                        # Strategy research & evidence
