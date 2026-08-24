@@ -39,7 +39,7 @@ claim of proven profitability.
 | FundingFade V2 shared its DB and dashboard gates with 24 pre-V2 trades; Keltner's empty V2 DB still showed its pre-V2 lab baseline as current | FundingFade V2 writes to `tradesv3.live.FundingFadeV1.v2.sqlite`; the former 24-trade live DB is immutable lineage. Both FundingFade and Keltner expose `baseline_status=stale-pre-v2`, exclude those baselines from gates/expected deltas, and retain them only as labelled historical context. |
 | Equity seed could precede older DB points in array order | Every bot uses a persistent epoch start, pre-epoch trades are filtered, and live equity points are returned chronologically. Restarts no longer redefine the analytical epoch. |
 | The OI EMA50 dataframe exit could silently veto a valid entry on the same candle | The EMA50 condition now runs in `custom_exit`, which only evaluates existing positions. `populate_exit_trend` stays zero, while the exit remains independent of OI freshness. |
-| Round-3 code changes were being measured under round-2 epoch timestamps | OITrendPullback, Killers, and Insiders now begin current measurement epochs at `2026-08-24T18:00:51Z`. The registration records the amendment and why these three curves were rebased. Every affected live DB was empty at cutover. |
+| Round-3 code changes were being measured under round-2 epoch timestamps | OITrendPullback, Killers, and Insiders now begin current measurement epochs at their exact executable-ready timestamps: `18:08:52.845Z`, `16:32:41.248Z`, and `16:32:41.684Z` respectively on 2026-08-24. The registration records the amendment and why these three curves were rebased. Every affected live DB was empty at cutover. |
 
 ## Stop architecture
 
