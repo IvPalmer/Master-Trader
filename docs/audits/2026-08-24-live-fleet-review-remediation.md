@@ -193,3 +193,33 @@ reduce-only stop after the first organic Hyperliquid fill.
 References: Freqtrade
 [stop-loss documentation](https://docs.freqtrade.io/en/stable/stoploss/) and
 [strategy callback documentation](https://www.freqtrade.io/en/stable/strategy-callbacks/).
+
+## Third-round final verification
+
+The final review reservations were closed by source commits `8bb1952` and
+`ca1d374`, deployed through `vps-deploy` merge `ab3ab07` on 2026-08-24.
+
+- The second-round receipt above is corrected to its historical count: 150
+  receiver + 27 dashboard + 11 remediation = 188 unique tests.
+- The final suites pass 150 receiver + 28 dashboard + 11 remediation = 189
+  unique tests. The additional dashboard contract locks the per-bot round-3
+  epoch mapping.
+- Freqtrade 2026.7 source was inspected and confirms that a simultaneous
+  dataframe `exit_long` suppresses `enter_long`. OI's EMA50 exit now runs only
+  in `custom_exit`; stale OI still blocks entry while price-only management of
+  an existing trade remains available.
+- Exact executable-ready epoch starts are recorded and served by the dashboard:
+  Killers `2026-08-24T16:32:41.248Z`, Insiders
+  `2026-08-24T16:32:41.684Z`, and OI
+  `2026-08-24T18:08:52.845Z`. All three live DBs had zero open and zero closed
+  trades at their respective cutovers.
+- Deployment blast radius was limited to one OI restart and two dashboard-only
+  recreates. FundingFade, Keltner, Killers, Insiders, and ShortKeltner were not
+  restarted by this round.
+- Final runtime: all six bots and the dashboard are healthy; dashboard fleet
+  level is green, all six bots are reachable, poll errors are empty, every live
+  book is empty, and the OI log has no strategy load/runtime error.
+
+No unresolved code or measurement finding remains from review rounds 1–3. The
+venue-only observation item remains: inspect the actual reduce-only stop order
+after the first organic Hyperliquid fill.
