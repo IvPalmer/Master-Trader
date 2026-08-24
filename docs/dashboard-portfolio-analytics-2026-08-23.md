@@ -72,3 +72,4 @@ Implementation commits:
 - `df2105e` — unknown expectancy shown honestly without trade history.
 - `4ef1f58` — consolidated Portfolio analytics.
 - `0e941c8` — chart recreation after hidden-tab transitions.
+- `00c2f61` — normalized dry-run → live strategy lineage and cutover markers.
