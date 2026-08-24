@@ -186,10 +186,12 @@ class OITrendPullbackV1(IStrategy):
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        # OI confirms entry quality; it must never be required for the
+        # price-risk exit. A stale/public-feed outage should suppress new
+        # entries without trapping an existing position above only the hard
+        # stop, trailing stop, and ROI schedule.
         dataframe.loc[
-            (dataframe["close"] < dataframe["ema50"])
-            & (dataframe["oi_growth"].notna())
-            & (dataframe["oi_growth"] < 0),
+            dataframe["close"] < dataframe["ema50"],
             "exit_long",
         ] = 1
         return dataframe

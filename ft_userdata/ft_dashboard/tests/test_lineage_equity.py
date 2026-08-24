@@ -88,3 +88,29 @@ def test_lineage_rejects_tiny_live_capital_amplification(tmp_path, monkeypatch):
     assert lineage["normalized"] is False
     assert lineage["normalization_status"] == "invalid-live-capital-basis"
     assert lineage["live"] == [[transition, 205.0]]
+
+
+def test_live_equity_filters_pre_epoch_trades_and_stays_chronological():
+    epoch = 1_800_000_000_000
+    closed = [
+        {"close_timestamp": epoch + 2_000, "profit_abs": 2.0},
+        {"close_timestamp": epoch - 1_000, "profit_abs": 99.0},
+        {"close_timestamp": epoch + 1_000, "profit_abs": -1.0},
+    ]
+
+    curve = app._equity_curve_live(closed, [], 50.0, epoch)
+
+    assert curve == [
+        [epoch, 50.0],
+        [epoch + 1_000, 49.0],
+        [epoch + 2_000, 51.0],
+    ]
+
+
+def test_ff_and_keltner_historical_baselines_are_explicitly_stale():
+    bots = {bot["key"]: bot for bot in app.BOTS}
+
+    for key in ("fundingfade", "keltner"):
+        assert bots[key]["baseline_status"] == "stale-pre-v2"
+        assert bots[key]["epoch_start_ts_ms"] == bots[key]["lineage"]["transition_ts_ms"]
+    assert bots["fundingfade"]["lineage"]["legacy_db"] == "tradesv3.live.FundingFadeV1.sqlite"

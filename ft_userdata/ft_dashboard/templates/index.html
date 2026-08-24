@@ -641,7 +641,7 @@
               </td>
               <td class="grad-blocker" x-text="dryBotBlocker(bot)">—</td>
               <td>
-                <template x-if="!bot.no_baseline && !bot.observational">
+                <template x-if="bot.baseline_comparable">
                   <div class="grad-progress">
                     <span class="grad-prog-nums num" x-text="(bot.gate1?.trades?.actual ?? 0) + ' / ' + (bot.gate1?.trades?.target ?? 30)">0/30</span>
                     <div class="grad-prog-bar">
@@ -650,10 +650,10 @@
                     </div>
                   </div>
                 </template>
-                <span class="dim" x-show="bot.no_baseline || bot.observational">—</span>
+                <span class="dim" x-show="!bot.baseline_comparable">—</span>
               </td>
               <td>
-                <template x-if="!bot.no_baseline && !bot.observational">
+                <template x-if="bot.baseline_comparable">
                   <div class="grad-progress">
                     <span class="grad-prog-nums num" x-text="(bot.gate1?.days?.actual ?? 0) + ' / ' + (bot.gate1?.days?.target ?? 14)">0/14</span>
                     <div class="grad-prog-bar">
@@ -662,10 +662,10 @@
                     </div>
                   </div>
                 </template>
-                <span class="dim" x-show="bot.no_baseline || bot.observational">—</span>
+                <span class="dim" x-show="!bot.baseline_comparable">—</span>
               </td>
               <td>
-                <template x-if="!bot.no_baseline && !bot.observational && bot.stats?.profit_factor != null">
+                <template x-if="bot.baseline_comparable && bot.stats?.profit_factor != null">
                   <span class="grad-pf-cell">
                     <span class="num" x-text="fmtPF(bot.stats?.profit_factor)">—</span>
                     <span class="grad-delta" :class="g2DeltaClass(bot.gate2?.pf?.status)"
@@ -673,10 +673,10 @@
                     </span>
                   </span>
                 </template>
-                <span class="dim" x-show="bot.no_baseline || bot.observational || bot.stats?.profit_factor == null">—</span>
+                <span class="dim" x-show="!bot.baseline_comparable || bot.stats?.profit_factor == null">—</span>
               </td>
               <td>
-                <template x-if="!bot.no_baseline && !bot.observational">
+                <template x-if="bot.baseline_comparable">
                   <span class="grad-dd-cell">
                     <span class="num" x-text="fmtPct((bot.stats?.max_drawdown ?? 0) * 100, 2)">—</span>
                     <span class="grad-delta" :class="g2DeltaClass(bot.gate2?.dd?.status)"
@@ -684,7 +684,7 @@
                     </span>
                   </span>
                 </template>
-                <span class="dim" x-show="bot.no_baseline || bot.observational">—</span>
+                <span class="dim" x-show="!bot.baseline_comparable">—</span>
               </td>
               <td>
                 <template x-if="lastClosedTrade(bot)">
@@ -735,13 +735,14 @@
               </div>
             </div>
             <div class="verdict" :class="readyVerdict(bot).cls" x-text="readyVerdict(bot).text"
-                 x-show="!bot.no_baseline && !bot.observational"></div>
+                 x-show="bot.baseline_comparable"></div>
             <div class="verdict" style="background:var(--info-soft);color:var(--info);border-color:rgba(37,99,235,0.3);"
-                 x-show="bot.no_baseline || bot.observational">observational</div>
+                 x-show="!bot.baseline_comparable"
+                 x-text="bot.baseline_status === 'stale-pre-v2' ? 'fresh epoch · baseline stale' : 'observational'">observational</div>
           </div>
 
           <!-- gate rings + bullets for non-observational bots -->
-          <template x-if="!bot.no_baseline && !bot.observational">
+          <template x-if="bot.baseline_comparable">
             <div class="grid grid-12" style="padding: 1.1rem;">
               <div class="col-6">
                 <div class="small-cap" style="margin-bottom: 0.85rem;">gate 1 · sample threshold</div>
@@ -824,9 +825,10 @@
           </template>
 
           <!-- observational bot: simple info panel -->
-          <template x-if="bot.no_baseline || bot.observational">
+          <template x-if="!bot.baseline_comparable">
             <div class="kv" style="padding:1rem 1.1rem;">
-              <span class="k">mode</span> <span class="v">copy-trader · no graduation gates</span>
+              <span class="k">mode</span>
+              <span class="v" x-text="bot.baseline_status === 'stale-pre-v2' ? 'fresh v2 epoch · historical baseline excluded from gates' : (bot.strategy_kind === 'copy-trader' ? 'copy-trader · no graduation gates' : 'forward observation · no transferable baseline')">forward observation</span>
               <span class="k">trades</span> <span class="v num" x-text="bot.stats?.closed_trade_count ?? 0">0</span>
               <span class="k">running</span> <span class="v num" x-text="bot.days_running + 'd'">0d</span>
               <span class="k">strategy</span> <span class="v" x-text="bot.name || '—'">—</span>
@@ -1057,6 +1059,7 @@
               <span class="bot-state-dot"></span>
               <span x-text="botStatus(bot).label">running</span>
             </span>
+            <span class="tag imm" x-show="bot.baseline_status === 'stale-pre-v2'" x-cloak>baseline stale · pre-v2</span>
           </div>
           <p class="bis-context">
             <span x-text="bot.name">—</span><span aria-hidden="true">·</span>
@@ -1150,21 +1153,21 @@
         <!-- Live vs backtest deviation -->
         <div class="card col-4">
           <div class="card-head">
-            <div class="card-title" x-text="(bot.observational || bot.no_baseline) ? 'performance' : 'live vs backtest'">live vs backtest</div>
-            <div class="card-sub" x-text="(bot.observational || bot.no_baseline) ? (bot.strategy_kind === 'copy-trader' ? 'copy-trader · fresh live epoch' : 'autonomous quant · forward live epoch') : 'deviation from expected · all-time'">deviation from expected · all-time</div>
+            <div class="card-title" x-text="bot.baseline_comparable ? 'live vs backtest' : 'performance'">performance</div>
+            <div class="card-sub" x-text="bot.baseline_status === 'stale-pre-v2' ? 'fresh v2 epoch · pre-v2 baseline is context only' : (!bot.baseline_comparable ? (bot.strategy_kind === 'copy-trader' ? 'copy-trader · fresh live epoch' : 'autonomous quant · forward live epoch') : 'deviation from expected · all-time')">forward live epoch</div>
           </div>
           <div class="kv">
             <span class="k">p&l</span>
               <span class="v" :class="(bot.pnl?.all_pct ?? 0) >= 0 ? 'pos' : 'neg'"
-                    x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '%' + ((bot.observational || bot.no_baseline) ? '' : ' · expected ' + (bot.gate2?.profit?.expected_pct ?? bot.baseline?.annual_return_pct ?? 0).toFixed(2) + '%')">—</span>
+                    x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '%' + (!bot.baseline_comparable ? '' : ' · expected ' + (bot.gate2?.profit?.expected_pct ?? bot.baseline?.annual_return_pct ?? 0).toFixed(2) + '%')">—</span>
             <span class="k">profit factor</span>
-              <span class="v" x-text="(bot.stats?.profit_factor?.toFixed(2) ?? '—') + (bot.baseline?.profit_factor ? ' · lab ' + bot.baseline.profit_factor : '')">—</span>
+              <span class="v" x-text="(bot.stats?.profit_factor?.toFixed(2) ?? '—') + (bot.baseline_comparable && bot.baseline?.profit_factor ? ' · lab ' + bot.baseline.profit_factor : '')">—</span>
             <span class="k">win rate</span>
-              <span class="v" x-text="((bot.stats?.winrate ?? 0) * 100).toFixed(1) + '%' + (bot.baseline?.win_rate ? ' · lab ' + ((bot.baseline.win_rate ?? 0) * 100).toFixed(1) + '%' : '')">—</span>
+              <span class="v" x-text="((bot.stats?.winrate ?? 0) * 100).toFixed(1) + '%' + (bot.baseline_comparable && bot.baseline?.win_rate ? ' · lab ' + ((bot.baseline.win_rate ?? 0) * 100).toFixed(1) + '%' : '')">—</span>
             <span class="k">trades / yr pace</span>
-              <span class="v" x-text="bot.days_running > 0 ? ((bot.stats?.closed_trade_count ?? 0) / bot.days_running * 365).toFixed(0) + (bot.baseline?.trades_per_year ? ' · lab ' + bot.baseline.trades_per_year : '') : '—'">—</span>
+              <span class="v" x-text="bot.days_running > 0 ? ((bot.stats?.closed_trade_count ?? 0) / bot.days_running * 365).toFixed(0) + (bot.baseline_comparable && bot.baseline?.trades_per_year ? ' · lab ' + bot.baseline.trades_per_year : '') : '—'">—</span>
             <span class="k">max drawdown</span>
-              <span class="v" x-text="fmtPct((bot.stats?.max_drawdown ?? 0) * 100, 2) + (bot.baseline?.max_dd_pct ? ' · lab ' + fmtPct(bot.baseline.max_dd_pct, 1) : '')">—</span>
+              <span class="v" x-text="fmtPct((bot.stats?.max_drawdown ?? 0) * 100, 2) + (bot.baseline_comparable && bot.baseline?.max_dd_pct ? ' · lab ' + fmtPct(bot.baseline.max_dd_pct, 1) : '')">—</span>
           </div>
           <div class="bot-detail-section" x-show="deviationSummary(bot)">
             <div class="deviation-summary" x-text="deviationSummary(bot)"></div>
@@ -1190,7 +1193,7 @@
         <div class="card col-8">
           <div class="card-head">
             <div class="card-title">equity curve</div>
-            <div class="card-sub" x-text="bot.lineage ? 'dry-run lineage → normalized live performance' : (bot.baseline ? 'live equity vs backtest expectation' : 'forward live equity · collecting trades')">forward live equity</div>
+            <div class="card-sub" x-text="bot.lineage ? 'historical lineage → isolated live epoch' : (bot.baseline_comparable ? 'live equity vs backtest expectation' : 'forward live equity · collecting trades')">forward live equity</div>
           </div>
           <div class="chart tall" :id="'chart-detail-equity-'+bot.key"></div>
         </div>

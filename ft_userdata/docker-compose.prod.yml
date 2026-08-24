@@ -14,7 +14,7 @@ x-bot-env: &a1
   FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FREQTRADE__API_SERVER__JWT_SECRET_KEY}
 services:
   keltnerbouncev1:
-    image: freqtradeorg/freqtrade:stable
+    image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
     container_name: ft-keltner-bounce
     environment: *a1
@@ -37,7 +37,7 @@ services:
     # Re-enabled 2026-05-19 after macro gate v2 (slope + regime halt) upgrade.
     # Pause was triggered by the May 10-16 5-SL streak; new gate's bootstrap
     # P(MaxDD < baseline) = 92.5%. See project_funding_fade_gate_v2_2026-05-19.md.
-    image: freqtradeorg/freqtrade:stable
+    image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
     container_name: ft-funding-fade
     environment: *a1
@@ -58,7 +58,7 @@ services:
       - sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1
 
   oi-trend-pullback:
-    image: freqtradeorg/freqtrade:stable
+    image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
     container_name: ft-oi-trend-pullback
     environment: *a1
@@ -117,6 +117,10 @@ services:
       KILLERS_MIN_MARGIN_USD: "5"
       KILLERS_MAX_MARGIN_USD: "10"
       KILLERS_MAX_LEVERAGE: "3"
+      # Must match the Freqtrade stop-limit execution band in
+      # user_data/configs/KillersScalpV1.json. Risk sizing uses the adverse
+      # limit-fill price, not merely the trigger price.
+      KILLERS_STOP_LIMIT_RATIO: "0.98"
       KILLERS_REQUIRE_POSTED_SL: "true"
       KILLERS_MAX_OPEN: "5"
       # Posted-SL hard-stop mode ON (2026-06-06): force-exit a position once
@@ -141,7 +145,7 @@ services:
     # Hyperliquid forward bot. Pass-through strategy: all entries + exits are
     # driven by killers-receiver via REST. One dedicated API wallet per bot
     # avoids nonce contention and makes revocation independent.
-    image: freqtradeorg/freqtrade:stable
+    image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
     container_name: ft-killers-scalp
     environment:
@@ -185,7 +189,7 @@ services:
   ft-insiders-scalp:
     # Insiders Scalp V2 forward executor on Hyperliquid. Uses a separate API
     # wallet from Killers so the two signing streams cannot collide.
-    image: freqtradeorg/freqtrade:stable
+    image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
     container_name: ft-insiders-scalp
     environment:
@@ -248,6 +252,7 @@ services:
       KILLERS_MIN_MARGIN_USD: "5"
       KILLERS_MAX_MARGIN_USD: "10"
       KILLERS_MAX_LEVERAGE: "3"
+      KILLERS_STOP_LIMIT_RATIO: "0.98"
       KILLERS_REQUIRE_POSTED_SL: "true"
       KILLERS_MAX_OPEN: "5"
       KILLERS_POSTED_SL: "true"
@@ -268,7 +273,7 @@ services:
     # Autonomous Hyperliquid strategy on its own funded master account.  The
     # account separation is intentional: HL sub-accounts require $100k volume,
     # while independent master accounts keep positions and margin isolated now.
-    image: freqtradeorg/freqtrade:stable
+    image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
     container_name: ft-short-keltner-hl-live
     environment:
@@ -307,7 +312,7 @@ services:
         exec freqtrade trade --logfile /freqtrade/user_data/logs/ShortKeltnerV2HLlive.log --config /freqtrade/user_data/configs/ShortKeltnerV2HL-live.json --strategy ShortKeltnerV2HL
 
   funding-refresh:
-    image: freqtradeorg/freqtrade:stable
+    image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
     container_name: ft-funding-refresh
     user: 1000:1000

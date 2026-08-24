@@ -77,6 +77,14 @@ class Config:
         self.min_margin_usd = float(os.environ.get("KILLERS_MIN_MARGIN_USD", "5"))
         self.max_margin_usd = float(os.environ.get("KILLERS_MAX_MARGIN_USD", "10"))
         self.max_leverage = float(os.environ.get("KILLERS_MAX_LEVERAGE", "3"))
+        # Must match Freqtrade's stoploss_on_exchange_limit_ratio. Sizing to
+        # the trigger alone understates loss when a stop-limit fills at the
+        # adverse edge of its execution band.
+        self.stop_limit_ratio = float(os.environ.get(
+            "KILLERS_STOP_LIMIT_RATIO", "0.98",
+        ))
+        if not 0 < self.stop_limit_ratio <= 1:
+            raise ValueError("KILLERS_STOP_LIMIT_RATIO must be in (0, 1]")
         self.require_posted_sl = os.environ.get(
             "KILLERS_REQUIRE_POSTED_SL", "true"
         ).lower() in ("true", "1", "yes")
@@ -587,13 +595,23 @@ def find_active_position(
 
 
 def compute_stake(
-    classification: dict, cfg: Config
+    classification: dict,
+    cfg: Config,
+    *,
+    effective_entry: Optional[float] = None,
+    stop_limit_ratio: Optional[float] = None,
 ) -> tuple[float, float, Optional[float]]:
     """Return (stake_usd, leverage, sl_distance_pct).
 
     V2 sizing model:
       loss_at_stop ~= margin * leverage * sl_distance_pct
       target loss is KILLERS_RISK_USD, with margin and leverage capped.
+
+    ``effective_entry`` is the price the order can actually fill at: current
+    mark for a market order or the submitted limit price. The stop distance
+    also uses the adverse stop-limit fill edge, not just the posted trigger.
+    The signal midpoint remains a compatibility fallback for pure unit tests
+    and deliberately SL-optional deployments.
     """
     sl = classification.get("sl")
     entry_range = classification.get("entry_range") or []
@@ -611,9 +629,27 @@ def compute_stake(
     else:
         entry_mid = None
 
+    entry_ref = (
+        float(effective_entry)
+        if isinstance(effective_entry, (int, float)) and effective_entry > 0
+        else entry_mid
+    )
+    ratio = stop_limit_ratio
+    if ratio is None:
+        ratio = float(getattr(cfg, "stop_limit_ratio", 1.0))
+    if not 0 < ratio <= 1:
+        raise ValueError("stop_limit_ratio must be in (0, 1]")
+
     sl_dist = None
-    if entry_mid and isinstance(sl, (int, float)):
-        sl_dist = abs(entry_mid - float(sl)) / entry_mid if entry_mid else None
+    if entry_ref and isinstance(sl, (int, float)):
+        sl_price = float(sl)
+        direction = str(classification.get("direction") or "").lower()
+        if direction not in ("long", "short"):
+            direction = "long" if sl_price < entry_ref else "short"
+        # Freqtrade places a SELL limit below a long stop trigger and a BUY
+        # limit above a short trigger (exchange._get_stop_limit_rate).
+        stop_fill = sl_price * (ratio if direction == "long" else (2 - ratio))
+        sl_dist = abs(entry_ref - stop_fill) / entry_ref
 
     if not sl_dist or sl_dist <= 0:
         return cfg.stake_usd, cfg.leverage, None
@@ -2153,22 +2189,12 @@ async def _process_event(payload: EventPayload):
         if direction not in ("long", "short"):
             return {"action": "skipped", "reason": "bad_direction"}
 
-        stake, leverage, sl_dist = compute_stake(cls, cfg)
         # Absolute posted SL price — stored for the KILLERS_POSTED_SL hard-stop
         # mode (off by default). None when the signal carried no parseable SL.
         _sl_raw = cls.get("sl")
         sl_abs = float(_sl_raw) if isinstance(_sl_raw, (int, float)) and _sl_raw > 0 else None
         if cfg.require_posted_sl and sl_abs is None:
             return {"action": "skipped", "reason": "posted_sl_required"}
-        if stake < cfg.min_margin_usd:
-            return {
-                "action": "skipped",
-                "reason": "risk_below_exchange_minimum",
-                "risk_usd": cfg.risk_usd,
-                "min_margin_usd": cfg.min_margin_usd,
-                "sl_distance_pct": sl_dist,
-            }
-
         entry_range = cls.get("entry_range") or []
         entry_value = cls.get("entry")
         entry_mid = None
@@ -2340,6 +2366,26 @@ async def _process_event(payload: EventPayload):
         target_ref = (entry_limit_price
                       if entry_ordertype == "limit" and entry_limit_price is not None
                       else mark)
+
+        # Size only after the execution price is known. This prevents an
+        # allowed move away from the signal midpoint from silently increasing
+        # the dollar loss at the posted stop. The stop-limit execution band is
+        # included as well, so the target is end-to-end rather than trigger-only.
+        stake, leverage, sl_dist = compute_stake(
+            cls,
+            cfg,
+            effective_entry=target_ref,
+            stop_limit_ratio=cfg.stop_limit_ratio,
+        )
+        if stake < cfg.min_margin_usd:
+            return {
+                "action": "skipped",
+                "reason": "risk_below_exchange_minimum",
+                "risk_usd": cfg.risk_usd,
+                "min_margin_usd": cfg.min_margin_usd,
+                "effective_entry": target_ref,
+                "sl_distance_pct": sl_dist,
+            }
         if signal_targets:
             remaining_targets = filter_remaining_targets(
                 signal_targets, target_ref, direction,
@@ -2411,6 +2457,7 @@ async def _process_event(payload: EventPayload):
                          "leverage": leverage,
                          "ordertype": entry_ordertype,
                          "limit_price": entry_limit_price,
+                         "effective_entry": target_ref,
                          "entry_tag": entry_tag,
                          "signal_targets": signal_targets,
                          "remaining_targets": remaining_targets}),

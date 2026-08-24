@@ -48,6 +48,19 @@ BOTS: list[dict[str, Any]] = [
         "url": "http://ft-funding-fade:8080",
         "account_group": "binance-spot",
         "strategy_kind": "autonomous-quant",
+        "epoch_start_ts_ms": 1787509045565,
+        "lineage": {
+            # The former live DB is immutable after the V2 split and is now
+            # historical lineage only. It must never feed current gates.
+            "legacy_db": "tradesv3.live.FundingFadeV1.sqlite",
+            "legacy_starting_capital": 90.59,
+            "transition_ts_ms": 1787509045565,
+            "transition_label": "live + strategy v2",
+            "legacy_label": "FundingFade pre-v2 live",
+            "live_label": "FundingFade v2 live",
+        },
+        "baseline_status": "stale-pre-v2",
+        "baseline_label": "historical lab · pre-v2",
         "baseline": {
             "annual_return_pct": 18.4, "profit_factor": 1.29, "win_rate": 0.657,
             "max_dd_pct": 19.6, "trades_per_year": 131, "worst_trade_pct": -5.0,
@@ -61,6 +74,7 @@ BOTS: list[dict[str, Any]] = [
         "url": "http://ft-keltner-bounce:8080",
         "account_group": "binance-spot",
         "strategy_kind": "autonomous-quant",
+        "epoch_start_ts_ms": 1787509045565,
         "lineage": {
             "legacy_db": "tradesv3.dryrun.KeltnerBounceV1.sqlite",
             "legacy_starting_capital": 200.0,
@@ -69,6 +83,8 @@ BOTS: list[dict[str, Any]] = [
             "legacy_label": "Binance spot dry-run",
             "live_label": "Binance spot live",
         },
+        "baseline_status": "stale-pre-v2",
+        "baseline_label": "historical lab · pre-v2",
         "baseline": {
             "annual_return_pct": 15.6, "profit_factor": 1.58, "win_rate": 0.64,
             "max_dd_pct": 12.9, "trades_per_year": 46, "worst_trade_pct": -5.0,
@@ -85,6 +101,7 @@ BOTS: list[dict[str, Any]] = [
         "url": "http://ft-oi-trend-pullback:8080",
         "account_group": "binance-spot",
         "strategy_kind": "autonomous-quant",
+        "epoch_start_ts_ms": 1787509045565,
         "observational": True,
         "no_baseline": True,
         "baseline": None,
@@ -563,7 +580,8 @@ def _equity_curve_live(
     """Return [[ts_ms, equity_usd], ...] from launch onward.
 
     Always seeds with [bot_start_ts_ms, starting_capital] so the curve renders
-    even before the first trade closes. Closed trades stack cumulatively. A
+    even before the first trade closes. Trades from an earlier epoch are
+    excluded and the result is kept chronological. Closed trades stack. A
     final synthetic point at 'now' includes unrealized P&L from open trades
     so the live tip reflects the wallet right now.
     """
@@ -576,14 +594,14 @@ def _equity_curve_live(
     )
     cum = 0.0
     for ts, pnl in pts:
-        if not ts:
+        if not ts or (bot_start_ts_ms and ts < bot_start_ts_ms):
             continue
         cum += pnl
         out.append([ts, round(starting_capital + cum, 4)])
     unrealized = sum(float(t.get("profit_abs") or 0) for t in open_trades)
     if unrealized:
         out.append([int(time.time() * 1000), round(starting_capital + cum + unrealized, 4)])
-    return out
+    return sorted(out, key=lambda point: point[0])
 
 
 def _drawdown_curve(equity: list[list]) -> list[list]:
@@ -711,12 +729,25 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
 
     open_trades = status if isinstance(status, list) else []
     closed_trades = (trades_resp or {}).get("trades", []) if trades_resp else []
+    epoch_start_ts_ms = int(
+        bot.get("epoch_start_ts_ms")
+        or (bot.get("lineage") or {}).get("transition_ts_ms")
+        or 0
+    )
+    if epoch_start_ts_ms:
+        closed_trades = [
+            trade for trade in closed_trades
+            if int(trade.get("close_timestamp") or 0) >= epoch_start_ts_ms
+        ]
     all_trades = closed_trades + open_trades
 
     starting_capital = float((balance or {}).get("starting_capital") or 0.0)
     bot_owned = float((balance or {}).get("total_bot") or 0.0)
     is_dry_run = bool((cfg or {}).get("dry_run"))
-    bot_start_ts = (profit or {}).get("bot_start_timestamp", 0) / 1000.0
+    runtime_start_ts = (profit or {}).get("bot_start_timestamp", 0) / 1000.0
+    bot_start_ts = (
+        epoch_start_ts_ms / 1000.0 if epoch_start_ts_ms else runtime_start_ts
+    )
     days_running = (time.time() - bot_start_ts) / 86400.0 if bot_start_ts else 0
 
     per_pair = _per_pair_pnl(closed_trades)
@@ -732,6 +763,12 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     # ── New: no-baseline bots (killers-scalp) ─────────────────────────────
     no_baseline = bot.get("no_baseline", False)
     baseline = bot.get("baseline") if not no_baseline else None
+    baseline_status = bot.get("baseline_status", "active" if baseline else "none")
+    baseline_comparable = bool(
+        baseline
+        and baseline_status == "active"
+        and not bot.get("observational", False)
+    )
 
     tp_ladder = {}
     if bot.get("key") == "killers-ft" and KILLERS_RECEIVER_DB:
@@ -821,6 +858,9 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "concentration": _concentration(per_pair, closed_pnl),
         "observational": bot.get("observational", False),
         "no_baseline": no_baseline,
+        "baseline_status": baseline_status,
+        "baseline_label": bot.get("baseline_label"),
+        "baseline_comparable": baseline_comparable,
         "account_group": bot.get("account_group", bot["key"]),
         "strategy_kind": bot.get("strategy_kind", "autonomous-quant"),
         "venue": bot.get("venue", "binance"),
@@ -830,22 +870,22 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
                      if k != "legacy_db"} if bot.get("lineage") else None),
         # Gates: null for no-baseline bots, observational marker for copy-traders
         # with soft gating, full gate objects for quant-validated bots.
-        "gate1": (None if no_baseline
-                  else {"status": "observational"} if bot.get("observational")
-                  else _gate1(all_trades, days_running)),
-        "gate2": (None if no_baseline
-                  else {"status": "observational"} if bot.get("observational")
-                  else _gate2(profit or {}, starting_capital, days_running, bot["baseline"])),
-        "gate3": (None if no_baseline
-                  else {"status": "observational"} if bot.get("observational")
-                  else _gate3(all_trades, bot["baseline"])),
+        "gate1": (_gate1(all_trades, days_running) if baseline_comparable else None),
+        "gate2": (_gate2(profit or {}, starting_capital, days_running, baseline)
+                  if baseline_comparable else None),
+        "gate3": (_gate3(all_trades, baseline) if baseline_comparable else None),
         "baseline": baseline,
         "equity_live": live_equity,
         "drawdown_curve": drawdown_curve,
         "whitelist_size": len((whitelist or {}).get("whitelist", [])) if whitelist else None,
         # ── NEW: additive fields (frontend feature-detects these) ──────────
         "links": _bot_links(bot, open_trades_out, per_pair),
-        "delta_24h": _delta_24h(closed_trades, current_dd_pct, baseline, bot),
+        "delta_24h": _delta_24h(
+            closed_trades,
+            current_dd_pct,
+            baseline if baseline_comparable else None,
+            bot,
+        ),
         "equity_annotations": _equity_annotations(bot["key"]),
     }
 
