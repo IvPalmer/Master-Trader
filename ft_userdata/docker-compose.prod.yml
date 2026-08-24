@@ -379,7 +379,7 @@ services:
       # Retired dry-run epochs are chart lineage only. They are mounted
       # read-only and never participate in live wallet/P&L aggregation.
       - ft_user_data:/var/lib/freqtrade-history:ro
-      - /home/ubuntu/hl_validation/user_data/tradesv3.dryrun.ShortKeltnerV2HL.sqlite:/var/lib/freqtrade-history/tradesv3.dryrun.ShortKeltnerV2HL.sqlite:ro
+      - /home/ubuntu/hl_validation/user_data/tradesv3.dryrun.ShortKeltnerV2HL.sqlite:/var/lib/short-keltner-history.sqlite:ro
     deploy:
       resources:
         limits:
