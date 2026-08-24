@@ -303,7 +303,7 @@
     "binance_spot": ["FundingFadeV1", "KeltnerBounceV1", "OITrendPullbackV1"],
     "hyperliquid_futures": ["KillersScalpV1", "InsidersScalpV2", "ShortKeltnerV2HLlive"],
     "capital_policy": "Bounded strategy allocations; no requirement to deploy all available capital; monthly deposits may be allocated after observation.",
-    "execution_epoch": "New live curves begin at the 2026-08-23 live/strategy-update transition and retain frozen dry-run lineage for comparison."
+    "execution_epoch": "New live curves begin at the 2026-08-23 live/strategy-update transition. FundingFade V2 writes to a fresh live DB and retains its former 24-trade live DB as frozen pre-V2 lineage; Keltner's live DB was empty at cutover. FundingFade and Keltner lab baselines are labelled stale-pre-v2 and excluded from current gates."
    },
    "supersedes": [
     "The historical Killers/Insiders do-not-fund conclusion is retained as evidence but no longer acts as an absolute deployment prohibition.",

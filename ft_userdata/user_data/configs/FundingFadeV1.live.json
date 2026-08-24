@@ -217,5 +217,5 @@
     "internals": {
         "process_throttle_secs": 5
     },
-    "db_url": "sqlite:////freqtrade/user_data/tradesv3.live.FundingFadeV1.sqlite"
+    "db_url": "sqlite:////freqtrade/user_data/tradesv3.live.FundingFadeV1.v2.sqlite"
 }

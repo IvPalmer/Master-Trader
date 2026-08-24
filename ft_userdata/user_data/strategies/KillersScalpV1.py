@@ -19,6 +19,7 @@ template (services/insiders-receiver/).
 import json
 import logging
 import os
+import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -56,9 +57,12 @@ class KillersScalpV1(IStrategy):
 
     startup_candle_count = 10
     _sl_cache: dict[int, float] = {}
+    _sl_cache_updated: dict[int, float] = {}
     _sl_refreshing: set[int] = set()
     _sl_lock = Lock()
     _sl_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="killers-sl")
+    _sl_refresh_ttl_sec = 30.0
+    _sl_cache_max_entries = 128
 
     # ── pass-through indicators / signals ──────────────────────────────
 
@@ -90,6 +94,33 @@ class KillersScalpV1(IStrategy):
     ) -> float:
         """Honor receiver-requested leverage while enforcing the V2 cap."""
         return min(max(1.0, proposed_leverage), self.leverage_amount, max_leverage)
+
+    def custom_stake_amount(
+        self,
+        pair: str,
+        current_time: datetime,
+        current_rate: float,
+        proposed_stake: float,
+        min_stake: Optional[float],
+        max_stake: float,
+        leverage: float,
+        entry_tag: Optional[str],
+        side: str,
+        **kwargs,
+    ) -> float:
+        """Reject an entry Freqtrade would otherwise round above its risk cap.
+
+        The receiver has already sized the order from the effective entry and
+        adverse stop-limit fill. Returning zero here is the final fail-closed
+        backstop when the venue minimum is larger than that approved margin.
+        """
+        if min_stake is not None and proposed_stake < min_stake:
+            logger.warning(
+                "Rejecting %s %s stake %.4f below venue minimum %.4f",
+                pair, side, proposed_stake, min_stake,
+            )
+            return 0.0
+        return min(proposed_stake, max_stake)
 
     @staticmethod
     def _tagged_stop(trade) -> Optional[float]:
@@ -131,7 +162,11 @@ class KillersScalpV1(IStrategy):
 
     def _schedule_stop_refresh(self, trade_id: int) -> None:
         """Refresh receiver state asynchronously without delaying trading."""
+        now = time.monotonic()
         with self._sl_lock:
+            updated = self._sl_cache_updated.get(trade_id, 0.0)
+            if updated and now - updated < self._sl_refresh_ttl_sec:
+                return
             if trade_id in self._sl_refreshing:
                 return
             self._sl_refreshing.add(trade_id)
@@ -143,6 +178,14 @@ class KillersScalpV1(IStrategy):
                 if sl_price is not None:
                     with self._sl_lock:
                         self._sl_cache[trade_id] = sl_price
+                        self._sl_cache_updated[trade_id] = time.monotonic()
+                        if len(self._sl_cache) > self._sl_cache_max_entries:
+                            oldest = min(
+                                self._sl_cache,
+                                key=lambda key: self._sl_cache_updated.get(key, 0.0),
+                            )
+                            self._sl_cache.pop(oldest, None)
+                            self._sl_cache_updated.pop(oldest, None)
             except Exception as exc:
                 logger.info("Receiver SL refresh failed for trade %s: %s", trade_id, exc)
             finally:
@@ -175,6 +218,10 @@ class KillersScalpV1(IStrategy):
             if sl_price is not None:
                 with self._sl_lock:
                     self._sl_cache[trade_id] = sl_price
+                    # A tag is an immediate deterministic fallback, but it is
+                    # not proof the receiver has no newer moved stop. Leave it
+                    # due for one asynchronous refresh.
+                    self._sl_cache_updated[trade_id] = 0.0
         self._schedule_stop_refresh(trade_id)
         if sl_price is None:
             return None

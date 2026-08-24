@@ -21,12 +21,13 @@ claim of proven profitability.
 | FundingFade and Keltner `custom_exit` callbacks were disabled by `use_exit_signal = False` | Both strategies now set `use_exit_signal = True`. Their dataframe exit columns remain zero, so this only activates the intended time/reversion callbacks. |
 | Hyperliquid positions had no exchange-resident stop | Killers, Insiders, and ShortKeltner configs now use Hyperliquid-supported limit stops on exchange, refreshed every 60 seconds with a 0.98 limit ratio. |
 | Killers' initial -7% floor could not widen to the posted stop; relative cache accidentally trailed | The receiver embeds the absolute posted SL in `entry_tag`. `custom_stoploss` explicitly accepts `after_fill`, caches the absolute price, and recomputes the relative stop at every rate. Receiver refresh is asynchronous. The -7% value remains only a catastrophe fallback when no posted stop can be recovered. |
-| OI failed open after feed failure and selected the oldest sample in a two-hour buffer | Failed polls clear the gate, values expire after 15 minutes, the nearest eligible 45-minute baseline is selected, and HTTP work runs in a long-lived background pool instead of the strategy loop. |
+| OI failed open after feed failure and selected the oldest sample in a two-hour buffer | Failed polls clear the entry gate, values expire after 15 minutes, the nearest eligible 45-minute baseline is selected, and HTTP work runs in a long-lived background pool. The EMA50 price exit is independent of OI availability, so an OI outage cannot suppress risk reduction on an existing position. |
 | Dry fallback wrote into live-named Hyperliquid databases | Compose now selects a distinct dry or live DB from the effective `DRY_RUN` value at container startup and rejects malformed values. Dry mode also disables on-exchange stops. |
 | Receiver could enter after live mark crossed the posted SL | Mark price is required whenever a posted SL is required; an already-breached signal is skipped before any position row or order. |
-| Minimum-margin clamp could exceed the configured $1 stop-risk | Sizing no longer rounds a too-small risk budget up to venue minimum. Such signals are skipped as `risk_below_exchange_minimum`. Stake cents are floored rather than rounded upward. |
+| Minimum-margin and execution displacement could exceed the configured $1 stop-risk | Killers and Insiders now size only after the live mark and final order type are known: market entries use the mark, limit-in-zone entries use their submitted limit, and both include the adverse 0.98 stop-limit fill edge. A strategy `custom_stake_amount` callback returns zero when Freqtrade would otherwise raise the approved margin to the venue minimum. Too-small receiver stakes still fail closed as `risk_below_exchange_minimum`; cents are floored. |
 | Concurrent opens could race past `max_open` | OPEN admission, capacity check, position insert, and force-enter response are serialized by an application lock. Close/update paths remain concurrent. |
 | Blocking receiver HTTP in `custom_stoploss` | The tagged stop is immediately available and receiver refresh runs on a two-worker executor; the Freqtrade loop never waits for that HTTP call. |
+| Receiver stop refresh ran every five-second strategy loop and cached every historical trade ID | Refreshes now have a 30-second TTL, in-flight deduplication, and a 128-entry oldest-first bound. |
 | Blocking OI polling in `bot_loop_start` | Fetches are submitted asynchronously and harvested on later bot loops. |
 | Binance stop-limit gap | The limit ratio is widened from 0.985 to 0.98 on all three spot bots. A stop-limit fill gap is an inherent residual risk of Binance spot/Freqtrade support and cannot be eliminated by configuration alone. |
 | Dashboard used SQLite `immutable=1` on a database still receiving dry trades | Production now mounts a frozen, SQLite-consistent ShortKeltner pre-live snapshot. The dashboard's immutable read is therefore valid. |
@@ -34,6 +35,9 @@ claim of proven profitability.
 | Governance did not record the live override | `ff-gate-v2-review` is closed with an explicit override resolution; the fleet-v2 registration records scope, authorization, superseded prohibitions, operating rules, and the next review. ROADMAP D1/T-010 are marked superseded. |
 | Runtime registry still described receiver bots as awaiting wallets | `bots_config.json` now distinguishes autonomous `active` from receiver-managed `production_live` and records the actual V2 runtime strategy/config. |
 | ShortKeltner strategy documentation still said dry-only | Its module documentation now describes the frozen dry lineage and bounded live epoch. |
+| Production execution engine used mutable `freqtrade:stable` | All seven production Freqtrade services are pinned to the exact multi-architecture digest deployed and verified as Freqtrade 2026.7: `sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486`. A restart can no longer change callback or execution semantics implicitly. |
+| FundingFade V2 shared its DB and dashboard gates with 24 pre-V2 trades; Keltner's empty V2 DB still showed its pre-V2 lab baseline as current | FundingFade V2 writes to `tradesv3.live.FundingFadeV1.v2.sqlite`; the former 24-trade live DB is immutable lineage. Both FundingFade and Keltner expose `baseline_status=stale-pre-v2`, exclude those baselines from gates/expected deltas, and retain them only as labelled historical context. |
+| Equity seed could precede older DB points in array order | Every bot uses a persistent epoch start, pre-epoch trades are filtered, and live equity points are returned chronologically. Restarts no longer redefine the analytical epoch. |
 
 ## Stop architecture
 
@@ -53,6 +57,12 @@ actual reduce-only stop order exists at the venue.
 
 - Dry and live databases have separate filenames selected from effective
   runtime mode.
+- FundingFade V2 has a new live database. Its former 24-trade live database
+  (2026-04-22 through 2026-07-31) is historical lineage only.
+- Keltner's current live database had zero trades at the split. Its historical
+  baseline is stale context, not data contamination and not an active gate.
+- Explicit epoch timestamps, rather than the latest process restart time,
+  bound live equity and measurement duration.
 - ShortKeltner's historical curve is copied with SQLite backup semantics to
   `tradesv3.snapshot.ShortKeltnerV2HL.pre-live.sqlite`.
 - Historical dry curves stop at the recorded transition timestamp.
@@ -69,9 +79,13 @@ The regression suite covers:
 - absolute Killers stop behavior and explicit `after_fill`;
 - posted-SL entry guard and stop propagation through `entry_tag`;
 - no risk oversizing to venue minimum;
+- effective-entry and adverse stop-limit risk sizing for long and short orders;
+- OI-independent EMA50 exits;
 - Hyperliquid native-stop config;
+- digest-pinned production images;
 - dry/live DB isolation and OPEN serialization;
-- bounded dashboard lineage normalization.
+- bounded dashboard lineage normalization, stale-baseline exclusion, and
+  chronological epoch filtering.
 
 Deployment is complete only after:
 

@@ -21,11 +21,13 @@ The front-facing dashboard at `master-trader.grooveops.dev` has two complementar
 
 ## Dry-run → live strategy lineage
 
-Keltner Bounce, Killers Scalp, Insiders Scalp, and Short Keltner retain their
-closed-trade dry-run curves as historical strategy lineage. In each bot's
-selected Overview curve and detail tab, the dry-run segment ends at its last
-known equity and the new live segment begins at the same visual level. A dashed
-vertical marker names the production/strategy cutover.
+Funding Fade, Keltner Bounce, Killers Scalp, Insiders Scalp, and Short Keltner
+retain their prior closed-trade curves as historical strategy lineage. Funding
+Fade's source is its now-frozen pre-V2 live DB; the others use their recorded
+pre-live history. In each bot's selected Overview curve and detail tab, the
+historical segment ends at its last known equity and the new live segment
+begins at the same visual level. A dashed vertical marker names the
+production/strategy cutover.
 
 The joined curve is normalized, not an account statement. Live returns are
 rebased onto the final dry-run equity so continuity and post-update slope can be
@@ -36,6 +38,17 @@ are frozen with SQLite backup semantics and mounted read-only into the dashboard
 container; `immutable=1` is used only for those snapshots. If a validation
 container keeps running in parallel, it writes to a different database and
 cannot mutate the chart lineage.
+
+Funding Fade and Keltner expose their prior lab baselines as
+`stale-pre-v2`. The UI labels that status directly and never uses those numbers
+for current-epoch expected return, PF/DD deltas, graduation gates, or incident
+generation. Keltner's live DB was empty at cutover; its issue was stale
+comparison metadata, not mixed trade data.
+
+Live equity uses a persistent per-strategy epoch timestamp. Pre-epoch trade
+rows are excluded and chart points are sorted chronologically, so restarting a
+container cannot move the analytical start or place older closes after a newer
+seed point.
 
 Rebasing is refused when live starting capital is below $1, non-finite, or
 would require a scale outside 0.01–100x. In that state the API reports

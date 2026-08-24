@@ -96,10 +96,28 @@ def test_oi_uses_nearest_eligible_baseline_and_expires_failures():
     assert "BTC/USDT" not in strategy._oi_growth_updated
 
 
+def test_oi_price_exit_remains_available_when_oi_is_stale():
+    pd = pytest.importorskip("pandas")
+    module = _load_strategy("OITrendPullbackV1.py")
+    strategy = module.OITrendPullbackV1.__new__(module.OITrendPullbackV1)
+    frame = pd.DataFrame(
+        {
+            "close": [99.0, 99.0, 101.0],
+            "ema50": [100.0, 100.0, 100.0],
+            "oi_growth": [float("nan"), 0.02, -0.02],
+        }
+    )
+
+    result = strategy.populate_exit_trend(frame, {})
+
+    assert result["exit_long"].fillna(0).tolist() == [1.0, 1.0, 0.0]
+
+
 def test_killers_stop_is_absolute_recomputed_and_after_fill_aware():
     module = _load_strategy("KillersScalpV1.py")
     strategy = module.KillersScalpV1.__new__(module.KillersScalpV1)
     strategy._sl_cache = {}
+    strategy._sl_cache_updated = {}
     strategy._sl_refreshing = set()
     strategy._schedule_stop_refresh = lambda trade_id: None
     trade = SimpleNamespace(
@@ -114,6 +132,23 @@ def test_killers_stop_is_absolute_recomputed_and_after_fill_aware():
     assert first == pytest.approx(0.95)
     assert second == pytest.approx(95.0 / 110.0)
     assert first != second  # relative value is not cached/trailing.
+
+
+def test_killers_rejects_freqtrade_minimum_stake_bump():
+    module = _load_strategy("KillersScalpV1.py")
+    strategy = module.KillersScalpV1.__new__(module.KillersScalpV1)
+
+    rejected = strategy.custom_stake_amount(
+        "BTC/USDC:USDC", None, 100.0, 4.99, 5.0, 100.0, 3.0,
+        "signal:1|sl:95", "long",
+    )
+    accepted = strategy.custom_stake_amount(
+        "BTC/USDC:USDC", None, 100.0, 5.0, 5.0, 100.0, 3.0,
+        "signal:1|sl:95", "long",
+    )
+
+    assert rejected == 0.0
+    assert accepted == 5.0
 
 
 @pytest.mark.parametrize(
@@ -138,3 +173,16 @@ def test_production_compose_isolates_dry_and_live_databases_and_serializes_opens
     assert "tradesv3.snapshot.ShortKeltnerV2HL.pre-live.sqlite" in compose
     assert "app.state.entry_lock = asyncio.Lock()" in receiver
     assert "async with app.state.entry_lock" in receiver
+
+
+def test_production_freqtrade_image_is_digest_pinned_and_funding_v2_isolated():
+    compose = (ROOT / "ft_userdata" / "docker-compose.prod.yml").read_text()
+    funding = json.loads((CONFIGS / "FundingFadeV1.live.json").read_text())
+    digest = (
+        "freqtradeorg/freqtrade@sha256:"
+        "50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486"
+    )
+
+    assert "freqtradeorg/freqtrade:stable" not in compose
+    assert compose.count(digest) == 7
+    assert funding["db_url"].endswith("tradesv3.live.FundingFadeV1.v2.sqlite")
