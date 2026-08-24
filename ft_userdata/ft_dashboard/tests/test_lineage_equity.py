@@ -54,6 +54,8 @@ def test_lineage_stitches_closed_dry_run_to_rebased_live(tmp_path, monkeypatch):
     assert lineage["live"] == [[transition, 205.0], [transition + 1_000, 225.5]]
     assert lineage["transition"]["label"] == "live + strategy v2"
     assert lineage["drawdown"][-1][1] == 0.0
+    assert lineage["normalized"] is True
+    assert lineage["normalization_status"] == "rebased"
 
 
 def test_lineage_is_absent_when_history_db_is_missing(tmp_path, monkeypatch):
@@ -62,3 +64,27 @@ def test_lineage_is_absent_when_history_db_is_missing(tmp_path, monkeypatch):
     snap = {"wallet": {"starting_capital": 50.0}, "equity_live": [[1, 50.0]]}
 
     assert app._lineage_payload(meta, snap) is None
+
+
+def test_lineage_rejects_tiny_live_capital_amplification(tmp_path, monkeypatch):
+    db = tmp_path / "legacy.sqlite"
+    _legacy_db(db)
+    monkeypatch.setattr(app, "LINEAGE_DB_DIR", tmp_path)
+    transition = 1_800_000_000_000
+    meta = {
+        "lineage": {
+            "legacy_db": db.name,
+            "legacy_starting_capital": 200.0,
+            "transition_ts_ms": transition,
+        }
+    }
+    snap = {
+        "wallet": {"starting_capital": 0.01},
+        "equity_live": [[transition, 0.01], [transition + 1_000, 0.02]],
+    }
+
+    lineage = app._lineage_payload(meta, snap)
+
+    assert lineage["normalized"] is False
+    assert lineage["normalization_status"] == "invalid-live-capital-basis"
+    assert lineage["live"] == [[transition, 205.0]]

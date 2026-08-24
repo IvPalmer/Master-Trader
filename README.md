@@ -1,6 +1,17 @@
 # Master Trader — Multi-Bot Algorithmic Trading System
 
-A self-improving multi-strategy crypto trading system built on [Freqtrade](https://www.freqtrade.io/). Runs 6 live bots with automated health monitoring, backtesting validation, parameter optimization, and capital rebalancing.
+A self-improving multi-strategy crypto trading system built on [Freqtrade](https://www.freqtrade.io/). Runs six bounded live bots with automated health monitoring, strategy evolution, and consolidated portfolio analytics.
+
+Current production fleet:
+
+| Venue | Bots | Execution |
+|---|---|---|
+| Binance spot | FundingFadeV1, KeltnerBounceV1, OITrendPullbackV1 | Shared spot wallet; independent strategy stakes and databases |
+| Hyperliquid futures | KillersScalpV1, InsidersScalpV2, ShortKeltnerV2HLlive | Dedicated accounts; isolated margin; native exchange stops |
+
+The current authorization, known limitations, remediation status, and next
+review are recorded in
+[the 2026-08-24 live-fleet audit](docs/audits/2026-08-24-live-fleet-review-remediation.md).
 
 ## Architecture
 
@@ -44,7 +55,7 @@ A self-improving multi-strategy crypto trading system built on [Freqtrade](https
 
 - Docker & Docker Compose
 - Python 3.11+ with `requests`, `prometheus_client`, `numpy`
-- A Binance account (API keys optional for dry-run)
+- A Binance spot account and/or dedicated Hyperliquid accounts (keys optional for dry-run)
 
 ### 1. Set Up Freqtrade Directory
 

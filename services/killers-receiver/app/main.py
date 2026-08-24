@@ -1,12 +1,12 @@
 """killers-receiver — Binance-Killers-VIP signal copy-trader executor.
 
 Listens for classified-message events from the killers_bot observer,
-translates them to Freqtrade Futures REST calls against the
-ft-killers-scalp dry-run bot.
+translates them to Freqtrade Futures REST calls against the configured
+Hyperliquid live/dry executor.
 
 Pipeline:
   observer.py → POST /event → this receiver →
-    open  → POST /forceenter  (BTC/USDT:USDT, market order, $20 stake, 5x lev)
+    open  → POST /forceenter  (BTC/USDC:USDC, risk-sized order, capped leverage)
     close → POST /forceexit   (look up trade by signal_id+symbol)
     move_sl / chat / increase → log only (Phase 2)
 
@@ -18,9 +18,9 @@ Env vars:
   KILLERS_FT_USERNAME       REST basic-auth
   KILLERS_FT_PASSWORD       REST basic-auth
   KILLERS_DB                SQLite path for position graph
-  KILLERS_STAKE_USD         per-trade stake (default 20 — gives ~10 concurrent on $200)
-  KILLERS_LEVERAGE          default leverage (default 5)
-  KILLERS_MAX_OPEN          guardrail (default 10, matches max_open_trades)
+  KILLERS_RISK_USD          target loss at the signal's posted stop
+  KILLERS_MIN_MARGIN_USD    venue minimum; signal is skipped if budget is smaller
+  KILLERS_MAX_OPEN          serialized portfolio admission cap
   KILLERS_BOT_LABEL         instance identity. When set, drives BOTH the logger
                             name and the Telegram-alert prefix. When unset (or
                             empty) each keeps its legacy default: logger
@@ -32,6 +32,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import sqlite3
 from contextlib import asynccontextmanager
@@ -625,8 +626,14 @@ def compute_stake(
     else:
         leverage = min(raw_leverage, cfg.max_leverage)
         stake = cfg.risk_usd / (sl_dist * leverage)
-    stake = min(max_margin, max(cfg.min_margin_usd, stake))
-    return round(stake, 2), round(leverage, 2), sl_dist
+    stake = min(max_margin, stake)
+    # Never increase risk merely to satisfy the venue's minimum order size.
+    # The caller skips an entry whose risk budget cannot fund the minimum.
+    if stake < cfg.min_margin_usd:
+        return 0.0, round(leverage, 2), sl_dist
+    # Floor to cents so presentation rounding cannot overshoot the risk cap.
+    stake = math.floor(stake * 100.0) / 100.0
+    return stake, round(leverage, 2), sl_dist
 
 
 # ── Freqtrade REST calls ───────────────────────────────────────────────────
@@ -635,6 +642,7 @@ def compute_stake(
 async def ft_force_enter(
     cfg: Config, pair: str, direction: str, stake: float, leverage: float,
     session=None, ordertype: str = "market", price: Optional[float] = None,
+    entry_tag: Optional[str] = None,
 ) -> dict:
     """POST /forceenter to the killers Freqtrade bot. Returns response dict.
 
@@ -661,6 +669,8 @@ async def ft_force_enter(
     }
     if ordertype == "limit" and price is not None:
         body["price"] = float(price)
+    if entry_tag:
+        body["entry_tag"] = entry_tag
     timeout = aiohttp.ClientTimeout(total=10)
     if session is not None:
         async with session.post(url, json=body, timeout=timeout) as r:
@@ -1538,6 +1548,10 @@ async def lifespan(app: FastAPI):
     # POST /forceexit, and FT will cancel the first → re-creating the
     # 2026-05-28 19:21 incident pattern (per codex 019e7030 review).
     app.state.phase2_lock = asyncio.Lock()
+    # Serialize OPEN admission through max-open, tentative insert, and the
+    # force-enter response. Without this lock, concurrent Telegram events can
+    # both observe capacity and exceed the configured portfolio cap.
+    app.state.entry_lock = asyncio.Lock()
     logger.info(
         "receiver up ft=%s db=%s risk=$%.2f margin=$%.0f..$%.0f lev<=%.1fx max_open=%d "
         "max_slippage=%.1f%% limit_in_zone=%s active_tp=%s posted_sl=%s reconcile_sec=%d",
@@ -2008,7 +2022,11 @@ async def handle_event(payload: EventPayload):
     ingress_id = _ingress_log_start(conn, payload)
 
     try:
-        result = await _process_event(payload)
+        if payload.classification.get("kind") == "open":
+            async with app.state.entry_lock:
+                result = await _process_event(payload)
+        else:
+            result = await _process_event(payload)
     except Exception as e:
         # Catch-all: log + persist + return structured 500. Without this,
         # FastAPI bubbles the exception to its generic handler which says
@@ -2142,6 +2160,14 @@ async def _process_event(payload: EventPayload):
         sl_abs = float(_sl_raw) if isinstance(_sl_raw, (int, float)) and _sl_raw > 0 else None
         if cfg.require_posted_sl and sl_abs is None:
             return {"action": "skipped", "reason": "posted_sl_required"}
+        if stake < cfg.min_margin_usd:
+            return {
+                "action": "skipped",
+                "reason": "risk_below_exchange_minimum",
+                "risk_usd": cfg.risk_usd,
+                "min_margin_usd": cfg.min_margin_usd,
+                "sl_distance_pct": sl_dist,
+            }
 
         entry_range = cls.get("entry_range") or []
         entry_value = cls.get("entry")
@@ -2188,6 +2214,7 @@ async def _process_event(payload: EventPayload):
         needs_mark = (
             (signal_targets and len(signal_targets) > 0)
             or cfg.max_entry_slippage_pct > 0
+            or cfg.require_posted_sl
         )
         if needs_mark:
             mark = await get_execution_mark_price(
@@ -2202,6 +2229,23 @@ async def _process_event(payload: EventPayload):
                 return {"action": "skipped",
                         "reason": "mark_fetch_failed (guard fail-closed)",
                         "signal_targets": signal_targets}
+
+        # A delayed signal must never open after its own posted stop has
+        # already been crossed. Entry-midpoint validation alone cannot catch
+        # market movement between the Telegram post and execution.
+        if sl_abs is not None and mark is not None and _posted_sl_breached(
+            direction, mark, sl_abs
+        ):
+            logger.warning(
+                "[POSTED-SL GUARD] %s %s mark=%.6g already breached SL=%.6g — skipping",
+                symbol, direction.upper(), mark, sl_abs,
+            )
+            return {
+                "action": "skipped",
+                "reason": "posted_sl_already_breached",
+                "mark": mark,
+                "posted_sl": sl_abs,
+            }
 
         # ── Entry slippage gate ───────────────────────────────────────────
         # If we'd fill too far past the signaler's entry boundary, skip.
@@ -2350,10 +2394,14 @@ async def _process_event(payload: EventPayload):
                     "state": existing["state"], "ft_trade_id": existing["ft_trade_id"]}
 
         # Fire the order
+        entry_tag = f"signal:{signal_id or msg_id}"
+        if sl_abs is not None:
+            entry_tag += f"|sl:{sl_abs:.12g}"
         resp = await ft_force_enter(
             cfg, pair, direction, stake, leverage,
             session=getattr(app.state, "ft_session", None),
             ordertype=entry_ordertype, price=entry_limit_price,
+            entry_tag=entry_tag,
         )
         conn.execute(
             "INSERT INTO events (pos_id, msg_id, event_at, kind, payload, response) "
@@ -2363,6 +2411,7 @@ async def _process_event(payload: EventPayload):
                          "leverage": leverage,
                          "ordertype": entry_ordertype,
                          "limit_price": entry_limit_price,
+                         "entry_tag": entry_tag,
                          "signal_targets": signal_targets,
                          "remaining_targets": remaining_targets}),
              json.dumps(resp)),
@@ -2418,6 +2467,7 @@ async def _process_event(payload: EventPayload):
         return {"action": "force_enter", "pos_id": pos_id, "ft": resp,
                 "ordertype": entry_ordertype,
                 "limit_price": entry_limit_price,
+                "entry_tag": entry_tag,
                 "remaining_targets": remaining_targets,
                 "signal_targets": signal_targets,
                 "tp_orders_placed": placed_tps}

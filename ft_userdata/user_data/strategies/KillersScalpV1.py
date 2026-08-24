@@ -8,7 +8,7 @@ pass-throughs that prevent automatic trading decisions.
 The bot's only job is to:
   1. Maintain OHLCV data subscriptions for the pair_whitelist (so when
      a force_enter arrives, current price + history is available).
-  2. Execute REST-issued orders against the dry-run wallet.
+  2. Execute REST-issued orders against the configured live/dry wallet.
   3. Track positions, fire webhook events on entry/exit/cancel.
 
 Why pass-through?  This bot mirrors a Telegram-channel signaler. The
@@ -19,10 +19,11 @@ template (services/insiders-receiver/).
 import json
 import logging
 import os
-import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from threading import Lock
 from typing import Optional
 
 from freqtrade.strategy import IStrategy, stoploss_from_absolute
@@ -40,8 +41,9 @@ class KillersScalpV1(IStrategy):
     can_short = True        # futures: shorts allowed
     process_only_new_candles = True
 
-    # Channel exits still drive normal closes. V2 adds a catastrophe floor
-    # plus the receiver's per-signal posted stop as an exchange-managed stop.
+    # Channel exits still drive normal closes. The receiver embeds the posted
+    # stop in entry_tag; custom_stoploss turns it into Freqtrade's native
+    # exchange-resident stop while the receiver remains a second exit path.
     minimal_roi = {"0": 100}        # 100x profit before ROI exit (never hit)
     stoploss = -0.07
     trailing_stop = False
@@ -53,7 +55,10 @@ class KillersScalpV1(IStrategy):
     leverage_amount = 3.0
 
     startup_candle_count = 10
-    _sl_cache: dict = {}
+    _sl_cache: dict[int, float] = {}
+    _sl_refreshing: set[int] = set()
+    _sl_lock = Lock()
+    _sl_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="killers-sl")
 
     # ── pass-through indicators / signals ──────────────────────────────
 
@@ -86,17 +91,28 @@ class KillersScalpV1(IStrategy):
         """Honor receiver-requested leverage while enforcing the V2 cap."""
         return min(max(1.0, proposed_leverage), self.leverage_amount, max_leverage)
 
-    def custom_stoploss(
-        self, pair, trade, current_time, current_rate, current_profit, **kwargs
-    ):
-        """Pull the signal's posted SL from the receiver with a short cache."""
-        now = time.time()
-        cached = self._sl_cache.get(trade.id)
-        if cached and now - cached[0] < 30:
-            return cached[1]
+    @staticmethod
+    def _tagged_stop(trade) -> Optional[float]:
+        """Read the immutable posted stop embedded by the receiver at entry."""
+        tag = getattr(trade, "enter_tag", None) or getattr(trade, "entry_tag", None)
+        if not isinstance(tag, str):
+            return None
+        for part in tag.split("|"):
+            if not part.startswith("sl:"):
+                continue
+            try:
+                value = float(part[3:])
+            except (TypeError, ValueError):
+                return None
+            return value if value > 0 else None
+        return None
+
+    @staticmethod
+    def _fetch_receiver_stop(trade_id: int) -> Optional[float]:
+        """Fetch the latest absolute stop; always called off the bot loop."""
         try:
             request = urllib.request.Request(
-                f"{RECEIVER_URL}/position/by_ft_id/{trade.id}",
+                f"{RECEIVER_URL}/position/by_ft_id/{trade_id}",
                 headers={"Accept": "application/json"},
             )
             with urllib.request.urlopen(request, timeout=0.5) as response:
@@ -104,28 +120,77 @@ class KillersScalpV1(IStrategy):
             sl_price = payload.get("current_sl")
             if not isinstance(sl_price, (int, float)) or sl_price <= 0:
                 return None
-            sl_price = float(sl_price)
-            if (not trade.is_short and sl_price >= current_rate) or (
-                trade.is_short and sl_price <= current_rate
-            ):
-                logger.warning(
-                    "Ignoring wrong-side receiver SL %s at rate %s for trade %s",
-                    sl_price, current_rate, trade.id,
-                )
-                return None
-            relative = stoploss_from_absolute(
-                stop_rate=sl_price,
-                current_rate=current_rate,
-                is_short=trade.is_short,
-                leverage=trade.leverage or 1.0,
-            )
-            if relative is not None:
-                self._sl_cache[trade.id] = (now, relative)
-            return relative
+            return float(sl_price)
         except urllib.error.HTTPError as exc:
             if exc.code != 404:
-                logger.warning("Receiver SL HTTP %s for trade %s", exc.code, trade.id)
+                logger.warning("Receiver SL HTTP %s for trade %s", exc.code, trade_id)
             return None
         except Exception as exc:
-            logger.info("Receiver SL fallback for trade %s: %s", trade.id, exc)
+            logger.info("Receiver SL fallback for trade %s: %s", trade_id, exc)
             return None
+
+    def _schedule_stop_refresh(self, trade_id: int) -> None:
+        """Refresh receiver state asynchronously without delaying trading."""
+        with self._sl_lock:
+            if trade_id in self._sl_refreshing:
+                return
+            self._sl_refreshing.add(trade_id)
+        future = self._sl_executor.submit(self._fetch_receiver_stop, trade_id)
+
+        def done(completed) -> None:
+            try:
+                sl_price = completed.result()
+                if sl_price is not None:
+                    with self._sl_lock:
+                        self._sl_cache[trade_id] = sl_price
+            except Exception as exc:
+                logger.info("Receiver SL refresh failed for trade %s: %s", trade_id, exc)
+            finally:
+                with self._sl_lock:
+                    self._sl_refreshing.discard(trade_id)
+
+        future.add_done_callback(done)
+
+    def custom_stoploss(
+        self,
+        pair,
+        trade,
+        current_time,
+        current_rate,
+        current_profit,
+        after_fill: bool,
+        **kwargs,
+    ):
+        """Maintain the signal's absolute posted SL without accidental trailing.
+
+        ``after_fill`` is explicit because Freqtrade only permits widening the
+        initial -7% catastrophe floor to the posted stop in that callback. The
+        entry tag makes this deterministic before the receiver lookup finishes.
+        """
+        trade_id = int(trade.id)
+        with self._sl_lock:
+            sl_price = self._sl_cache.get(trade_id)
+        if sl_price is None:
+            sl_price = self._tagged_stop(trade)
+            if sl_price is not None:
+                with self._sl_lock:
+                    self._sl_cache[trade_id] = sl_price
+        self._schedule_stop_refresh(trade_id)
+        if sl_price is None:
+            return None
+        if (not trade.is_short and sl_price >= current_rate) or (
+            trade.is_short and sl_price <= current_rate
+        ):
+            logger.warning(
+                "Posted SL %s already breached at rate %s for trade %s",
+                sl_price, current_rate, trade_id,
+            )
+            return None
+        # Recompute from the SAME absolute price on every tick. Caching the
+        # relative value would silently turn a fixed stop into a trailing stop.
+        return stoploss_from_absolute(
+            stop_rate=sl_price,
+            current_rate=current_rate,
+            is_short=trade.is_short,
+            leverage=trade.leverage or 1.0,
+        )

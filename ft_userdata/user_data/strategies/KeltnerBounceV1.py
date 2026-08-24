@@ -58,7 +58,9 @@ class KeltnerBounceV1(IStrategy):
 
     timeframe = "1h"
     process_only_new_candles = True
-    use_exit_signal = False
+    # Required for Freqtrade to call custom_exit(). populate_exit_trend emits
+    # no signals, so enabling this only activates the stale-bounce exit below.
+    use_exit_signal = True
     exit_profit_only = True
     exit_profit_offset = 0.01
 
