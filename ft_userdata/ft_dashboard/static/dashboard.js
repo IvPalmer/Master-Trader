@@ -52,6 +52,8 @@ function dash() {
     tradesFilter: 'all',
     _tradeTfOverride: {},
     _charts: {},
+    _chartObservers: {},
+    _chartResizeTimers: [],
     _equityData: {},
     _tradeCandles: {},
     _killersSL: {},   // {symbol: posted channel SL} for copy-trader open positions
@@ -84,15 +86,18 @@ function dash() {
       }), this.pollInterval * 1000);
       window.addEventListener('hashchange', () => {
         this.tab = location.hash.slice(1) || 'live';
-        this.$nextTick(() => this.renderCharts());
-      });
-      window.addEventListener('resize', () => {
-        Object.entries(this._charts).forEach(([id, c]) => {
-          try { c?.resize(); }
-          catch (e) { console.warn('resize', id, e?.message); }
+        this.$nextTick(() => {
+          this.renderCharts();
+          this._scheduleChartResize();
         });
       });
-      this.$watch('tab', () => this.$nextTick(() => this.renderCharts()));
+      window.addEventListener('resize', () => {
+        this._scheduleChartResize();
+      });
+      this.$watch('tab', () => this.$nextTick(() => {
+        this.renderCharts();
+        this._scheduleChartResize();
+      }));
     },
     setTab(t) {
       this.tab = t;
@@ -115,6 +120,7 @@ function dash() {
         this.renderEquity();
         this.renderDrawdown();
         this.renderPerPair();
+        this._scheduleChartResize(['chart-equity', 'chart-drawdown', 'chart-perpair']);
       });
     },
 
@@ -390,7 +396,11 @@ function dash() {
     },
     get recentLiveTrades() {
       const live = this.liveBots;
-      return live.flatMap(b => b.recent_trades || []).sort((a, b) => (b.close_timestamp || 0) - (a.close_timestamp || 0)).slice(0, 30);
+      return live.flatMap(bot => (bot.recent_trades || []).map(trade => ({
+        ...trade,
+        _bot: bot.key,
+        _botLabel: bot.label,
+      }))).sort((a, b) => (b.close_timestamp || 0) - (a.close_timestamp || 0)).slice(0, 30);
     },
     get statusLabel() {
       if (!this.raw.last_poll) return 'connecting';
@@ -537,6 +547,84 @@ function dash() {
         drawdown.push([ts, Number(dd.toFixed(4))]);
       }
       return { live, drawdown, trades };
+    },
+
+    get portfolioAccounts() {
+      const accounts = new Map();
+      for (const bot of this.liveBots) {
+        const key = bot.account_group || bot.key;
+        const current = accounts.get(key) || {
+          key,
+          venue: bot.venue || 'binance',
+          capital: 0,
+          pnl: 0,
+          atRisk: 0,
+          open: 0,
+          bots: [],
+        };
+        current.capital = Math.max(current.capital, Number(bot.wallet?.bot_owned ?? bot.wallet?.starting_capital ?? 0));
+        current.pnl += Number(bot.pnl?.all_coin || 0);
+        current.atRisk += Number(bot.capital_at_risk?.abs_loss || 0);
+        current.open += bot.open_trades?.length || 0;
+        current.bots.push(bot.label);
+        accounts.set(key, current);
+      }
+      return [...accounts.values()]
+        .map(account => ({
+          ...account,
+          label: account.key === 'binance-spot'
+            ? 'Binance spot'
+            : (account.bots.length === 1 ? account.bots[0] : account.key),
+          weight: this.hero.walletNow ? account.capital / this.hero.walletNow * 100 : 0,
+        }))
+        .sort((a, b) => b.capital - a.capital);
+    },
+
+    get portfolioVenues() {
+      const venues = new Map();
+      for (const account of this.portfolioAccounts) {
+        const key = account.venue === 'hyperliquid' ? 'Hyperliquid perps' : 'Binance spot';
+        const current = venues.get(key) || { label: key, capital: 0, pnl: 0, accounts: 0, bots: 0 };
+        current.capital += account.capital;
+        current.pnl += account.pnl;
+        current.accounts += 1;
+        current.bots += account.bots.length;
+        venues.set(key, current);
+      }
+      return [...venues.values()].sort((a, b) => b.capital - a.capital);
+    },
+
+    get portfolioStrategyRows() {
+      return this.liveBots.map(bot => ({
+        key: bot.key,
+        label: bot.label,
+        pnl: Number(bot.pnl?.all_coin || 0),
+        trades: bot.stats?.closed_trade_count || 0,
+        open: bot.open_trades?.length || 0,
+      })).sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
+    },
+
+    get portfolioPairRows() {
+      const pairs = new Map();
+      for (const bot of this.liveBots) {
+        for (const row of bot.per_pair || []) {
+          const current = pairs.get(row.pair) || { pair: row.pair, pnl: 0, trades: 0 };
+          current.pnl += Number(row.pnl || 0);
+          current.trades += Number(row.count || row.trades || 0);
+          pairs.set(row.pair, current);
+        }
+      }
+      return [...pairs.values()].sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
+    },
+
+    get portfolioDrawdownMax() {
+      const values = this.fleetPerformanceData.drawdown.map(point => Number(point[1] || 0));
+      return values.length ? Math.abs(Math.min(...values, 0)) : 0;
+    },
+
+    get portfolioCurrentDrawdown() {
+      const rows = this.fleetPerformanceData.drawdown;
+      return rows.length ? Number(rows[rows.length - 1][1] || 0) : 0;
     },
 
     // ─── last closed trade for a bot ───
@@ -724,6 +812,8 @@ function dash() {
         this.renderDrawdown();
         this.renderPerPair();
         this.renderCandles();
+      } else if (t === 'portfolio') {
+        this.renderPortfolioCharts();
       } else if (t === 'dryrun') {
         this.dryRunBots.forEach(b => this.renderBotEquity(b.key));
         if (this._expandedDryBot) {
@@ -735,6 +825,7 @@ function dash() {
         const key = t.slice(4);
         this.renderDetailCharts(key);
       }
+      this._scheduleChartResize();
     },
 
     // ─── trades tab ───
@@ -1018,20 +1109,50 @@ function dash() {
       chart.resize();
     },
 
+    _resizeChart(id, chart = this._charts[id]) {
+      const el = document.getElementById(id);
+      if (!el || !chart || !el.isConnected || el.offsetParent === null) return;
+      const rect = el.getBoundingClientRect();
+      const width = Math.floor(rect.width);
+      const height = Math.floor(rect.height);
+      if (width < 120 || height < 80) return;
+      try { chart.resize({ width, height, silent: true }); }
+      catch (e) { console.warn('resize', id, e?.message); }
+    },
+
+    _scheduleChartResize(ids = null) {
+      this._chartResizeTimers.forEach(timer => clearTimeout(timer));
+      const resize = () => requestAnimationFrame(() => {
+        const keys = ids || Object.keys(this._charts);
+        keys.forEach(id => this._resizeChart(id));
+      });
+      resize();
+      this._chartResizeTimers = [60, 240].map(delay => setTimeout(resize, delay));
+    },
+
     _ensureChart(id) {
       const el = document.getElementById(id);
       if (!el) return null;
+      const existing = this._charts[id];
+      if (existing && existing.getDom?.() !== el) {
+        this._chartObservers[id]?.disconnect?.();
+        try { existing.dispose(); } catch {}
+        delete this._charts[id];
+      }
       if (!this._charts[id] || this._charts[id].isDisposed()) {
         const chart = echarts.init(el, null, { renderer: 'canvas' });
-        requestAnimationFrame(() => { try { chart.resize(); } catch {} });
         if (typeof ResizeObserver !== 'undefined') {
-          const ro = new ResizeObserver(() => { try { chart.resize(); } catch {} });
+          const ro = new ResizeObserver(entries => {
+            const box = entries[0]?.contentRect;
+            if (!box || box.width < 120 || box.height < 80) return;
+            this._resizeChart(id, chart);
+          });
           ro.observe(el);
-          this._chartObservers = this._chartObservers || {};
           this._chartObservers[id]?.disconnect?.();
           this._chartObservers[id] = ro;
         }
         this._charts[id] = chart;
+        this._scheduleChartResize([id]);
       }
       return this._charts[id];
     },
@@ -1226,6 +1347,122 @@ function dash() {
           barWidth: 14,
         }],
       }, true);
+    },
+
+    renderPortfolioCharts() {
+      const performance = this.fleetPerformanceData;
+      const live = (performance.live || []).map(point => [new Date(point[0]), point[1]]);
+      const drawdown = (performance.drawdown || []).map(point => [new Date(point[0]), point[1]]);
+      const chartIds = [
+        'chart-portfolio-equity',
+        'chart-portfolio-dd',
+        'chart-portfolio-strategy',
+        'chart-portfolio-venue',
+        'chart-portfolio-pair',
+      ];
+
+      const equityChart = this._ensureChart(chartIds[0]);
+      if (equityChart) equityChart.setOption({
+        ...ECHART_COMMON, animation: false,
+        graphic: live.length > 1 ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
+          style: { text: 'Collecting portfolio trades', fill: COLORS.text3, font: '500 12px Inter' } }],
+        tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1,
+          textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: value => '$' + Number(value).toFixed(2) },
+        grid: { left: 60, right: 18, top: 24, bottom: 30 },
+        xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { show: false } },
+        yAxis: { type: 'value', scale: true, axisLine: { show: false }, axisTick: { show: false },
+          axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.hairline, type: 'dashed' } } },
+        series: [{ name: 'portfolio equity', type: 'line', data: live, showSymbol: false,
+          lineStyle: { color: COLORS.accent, width: 2.2 }, itemStyle: { color: COLORS.accent },
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(14,135,163,.20)' }, { offset: 1, color: 'rgba(14,135,163,0)' },
+          ]) } }],
+      }, true);
+
+      const ddChart = this._ensureChart(chartIds[1]);
+      if (ddChart) {
+        const floor = Math.min(-5, Math.floor(Math.min(...drawdown.map(point => point[1]), 0) * 1.25));
+        ddChart.setOption({
+          ...ECHART_COMMON, animation: false,
+          graphic: drawdown.length > 1 ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
+            style: { text: 'No portfolio drawdown yet', fill: COLORS.text3, font: '500 12px Inter' } }],
+          tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1,
+            textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: value => Number(value).toFixed(2) + '%' },
+          grid: { left: 50, right: 18, top: 18, bottom: 30 },
+          xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 } },
+          yAxis: { type: 'value', min: floor, max: 0, axisLine: { show: false }, axisTick: { show: false },
+            axisLabel: { color: COLORS.text3, fontSize: 10, formatter: value => Math.round(value) + '%' },
+            splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: .55 } } },
+          series: [{ type: 'line', data: drawdown, showSymbol: false, lineStyle: { color: COLORS.neg, width: 1.6 },
+            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(210,71,58,0)' }, { offset: 1, color: 'rgba(210,71,58,.22)' },
+            ]) } }],
+        }, true);
+      }
+
+      const strategyChart = this._ensureChart(chartIds[2]);
+      if (strategyChart) {
+        const rows = [...this.portfolioStrategyRows].reverse();
+        strategyChart.setOption({
+          ...ECHART_COMMON, animation: false,
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface,
+            borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 },
+            valueFormatter: value => this.fmtUsdSigned(Number(value)) },
+          grid: { left: 118, right: 58, top: 12, bottom: 26 },
+          xAxis: { type: 'value', axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' },
+            splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: .5 } } },
+          yAxis: { type: 'category', data: rows.map(row => row.label), axisLine: { show: false }, axisTick: { show: false },
+            axisLabel: { color: COLORS.text2, fontSize: 10 } },
+          series: [{ type: 'bar', data: rows.map(row => row.pnl), barMaxWidth: 16,
+            itemStyle: { color: point => Number(point.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] },
+            label: { show: true, position: 'right', color: COLORS.text2, fontSize: 10,
+              formatter: point => this.fmtUsdSigned(Number(point.value)) } }],
+        }, true);
+      }
+
+      const venueChart = this._ensureChart(chartIds[3]);
+      if (venueChart) {
+        const rows = this.portfolioVenues;
+        venueChart.setOption({
+          ...ECHART_COMMON, animation: false,
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface,
+            borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 },
+            valueFormatter: value => this.fmtUsd(Number(value)) },
+          grid: { left: 118, right: 58, top: 16, bottom: 28 },
+          xAxis: { type: 'value', axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' },
+            splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: .5 } } },
+          yAxis: { type: 'category', data: rows.map(row => row.label), axisLine: { show: false }, axisTick: { show: false },
+            axisLabel: { color: COLORS.text2, fontSize: 10 } },
+          series: [{ type: 'bar', data: rows.map(row => row.capital), barMaxWidth: 22,
+            itemStyle: { color: COLORS.accent, borderRadius: [0, 3, 3, 0] },
+            label: { show: true, position: 'right', color: COLORS.text2, fontSize: 10,
+              formatter: point => this.fmtUsd(Number(point.value)) } }],
+        }, true);
+      }
+
+      const pairChart = this._ensureChart(chartIds[4]);
+      if (pairChart) {
+        const rows = this.portfolioPairRows.slice(0, 10).reverse();
+        pairChart.setOption({
+          ...ECHART_COMMON, animation: false,
+          graphic: rows.length ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
+            style: { text: 'No pair performance yet', fill: COLORS.text3, font: '500 12px Inter' } }],
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface,
+            borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 },
+            valueFormatter: value => this.fmtUsdSigned(Number(value)) },
+          grid: { left: 72, right: 58, top: 12, bottom: 26 },
+          xAxis: { type: 'value', axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' },
+            splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: .5 } } },
+          yAxis: { type: 'category', data: rows.map(row => row.pair.split('/')[0]), axisLine: { show: false }, axisTick: { show: false },
+            axisLabel: { color: COLORS.text2, fontSize: 10 } },
+          series: [{ type: 'bar', data: rows.map(row => row.pnl), barMaxWidth: 14,
+            itemStyle: { color: point => Number(point.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] },
+            label: { show: true, position: 'right', color: COLORS.text2, fontSize: 10,
+              formatter: point => this.fmtUsdSigned(Number(point.value)) } }],
+        }, true);
+      }
+
+      this._scheduleChartResize(chartIds);
     },
 
     async renderCandles() {

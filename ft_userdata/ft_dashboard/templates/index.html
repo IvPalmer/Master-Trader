@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css?v=21">
+<link rel="stylesheet" href="/static/styles.css?v=22">
 <script defer
         src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
         integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
@@ -48,6 +48,10 @@
     <button class="tab" :class="tab === 'live' ? 'on' : ''" @click="setTab('live')">
       overview
       <span class="badge" x-text="liveBots.length">0</span>
+    </button>
+    <button class="tab" :class="tab === 'portfolio' ? 'on' : ''" @click="setTab('portfolio')">
+      portfolio
+      <span class="badge" x-text="liveAccountCount">0</span>
     </button>
     <button class="tab" :class="tab === 'trades' && tradesView === 'open' ? 'on' : ''" @click="openPositionsTab()">
       positions
@@ -410,6 +414,193 @@
       </div>
     </div>
 
+  </main>
+
+  <!-- ══════════════ CONSOLIDATED PORTFOLIO ══════════════ -->
+  <main class="tab-panel portfolio-analysis" x-show="tab === 'portfolio'" x-cloak>
+    <header class="portfolio-head">
+      <div>
+        <h1>portfolio analysis</h1>
+        <p>consolidated capital, performance and risk across every funded account</p>
+      </div>
+      <div class="portfolio-health" :class="staleClass">
+        <span class="bot-state-dot"></span>
+        <div>
+          <strong x-text="liveAccountCount + ' accounts · ' + liveVenueCount + ' venues'">portfolio scope</strong>
+          <span>updated <span x-text="lastPollLabel">never</span></span>
+        </div>
+      </div>
+    </header>
+
+    <section class="portfolio-metrics" aria-label="Consolidated portfolio metrics">
+      <div class="portfolio-metric">
+        <span>capital</span><strong class="num" x-text="fmtUsd(hero.walletNow)">—</strong>
+      </div>
+      <div class="portfolio-metric">
+        <span>net p&amp;l</span><strong class="num" :class="hero.totalPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalPnl)">—</strong>
+      </div>
+      <div class="portfolio-metric">
+        <span>return</span><strong class="num" :class="hero.totalPct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(hero.totalPct)">—</strong>
+      </div>
+      <div class="portfolio-metric">
+        <span>max drawdown</span><strong class="num" x-text="fmtPct(-portfolioDrawdownMax, 2)">—</strong>
+      </div>
+      <div class="portfolio-metric">
+        <span>profit factor</span><strong class="num" x-text="fmtPF(hero.profitFactor)">—</strong>
+      </div>
+      <div class="portfolio-metric">
+        <span>expectancy</span><strong class="num" :class="(hero.expectancyPerTrade || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.expectancyPerTrade)">—</strong>
+      </div>
+      <div class="portfolio-metric">
+        <span>closed trades</span><strong class="num" x-text="hero.closedTrades">0</strong>
+      </div>
+      <div class="portfolio-metric">
+        <span>win rate</span><strong class="num" x-text="hero.closedTrades ? fmtPct(hero.winRate * 100, 1) : '—'">—</strong>
+      </div>
+    </section>
+
+    <div class="grid grid-12">
+      <section class="card col-8">
+        <div class="card-head">
+          <div>
+            <div class="card-title">consolidated equity</div>
+            <div class="card-sub">realized results sequenced across all live strategies</div>
+          </div>
+          <span class="tag live">live</span>
+        </div>
+        <div class="chart tall" id="chart-portfolio-equity"></div>
+      </section>
+
+      <section class="card col-4 portfolio-risk-summary">
+        <div class="card-head">
+          <div>
+            <div class="card-title">portfolio state</div>
+            <div class="card-sub">current exposure and payoff quality</div>
+          </div>
+        </div>
+        <div class="portfolio-state-row">
+          <span>open positions</span><strong class="num" x-text="hero.openCount">0</strong>
+        </div>
+        <div class="portfolio-state-row">
+          <span>open notional</span><strong class="num" x-text="fmtUsd(hero.openNotional)">—</strong>
+        </div>
+        <div class="portfolio-state-row">
+          <span>capital at risk</span><strong class="num" x-text="fmtUsd(hero.capitalAtRisk)">—</strong>
+        </div>
+        <div class="portfolio-state-row">
+          <span>risk / starting capital</span><strong class="num" x-text="fmtPct(hero.capitalAtRiskPct, 2)">—</strong>
+        </div>
+        <div class="portfolio-state-row">
+          <span>current drawdown</span><strong class="num" x-text="fmtPct(portfolioCurrentDrawdown, 2)">—</strong>
+        </div>
+        <div class="portfolio-state-row">
+          <span>average win</span><strong class="num pos" x-text="fmtUsdSigned(hero.avgWin)">—</strong>
+        </div>
+        <div class="portfolio-state-row">
+          <span>average loss</span><strong class="num neg" x-text="fmtUsdSigned(hero.avgLoss)">—</strong>
+        </div>
+        <div class="portfolio-state-row">
+          <span>payoff ratio</span><strong class="num" x-text="hero.payoff != null ? hero.payoff.toFixed(2) : '—'">—</strong>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid grid-12">
+      <section class="card col-7">
+        <div class="card-head">
+          <div>
+            <div class="card-title">portfolio drawdown</div>
+            <div class="card-sub">underwater curve from the consolidated realized-equity peak</div>
+          </div>
+        </div>
+        <div class="chart short" id="chart-portfolio-dd"></div>
+      </section>
+
+      <section class="card col-5">
+        <div class="card-head">
+          <div>
+            <div class="card-title">capital by account</div>
+            <div class="card-sub">shared balances counted once</div>
+          </div>
+        </div>
+        <div class="account-allocation">
+          <template x-for="account in portfolioAccounts" :key="account.key">
+            <div class="account-allocation-row">
+              <div>
+                <strong x-text="account.label">account</strong>
+                <span x-text="account.bots.length + ' strateg' + (account.bots.length === 1 ? 'y' : 'ies')">—</span>
+              </div>
+              <div class="allocation-bar" aria-hidden="true"><span :style="'width:' + account.weight.toFixed(2) + '%' "></span></div>
+              <strong class="num" x-text="fmtUsd(account.capital)">—</strong>
+              <span class="num allocation-weight" x-text="fmtPct(account.weight, 1)">—</span>
+            </div>
+          </template>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid grid-12">
+      <section class="card col-6">
+        <div class="card-head">
+          <div>
+            <div class="card-title">strategy contribution</div>
+            <div class="card-sub">net realized P&amp;L attributed to each live bot</div>
+          </div>
+        </div>
+        <div class="chart" id="chart-portfolio-strategy"></div>
+      </section>
+
+      <section class="card col-6">
+        <div class="card-head">
+          <div>
+            <div class="card-title">capital by venue</div>
+            <div class="card-sub">funded capital after shared-account deduplication</div>
+          </div>
+        </div>
+        <div class="chart" id="chart-portfolio-venue"></div>
+      </section>
+    </div>
+
+    <div class="grid grid-12">
+      <section class="card col-5">
+        <div class="card-head">
+          <div>
+            <div class="card-title">pair contribution</div>
+            <div class="card-sub">top consolidated P&amp;L drivers by absolute impact</div>
+          </div>
+        </div>
+        <div class="chart" id="chart-portfolio-pair"></div>
+      </section>
+
+      <section class="card col-7 card-body flush">
+        <div class="card-head">
+          <div>
+            <div class="card-title">portfolio trade ledger</div>
+            <div class="card-sub">last 30 closes across all live strategies</div>
+          </div>
+        </div>
+        <div class="portfolio-ledger-wrap">
+          <table class="ledger" x-show="recentLiveTrades.length" x-cloak>
+            <thead>
+              <tr><th>closed</th><th>strategy</th><th>pair</th><th class="right">p&amp;l %</th><th class="right">p&amp;l $</th><th>reason</th></tr>
+            </thead>
+            <tbody>
+              <template x-for="trade in recentLiveTrades" :key="trade._bot + ':' + trade.close_timestamp + ':' + trade.pair">
+                <tr>
+                  <td x-text="fmtDate(trade.close_date)"></td>
+                  <td class="label" x-text="trade._botLabel">—</td>
+                  <td class="label" x-text="trade.pair">—</td>
+                  <td class="right" :class="trade.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(trade.profit_pct)">—</td>
+                  <td class="right" :class="trade.profit_abs >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(trade.profit_abs)">—</td>
+                  <td><span class="reason-pill" :class="trade.exit_reason" x-text="trade.exit_reason">—</span></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+          <div class="empty" x-show="!recentLiveTrades.length"><div class="icon">—</div> no closed trades yet</div>
+        </div>
+      </section>
+    </div>
   </main>
 
   <!-- ══════════════ DRY-RUN TAB ══════════════ -->
@@ -1088,6 +1279,6 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=35"></script>
+<script src="/static/dashboard.js?v=36"></script>
 </body>
 </html>

@@ -166,6 +166,45 @@ button { font: inherit; }
 .portfolio-health strong { font-size: 12px; font-weight: 650; }
 .portfolio-health > div > span { color: var(--text-2); font-size: 10.5px; }
 
+/* Consolidated portfolio analysis. */
+.portfolio-metrics {
+  display: grid; grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 1px; overflow: hidden; background: var(--border);
+  border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--el2);
+}
+.portfolio-metric { min-width: 0; padding: 0.85rem 0.9rem; background: var(--surface); }
+.portfolio-metric > span {
+  display: block; margin-bottom: 0.35rem; color: var(--text-3);
+  font-size: 9.5px; font-weight: 650; letter-spacing: .065em; text-transform: uppercase;
+}
+.portfolio-metric > strong { display: block; overflow: hidden; color: var(--text); font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
+.portfolio-metric > strong.pos { color: var(--pos); }
+.portfolio-metric > strong.neg { color: var(--neg); }
+.portfolio-risk-summary { display: flex; flex-direction: column; }
+.portfolio-state-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 1rem;
+  padding: 0.64rem 1.1rem; border-bottom: 1px solid var(--hairline); font-size: 11px;
+}
+.portfolio-state-row:last-child { border-bottom: 0; }
+.portfolio-state-row > span { color: var(--text-2); }
+.portfolio-state-row > strong { text-align: right; font-weight: 600; }
+.account-allocation { padding: 0.3rem 1.1rem 0.75rem; }
+.account-allocation-row {
+  display: grid; grid-template-columns: minmax(110px, 1fr) minmax(90px, 1.2fr) auto 44px;
+  align-items: center; gap: 0.7rem; padding: 0.58rem 0; border-bottom: 1px solid var(--hairline);
+}
+.account-allocation-row:last-child { border-bottom: 0; }
+.account-allocation-row > div:first-child { min-width: 0; }
+.account-allocation-row > div:first-child strong,
+.account-allocation-row > div:first-child span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-allocation-row > div:first-child strong { font-size: 11px; font-weight: 620; }
+.account-allocation-row > div:first-child span { color: var(--text-3); font-size: 9.5px; }
+.allocation-bar { height: 5px; overflow: hidden; background: var(--surface-3); border-radius: 999px; }
+.allocation-bar span { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+.account-allocation-row > strong { font-size: 10.5px; }
+.allocation-weight { color: var(--text-3); font-size: 9.5px; text-align: right; }
+.portfolio-ledger-wrap { max-height: 372px; overflow: auto; }
+
 /* ═══════════════════════════════════════════════
    COMMAND BAR — the new incident surface
    ═══════════════════════════════════════════════ */
@@ -365,12 +404,14 @@ button { font: inherit; }
 @media (max-width: 1100px) {
   .portfolio-head { align-items: flex-start; }
   .vitals-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .portfolio-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .curve-switcher { justify-content: flex-start; }
 }
 @media (max-width: 720px) {
   .portfolio-head { flex-direction: column; gap: 0.75rem; }
   .portfolio-health > div { align-items: flex-start; }
   .vitals-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portfolio-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vital-cell { padding: 11px 12px; }
   .vital-cell .vital-val { font-size: 18px; }
   .fleet-board-head { align-items: flex-start; flex-direction: column; }
@@ -633,6 +674,7 @@ button { font: inherit; }
 
 /* ── grids ─────────────────────────────────────── */
 .grid { display: grid; gap: 0.85rem; }
+.grid > * { min-width: 0; }
 .grid-12 { grid-template-columns: repeat(12, 1fr); }
 .col-3 { grid-column: span 3; }
 .col-4 { grid-column: span 4; }
@@ -650,7 +692,7 @@ button { font: inherit; }
 }
 
 /* ── chart containers ──────────────────────────── */
-.chart { width: 100%; height: 320px; padding: 0.5rem; }
+.chart { display: block; width: 100%; min-width: 0; height: 320px; padding: 0.5rem; }
 .chart.tall { height: 380px; }
 .chart.short { height: 180px; }
 .chart.sm { height: 140px; }
