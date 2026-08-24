@@ -6,11 +6,13 @@ BTC daily-200d-MA macro bear guard). ONLY difference: Hyperliquid perps are
 USDC-margined (BTC/USDC:USDC), so the BTC macro-gate informatives reference
 BTC/USDC:USDC and the generated columns are btc_usdc_* (not btc_usdt_*).
 
-Purpose: FORWARD dry-run measurement instrument on Hyperliquid. Hyperliquid does
-NOT serve historical OHLCV (Freqtrade: "does not support downloading ... ohlcv
-data"), so this can ONLY be validated forward, not backtested. This is exactly
-the on-venue OOS bar codex required before any capital. Dry-run only — no keys,
-no capital. See docs/hyperliquid_short_validation_2026-05-29.md.
+Purpose: forward-measured Hyperliquid strategy. It began as a dry-run instrument
+because Hyperliquid did not provide the historical download needed by the
+original validation workflow. The operator authorized a bounded micro-live
+epoch on 2026-08-23; the retired dry curve remains frozen as chart lineage and
+the live config uses a dedicated account plus an exchange-resident limit stop.
+See docs/hyperliquid_short_validation_2026-05-29.md and
+docs/audits/2026-08-24-live-fleet-review-remediation.md.
 
 Generated 2026-05-29.
 """

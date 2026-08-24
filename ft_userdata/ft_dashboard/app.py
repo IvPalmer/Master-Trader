@@ -1087,10 +1087,19 @@ def _lineage_payload(meta: dict, snap: dict) -> dict | None:
     live_actual = snap.get("equity_live") or []
     live_start = float((snap.get("wallet") or {}).get("starting_capital") or 0.0)
     live_curve: list[list] = []
-    if live_start > 0:
-        scale = legacy_end / live_start
+    scale = None
+    # A transient API balance near zero used to amplify the chart by hundreds
+    # of times. Refuse implausible normalization inputs and keep the lineage
+    # flat at cutover until a trustworthy live capital basis arrives.
+    if math.isfinite(live_start) and live_start >= 1.0:
+        candidate = legacy_end / live_start
+        if math.isfinite(candidate) and 0.01 <= candidate <= 100.0:
+            scale = candidate
+    if scale is not None:
         for ts, equity in live_actual:
-            live_curve.append([int(ts), round(float(equity) * scale, 4)])
+            equity_value = float(equity)
+            if math.isfinite(equity_value):
+                live_curve.append([int(ts), round(equity_value * scale, 4)])
     if not live_curve:
         live_curve = [[transition_ts, round(legacy_end, 4)]]
     elif live_curve[0][0] > transition_ts:
@@ -1110,7 +1119,10 @@ def _lineage_payload(meta: dict, snap: dict) -> dict | None:
         "basis": float(config.get("legacy_starting_capital") or 200.0),
         "legacy_closed_trades": legacy["closed_trades"],
         "legacy_ending_equity": legacy["ending_equity"],
-        "normalized": True,
+        "normalized": scale is not None,
+        "normalization_status": (
+            "rebased" if scale is not None else "invalid-live-capital-basis"
+        ),
     }
 
 

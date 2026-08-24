@@ -28,7 +28,7 @@
   {
    "id": "ff-gate-v2-review",
    "bot": "FundingFadeV1",
-   "status": "open",
+   "status": "closed",
    "registered": "2026-05-19",
    "review_by": "2026-08-17",
    "min_closed_trades": 30,
@@ -77,7 +77,9 @@
      "provenance": "The pause was first applied at 2026-07-31 03:29:46 UTC by an unintended state-changing API call during this audit (a POST issued while probing endpoint availability), not by a deliberate decision. It was reported to the operator immediately with a revert command offered; the operator reviewed the finding and confirmed the pause as the intended action in the same session. Recorded because a governance file must not launder how its own state came about."
     }
    ],
-   "notes": "Original window said '90d or 75 trades, whichever first' \u2014 at the gate-v2 backtest rate (1.67 trades/wk) 75 trades takes ~10 months, so the trade arm was vacuous. Live rate since redeploy is ZERO trades in 21d (BTC below SMA50/200 \u2014 mostly the pre-existing v1 base gate). Audited 2026-06-09. PAUSED 2026-07-31 \u2014 see amendments."
+   "notes": "Original window said '90d or 75 trades, whichever first' \u2014 at the gate-v2 backtest rate (1.67 trades/wk) 75 trades takes ~10 months, so the trade arm was vacuous. Live rate since redeploy is ZERO trades in 21d (BTC below SMA50/200 \u2014 mostly the pre-existing v1 base gate). Audited 2026-06-09. PAUSED 2026-07-31 \u2014 see amendments.",
+   "closed": "2026-08-24",
+   "resolution": "Closed by explicit operator override after the 2026-08-23 strategy-by-strategy review. The operator rejected treating the old gate as a permanent retirement rule, authorized a bounded live evolution epoch, and accepted ongoing maintenance instead of requiring a perfect historical proof. This does not retroactively validate gate-v2 or erase its adverse evidence. FundingFadeV1 starts a new live measurement epoch with updated logic, corrected custom_exit activation, exchange-resident stop protection, and portfolio-level observation under micro-live-fleet-v2-2026-08-23."
   },
   {
    "id": "cascade-dry-run-gate-v2",
@@ -289,6 +291,38 @@
    ],
    "review_by": "2026-09-15",
    "notes": "Retrospective sample is the HYPOTHESIS SOURCE and is quarantined from validation. Passing authorizes a dry-run reaction bot design only. MONITOR DEPLOYED 2026-07-13 (systemd listing-monitor, bootstrap-safe, resumable). Return formula codex-verified. Unblind note: forward BBO-based numbers are execution-realistic and SYSTEMATICALLY MORE CONSERVATIVE than the retrospective 1m-close numbers (bid/ask crossing + spread + fees vs optimistic candle closes) \u2014 retrospective is optimistic reference only."
+  },
+  {
+   "id": "micro-live-fleet-v2-2026-08-23",
+   "bot": "fleet",
+   "status": "open",
+   "registered": "2026-08-23",
+   "review_by": "2026-09-30",
+   "operator_authorization": "The operator explicitly authorized using available crypto capital for the bots, directed the assistant to update strategies/configurations, put the full practical fleet live, and continue autonomously. On 2026-08-24 the operator further directed that old evaluations not be treated as immutable and that bots be maintained and evolved over time.",
+   "scope": {
+    "binance_spot": ["FundingFadeV1", "KeltnerBounceV1", "OITrendPullbackV1"],
+    "hyperliquid_futures": ["KillersScalpV1", "InsidersScalpV2", "ShortKeltnerV2HLlive"],
+    "capital_policy": "Bounded strategy allocations; no requirement to deploy all available capital; monthly deposits may be allocated after observation.",
+    "execution_epoch": "New live curves begin at the 2026-08-23 live/strategy-update transition and retain frozen dry-run lineage for comparison."
+   },
+   "supersedes": [
+    "The historical Killers/Insiders do-not-fund conclusion is retained as evidence but no longer acts as an absolute deployment prohibition.",
+    "FundingFadeV1 ff-gate-v2-review is closed by explicit override; its historical sample remains visible.",
+    "ROADMAP D1/T-010 mainnet prohibitions are superseded for this bounded fleet epoch."
+   ],
+   "operating_rules": [
+    "Treat each strategy as a maintainable live experiment, not as a proven immutable edge.",
+    "Keep per-bot status, P&L, equity, drawdown, exposure, trades, stop state, venue, and lineage visible in the dashboard.",
+    "Do not infer promotion solely from win rate, one profitable trade, or legacy backtests; compare live expectancy, drawdown, fill quality, and concentration.",
+    "A bot may continue through ordinary losses while its execution and risk controls remain healthy; investigation and iteration are preferred to automatic retirement from small samples.",
+    "Pause a bot on missing or stale required data, broken native-stop placement, database epoch contamination, repeated execution faults, or an unexplained loss beyond its configured stop model."
+   ],
+   "review_outputs": [
+    "Per-bot realized and unrealized P&L, expectancy, drawdown, trade count, and fill or stop incidents",
+    "Consolidated portfolio equity, venue allocation, pair and strategy concentration, correlated exposure, and capital at risk",
+    "Maintenance decision for each bot: continue, tune with a new visible epoch, reduce allocation, or pause for a concrete operational fault"
+   ],
+   "notes": "This registration records the actual operator decision after the fact because the 2026-08-23 deployment preceded the governance update. It is deliberately not a claim that the old reports were wrong or that all six strategies are profitable. Remediation audit: docs/audits/2026-08-24-live-fleet-review-remediation.md."
   }
  ]
 }

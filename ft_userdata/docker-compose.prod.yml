@@ -122,8 +122,8 @@ services:
       # Posted-SL hard-stop mode ON (2026-06-06): force-exit a position once
       # mark breaches the signal's posted SL, instead of riding to the channel's
       # close / liquidation. Per research/killers_sl_replay this halves the loss
-      # and removes liquidations. Changes the measured object (channel→posted
-      # plan); still dry-run, do-not-fund stands. Set "false" to revert.
+      # and removes liquidations. This bounded live evolution explicitly
+      # supersedes the historical dry-only verdict; set "false" to revert.
       KILLERS_POSTED_SL: "true"
       KILLERS_EXECUTION_VENUE: hyperliquid
     volumes:
@@ -153,7 +153,6 @@ services:
       FREQTRADE__EXCHANGE__WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
       FREQTRADE__EXCHANGE__PRIVATE_KEY: ${HYPERLIQUID_KILLERS_PRIVATE_KEY:-}
       FREQTRADE__DRY_RUN: ${HYPERLIQUID_KILLERS_DRY_RUN:-true}
-      FREQTRADE__DB_URL: sqlite:////freqtrade/user_data/tradesv3.live.KillersScalpV1.hyperliquid.sqlite
       SIGNAL_RECEIVER_URL: http://killers-receiver:8089
     volumes:
       - ft_user_data:/freqtrade/user_data
@@ -169,7 +168,19 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-      - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KillersScalpV1.log --config /freqtrade/user_data/configs/KillersScalpV1.json --strategy KillersScalpV1
+      - |
+        case "$${FREQTRADE__DRY_RUN}" in
+          true|1|yes)
+            export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.dryrun.KillersScalpV1.hyperliquid.sqlite
+            export FREQTRADE__ORDER_TYPES__STOPLOSS_ON_EXCHANGE=false
+            ;;
+          false|0|no)
+            export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.live.KillersScalpV1.hyperliquid.sqlite
+            ;;
+          *) echo "invalid HYPERLIQUID_KILLERS_DRY_RUN value" >&2; exit 64 ;;
+        esac
+        sleep 60
+        exec freqtrade trade --logfile /freqtrade/user_data/logs/KillersScalpV1.log --config /freqtrade/user_data/configs/KillersScalpV1.json --strategy KillersScalpV1
 
   ft-insiders-scalp:
     # Insiders Scalp V2 forward executor on Hyperliquid. Uses a separate API
@@ -184,7 +195,6 @@ services:
       FREQTRADE__EXCHANGE__WALLET_ADDRESS: ${HYPERLIQUID_INSIDERS_WALLET_ADDRESS:-}
       FREQTRADE__EXCHANGE__PRIVATE_KEY: ${HYPERLIQUID_INSIDERS_PRIVATE_KEY:-}
       FREQTRADE__DRY_RUN: ${HYPERLIQUID_INSIDERS_DRY_RUN:-true}
-      FREQTRADE__DB_URL: sqlite:////freqtrade/user_data/tradesv3.live.InsidersScalpV2.hyperliquid.sqlite
       SIGNAL_RECEIVER_URL: http://insiders-receiver:8089
     volumes:
       - ft_user_data:/freqtrade/user_data
@@ -200,7 +210,19 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-      - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/InsidersScalpV2.log --config /freqtrade/user_data/configs/InsidersScalpV2.json --strategy KillersScalpV1
+      - |
+        case "$${FREQTRADE__DRY_RUN}" in
+          true|1|yes)
+            export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.dryrun.InsidersScalpV2.hyperliquid.sqlite
+            export FREQTRADE__ORDER_TYPES__STOPLOSS_ON_EXCHANGE=false
+            ;;
+          false|0|no)
+            export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.live.InsidersScalpV2.hyperliquid.sqlite
+            ;;
+          *) echo "invalid HYPERLIQUID_INSIDERS_DRY_RUN value" >&2; exit 64 ;;
+        esac
+        sleep 60
+        exec freqtrade trade --logfile /freqtrade/user_data/logs/InsidersScalpV2.log --config /freqtrade/user_data/configs/InsidersScalpV2.json --strategy KillersScalpV1
 
   insiders-receiver:
     # FastAPI executor for the Insiders forward measurement — SAME validated
@@ -268,7 +290,19 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-      - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/ShortKeltnerV2HLlive.log --config /freqtrade/user_data/configs/ShortKeltnerV2HL-live.json --strategy ShortKeltnerV2HL
+      - |
+        case "$${FREQTRADE__DRY_RUN}" in
+          true|1|yes)
+            export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.dryrun.ShortKeltnerV2HLlive.sqlite
+            export FREQTRADE__ORDER_TYPES__STOPLOSS_ON_EXCHANGE=false
+            ;;
+          false|0|no)
+            export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.live.ShortKeltnerV2HLlive.sqlite
+            ;;
+          *) echo "invalid HYPERLIQUID_SHORT_KELTNER_DRY_RUN value" >&2; exit 64 ;;
+        esac
+        sleep 60
+        exec freqtrade trade --logfile /freqtrade/user_data/logs/ShortKeltnerV2HLlive.log --config /freqtrade/user_data/configs/ShortKeltnerV2HL-live.json --strategy ShortKeltnerV2HL
 
   funding-refresh:
     image: freqtradeorg/freqtrade:stable
@@ -379,7 +413,7 @@ services:
       # Retired dry-run epochs are chart lineage only. They are mounted
       # read-only and never participate in live wallet/P&L aggregation.
       - ft_user_data:/var/lib/freqtrade-history:ro
-      - /home/ubuntu/hl_validation/user_data/tradesv3.dryrun.ShortKeltnerV2HL.sqlite:/var/lib/short-keltner-history.sqlite:ro
+      - /home/ubuntu/hl_validation/user_data/tradesv3.snapshot.ShortKeltnerV2HL.pre-live.sqlite:/var/lib/short-keltner-history.sqlite:ro
     deploy:
       resources:
         limits:

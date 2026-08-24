@@ -24,7 +24,7 @@
     "stoploss": "limit",
     "stoploss_on_exchange": true,
     "stoploss_on_exchange_interval": 60,
-    "stoploss_on_exchange_limit_ratio": 0.985
+    "stoploss_on_exchange_limit_ratio": 0.98
   },
   "entry_pricing": {
     "price_side": "same",

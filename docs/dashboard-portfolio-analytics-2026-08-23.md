@@ -31,10 +31,16 @@ The joined curve is normalized, not an account statement. Live returns are
 rebased onto the final dry-run equity so continuity and post-update slope can be
 compared despite different account sizes. All fleet cards, portfolio capital,
 P&L, exposure, and risk continue to use only actual live wallets and trades.
-Open trades from retired dry-run databases are excluded. The databases are
-mounted read-only into the dashboard container. If a validation container keeps
-running in parallel, trades closed after the production cutover are also
-excluded so the historical segment remains frozen at the handoff.
+Open trades from retired dry-run databases are excluded. Historical databases
+are frozen with SQLite backup semantics and mounted read-only into the dashboard
+container; `immutable=1` is used only for those snapshots. If a validation
+container keeps running in parallel, it writes to a different database and
+cannot mutate the chart lineage.
+
+Rebasing is refused when live starting capital is below $1, non-finite, or
+would require a scale outside 0.01–100x. In that state the API reports
+`normalized: false` and renders a flat cutover point instead of amplifying a
+transient balance error.
 
 ## Chart lifecycle safeguard
 
@@ -53,14 +59,15 @@ This behavior applies to Overview, Portfolio, Trades, Validation, and per-bot de
 
 ## Verification performed
 
-- Dashboard test suite: 22 tests passing.
+- Dashboard test suite: 25 tests passing.
 - JavaScript syntax and repository whitespace checks passing.
 - Repeated browser navigation without refresh: Overview → Funding Fade → Portfolio → Overview.
 - Verified full-width equity, drawdown, and pair canvases after tab changes.
 - Verified consolidated production values and account deduplication.
 - Dashboard container healthy after deployment.
 - Trading bot containers were not restarted; dashboard deployment used `--no-deps` and targeted only `ft-dashboard`.
-- Dry-run lineage tests verify closed-only history, live rebasing, and missing-database fallback.
+- Dry-run lineage tests verify closed-only history, bounded live rebasing,
+  missing-database fallback, and invalid-capital fallback.
 
 ## Deployment
 

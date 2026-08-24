@@ -1,5 +1,5 @@
 {
-    "dry_run": true,
+    "dry_run": false,
     "dry_run_wallet": 200,
     "cancel_open_orders_on_exit": true,
     "trading_mode": "futures",
@@ -38,9 +38,10 @@
         "emergency_exit": "market",
         "force_exit": "market",
         "force_entry": "market",
-        "stoploss": "market",
-        "stoploss_on_exchange": false,
-        "stoploss_on_exchange_interval": 60
+        "stoploss": "limit",
+        "stoploss_on_exchange": true,
+        "stoploss_on_exchange_interval": 60,
+        "stoploss_on_exchange_limit_ratio": 0.98
     },
     "exchange": {
         "name": "hyperliquid",
@@ -161,5 +162,5 @@
     "internals": {
         "process_throttle_secs": 5
     },
-    "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.KillersScalpV1.hyperliquid.sqlite"
+    "db_url": "sqlite:////freqtrade/user_data/tradesv3.live.KillersScalpV1.hyperliquid.sqlite"
 }

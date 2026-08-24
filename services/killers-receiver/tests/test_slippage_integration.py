@@ -184,6 +184,50 @@ def test_short_fast_path_slippage_gate():
     assert abs(result["slippage_pct"] - 5.0) < 0.01
 
 
+def test_open_is_rejected_when_live_mark_already_breached_posted_stop():
+    with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as tf:
+        _setup(tf.name, max_slip=3.0)
+    payload = _hype_fast_path_payload(msg_id=999005)
+
+    async def fake_mark(*args, **kwargs):
+        return 51.0  # LONG stop is 52.0: signal is already invalid.
+
+    with patch.object(receiver_main, "get_execution_mark_price",
+                      side_effect=fake_mark):
+        result = _run(receiver_main._process_event(payload))
+
+    assert result == {
+        "action": "skipped",
+        "reason": "posted_sl_already_breached",
+        "mark": 51.0,
+        "posted_sl": 52.0,
+    }
+
+
+def test_force_enter_embeds_posted_stop_in_entry_tag():
+    with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as tf:
+        _setup(tf.name, max_slip=3.0)
+    payload = _hype_fast_path_payload(msg_id=999006)
+    captured = {}
+
+    async def fake_mark(*args, **kwargs):
+        return 58.0
+
+    async def fake_force_enter(*args, **kwargs):
+        captured.update(kwargs)
+        return {"status": 200, "body": '{"trade_id": 91, "amount": 0}'}
+
+    with patch.object(receiver_main, "get_execution_mark_price",
+                      side_effect=fake_mark), \
+         patch.object(receiver_main, "ft_force_enter",
+                      side_effect=fake_force_enter):
+        result = _run(receiver_main._process_event(payload))
+
+    assert result["action"] == "force_enter"
+    assert captured["entry_tag"] == "signal:2144|sl:52"
+    assert result["entry_tag"] == captured["entry_tag"]
+
+
 if __name__ == "__main__":
     funcs = [v for k, v in dict(globals()).items() if k.startswith("test_")]
     failed = []

@@ -33,3 +33,12 @@ def test_sizing_targets_one_dollar_and_caps_leverage(stop, expected_leverage):
 def test_sizing_without_stop_returns_legacy_values_but_marks_distance_missing():
     stake, leverage, distance = compute_stake({"entry": 100.0}, CFG)
     assert (stake, leverage, distance) == (10.0, 2.0, None)
+
+
+def test_wide_stop_skips_instead_of_raising_risk_to_exchange_minimum():
+    stake, leverage, distance = compute_stake(
+        {"entry": 100.0, "sl": 70.0}, CFG
+    )
+    assert stake == 0.0
+    assert leverage == 1.0
+    assert distance == pytest.approx(0.30)

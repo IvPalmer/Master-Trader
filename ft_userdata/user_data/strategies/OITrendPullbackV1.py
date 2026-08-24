@@ -13,7 +13,7 @@ import logging
 import time
 import urllib.parse
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 
 import numpy as np
@@ -43,9 +43,13 @@ class OITrendPullbackV1(IStrategy):
     oi_min_growth = 0.02
     oi_sample_interval_s = 300
     oi_lookback_s = 45 * 60
+    oi_max_age_s = 15 * 60
     _oi_history: dict[str, list[tuple[float, float]]] = {}
     _oi_growth: dict[str, float] = {}
+    _oi_growth_updated: dict[str, float] = {}
     _last_oi_poll = 0.0
+    _oi_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="oi-poll")
+    _oi_futures: dict[str, Future] = {}
 
     @property
     def protections(self):
@@ -67,33 +71,71 @@ class OITrendPullbackV1(IStrategy):
         return dataframe
 
     def bot_loop_start(self, current_time: datetime, **kwargs) -> None:
-        """Collect one public OI snapshot per whitelisted pair every 5m."""
+        """Collect OI asynchronously and expire failed/stale confirmations."""
         now = time.time()
+
+        # Never block Freqtrade's strategy loop on public HTTP. A completed
+        # batch is harvested here; the next batch is submitted below.
+        if self._oi_futures:
+            if not all(future.done() for future in self._oi_futures.values()):
+                return
+            results = []
+            for pair, future in self._oi_futures.items():
+                try:
+                    _, oi = future.result()
+                except Exception as exc:
+                    logger.warning("OI future failed for %s: %s", pair, exc)
+                    oi = None
+                results.append((pair, oi))
+            self._oi_futures = {}
+            for pair, oi in results:
+                self._record_oi_result(pair, oi, now)
+            valid = sum(oi is not None for _, oi in results)
+            ready = sum(self._fresh_oi_growth(pair, now) is not None for pair, _ in results)
+            logger.info(
+                "OI snapshot: valid=%d/%d growth_ready=%d",
+                valid, len(results), ready,
+            )
+
         if now - self._last_oi_poll < self.oi_sample_interval_s:
             return
         self._last_oi_poll = now
         pairs = self.dp.current_whitelist() if self.dp else []
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            results = list(pool.map(self._fetch_oi, pairs))
-        for pair, oi in results:
-            if oi is None:
-                continue
-            history = self._oi_history.setdefault(pair, [])
-            history.append((now, oi))
-            cutoff = now - 2 * 3600
-            history[:] = [(ts, value) for ts, value in history if ts >= cutoff]
-            baseline = next(
-                (value for ts, value in history if ts <= now - self.oi_lookback_s),
-                None,
-            )
-            if baseline and baseline > 0:
-                self._oi_growth[pair] = oi / baseline - 1.0
-        valid = sum(oi is not None for _, oi in results)
-        ready = sum(pair in self._oi_growth for pair in pairs)
-        logger.info(
-            "OI snapshot: valid=%d/%d growth_ready=%d (entries fail-closed until ready)",
-            valid, len(pairs), ready,
-        )
+        self._oi_futures = {
+            pair: self._oi_executor.submit(self._fetch_oi, pair) for pair in pairs
+        }
+
+    def _record_oi_result(self, pair: str, oi: float | None, now: float) -> None:
+        """Apply one fetch result; failures invalidate the entry gate."""
+        if oi is None:
+            self._oi_growth.pop(pair, None)
+            self._oi_growth_updated.pop(pair, None)
+            return
+        history = self._oi_history.setdefault(pair, [])
+        history.append((now, oi))
+        cutoff = now - 2 * 3600
+        history[:] = [(ts, value) for ts, value in history if ts >= cutoff]
+        eligible = [
+            (ts, value) for ts, value in history
+            if ts <= now - self.oi_lookback_s
+        ]
+        # Nearest sample at/before 45m — not the oldest point in the 2h buffer.
+        baseline = max(eligible, key=lambda item: item[0])[1] if eligible else None
+        if baseline and baseline > 0:
+            self._oi_growth[pair] = oi / baseline - 1.0
+            self._oi_growth_updated[pair] = now
+        else:
+            self._oi_growth.pop(pair, None)
+            self._oi_growth_updated.pop(pair, None)
+
+    def _fresh_oi_growth(self, pair: str, now: float | None = None) -> float | None:
+        now = time.time() if now is None else now
+        updated = self._oi_growth_updated.get(pair)
+        if updated is None or now - updated > self.oi_max_age_s:
+            self._oi_growth.pop(pair, None)
+            self._oi_growth_updated.pop(pair, None)
+            return None
+        return self._oi_growth.get(pair)
 
     @staticmethod
     def _fetch_oi(pair: str) -> tuple[str, float | None]:
@@ -117,7 +159,8 @@ class OITrendPullbackV1(IStrategy):
         dataframe["ema200"] = ta.EMA(dataframe, timeperiod=200)
         dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
         dataframe["vol_sma"] = dataframe["volume"].rolling(20).mean()
-        dataframe["oi_growth"] = self._oi_growth.get(metadata["pair"], np.nan)
+        fresh_growth = self._fresh_oi_growth(metadata["pair"])
+        dataframe["oi_growth"] = fresh_growth if fresh_growth is not None else np.nan
         dataframe["btc_trend"] = (
             (dataframe["btc_usdt_close_1h"] > dataframe["btc_usdt_ema200_1h"])
             & (dataframe["btc_usdt_ema50_1h"] > dataframe["btc_usdt_ema200_1h"])
