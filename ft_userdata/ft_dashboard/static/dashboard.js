@@ -77,7 +77,7 @@ function dash() {
         // Falls back to first dry bot if no closest-to-gate ranking is available.
         this.selectedDryBot = this.closestToGate?.key || this.dryRunBots[0]?.key || null;
         this.fetchClosedTrades();
-        this.$nextTick(() => this.renderCharts());
+        this._renderTabFresh();
       });
       setInterval(() => this.refresh().then(() => {
         this.fetchClosedTrades();
@@ -85,23 +85,20 @@ function dash() {
         this.$nextTick(() => this.renderCharts());
       }), this.pollInterval * 1000);
       window.addEventListener('hashchange', () => {
-        this.tab = location.hash.slice(1) || 'live';
-        this.$nextTick(() => {
-          this.renderCharts();
-          this._scheduleChartResize();
-        });
+        const nextTab = location.hash.slice(1) || 'live';
+        if (nextTab === this.tab) return;
+        this.tab = nextTab;
+        this._renderTabFresh();
       });
       window.addEventListener('resize', () => {
         this._scheduleChartResize();
       });
-      this.$watch('tab', () => this.$nextTick(() => {
-        this.renderCharts();
-        this._scheduleChartResize();
-      }));
     },
     setTab(t) {
+      if (this.tab === t) return;
       this.tab = t;
       location.hash = t === 'live' ? '' : t;
+      this._renderTabFresh();
     },
 
     openPositionsTab() {
@@ -1118,6 +1115,28 @@ function dash() {
       if (width < 120 || height < 80) return;
       try { chart.resize({ width, height, silent: true }); }
       catch (e) { console.warn('resize', id, e?.message); }
+    },
+
+    _disposeCharts() {
+      this._chartResizeTimers.forEach(timer => clearTimeout(timer));
+      this._chartResizeTimers = [];
+      Object.values(this._chartObservers).forEach(observer => observer?.disconnect?.());
+      this._chartObservers = {};
+      Object.values(this._charts).forEach(chart => {
+        try { chart?.dispose?.(); } catch {}
+      });
+      this._charts = {};
+    },
+
+    _renderTabFresh() {
+      this.$nextTick(() => requestAnimationFrame(() => {
+        // x-show must finish applying before ECharts reads the destination
+        // panel. Recreating here prevents a hidden tab's 0px coordinate grid
+        // from surviving after its canvas expands.
+        this._disposeCharts();
+        this.renderCharts();
+        this._scheduleChartResize();
+      }));
     },
 
     _scheduleChartResize(ids = null) {
