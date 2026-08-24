@@ -151,6 +151,40 @@ Native Hyperliquid stop *configuration* is verified. Actual reduce-only stop
 order placement cannot be evidenced with an empty position book; ROADMAP T-012
 requires venue inspection after the first organic fill on each futures bot.
 
+## Second-round closure receipt
+
+The four residuals from the follow-up review were deployed on 2026-08-24 from
+`vps-deploy` merge `01a917e` (source commit `52528e1`).
+
+- Pre-deploy: all six Freqtrade books and both receiver state databases had
+  zero open/requested positions.
+- Tests: 150 killers-receiver, 27 dashboard, and 12 root remediation contracts
+  passed (189 unique tests across the three suites).
+- All six trading containers resolve to image ID
+  `sha256:c19fdf05c17cf3ad11017aa3fae40ea2ea5f9de2e3580d11f5ce9ba157685cc8`,
+  Freqtrade 2026.7, from the pinned repository digest recorded above.
+- FundingFade V2 opened the new database with zero trades. The former database
+  remains intact with 24 closed trades from 2026-04-22 through 2026-07-31 and
+  zero open trades.
+- Dashboard state is green: all six bots reachable and no poll errors.
+  FundingFade and Keltner report `stale-pre-v2`, `baseline_comparable=false`,
+  and no active baseline gates. FundingFade lineage exposes all 24 historical
+  trades plus the `live + strategy v2` cutover.
+- Effective configs report `dry_run=false` and exchange-resident stops for all
+  six bots. Hyperliquid live DB paths remain distinct.
+- Killers and Insiders receivers report healthy with
+  `KILLERS_STOP_LIMIT_RATIO=0.98`; the deployed strategy exposes the minimum-
+  stake rejection callback, 30-second stop refresh TTL, and 128-entry cache
+  bound.
+- The simultaneous restart briefly produced Hyperliquid public OHLCV 429s
+  during startup. They cleared without intervention; the following 20-second
+  clean window contained zero new 429s and every bot remained healthy. This was
+  startup API contention, not a position or order failure.
+- Final state: all six bots running live and zero open positions.
+
+The remaining venue-only evidence item is unchanged: inspect the actual
+reduce-only stop after the first organic Hyperliquid fill.
+
 References: Freqtrade
 [stop-loss documentation](https://docs.freqtrade.io/en/stable/stoploss/) and
 [strategy callback documentation](https://www.freqtrade.io/en/stable/strategy-callbacks/).
