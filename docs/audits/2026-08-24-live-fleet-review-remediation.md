@@ -96,6 +96,47 @@ Deployment is complete only after:
 - Hyperliquid account separation prevents position netting between bots but
   increases operational key/account surface.
 
+## Deployment receipt
+
+Deployed on 2026-08-24 from `vps-deploy` merge `08d6409` (source commit
+`a08c647`).
+
+- Pre-deploy: all six bots stopped, all six reported zero open positions.
+- ShortKeltner snapshot:
+  `tradesv3.snapshot.ShortKeltnerV2HL.pre-live.sqlite`, SQLite
+  `integrity_check: ok`.
+- Local focused remediation suite: 19 passed.
+- Full killers-receiver suite: 147 passed.
+- Full dashboard suite: 25 passed.
+- Production compose parse: passed locally and on the VPS.
+- All six strategy/config pairs loaded in the Freqtrade image without
+  `LOAD FAILED`.
+- Effective production config: `dry_run=false` for all six; Binance for the
+  three spot bots; Hyperliquid for the three futures bots.
+- Effective stop config: limit + `stoploss_on_exchange=true` for all six;
+  startup logs show ratio 0.98.
+- Hyperliquid DB selection from PID 1 environment resolves to three distinct
+  `tradesv3.live.*` paths.
+- Receivers rebuilt and healthy with posted-SL mode enabled.
+- OI feed after restart: `valid=8/8`; growth remains fail-closed until the
+  45-minute baseline exists.
+- Dashboard API after restart: six bots reachable, no poll errors, fleet status
+  green.
+- Final state: all six bots running live; zero positions opened during the
+  maintenance window.
+
+The repository's broad legacy `tests/` run also produced 145 passes and 11
+skips, but 47 unrelated failures remain. They are concentrated in obsolete bot
+expectations (for example retired BearCrash/Supertrend assertions), legacy
+config filename assumptions for `.live.json` files, and laptop-only live
+infrastructure checks (missing local containers, Grafana, symlink, and
+`.env`). These are not counted as a green full-suite result and should be
+cleaned up as a separate test-harness maintenance task.
+
+Native Hyperliquid stop *configuration* is verified. Actual reduce-only stop
+order placement cannot be evidenced with an empty position book; ROADMAP T-012
+requires venue inspection after the first organic fill on each futures bot.
+
 References: Freqtrade
 [stop-loss documentation](https://docs.freqtrade.io/en/stable/stoploss/) and
 [strategy callback documentation](https://www.freqtrade.io/en/stable/strategy-callbacks/).
