@@ -343,6 +343,8 @@ _cache: dict[str, Any] = {
 }
 # Complete epoch trade ledgers stay server-side so /api/state remains compact.
 _trade_cache: dict[str, list[dict]] = {}
+# First dashboard observation of a fill when the API lacks a fill timestamp.
+_fill_seen_at: dict[tuple[str, Any], float] = {}
 
 # ── Events store ──────────────────────────────────────────────────────────────
 # events.yml lives alongside app.py.  We cache in module scope and hot-reload
@@ -428,7 +430,8 @@ async def _fetch_epoch_trades(
     for page in range(max_pages):
         offset = page * page_size
         payload, err = await _get(
-            client, bot["url"], f"trades?limit={page_size}&offset={offset}"
+            client, bot["url"],
+            f"trades?limit={page_size}&offset={offset}&order_by_id=false",
         )
         if err:
             return collected, False, err
@@ -450,13 +453,24 @@ async def _fetch_epoch_trades(
                 seen.add(identity)
                 collected.append(trade)
 
-        total = (payload or {}).get("trades_count")
-        if total is None:
-            total = (payload or {}).get("total_trades")
+        # `trades_count` is the current page length in Freqtrade 2026.7.
+        # Only `total_trades` describes the full result set.
+        total = (payload or {}).get("total_trades")
         reached_total = total is not None and offset + len(rows) >= int(total)
         if crossed_epoch or len(rows) < page_size or reached_total:
             return collected, True, None
     return collected, False, f"trade history exceeded {max_pages * page_size} rows"
+
+
+def _retain_complete_history(
+    bot_key: str, fetched: list[dict], complete: bool
+) -> tuple[list[dict], bool]:
+    """Never let a partial network result overwrite a complete ledger."""
+    if complete:
+        _trade_cache[bot_key] = fetched
+        return fetched, False
+    cached = _trade_cache.get(bot_key)
+    return (cached if cached is not None else []), cached is not None
 
 
 # ── Computations ───────────────────────────────────────────────────────────
@@ -570,12 +584,12 @@ def _gate1(trades: list[dict], days_running: float) -> dict:
     }
 
 
-def _gate2(profit: dict, starting_capital: float, days_running: float, baseline: dict) -> dict:
+def _gate2(epoch_pnl: dict, epoch_stats: dict, days_running: float, baseline: dict) -> dict:
     """Gate 2: calibration checks (profit, profit-factor, drawdown).
 
     Adds `blocked_on` to each sub-key: human string when failing, null when ok.
     """
-    actual_pct = (profit.get("profit_all_coin", 0.0) / starting_capital * 100) if starting_capital else 0
+    actual_pct = float(epoch_pnl.get("all_pct") or 0.0)
     expected_pct = baseline["annual_return_pct"] * (days_running / 365) if days_running > 0 else 0
     profit_lower = round(expected_pct * (1 - GATE2_PROFIT_BAND), 2)
     profit_upper = round(expected_pct * (1 + GATE2_PROFIT_BAND), 2)
@@ -592,7 +606,7 @@ def _gate2(profit: dict, starting_capital: float, days_running: float, baseline:
                        if not profit_ok and profit_status != "n/a" else None),
     }
 
-    pf_actual = profit.get("profit_factor")
+    pf_actual = epoch_stats.get("profit_factor")
     pf_lower = round(baseline["profit_factor"] * (1 - GATE2_PF_BAND), 2)
     pf_upper = round(baseline["profit_factor"] * (1 + GATE2_PF_BAND), 2)
     pf_status = ("n/a" if pf_actual is None
@@ -608,7 +622,7 @@ def _gate2(profit: dict, starting_capital: float, days_running: float, baseline:
                        if not pf_ok and pf_status != "n/a" else None),
     }
 
-    dd_actual = (profit.get("max_drawdown", 0.0) or 0.0) * 100
+    dd_actual = float(epoch_stats.get("max_drawdown") or 0.0) * 100
     dd_cap = baseline["max_dd_pct"] * GATE2_DD_MULT
     dd_status = "breach" if dd_actual > dd_cap else "hot" if dd_actual > baseline["max_dd_pct"] else "ok"
     dd_ok = dd_status == "ok"
@@ -822,28 +836,92 @@ def _candle_readiness(bot: dict, payload: dict | None, timeframe: str | None) ->
     }
 
 
+def _fleet_candle_readiness(
+    bot: dict, payloads: list[dict | None], timeframe: str | None
+) -> dict:
+    """Aggregate pair-specific data gates without hiding a sick whitelist pair."""
+    pair_states = [_candle_readiness(bot, payload, timeframe) for payload in payloads]
+    if not pair_states:
+        return _candle_readiness(bot, None, timeframe)
+    healthy_count = sum(1 for state in pair_states if state.get("healthy"))
+    blocked = [state for state in pair_states if state.get("status") in {"blocked", "warming"}]
+    recent_signals = [state for state in pair_states if state.get("label") == "signal observed"]
+    total = len(pair_states)
+
+    if healthy_count < total:
+        status, label = "stale", f"pair feeds degraded · {healthy_count}/{total} fresh"
+        detail = "one or more watched pairs has stale or unavailable analysis"
+    elif recent_signals:
+        status, label = "ready", f"signal observed · {recent_signals[0].get('pair') or 'watched pair'}"
+        detail = recent_signals[0].get("detail") or bot.get("entry_gate_label")
+    elif bot.get("key") == "oi-trend" and blocked:
+        status = "blocked" if len(blocked) == total else "ready"
+        label = ("all entry gates blocked" if len(blocked) == total
+                 else f"{total - len(blocked)}/{total} pairs clear OI/BTC gates")
+        oi_below = sum(1 for state in blocked if "needs 2.00%" in str(state.get("detail")))
+        detail = (f"OI growth below 2.00% on {oi_below}/{total} pairs"
+                  if oi_below else blocked[0].get("detail"))
+    else:
+        status, label = "ready", f"all {total} pair feeds fresh · scanning"
+        detail = bot.get("entry_gate_label") or "waiting for entry conditions"
+
+    analyzed = [state.get("last_analyzed_ts_ms") for state in pair_states
+                if state.get("last_analyzed_ts_ms")]
+    candles = [state.get("last_candle_ts_ms") for state in pair_states
+               if state.get("last_candle_ts_ms")]
+    signals = [state.get("last_signal_ts_ms") for state in pair_states
+               if state.get("last_signal_ts_ms")]
+    ages = [state.get("analysis_age_s") for state in pair_states
+            if state.get("analysis_age_s") is not None]
+    oi_values = [state.get("metrics", {}).get("oi_growth") for state in pair_states]
+    oi_values = [float(value) for value in oi_values if value is not None and math.isfinite(float(value))]
+    return {
+        "status": status, "label": label, "detail": detail,
+        "gate": bot.get("entry_gate_label"), "healthy": healthy_count == total,
+        "pair": f"{total} pairs", "pair_count": total, "timeframe": timeframe,
+        "last_analyzed_ts_ms": max(analyzed) if analyzed else None,
+        "last_candle_ts_ms": max(candles) if candles else None,
+        "analysis_age_s": max(ages) if ages else None,
+        "last_signal_ts_ms": max(signals) if signals else None,
+        "signals_in_window": sum(int(state.get("signals_in_window") or 0) for state in pair_states),
+        "metrics": ({"oi_growth_min": min(oi_values), "oi_growth_max": max(oi_values)}
+                    if oi_values else {}),
+        "pairs": pair_states,
+    }
+
+
 def _receiver_readiness(bot: dict, health: dict | None, ingress: dict | None, err: str | None) -> dict:
     rows = (ingress or {}).get("ingress", []) if isinstance(ingress, dict) else []
-    last = rows[0] if rows else None
-    last_ts = _parse_ts_ms((last or {}).get("received_at"))
+    last_event = rows[0] if rows else None
+    signal_kinds = {"open", "close_full", "close_partial", "signal_update"}
+    signal_rows = [row for row in rows if row.get("kind") in signal_kinds]
+    last_signal = signal_rows[0] if signal_rows else None
+    last_event_ts = _parse_ts_ms((last_event or {}).get("received_at"))
+    last_signal_ts = _parse_ts_ms((last_signal or {}).get("received_at"))
     cutoff_ms = int((time.time() - 86400) * 1000)
-    signals_24h = sum(1 for row in rows if (_parse_ts_ms(row.get("received_at")) or 0) >= cutoff_ms)
+    signals_24h = sum(
+        1 for row in signal_rows
+        if (_parse_ts_ms(row.get("received_at")) or 0) >= cutoff_ms
+    )
     healthy = bool((health or {}).get("ok")) and err is None
     return {
         "status": "ready" if healthy else "unavailable",
         "label": "receiver online · waiting for channel signal" if healthy else "receiver unavailable",
-        "detail": ((f"last {last.get('kind') or 'event'} · {last.get('final_action') or 'processing'}")
-                   if last else "no channel events recorded in the current window"),
+        "detail": ((f"last signal {last_signal.get('kind')} · {last_signal.get('final_action') or 'processing'}")
+                   if last_signal else "no actionable channel signals recorded in the current window"),
         "gate": bot.get("entry_gate_label"), "healthy": healthy,
-        "last_signal_ts_ms": last_ts, "signals_24h": signals_24h,
-        "last_action": (last or {}).get("final_action"), "error": err,
+        "last_event_ts_ms": last_event_ts, "last_signal_ts_ms": last_signal_ts,
+        "signals_24h": signals_24h,
+        "last_action": (last_signal or {}).get("final_action"), "error": err,
     }
 
 
-def _has_native_stop_order(trade: dict) -> bool:
+def _has_active_native_stop_order(trade: dict) -> bool:
     for order in trade.get("orders") or []:
         side = str(order.get("ft_order_side") or order.get("order_type") or "").lower()
-        if "stop" in side:
+        status = str(order.get("status") or "").lower()
+        active = bool(order.get("is_open")) or status in {"open", "new", "active", "pending"}
+        if "stop" in side and active and status not in {"canceled", "cancelled", "rejected", "expired", "closed"}:
             return True
     return False
 
@@ -851,29 +929,73 @@ def _has_native_stop_order(trade: dict) -> bool:
 def _native_stop_verification(bot: dict, open_trades: list[dict], closed_trades: list[dict]) -> dict:
     if bot.get("venue") != "hyperliquid":
         return {"status": "not-applicable", "label": "spot protection", "expected": False}
-    if any(_has_native_stop_order(t) for t in open_trades + closed_trades):
-        return {
-            "status": "verified", "label": "native stop verified", "expected": True,
-            "detail": "exchange stop order observed in the live epoch",
-        }
+    bot_key = bot.get("key", "unknown")
+    open_ids = {trade.get("trade_id") for trade in open_trades}
+    for cache_key in list(_fill_seen_at):
+        if cache_key[0] == bot_key and cache_key[1] not in open_ids:
+            _fill_seen_at.pop(cache_key, None)
     if not open_trades:
+        if closed_trades:
+            return {
+                "status": "no-open-position", "label": "no open position", "expected": True,
+                "detail": "native-stop evidence is evaluated again on the next fill",
+                "positions": [],
+            }
         return {
             "status": "awaiting-first-fill", "label": "awaiting first fill", "expected": True,
-            "detail": "verification starts when the first live position opens",
+            "detail": "verification starts when the first live entry fills", "positions": [],
         }
-    oldest_open = min(
-        (_parse_ts_ms(t.get("open_timestamp")) or int(time.time() * 1000))
-        for t in open_trades
-    )
-    age_s = max(0, time.time() - oldest_open / 1000)
-    if age_s <= 120:
-        return {
-            "status": "awaiting-stop", "label": "fill seen · checking stop", "expected": True,
-            "detail": "allowing the venue order a 120-second placement window",
-        }
+
+    now = time.time()
+    positions: list[dict] = []
+    for trade in open_trades:
+        trade_id = trade.get("trade_id")
+        entry_orders = [
+            order for order in (trade.get("orders") or [])
+            if "stop" not in str(order.get("ft_order_side") or "").lower()
+        ]
+        partially_filled = any(float(order.get("filled") or 0) > 0 for order in entry_orders)
+        filled = bool(
+            trade.get("open_fill_timestamp")
+            or int(trade.get("nr_of_successful_entries") or 0) >= 1
+            or partially_filled
+        )
+        active_stop = _has_active_native_stop_order(trade)
+        if not filled:
+            state = "awaiting-fill"
+            age_s = None
+        else:
+            fill_ts_ms = _parse_ts_ms(trade.get("open_fill_timestamp"))
+            if fill_ts_ms:
+                age_s = max(0.0, now - fill_ts_ms / 1000)
+            else:
+                cache_key = (bot_key, trade_id)
+                first_seen = _fill_seen_at.setdefault(cache_key, now)
+                age_s = max(0.0, now - first_seen)
+            state = "verified" if active_stop else ("awaiting-stop" if age_s <= 120 else "missing")
+        positions.append({
+            "trade_id": trade_id, "pair": trade.get("pair"), "filled": filled,
+            "active_stop": active_stop, "status": state,
+            "fill_age_s": round(age_s, 1) if age_s is not None else None,
+        })
+
+    counts = {state: sum(1 for p in positions if p["status"] == state)
+              for state in ("verified", "awaiting-fill", "awaiting-stop", "missing")}
+    if counts["missing"]:
+        status, label = "missing", f"native stop missing · {counts['missing']} position(s)"
+        detail = "at least one filled Hyperliquid position has no active stop order"
+    elif counts["awaiting-stop"]:
+        status, label = "awaiting-stop", "fill seen · checking active stop"
+        detail = "allowing each filled position a 120-second venue placement window"
+    elif counts["awaiting-fill"]:
+        status, label = "awaiting-fill", "entry resting · awaiting fill"
+        detail = "the 120-second stop clock has not started because no fill is recorded"
+    else:
+        status, label = "verified", f"native stops verified · {counts['verified']} position(s)"
+        detail = "every filled open position has an active exchange stop order"
     return {
-        "status": "missing", "label": "native stop not observed", "expected": True,
-        "detail": "an open Hyperliquid trade has no stop order in its order payload",
+        "status": status, "label": label, "expected": True,
+        "detail": detail, "positions": positions, "counts": counts,
     }
 
 
@@ -991,10 +1113,12 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         or (bot.get("lineage") or {}).get("transition_ts_ms")
         or 0
     )
-    closed_trades, history_complete, history_error = await _fetch_epoch_trades(
+    fetched_trades, history_complete, history_error = await _fetch_epoch_trades(
         client, bot, epoch_start_ts_ms
     )
-    _trade_cache[bot["key"]] = closed_trades
+    closed_trades, history_using_cache = _retain_complete_history(
+        bot["key"], fetched_trades, history_complete
+    )
     all_trades = closed_trades + open_trades
 
     readiness: dict
@@ -1012,13 +1136,18 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     else:
         pairs = (whitelist or {}).get("whitelist", []) if whitelist else []
         timeframe = (cfg or {}).get("timeframe") or "5m"
-        candles = None
-        if pairs:
-            candles, _ = await _get(
+        candle_results = await asyncio.gather(*[
+            _get(
                 client, bot["url"],
-                f"pair_candles?pair={quote(pairs[0], safe='')}&timeframe={quote(timeframe, safe='')}&limit=200",
+                f"pair_candles?pair={quote(pair, safe='')}&timeframe={quote(timeframe, safe='')}&limit=50",
             )
-        readiness = _candle_readiness(bot, candles, timeframe)
+            for pair in pairs
+        ])
+        readiness = _fleet_candle_readiness(
+            bot,
+            [payload if not candle_err else None for payload, candle_err in candle_results],
+            timeframe,
+        )
 
     starting_capital = float((balance or {}).get("starting_capital") or 0.0)
     bot_owned = float((balance or {}).get("total_bot") or 0.0)
@@ -1137,6 +1266,8 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "history": {
             "scope": "epoch", "complete": history_complete,
             "count": len(closed_trades), "error": history_error,
+            "using_last_complete": history_using_cache,
+            "partial_count_discarded": (len(fetched_trades) if not history_complete else 0),
         },
         "readiness": readiness,
         "native_stop": _native_stop_verification(bot, open_trades, closed_trades),
@@ -1147,7 +1278,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         # Gates: null for no-baseline bots, observational marker for copy-traders
         # with soft gating, full gate objects for quant-validated bots.
         "gate1": (_gate1(all_trades, days_running) if baseline_comparable else None),
-        "gate2": (_gate2(profit or {}, starting_capital, days_running, baseline)
+        "gate2": (_gate2(epoch_pnl, epoch_stats, days_running, baseline)
                   if baseline_comparable else None),
         "gate3": (_gate3(all_trades, baseline) if baseline_comparable else None),
         "baseline": baseline,

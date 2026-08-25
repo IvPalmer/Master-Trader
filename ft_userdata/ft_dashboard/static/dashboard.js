@@ -483,7 +483,7 @@ function dash() {
     },
     stopTone(bot) {
       if (bot?.native_stop?.status === 'missing') return 'bad';
-      if (['awaiting-first-fill', 'awaiting-stop'].includes(bot?.native_stop?.status)) return 'pending';
+      if (['awaiting-first-fill', 'awaiting-fill', 'awaiting-stop', 'no-open-position'].includes(bot?.native_stop?.status)) return 'pending';
       return 'good';
     },
     fmtEpoch(bot) {
