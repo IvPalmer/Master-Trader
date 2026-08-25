@@ -17,7 +17,7 @@ The front-facing dashboard at `master-trader.grooveops.dev` has two complementar
 - Portfolio equity sequences the available closed trades chronologically from deduplicated starting capital.
 - Portfolio drawdown is calculated from the running peak of that consolidated realized-equity curve. It is distinct from the worst individual bot drawdown shown in bot detail.
 - Strategy contribution sums P&L by bot. Pair contribution sums P&L for the same pair across bots.
-- Profit factor, average win/loss, payoff, equity, and pair contribution use the complete active-epoch ledger. The backend paginates Freqtrade trade history until it reaches each bot's epoch boundary; the 30-row list in bot detail is display-only and never limits calculations.
+- Profit factor, average win/loss, payoff, equity, and pair contribution use the complete active-epoch ledger. The backend requests close-time ordering and paginates against Freqtrade's `total_trades` field until it reaches each bot's epoch boundary; `trades_count` is only the current page length. The 30-row list in bot detail is display-only and never limits calculations. A partial fetch is discarded and the last complete ledger is retained.
 - Every displayed bot statistic is recomputed from epoch trades. Freqtrade's lifetime `/profit` totals are not used for dashboard P&L, return, trade counts, win rate, profit factor, or drawdown.
 
 ## Live observability contract
@@ -29,9 +29,9 @@ Every bot publishes one explicit measurement contract in the Overview and bot de
 - complete/incomplete epoch-ledger status;
 - for Hyperliquid, native-stop verification state: `awaiting-first-fill`, `awaiting-stop`, `verified`, or `missing`.
 
-Autonomous bots derive readiness from the latest analyzed Freqtrade dataframe. OI Trend Pullback additionally exposes OI growth, baseline readiness, and BTC trend state. Copy-traders derive readiness from their receiver health and ingress audit trail. A stale feed, incomplete ledger, or missing Hyperliquid stop becomes a command-bar incident.
+Autonomous bots derive readiness from the latest analyzed Freqtrade dataframe for every whitelisted pair. OI Trend Pullback additionally exposes per-pair OI growth, baseline readiness, BTC trend state, and the dominant fleet gate. Copy-traders derive readiness from their receiver health and ingress audit trail; only actionable `open`, `close_full`, `close_partial`, and `signal_update` classifications count as signals. A stale feed, incomplete ledger, or missing Hyperliquid stop becomes a command-bar incident.
 
-`verified` is evidence-based: at least one live-epoch Freqtrade trade payload must contain a stop order. Configuration alone does not satisfy verification. After a fill, a 120-second placement window is allowed before the state becomes `missing`.
+`verified` is evidence-based and position-specific: every filled open Hyperliquid position must expose an active stop order. Cancelled, rejected, expired, or closed stop records never qualify. A resting entry remains `awaiting-fill`; its 120-second placement window starts from `open_fill_timestamp`, not trade creation. One unprotected filled position makes the aggregate state `missing` even when another position is protected.
 
 ## Dry-run → live strategy lineage
 
@@ -88,7 +88,7 @@ This behavior applies to Overview, Portfolio, Trades, Validation, and per-bot de
 
 ## Verification performed
 
-- Dashboard test suite: 33 tests passing.
+- Dashboard test suite: 39 tests passing.
 - JavaScript syntax and repository whitespace checks passing.
 - Repeated browser navigation without refresh: Overview → Funding Fade → Portfolio → Overview.
 - Verified full-width equity, drawdown, and pair canvases after tab changes.

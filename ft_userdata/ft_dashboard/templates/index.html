@@ -1126,7 +1126,7 @@
         </div>
         <div class="obs-item" x-show="bot.venue !== 'hyperliquid'" x-cloak>
           <span class="obs-k">history scope</span>
-          <strong x-text="bot.history?.complete === false ? 'epoch ledger incomplete' : 'complete epoch ledger'">complete epoch ledger</strong>
+          <strong x-text="bot.history?.complete === false ? (bot.history?.using_last_complete ? 'last complete ledger retained' : 'epoch ledger unavailable') : 'complete epoch ledger'">complete epoch ledger</strong>
           <span x-text="(bot.history?.count || 0) + ' closed trades · no lifetime carryover'">0 closed trades</span>
         </div>
       </section>
