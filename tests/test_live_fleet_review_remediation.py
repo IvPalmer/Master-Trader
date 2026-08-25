@@ -98,6 +98,8 @@ def test_oi_uses_nearest_eligible_baseline_and_expires_failures():
 
 def test_oi_price_exit_uses_custom_exit_without_same_candle_entry_veto():
     pd = pytest.importorskip("pandas")
+    from datetime import datetime, timezone
+
     module = _load_strategy("OITrendPullbackV1.py")
     strategy = module.OITrendPullbackV1.__new__(module.OITrendPullbackV1)
     frame = pd.DataFrame(
@@ -105,6 +107,10 @@ def test_oi_price_exit_uses_custom_exit_without_same_candle_entry_veto():
             "close": [99.0, 99.0, 101.0],
             "ema50": [100.0, 100.0, 100.0],
             "oi_growth": [float("nan"), 0.02, -0.02],
+            "date": pd.to_datetime(
+                ["2026-08-24T18:00:00Z", "2026-08-24T19:00:00Z", None],
+                utc=True,
+            ),
         }
     )
 
@@ -114,18 +120,31 @@ def test_oi_price_exit_uses_custom_exit_without_same_candle_entry_veto():
     # EMA50 instead of silently vetoing enter_long on the same candle.
     assert result["exit_long"].tolist() == [0, 0, 0]
 
-    # Existing positions retain the price-only exit even with stale OI.
+    trade = SimpleNamespace(
+        open_date_utc=datetime(2026, 8, 24, 18, 0, tzinfo=timezone.utc)
+    )
+
+    # The entry candle cannot immediately unwind the new trade, even below
+    # EMA50. The first complete candle that began after entry can exit it.
     strategy.dp = SimpleNamespace(
         get_analyzed_dataframe=lambda pair, timeframe: (frame.iloc[:1], None)
     )
     assert strategy.custom_exit(
-        "BTC/USDT", SimpleNamespace(), None, 99.0, -0.01
+        "BTC/USDT", trade, None, 99.0, -0.01
+    ) is None
+    strategy.dp = SimpleNamespace(
+        get_analyzed_dataframe=lambda pair, timeframe: (frame.iloc[1:2], None)
+    )
+    assert strategy.custom_exit(
+        "BTC/USDT", trade, None, 99.0, -0.01
     ) == "ema50_break"
+
+    # Warm-up/invalid timestamps and a price above EMA50 remain safe no-ops.
     strategy.dp = SimpleNamespace(
         get_analyzed_dataframe=lambda pair, timeframe: (frame.iloc[-1:], None)
     )
     assert strategy.custom_exit(
-        "BTC/USDT", SimpleNamespace(), None, 101.0, 0.01
+        "BTC/USDT", trade, None, 101.0, 0.01
     ) is None
 
 
