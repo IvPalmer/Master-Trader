@@ -17,6 +17,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 
 import numpy as np
+import pandas as pd
 import talib.abstract as ta
 from freqtrade.strategy import IStrategy, informative
 from pandas import DataFrame
@@ -213,6 +214,33 @@ class OITrendPullbackV1(IStrategy):
         if dataframe is None or dataframe.empty:
             return None
         candle = dataframe.iloc[-1]
+        candle_date = candle.get("date")
+        trade_open = getattr(trade, "open_date_utc", None)
+        if candle_date is None or trade_open is None:
+            return None
+        try:
+            candle_ts = pd.Timestamp(candle_date)
+            trade_open_ts = pd.Timestamp(trade_open)
+            if pd.isna(candle_ts) or pd.isna(trade_open_ts):
+                return None
+            candle_ts = (
+                candle_ts.tz_localize("UTC")
+                if candle_ts.tzinfo is None
+                else candle_ts.tz_convert("UTC")
+            )
+            trade_open_ts = (
+                trade_open_ts.tz_localize("UTC")
+                if trade_open_ts.tzinfo is None
+                else trade_open_ts.tz_convert("UTC")
+            )
+        except (TypeError, ValueError):
+            return None
+        # OHLCV `date` is the candle's opening time. Requiring it to be later
+        # than the trade open guarantees a complete post-entry candle before
+        # the EMA50 exit can fire, avoiding enter-at-open/exit-seconds-later
+        # churn when the valid EMA20 reclaim signal is still below EMA50.
+        if candle_ts <= trade_open_ts:
+            return None
         close = candle.get("close")
         ema50 = candle.get("ema50")
         if close is None or ema50 is None:
