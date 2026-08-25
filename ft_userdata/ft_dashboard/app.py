@@ -798,12 +798,15 @@ def _candle_readiness(bot: dict, payload: dict | None, timeframe: str | None) ->
         if growth is None or (isinstance(growth, float) and math.isnan(growth)):
             status, label, detail = "warming", "building OI baseline", "fresh 45-minute OI baseline not ready"
         elif float(growth) < 0.02:
+            status, label = "blocked", "entry gate blocked"
             detail = f"OI growth {float(growth) * 100:.2f}% · needs 2.00%"
         elif float(btc_trend or 0) != 1:
+            status, label = "blocked", "entry gate blocked"
             detail = "OI gate passed · BTC trend gate blocked"
         else:
             detail = "OI and BTC gates passed · waiting for EMA20 reclaim"
-    if signal_rows and last_signal_ts:
+    signal_age_s = (time.time() - last_signal_ts / 1000) if last_signal_ts else None
+    if signal_age_s is not None and signal_age_s <= _timeframe_seconds(timeframe) * 2:
         label = "signal observed"
     return {
         "status": status, "label": label, "detail": detail,
