@@ -78,7 +78,8 @@ def test_oi_readiness_exposes_dominant_gate_and_feed_age():
     readiness = app._candle_readiness(bot, payload, "1h")
 
     assert readiness["healthy"] is True
-    assert readiness["status"] == "ready"
+    assert readiness["status"] == "blocked"
+    assert readiness["label"] == "entry gate blocked"
     assert "needs 2.00%" in readiness["detail"]
     assert readiness["metrics"]["oi_growth"] == 0.013
 
@@ -89,4 +90,3 @@ def test_every_bot_declares_epoch_version_and_gate_contract():
         assert bot["epoch_label"]
         assert bot["strategy_version"]
         assert bot["entry_gate_label"]
-
