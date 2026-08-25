@@ -46,7 +46,7 @@ log = logging.getLogger("ft-dashboard")
 # Every affected live DB was empty at its cutover.
 KILLERS_ROUND3_EPOCH_TS_MS = 1787589161248  # 2026-08-24T16:32:41.248Z
 INSIDERS_ROUND3_EPOCH_TS_MS = 1787589161684  # 2026-08-24T16:32:41.684Z
-OI_ROUND3_EPOCH_TS_MS = 1787594932845  # 2026-08-24T18:08:52.845Z
+OI_ROUND4_EPOCH_TS_MS = 1787619881124  # 2026-08-25T01:04:41.124Z
 
 BOTS: list[dict[str, Any]] = [
     {
@@ -109,7 +109,7 @@ BOTS: list[dict[str, Any]] = [
         "url": "http://ft-oi-trend-pullback:8080",
         "account_group": "binance-spot",
         "strategy_kind": "autonomous-quant",
-        "epoch_start_ts_ms": OI_ROUND3_EPOCH_TS_MS,
+        "epoch_start_ts_ms": OI_ROUND4_EPOCH_TS_MS,
         "observational": True,
         "no_baseline": True,
         "baseline": None,

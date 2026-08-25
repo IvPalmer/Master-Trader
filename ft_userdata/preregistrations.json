@@ -333,6 +333,14 @@
      },
      "affected_bots": ["OITrendPullbackV1", "KillersScalpV1", "InsidersScalpV2"],
      "cutover_state": "Zero open and zero closed live trades for every affected bot; no observation was discarded."
+    },
+    {
+     "date": "2026-08-24",
+     "reason": "Round-4 review found that moving OITrendPullback's EMA50 exit to custom_exit removed Freqtrade's same-candle entry veto but still allowed custom_exit to close the new trade seconds later while reading that entry signal candle. The callback now requires the analyzed OHLCV candle opening time to be strictly later than trade.open_date_utc, guaranteeing one complete post-entry candle before the EMA50 exit can fire. The OI current measurement epoch moves again because the executable exit contract changed; the former round-3 timestamp remains historical evidence above rather than being overwritten.",
+     "effective_at": "2026-08-25T01:04:41.124Z",
+     "affected_bots": ["OITrendPullbackV1"],
+     "supersedes_for_current_measurement": "The OITrendPullbackV1 effective_at value in the prior amendment; Killers and Insiders timestamps are unchanged.",
+     "cutover_state": "Zero open and zero closed live OI trades; no observation was discarded."
     }
    ],
    "notes": "This registration records the actual operator decision after the fact because the 2026-08-23 deployment preceded the governance update. It is deliberately not a claim that the old reports were wrong or that all six strategies are profitable. Remediation audit: docs/audits/2026-08-24-live-fleet-review-remediation.md."
