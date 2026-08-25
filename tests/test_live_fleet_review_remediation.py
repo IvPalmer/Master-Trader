@@ -147,6 +147,32 @@ def test_oi_price_exit_uses_custom_exit_without_same_candle_entry_veto():
         "BTC/USDT", trade, None, 101.0, 0.01
     ) is None
 
+    # Restart/warm-up and timezone-naive inputs stay deterministic.
+    strategy.dp = None
+    assert strategy.custom_exit("BTC/USDT", trade, None, 99.0, -0.01) is None
+    naive_frame = pd.DataFrame(
+        {
+            "date": [datetime(2026, 8, 24, 19, 0)],
+            "close": [99.0],
+            "ema50": [100.0],
+        }
+    )
+    strategy.dp = SimpleNamespace(
+        get_analyzed_dataframe=lambda pair, timeframe: (naive_frame, None)
+    )
+    naive_trade = SimpleNamespace(open_date_utc=datetime(2026, 8, 24, 18, 0))
+    assert strategy.custom_exit(
+        "BTC/USDT", naive_trade, None, 99.0, -0.01
+    ) == "ema50_break"
+    nan_frame = naive_frame.copy()
+    nan_frame["close"] = float("nan")
+    strategy.dp = SimpleNamespace(
+        get_analyzed_dataframe=lambda pair, timeframe: (nan_frame, None)
+    )
+    assert strategy.custom_exit(
+        "BTC/USDT", naive_trade, None, 99.0, -0.01
+    ) is None
+
 
 def test_killers_stop_is_absolute_recomputed_and_after_fill_aware():
     module = _load_strategy("KillersScalpV1.py")
