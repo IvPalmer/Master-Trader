@@ -188,9 +188,9 @@ function dash() {
       const totalWins = live.reduce((s, b) => s + (b.stats?.winning_trades ?? 0), 0);
       const totalLosses = live.reduce((s, b) => s + (b.stats?.losing_trades ?? 0), 0);
       const winRate = (totalWins + totalLosses) ? totalWins / (totalWins + totalLosses) : 0;
-      const aggregateClosed = live.flatMap(b => b.recent_trades || []).filter(t => !t.is_open);
-      const grossProfit = aggregateClosed.reduce((s, t) => s + Math.max(0, Number(t.profit_abs || 0)), 0);
-      const grossLoss = aggregateClosed.reduce((s, t) => s + Math.abs(Math.min(0, Number(t.profit_abs || 0))), 0);
+      const aggregateClosed = this.closedTrades;
+      const grossProfit = live.reduce((s, b) => s + Number(b.stats?.gross_profit || 0), 0);
+      const grossLoss = live.reduce((s, b) => s + Number(b.stats?.gross_loss || 0), 0);
       const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : null;
       const totalRealizedPnl = live.reduce((s, b) => s + (b.pnl?.closed ?? 0), 0);
       const expectancyPerTrade = closedTrades > 0 ? totalRealizedPnl / closedTrades : null;
@@ -300,6 +300,36 @@ function dash() {
             logsHint: b.links?.logs_hint || null,
             action: () => { this.setTab(b.dry_run ? 'dryrun' : 'live'); },
             detailTab: b.dry_run ? 'dryrun' : 'live',
+          });
+        }
+      }
+
+      for (const b of this.liveBots) {
+        if (b.native_stop?.status === 'missing') {
+          items.push({
+            color: 'red', icon: '!',
+            subject: `${b.label} native stop missing`,
+            reason: b.native_stop.detail || 'open Hyperliquid position has no visible exchange stop',
+            cta: 'inspect bot', logsHint: b.links?.logs_hint || null,
+            action: () => this.setTab('bot:' + b.key), detailTab: 'bot:' + b.key,
+          });
+        }
+        if (b.readiness && b.readiness.healthy === false) {
+          items.push({
+            color: 'amber', icon: '◷',
+            subject: `${b.label} signal feed unavailable`,
+            reason: b.readiness.error || b.readiness.detail || 'entry telemetry is stale',
+            cta: 'inspect bot', logsHint: b.links?.logs_hint || null,
+            action: () => this.setTab('bot:' + b.key), detailTab: 'bot:' + b.key,
+          });
+        }
+        if (b.history?.complete === false) {
+          items.push({
+            color: 'amber', icon: '!',
+            subject: `${b.label} epoch ledger incomplete`,
+            reason: b.history.error || 'trade pagination did not reach the epoch boundary',
+            cta: 'inspect bot', logsHint: b.links?.logs_hint || null,
+            action: () => this.setTab('bot:' + b.key), detailTab: 'bot:' + b.key,
           });
         }
       }
@@ -433,6 +463,7 @@ function dash() {
     botActivity(bot) {
       const open = bot?.open_trades?.length || 0;
       if (open) return `managing ${open} open position${open === 1 ? '' : 's'}`;
+      if (bot?.readiness?.label) return bot.readiness.label;
       const last = this.lastClosedTrade(bot);
       if (last?.close_timestamp) {
         const age = Math.max(0, Math.floor((Date.now() - toMs(last.close_timestamp)) / 1000));
@@ -440,6 +471,25 @@ function dash() {
       }
       if ((bot?.days_running ?? 0) < 1) return 'fresh live epoch · scanning';
       return 'scanning · waiting for signal';
+    },
+    readinessDetail(bot) {
+      return bot?.readiness?.detail || bot?.readiness?.gate || 'waiting for entry conditions';
+    },
+    readinessTone(bot) {
+      const status = bot?.readiness?.status;
+      if (['unavailable', 'stale'].includes(status)) return 'bad';
+      if (['warming', 'blocked'].includes(status)) return 'warn';
+      return 'good';
+    },
+    stopTone(bot) {
+      if (bot?.native_stop?.status === 'missing') return 'bad';
+      if (['awaiting-first-fill', 'awaiting-stop'].includes(bot?.native_stop?.status)) return 'pending';
+      return 'good';
+    },
+    fmtEpoch(bot) {
+      const ts = bot?.epoch?.start_ts_ms;
+      if (!ts) return bot?.epoch?.label || 'current epoch';
+      return `${bot.epoch.label} · since ${new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' })}`;
     },
     venueLabel(bot) {
       return bot?.venue === 'hyperliquid' ? 'Hyperliquid perps' : 'Binance spot';
@@ -523,10 +573,9 @@ function dash() {
       };
     },
     get fleetPerformanceData() {
-      const trades = this.liveBots
-        .flatMap(bot => (bot.recent_trades || [])
-          .filter(t => !t.is_open && t.close_timestamp)
-          .map(t => ({ ...t, _bot: bot.key })))
+      const trades = this.closedTrades
+        .filter(t => t.close_ts)
+        .map(t => ({ ...t, close_timestamp: t.close_ts, _bot: t.bot_key }))
         .sort((a, b) => toMs(a.close_timestamp) - toMs(b.close_timestamp));
       if (!trades.length) return { live: [], drawdown: [], trades: [] };
 
@@ -950,6 +999,7 @@ function dash() {
         const data = await r.json();
         this.closedTrades = data.trades || [];
         if (this.tab === 'trades') this.$nextTick(() => this.renderTradesCharts());
+        if (this.tab === 'live' || this.tab === 'portfolio') this.$nextTick(() => this.renderCharts());
       } catch (e) { console.warn('fetchClosedTrades', e); }
     },
 
@@ -1197,6 +1247,8 @@ function dash() {
       if (!chart) return;
       const bot = isFleet ? null : this.raw.bots[key];
       const lineage = !isFleet ? data?.lineage : null;
+      const transitionTs = lineage?.transition?.ts || bot?.epoch?.start_ts_ms || data?.bot_start_ts_ms;
+      const transitionLabel = lineage?.transition?.label || bot?.epoch?.label || 'live epoch';
       const legacyName = lineage?.legacy_label || 'dry-run';
       const liveName = lineage ? `${lineage.live_label} · normalized` : 'live equity';
       const legacy = (lineage?.legacy || []).map(p => [new Date(p[0]), p[1]]);
@@ -1279,11 +1331,11 @@ function dash() {
                 ...lossMarks.map(m => ({ coord: m.coord, itemStyle: { color: COLORS.neg, borderColor: COLORS.surface, borderWidth: 1.5 }, label: { show: false }, tooltip: { formatter: () => `${m.pair} · ${m.pct?.toFixed(2)}%` } })),
               ],
             },
-            markLine: lineage ? {
+            markLine: transitionTs ? {
               silent: true, symbol: 'none',
-              data: [{ xAxis: lineage.transition.ts,
+              data: [{ xAxis: transitionTs,
                 lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.4 },
-                label: { show: true, position: 'insideEndTop', formatter: lineage.transition.label,
+                label: { show: true, position: 'insideEndTop', formatter: transitionLabel,
                   color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)',
                   padding: [3, 5], borderRadius: 3 } }],
             } : undefined,
@@ -1301,6 +1353,8 @@ function dash() {
       if (!chart) return;
       const bot = isFleet ? null : this.raw.bots[key];
       const lineage = !isFleet ? data?.lineage : null;
+      const transitionTs = lineage?.transition?.ts || bot?.epoch?.start_ts_ms || data?.bot_start_ts_ms;
+      const transitionLabel = lineage?.transition?.label || bot?.epoch?.label || 'live epoch';
       const dd = (lineage?.drawdown || data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
       const baselineDd = isFleet ? this.hero.drawdownBacktest : (bot?.baseline?.max_dd_pct || 0);
       const ddCap = baselineDd ? -baselineDd * 1.5 : Math.min(-5, Math.floor((this.selectedMaxDrawdown || 0) * -1.5));
@@ -1329,9 +1383,9 @@ function dash() {
           markLine: {
             silent: true, symbol: 'none',
             data: [
-              ...(lineage ? [{ xAxis: lineage.transition.ts,
+              ...(transitionTs ? [{ xAxis: transitionTs,
                 lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.2 },
-                label: { show: true, position: 'insideEndTop', formatter: lineage.transition.label,
+                label: { show: true, position: 'insideEndTop', formatter: transitionLabel,
                   color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)', padding: [2,4], borderRadius: 2 } }] : []),
               ...(baselineDd ? [
               { yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 },
@@ -1608,6 +1662,8 @@ function dash() {
       if (!chart) return;
       const bot = this.raw.bots[key];
       const startTs = data?.bot_start_ts_ms || 0;
+      const transitionTs = data?.lineage?.transition?.ts || bot?.epoch?.start_ts_ms || startTs;
+      const transitionLabel = data?.lineage?.transition?.label || bot?.epoch?.label || 'live epoch';
       const expected = (data?.expected || []).filter(p => p[0] >= startTs).map(p => [new Date(p[0]), p[1]]);
       const live = (data?.live || []).map(p => [new Date(p[0]), p[1]]);
       chart.setOption({
@@ -1621,7 +1677,11 @@ function dash() {
           { name: 'backtest expected', type: 'line', data: expected, showSymbol: false, lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.2 } },
           { name: 'live equity', type: 'line', data: live, showSymbol: false,
             lineStyle: { color: COLORS.info, width: 2 },
-            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14, 135, 163, 0.18)' }, { offset: 1, color: 'rgba(14, 135, 163, 0.0)' }]) } },
+            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14, 135, 163, 0.18)' }, { offset: 1, color: 'rgba(14, 135, 163, 0.0)' }]) },
+            markLine: transitionTs ? { silent:true, symbol:'none', data:[{ xAxis:transitionTs,
+              lineStyle:{ color:COLORS.warn, type:'dashed', width:1.2 },
+              label:{ show:true, position:'insideEndTop', formatter:transitionLabel, color:COLORS.warn, fontSize:10,
+                backgroundColor:'rgba(255,254,251,.94)', padding:[2,4], borderRadius:2 } }] } : undefined },
         ],
       }, true);
     },
@@ -1639,6 +1699,8 @@ function dash() {
         const startCap = data?.starting_capital ?? bot.wallet?.starting_capital ?? 200;
         const annual   = bot.baseline?.annual_return_pct ?? 0;
         const lineage  = data?.lineage;
+        const transitionTs = lineage?.transition?.ts || bot?.epoch?.start_ts_ms || startTs;
+        const transitionLabel = lineage?.transition?.label || bot?.epoch?.label || 'live epoch';
         const legacyName = lineage?.legacy_label || 'dry-run';
         const liveName = lineage ? `${lineage.live_label} · normalized` : 'live equity';
         const legacy   = (lineage?.legacy || []).map(p => [new Date(p[0]), p[1]]);
@@ -1669,9 +1731,9 @@ function dash() {
             { name: liveName, type: 'line', data: live, showSymbol: false,
               lineStyle: { color: COLORS.info, width: 2 },
               areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14,135,163,0.18)' }, { offset: 1, color: 'rgba(14,135,163,0)' }]) },
-              markLine: lineage ? { silent: true, symbol: 'none', data: [{ xAxis: lineage.transition.ts,
+              markLine: transitionTs ? { silent: true, symbol: 'none', data: [{ xAxis: transitionTs,
                 lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.4 },
-                label: { show: true, position: 'insideEndTop', formatter: lineage.transition.label,
+                label: { show: true, position: 'insideEndTop', formatter: transitionLabel,
                   color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)', padding: [3,5], borderRadius: 3 } }] } : undefined },
           ],
         }, true);
@@ -1680,6 +1742,8 @@ function dash() {
       const ddChart = this._ensureChart('chart-detail-dd-' + key);
       if (ddChart) {
         const lineage = data?.lineage;
+        const transitionTs = lineage?.transition?.ts || bot?.epoch?.start_ts_ms || data?.bot_start_ts_ms;
+        const transitionLabel = lineage?.transition?.label || bot?.epoch?.label || 'live epoch';
         const dd    = (lineage?.drawdown || data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
         const baselineDd = bot.baseline?.max_dd_pct || 0;
         const ddCap = baselineDd ? -baselineDd * 1.5 : -5;
@@ -1696,7 +1760,7 @@ function dash() {
             lineStyle: { color: COLORS.neg, width: 1.5 },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(210,71,58,0)' }, { offset: 1, color: 'rgba(210,71,58,0.22)' }]) },
             markLine: { silent: true, symbol: 'none', data: [
-              ...(lineage ? [{ xAxis: lineage.transition.ts, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.2 }, label: { show: true, position: 'insideEndTop', formatter: lineage.transition.label, color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)', padding: [2,4], borderRadius: 2 } }] : []),
+              ...(transitionTs ? [{ xAxis: transitionTs, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.2 }, label: { show: true, position: 'insideEndTop', formatter: transitionLabel, color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)', padding: [2,4], borderRadius: 2 } }] : []),
               ...(baselineDd ? [{ yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%', color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2, 4], borderRadius: 2 } }] : []),
             ] },
           }],

@@ -17,7 +17,21 @@ The front-facing dashboard at `master-trader.grooveops.dev` has two complementar
 - Portfolio equity sequences the available closed trades chronologically from deduplicated starting capital.
 - Portfolio drawdown is calculated from the running peak of that consolidated realized-equity curve. It is distinct from the worst individual bot drawdown shown in bot detail.
 - Strategy contribution sums P&L by bot. Pair contribution sums P&L for the same pair across bots.
-- Profit factor, average win/loss, payoff, equity, and pair contribution use the dashboard's available recent-trade snapshots (currently up to 30 trades per bot). Closed-trade count and win rate come from each bot's aggregate Freqtrade statistics. If histories grow beyond the snapshot window, expanding the backend history endpoint is required for exact all-time portfolio curves and PF.
+- Profit factor, average win/loss, payoff, equity, and pair contribution use the complete active-epoch ledger. The backend paginates Freqtrade trade history until it reaches each bot's epoch boundary; the 30-row list in bot detail is display-only and never limits calculations.
+- Every displayed bot statistic is recomputed from epoch trades. Freqtrade's lifetime `/profit` totals are not used for dashboard P&L, return, trade counts, win rate, profit factor, or drawdown.
+
+## Live observability contract
+
+Every bot publishes one explicit measurement contract in the Overview and bot detail surfaces:
+
+- strategy/version and immutable epoch start;
+- signal path health, last analysis or channel event, representative pair/timeframe, and the dominant entry gate;
+- complete/incomplete epoch-ledger status;
+- for Hyperliquid, native-stop verification state: `awaiting-first-fill`, `awaiting-stop`, `verified`, or `missing`.
+
+Autonomous bots derive readiness from the latest analyzed Freqtrade dataframe. OI Trend Pullback additionally exposes OI growth, baseline readiness, and BTC trend state. Copy-traders derive readiness from their receiver health and ingress audit trail. A stale feed, incomplete ledger, or missing Hyperliquid stop becomes a command-bar incident.
+
+`verified` is evidence-based: at least one live-epoch Freqtrade trade payload must contain a stop order. Configuration alone does not satisfy verification. After a fill, a 120-second placement window is allowed before the state becomes `missing`.
 
 ## Dry-run → live strategy lineage
 
@@ -31,7 +45,9 @@ production/strategy cutover.
 
 The joined curve is normalized, not an account statement. Live returns are
 rebased onto the final dry-run equity so continuity and post-update slope can be
-compared despite different account sizes. All fleet cards, portfolio capital,
+compared despite different account sizes. Bots without historical lineage still
+render their active epoch as a dashed chart marker, so a forward-only strategy
+keeps its version boundary. All fleet cards, portfolio capital,
 P&L, exposure, and risk continue to use only actual live wallets and trades.
 Open trades from retired dry-run databases are excluded. Historical databases
 are frozen with SQLite backup semantics and mounted read-only into the dashboard
@@ -72,7 +88,7 @@ This behavior applies to Overview, Portfolio, Trades, Validation, and per-bot de
 
 ## Verification performed
 
-- Dashboard test suite: 25 tests passing.
+- Dashboard test suite: 33 tests passing.
 - JavaScript syntax and repository whitespace checks passing.
 - Repeated browser navigation without refresh: Overview → Funding Fade → Portfolio → Overview.
 - Verified full-width equity, drawdown, and pair canvases after tab changes.

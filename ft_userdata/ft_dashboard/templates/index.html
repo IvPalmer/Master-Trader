@@ -217,7 +217,7 @@
                       <span x-text="botStatus(bot).label">running</span>
                     </span>
                     <strong x-text="bot.label">bot</strong>
-                    <span x-text="strategyKindLabel(bot)">strategy</span>
+                    <span x-text="bot.epoch?.version || strategyKindLabel(bot)">strategy</span>
                   </button>
                 </td>
                 <td>
@@ -234,7 +234,13 @@
                 <td class="right num" x-text="bot.stats?.closed_trade_count || 0">0</td>
                 <td class="right num" x-text="(bot.stats?.closed_trade_count || 0) ? fmtPct((bot.stats?.winrate || 0) * 100, 1) : '—'">—</td>
                 <td class="right num" x-text="bot.open_trades?.length || 0">0</td>
-                <td><span class="table-activity" x-text="botActivity(bot)">scanning</span></td>
+                <td>
+                  <span class="readiness-line" :class="readinessTone(bot)">
+                    <span class="readiness-dot" aria-hidden="true"></span>
+                    <span x-text="botActivity(bot)">scanning</span>
+                  </span>
+                  <span class="table-activity" :title="readinessDetail(bot)" x-text="readinessDetail(bot)">waiting for entry conditions</span>
+                </td>
                 <td class="right"><button class="table-open" @click.stop="setTab('bot:'+bot.key)">inspect</button></td>
               </tr>
             </template>
@@ -1093,6 +1099,37 @@
           </template>
         </div>
       </div>
+
+      <section class="observation-strip" aria-label="Live observation contract">
+        <div class="obs-item obs-epoch">
+          <span class="obs-k">measurement epoch</span>
+          <strong x-text="bot.epoch?.version || bot.name">strategy</strong>
+          <span x-text="fmtEpoch(bot)">current epoch</span>
+        </div>
+        <div class="obs-item">
+          <span class="obs-k">signal readiness</span>
+          <strong class="readiness-line" :class="readinessTone(bot)">
+            <span class="readiness-dot" aria-hidden="true"></span>
+            <span x-text="bot.readiness?.label || 'collecting telemetry'">collecting telemetry</span>
+          </strong>
+          <span x-text="readinessDetail(bot)">waiting for entry conditions</span>
+        </div>
+        <div class="obs-item">
+          <span class="obs-k">last analysis</span>
+          <strong x-text="bot.readiness?.analysis_age_s != null ? fmtAge(bot.readiness.analysis_age_s) + ' ago' : (bot.readiness?.last_signal_ts_ms ? fmtAge(Math.max(0, Math.floor((Date.now()-bot.readiness.last_signal_ts_ms)/1000))) + ' ago' : 'no signal yet')">—</strong>
+          <span x-text="bot.readiness?.pair ? bot.readiness.pair + ' · ' + (bot.readiness.timeframe || '—') : ((bot.readiness?.signals_24h || 0) + ' channel events · 24h')">—</span>
+        </div>
+        <div class="obs-item" x-show="bot.venue === 'hyperliquid'" x-cloak>
+          <span class="obs-k">venue protection</span>
+          <strong class="stop-state" :class="stopTone(bot)" x-text="bot.native_stop?.label || 'checking native stop'">checking native stop</strong>
+          <span x-text="bot.native_stop?.detail || 'waiting for venue evidence'">waiting for venue evidence</span>
+        </div>
+        <div class="obs-item" x-show="bot.venue !== 'hyperliquid'" x-cloak>
+          <span class="obs-k">history scope</span>
+          <strong x-text="bot.history?.complete === false ? 'epoch ledger incomplete' : 'complete epoch ledger'">complete epoch ledger</strong>
+          <span x-text="(bot.history?.count || 0) + ' closed trades · no lifetime carryover'">0 closed trades</span>
+        </div>
+      </section>
 
       <!-- B: Current situation cluster (3 panels side by side) -->
       <div class="grid grid-12" x-show="botHasHistory(bot)" x-cloak>

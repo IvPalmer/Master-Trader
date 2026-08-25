@@ -25,10 +25,12 @@ import os
 import re
 import sqlite3 as _sqlite
 import time
+from datetime import datetime
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 import yaml
@@ -57,6 +59,9 @@ BOTS: list[dict[str, Any]] = [
         "account_group": "binance-spot",
         "strategy_kind": "autonomous-quant",
         "epoch_start_ts_ms": 1787509045565,
+        "epoch_label": "strategy v2 · isolated live DB",
+        "strategy_version": "FundingFadeV1 · v2",
+        "entry_gate_label": "funding divergence + BTC macro gate",
         "lineage": {
             # The former live DB is immutable after the V2 split and is now
             # historical lineage only. It must never feed current gates.
@@ -83,6 +88,9 @@ BOTS: list[dict[str, Any]] = [
         "account_group": "binance-spot",
         "strategy_kind": "autonomous-quant",
         "epoch_start_ts_ms": 1787509045565,
+        "epoch_label": "strategy v2 · fresh live epoch",
+        "strategy_version": "KeltnerBounceV1 · v2",
+        "entry_gate_label": "lower-band reversal + volume confirmation",
         "lineage": {
             "legacy_db": "tradesv3.dryrun.KeltnerBounceV1.sqlite",
             "legacy_starting_capital": 200.0,
@@ -110,6 +118,9 @@ BOTS: list[dict[str, Any]] = [
         "account_group": "binance-spot",
         "strategy_kind": "autonomous-quant",
         "epoch_start_ts_ms": OI_ROUND4_EPOCH_TS_MS,
+        "epoch_label": "round 4 · price-only exit guard",
+        "strategy_version": "OITrendPullbackV1 · r4",
+        "entry_gate_label": "EMA20 reclaim + fresh OI ≥ 2% + BTC trend",
         "observational": True,
         "no_baseline": True,
         "baseline": None,
@@ -126,6 +137,10 @@ BOTS: list[dict[str, Any]] = [
         "account_group": "hyperliquid-short-keltner",
         "strategy_kind": "autonomous-quant",
         "venue": "hyperliquid",
+        "epoch_start_ts_ms": 1787525718059,
+        "epoch_label": "live v1 · dedicated 40 USDC account",
+        "strategy_version": "ShortKeltnerV2HL · live v1",
+        "entry_gate_label": "4h Keltner rejection + bearish trend",
         "lineage": {
             # Separate host bind: this DB lives outside the shared Freqtrade
             # volume, so it is mounted at an absolute read-only path.
@@ -156,6 +171,11 @@ BOTS: list[dict[str, Any]] = [
         # deterministic quant strategy; the dashboard should show realised
         # performance without comparing it to an invented backtest baseline.
         "venue": "hyperliquid",
+        "epoch_start_ts_ms": KILLERS_ROUND3_EPOCH_TS_MS,
+        "epoch_label": "round 3 · post-mark risk sizing",
+        "strategy_version": "KillersScalpV1 · r3",
+        "entry_gate_label": "external signal + valid zone + posted stop",
+        "receiver_url": "http://killers-receiver:8089",
         "lineage": {
             "legacy_db": "tradesv3.dryrun.KillersScalpV1.sqlite",
             "legacy_starting_capital": 200.0,
@@ -184,6 +204,11 @@ BOTS: list[dict[str, Any]] = [
         "account_group": "hyperliquid-insiders",
         "strategy_kind": "copy-trader",
         "venue": "hyperliquid",
+        "epoch_start_ts_ms": INSIDERS_ROUND3_EPOCH_TS_MS,
+        "epoch_label": "round 3 · post-mark risk sizing",
+        "strategy_version": "InsidersScalp · r3",
+        "entry_gate_label": "external signal + valid zone + posted stop",
+        "receiver_url": "http://insiders-receiver:8089",
         "lineage": {
             "legacy_db": "tradesv3.dryrun.InsidersScalpV2.sqlite",
             "legacy_starting_capital": 200.0,
@@ -316,6 +341,8 @@ _cache: dict[str, Any] = {
     # Maps bot_key → unix timestamp of last successful (reachable=True) poll.
     "last_reachable_at": {},
 }
+# Complete epoch trade ledgers stay server-side so /api/state remains compact.
+_trade_cache: dict[str, list[dict]] = {}
 
 # ── Events store ──────────────────────────────────────────────────────────────
 # events.yml lives alongside app.py.  We cache in module scope and hot-reload
@@ -371,6 +398,65 @@ async def _get(client: httpx.AsyncClient, url: str, path: str) -> tuple[Any, str
         return None, f"HTTP {r.status_code}"
     except Exception as exc:
         return None, f"{type(exc).__name__}: {exc}"
+
+
+async def _get_plain(client: httpx.AsyncClient, url: str, path: str) -> tuple[Any, str | None]:
+    """GET a dashboard-adjacent service without the Freqtrade URL prefix."""
+    try:
+        r = await client.get(f"{url}/{path.lstrip('/')}", timeout=REQUEST_TIMEOUT)
+        if r.status_code == 200:
+            return r.json(), None
+        return None, f"HTTP {r.status_code}"
+    except Exception as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+
+
+async def _fetch_epoch_trades(
+    client: httpx.AsyncClient,
+    bot: dict,
+    epoch_start_ts_ms: int,
+    page_size: int = 100,
+    max_pages: int = 250,
+) -> tuple[list[dict], bool, str | None]:
+    """Fetch complete closed-trade history for an epoch using API pagination.
+
+    Freqtrade returns newest trades first. We stop once a page crosses the
+    epoch boundary, or when the API reports/returns the end of history.
+    """
+    collected: list[dict] = []
+    seen: set[Any] = set()
+    for page in range(max_pages):
+        offset = page * page_size
+        payload, err = await _get(
+            client, bot["url"], f"trades?limit={page_size}&offset={offset}"
+        )
+        if err:
+            return collected, False, err
+        rows = (payload or {}).get("trades", [])
+        if not isinstance(rows, list):
+            return collected, False, "malformed trades payload"
+        crossed_epoch = False
+        for trade in rows:
+            if trade.get("is_open"):
+                continue
+            close_ts = int(trade.get("close_timestamp") or 0)
+            if epoch_start_ts_ms and close_ts < epoch_start_ts_ms:
+                crossed_epoch = True
+                continue
+            identity = trade.get("trade_id") or (
+                trade.get("pair"), trade.get("open_timestamp"), close_ts
+            )
+            if identity not in seen:
+                seen.add(identity)
+                collected.append(trade)
+
+        total = (payload or {}).get("trades_count")
+        if total is None:
+            total = (payload or {}).get("total_trades")
+        reached_total = total is not None and offset + len(rows) >= int(total)
+        if crossed_epoch or len(rows) < page_size or reached_total:
+            return collected, True, None
+    return collected, False, f"trade history exceeded {max_pages * page_size} rows"
 
 
 # ── Computations ───────────────────────────────────────────────────────────
@@ -626,6 +712,168 @@ def _drawdown_curve(equity: list[list]) -> list[list]:
     return out
 
 
+def _epoch_stats(
+    closed_trades: list[dict], open_trades: list[dict], starting_capital: float
+) -> tuple[dict, dict, float]:
+    """Derive every displayed performance metric from the active epoch."""
+    closed_pnl = sum(float(t.get("profit_abs") or 0) for t in closed_trades)
+    unrealized = sum(float(t.get("profit_abs") or 0) for t in open_trades)
+    all_pnl = closed_pnl + unrealized
+    wins = [t for t in closed_trades if float(t.get("profit_abs") or 0) > 0]
+    losses = [t for t in closed_trades if float(t.get("profit_abs") or 0) < 0]
+    gross_profit = sum(float(t.get("profit_abs") or 0) for t in wins)
+    gross_loss = abs(sum(float(t.get("profit_abs") or 0) for t in losses))
+    durations = [float(t.get("trade_duration")) for t in closed_trades
+                 if t.get("trade_duration") is not None]
+    per_pair = _per_pair_pnl(closed_trades)
+    pnl = {
+        "closed": round(closed_pnl, 2),
+        "all_coin": round(all_pnl, 2),
+        "closed_pct": round(closed_pnl / starting_capital * 100, 2) if starting_capital else 0.0,
+        "all_pct": round(all_pnl / starting_capital * 100, 2) if starting_capital else 0.0,
+    }
+    stats = {
+        "trade_count": len(closed_trades) + len(open_trades),
+        "closed_trade_count": len(closed_trades),
+        "winning_trades": len(wins),
+        "losing_trades": len(losses),
+        "winrate": len(wins) / len(closed_trades) if closed_trades else 0.0,
+        "profit_factor": round(gross_profit / gross_loss, 4) if gross_loss else None,
+        "gross_profit": round(gross_profit, 4),
+        "gross_loss": round(gross_loss, 4),
+        "sharpe": None,
+        "sortino": None,
+        "max_drawdown": 0.0,
+        "best_pair": per_pair[0]["pair"] if per_pair else None,
+        "best_pair_pct": None,
+        "avg_duration": round(sum(durations) / len(durations), 1) if durations else None,
+        "scope": "epoch",
+    }
+    return pnl, stats, closed_pnl
+
+
+def _parse_ts_ms(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, (int, float)):
+        return int(value if value > 1e12 else value * 1000)
+    try:
+        return int(datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp() * 1000)
+    except (ValueError, TypeError):
+        return None
+
+
+def _timeframe_seconds(timeframe: str | None) -> int:
+    match = re.fullmatch(r"(\d+)([mhdw])", timeframe or "")
+    if not match:
+        return 300
+    amount, unit = int(match.group(1)), match.group(2)
+    return amount * {"m": 60, "h": 3600, "d": 86400, "w": 604800}[unit]
+
+
+def _candle_readiness(bot: dict, payload: dict | None, timeframe: str | None) -> dict:
+    """Summarize the latest analyzed dataframe into an operator-facing gate."""
+    if not payload:
+        return {
+            "status": "unavailable", "label": "feed unavailable",
+            "detail": "pair telemetry endpoint returned no data",
+            "gate": bot.get("entry_gate_label"), "healthy": False,
+        }
+    columns = payload.get("columns") or []
+    rows = payload.get("data") or []
+    mapped = [dict(zip(columns, row)) for row in rows if isinstance(row, list)]
+    latest = mapped[-1] if mapped else {}
+    analyzed_ts = _parse_ts_ms(payload.get("last_analyzed_ts") or payload.get("last_analyzed"))
+    candle_ts = _parse_ts_ms(payload.get("data_stop_ts") or latest.get("date"))
+    age_s = max(0, int(time.time() - analyzed_ts / 1000)) if analyzed_ts else None
+    healthy = age_s is not None and age_s <= max(180, _timeframe_seconds(timeframe) * 2)
+
+    signal_rows = [r for r in mapped if (r.get("enter_long") or r.get("enter_short"))]
+    last_signal_ts = _parse_ts_ms(signal_rows[-1].get("date")) if signal_rows else None
+    status, label = ("ready", "feed fresh · scanning") if healthy else ("stale", "analysis stale")
+    detail = bot.get("entry_gate_label") or "waiting for entry conditions"
+    if bot["key"] == "oi-trend":
+        growth = latest.get("oi_growth")
+        btc_trend = latest.get("btc_trend")
+        if growth is None or (isinstance(growth, float) and math.isnan(growth)):
+            status, label, detail = "warming", "building OI baseline", "fresh 45-minute OI baseline not ready"
+        elif float(growth) < 0.02:
+            detail = f"OI growth {float(growth) * 100:.2f}% · needs 2.00%"
+        elif float(btc_trend or 0) != 1:
+            detail = "OI gate passed · BTC trend gate blocked"
+        else:
+            detail = "OI and BTC gates passed · waiting for EMA20 reclaim"
+    if signal_rows and last_signal_ts:
+        label = "signal observed"
+    return {
+        "status": status, "label": label, "detail": detail,
+        "gate": bot.get("entry_gate_label"), "healthy": healthy,
+        "pair": payload.get("pair"), "timeframe": timeframe,
+        "last_analyzed_ts_ms": analyzed_ts, "last_candle_ts_ms": candle_ts,
+        "analysis_age_s": age_s, "last_signal_ts_ms": last_signal_ts,
+        "signals_in_window": len(signal_rows),
+        "metrics": {
+            key: latest.get(key) for key in ("oi_growth", "btc_trend", "funding_rate")
+            if key in latest
+        },
+    }
+
+
+def _receiver_readiness(bot: dict, health: dict | None, ingress: dict | None, err: str | None) -> dict:
+    rows = (ingress or {}).get("ingress", []) if isinstance(ingress, dict) else []
+    last = rows[0] if rows else None
+    last_ts = _parse_ts_ms((last or {}).get("received_at"))
+    cutoff_ms = int((time.time() - 86400) * 1000)
+    signals_24h = sum(1 for row in rows if (_parse_ts_ms(row.get("received_at")) or 0) >= cutoff_ms)
+    healthy = bool((health or {}).get("ok")) and err is None
+    return {
+        "status": "ready" if healthy else "unavailable",
+        "label": "receiver online · waiting for channel signal" if healthy else "receiver unavailable",
+        "detail": ((f"last {last.get('kind') or 'event'} · {last.get('final_action') or 'processing'}")
+                   if last else "no channel events recorded in the current window"),
+        "gate": bot.get("entry_gate_label"), "healthy": healthy,
+        "last_signal_ts_ms": last_ts, "signals_24h": signals_24h,
+        "last_action": (last or {}).get("final_action"), "error": err,
+    }
+
+
+def _has_native_stop_order(trade: dict) -> bool:
+    for order in trade.get("orders") or []:
+        side = str(order.get("ft_order_side") or order.get("order_type") or "").lower()
+        if "stop" in side:
+            return True
+    return False
+
+
+def _native_stop_verification(bot: dict, open_trades: list[dict], closed_trades: list[dict]) -> dict:
+    if bot.get("venue") != "hyperliquid":
+        return {"status": "not-applicable", "label": "spot protection", "expected": False}
+    if any(_has_native_stop_order(t) for t in open_trades + closed_trades):
+        return {
+            "status": "verified", "label": "native stop verified", "expected": True,
+            "detail": "exchange stop order observed in the live epoch",
+        }
+    if not open_trades:
+        return {
+            "status": "awaiting-first-fill", "label": "awaiting first fill", "expected": True,
+            "detail": "verification starts when the first live position opens",
+        }
+    oldest_open = min(
+        (_parse_ts_ms(t.get("open_timestamp")) or int(time.time() * 1000))
+        for t in open_trades
+    )
+    age_s = max(0, time.time() - oldest_open / 1000)
+    if age_s <= 120:
+        return {
+            "status": "awaiting-stop", "label": "fill seen · checking stop", "expected": True,
+            "detail": "allowing the venue order a 120-second placement window",
+        }
+    return {
+        "status": "missing", "label": "native stop not observed", "expected": True,
+        "detail": "an open Hyperliquid trade has no stop order in its order payload",
+    }
+
+
 # ── New helpers: links, 24h delta, equity annotations ─────────────────────────
 
 def _bot_links(bot: dict, open_trades: list[dict], per_pair: list[dict]) -> dict:
@@ -729,25 +977,45 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     balance, balance_err = results[2]
     cfg, cfg_err = results[3]
     whitelist, _ = results[4]
-    trades_resp, _ = await _get(client, bot["url"], "trades?limit=200")
 
     err = profit_err or balance_err or cfg_err
     if err:
         return {"key": bot["key"], "error": err, "reachable": False}
 
     open_trades = status if isinstance(status, list) else []
-    closed_trades = (trades_resp or {}).get("trades", []) if trades_resp else []
     epoch_start_ts_ms = int(
         bot.get("epoch_start_ts_ms")
         or (bot.get("lineage") or {}).get("transition_ts_ms")
         or 0
     )
-    if epoch_start_ts_ms:
-        closed_trades = [
-            trade for trade in closed_trades
-            if int(trade.get("close_timestamp") or 0) >= epoch_start_ts_ms
-        ]
+    closed_trades, history_complete, history_error = await _fetch_epoch_trades(
+        client, bot, epoch_start_ts_ms
+    )
+    _trade_cache[bot["key"]] = closed_trades
     all_trades = closed_trades + open_trades
+
+    readiness: dict
+    if bot.get("receiver_url"):
+        receiver_health, receiver_health_err = await _get_plain(
+            client, bot["receiver_url"], "healthz"
+        )
+        receiver_ingress, receiver_ingress_err = await _get_plain(
+            client, bot["receiver_url"], "ingress?limit=100"
+        )
+        readiness = _receiver_readiness(
+            bot, receiver_health, receiver_ingress,
+            receiver_health_err or receiver_ingress_err,
+        )
+    else:
+        pairs = (whitelist or {}).get("whitelist", []) if whitelist else []
+        timeframe = (cfg or {}).get("timeframe") or "5m"
+        candles = None
+        if pairs:
+            candles, _ = await _get(
+                client, bot["url"],
+                f"pair_candles?pair={quote(pairs[0], safe='')}&timeframe={quote(timeframe, safe='')}&limit=200",
+            )
+        readiness = _candle_readiness(bot, candles, timeframe)
 
     starting_capital = float((balance or {}).get("starting_capital") or 0.0)
     bot_owned = float((balance or {}).get("total_bot") or 0.0)
@@ -759,14 +1027,16 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     days_running = (time.time() - bot_start_ts) / 86400.0 if bot_start_ts else 0
 
     per_pair = _per_pair_pnl(closed_trades)
-    closed_pnl = float((profit or {}).get("profit_closed_coin") or 0.0)
+    epoch_pnl, epoch_stats, closed_pnl = _epoch_stats(
+        closed_trades, open_trades, starting_capital
+    )
     bot_start_ts_ms = int(bot_start_ts * 1000) if bot_start_ts else 0
     live_equity = _equity_curve_live(closed_trades, open_trades, starting_capital, bot_start_ts_ms)
     drawdown_curve = _drawdown_curve(live_equity)
 
     # ── New: compute current DD % for dd_breach check ──────────────────────
-    current_dd_pct = (profit or {}).get("max_drawdown", 0.0) or 0.0
-    current_dd_pct *= 100  # Freqtrade returns ratio (e.g. 0.05 = 5%)
+    current_dd_pct = abs(min((point[1] for point in drawdown_curve), default=0.0))
+    epoch_stats["max_drawdown"] = current_dd_pct / 100
 
     # ── New: no-baseline bots (killers-scalp) ─────────────────────────────
     no_baseline = bot.get("no_baseline", False)
@@ -822,26 +1092,8 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             "bot_owned": round(bot_owned, 2),
             "total": round(float((balance or {}).get("total") or 0.0), 2),
         },
-        "pnl": {
-            "closed": round(closed_pnl, 2),
-            "all_coin": round(float((profit or {}).get("profit_all_coin") or 0.0), 2),
-            "closed_pct": round(float((profit or {}).get("profit_closed_percent") or 0.0), 2),
-            "all_pct": round(float((profit or {}).get("profit_all_percent") or 0.0), 2),
-        },
-        "stats": {
-            "trade_count": int((profit or {}).get("trade_count") or 0),
-            "closed_trade_count": int((profit or {}).get("closed_trade_count") or 0),
-            "winning_trades": int((profit or {}).get("winning_trades") or 0),
-            "losing_trades": int((profit or {}).get("losing_trades") or 0),
-            "winrate": float((profit or {}).get("winrate") or 0.0),
-            "profit_factor": (profit or {}).get("profit_factor"),
-            "sharpe": (profit or {}).get("sharpe"),
-            "sortino": (profit or {}).get("sortino"),
-            "max_drawdown": float((profit or {}).get("max_drawdown") or 0.0),
-            "best_pair": (profit or {}).get("best_pair"),
-            "best_pair_pct": (profit or {}).get("best_rate"),
-            "avg_duration": (profit or {}).get("avg_duration"),
-        },
+        "pnl": epoch_pnl,
+        "stats": epoch_stats,
         "open_trades": open_trades_out,
         "recent_trades": [
             {
@@ -872,6 +1124,19 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "account_group": bot.get("account_group", bot["key"]),
         "strategy_kind": bot.get("strategy_kind", "autonomous-quant"),
         "venue": bot.get("venue", "binance"),
+        "epoch_start_ts_ms": epoch_start_ts_ms,
+        "epoch": {
+            "start_ts_ms": epoch_start_ts_ms,
+            "label": bot.get("epoch_label", "current live epoch"),
+            "version": bot.get("strategy_version", bot["name"]),
+            "days": round(days_running, 1),
+        },
+        "history": {
+            "scope": "epoch", "complete": history_complete,
+            "count": len(closed_trades), "error": history_error,
+        },
+        "readiness": readiness,
+        "native_stop": _native_stop_verification(bot, open_trades, closed_trades),
         # Public transition metadata only. The DB path is deliberately kept
         # server-side; the equity endpoint exposes the sanitized curve data.
         "lineage": ({k: v for k, v in bot.get("lineage", {}).items()
@@ -888,12 +1153,15 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "whitelist_size": len((whitelist or {}).get("whitelist", [])) if whitelist else None,
         # ── NEW: additive fields (frontend feature-detects these) ──────────
         "links": _bot_links(bot, open_trades_out, per_pair),
-        "delta_24h": _delta_24h(
-            closed_trades,
-            current_dd_pct,
-            baseline if baseline_comparable else None,
-            bot,
-        ),
+        "delta_24h": {
+            **_delta_24h(
+                closed_trades,
+                current_dd_pct,
+                baseline if baseline_comparable else None,
+                bot,
+            ),
+            "signals_observed": readiness.get("signals_24h", 0),
+        },
         "equity_annotations": _equity_annotations(bot["key"]),
     }
 
@@ -1344,18 +1612,16 @@ async def api_killers_state():
 async def api_closed_trades():
     """Aggregate closed trades across the fleet for the trades tab.
 
-    Reuses the snapshot cache's recent_trades (last 30 per bot, already in
-    timestamp form). Returns a flat list sorted newest-first with everything
-    a chart card needs: pair, timestamps, entry/exit rates, stoploss pct,
-    exit reason, win flag, bot identity for color theming.
+    Uses the server-side complete, paginated epoch ledger. Returns a flat list
+    sorted newest-first with everything a chart card needs.
     """
     out: list[dict] = []
     for bot in BOTS:
-        snap = _cache["bots"].get(bot["key"])
-        if not snap:
+        trades = _trade_cache.get(bot["key"])
+        if trades is None:
             continue
         baseline = bot.get("baseline") or {}
-        for t in snap.get("recent_trades", []):
+        for t in trades:
             if t.get("is_open") or not t.get("close_timestamp"):
                 continue
             entry = t.get("open_rate")
