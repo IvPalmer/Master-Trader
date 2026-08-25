@@ -194,7 +194,7 @@ References: Freqtrade
 [stop-loss documentation](https://docs.freqtrade.io/en/stable/stoploss/) and
 [strategy callback documentation](https://www.freqtrade.io/en/stable/strategy-callbacks/).
 
-## Third-round final verification
+## Third-round verification
 
 The final review reservations were closed by source commits `8bb1952` and
 `ca1d374`, deployed through `vps-deploy` merge `ab3ab07` on 2026-08-24.
@@ -220,6 +220,34 @@ The final review reservations were closed by source commits `8bb1952` and
   level is green, all six bots are reachable, poll errors are empty, every live
   book is empty, and the OI log has no strategy load/runtime error.
 
-No unresolved code or measurement finding remains from review rounds 1–3. The
+At the close of round 3, no code or measurement finding remained from those
+three review rounds. The following review found and closed an additional OI
+callback lifecycle defect.
+
+## Fourth-round OI callback verification
+
+Round 4 found that `custom_exit` could evaluate the same analyzed candle that
+opened the trade. That removed the dataframe entry veto but could still create
+an enter-at-open/exit-seconds-later churn whenever the reclaim signal was below
+EMA50.
+
+- The callback now compares the analyzed candle's OHLCV opening timestamp with
+  `trade.open_date_utc` and returns no signal unless the candle began strictly
+  after the trade opened. This guarantees one complete post-entry candle before
+  the EMA50 exit becomes eligible.
+- Missing/empty analyzed data, missing or invalid timestamps, timezone-naive
+  values, NaN indicators, and prices above EMA50 all fail to a safe no-op. The
+  hard stop, trailing stop, and ROI schedule remain independent.
+- The focused contract retains both properties: dataframe exits remain zero so
+  entries are not vetoed, and an existing trade exits below EMA50 only after a
+  complete post-entry candle. All 189 focused tests remain green.
+- Source commit `3a5e515` was deployed through `vps-deploy` merge `93bb408`.
+  Only OI restarted. It became executable-ready at
+  `2026-08-25T01:04:41.124Z` with zero open/closed live trades; this is its new
+  current measurement epoch. Killers and Insiders retain their round-3 epochs.
+
+No unresolved code or measurement finding remains from review rounds 1–4. The
 venue-only observation item remains: inspect the actual reduce-only stop order
-after the first organic Hyperliquid fill.
+after the first organic Hyperliquid fill. Dashboard lifetime aggregates and
+the 200-trade API window are tracked as non-impacting future-epoch technical
+debt; all current live epoch databases are empty and uncontaminated.
