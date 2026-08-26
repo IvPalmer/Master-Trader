@@ -85,6 +85,14 @@ class Config:
         ))
         if not 0 < self.stop_limit_ratio <= 1:
             raise ValueError("KILLERS_STOP_LIMIT_RATIO must be in (0, 1]")
+        # Smallest notional (stake × leverage) the venue will accept, matched
+        # to Freqtrade's effective floor: Hyperliquid $10 minimum order ×
+        # 1.05 amount reserve ÷ 0.93 stop buffer (class stoploss -0.07)
+        # ≈ $11.29. Entries risk-sized below this cannot fill at the $1 risk
+        # contract and are skipped instead of bumped.
+        self.min_notional_usd = float(os.environ.get(
+            "KILLERS_MIN_NOTIONAL_USD", "11.3",
+        ))
         self.require_posted_sl = os.environ.get(
             "KILLERS_REQUIRE_POSTED_SL", "true"
         ).lower() in ("true", "1", "yes")
@@ -1997,6 +2005,14 @@ def _format_event_summary(cfg: Config, payload: EventPayload, result: dict) -> O
     if action == "force_enter":
         pos = result.get("pos_id", "?")
         ft  = (result.get("ft") or {}).get("status", "?")
+        # A non-2xx Freqtrade response means NO position was opened (e.g. the
+        # strategy's custom_stake_amount risk backstop rejected the stake).
+        # Announcing "OPEN" here misreads as a filled position — 2026-08-25
+        # UNI #2213 alert incident.
+        ft_ok = isinstance(ft, int) and 200 <= ft < 300
+        if not ft_ok:
+            return (f"❌ {head} ENTRY FAILED · #{sig} {sym} {direc}  · "
+                    f"pos={pos} ft_status={ft} — no position opened")
         remaining = result.get("remaining_targets") or []
         sig_targets = result.get("signal_targets") or []
         tgt_tail = ""
@@ -2018,6 +2034,10 @@ def _format_event_summary(cfg: Config, payload: EventPayload, result: dict) -> O
         entry_hi = result.get("entry_hi", "?")
         return (f"🚫 {head} SKIPPED · #{sig} {sym} {direc}  · "
                 f"slippage {slip}% > {cap}% (entry {entry_lo}-{entry_hi}, mark {mark})")
+    if action == "skipped" and reason == "below_venue_min_notional":
+        return (f"🚫 {head} SKIPPED · #{sig} {sym} {direc}  · "
+                f"risk-sized notional ${result.get('notional_usd', '?')} < venue min "
+                f"${result.get('min_notional_usd', '?')} — $1-risk cap preserved")
     if action == "skipped" and reason == "entry_bounds_missing":
         cap = result.get("max_slippage_pct", "?")
         return (f"🚫 {head} SKIPPED · #{sig} {sym} {direc}  · "
@@ -2383,6 +2403,22 @@ async def _process_event(payload: EventPayload):
                 "reason": "risk_below_exchange_minimum",
                 "risk_usd": cfg.risk_usd,
                 "min_margin_usd": cfg.min_margin_usd,
+                "effective_entry": target_ref,
+                "sl_distance_pct": sl_dist,
+            }
+        # Loss at the posted stop is notional × sl_dist, so a venue minimum
+        # notional puts a hard floor under the achievable risk. When the
+        # risk-sized notional lands below that floor, Freqtrade's
+        # custom_stake_amount backstop would reject the entry anyway (2026-08-25
+        # UNI #2213: $8.47 < $11.29 minimum → 502). Skip here with a clean
+        # reason instead of firing a forceenter that cannot succeed.
+        if stake * leverage < cfg.min_notional_usd:
+            return {
+                "action": "skipped",
+                "reason": "below_venue_min_notional",
+                "risk_usd": cfg.risk_usd,
+                "notional_usd": round(stake * leverage, 2),
+                "min_notional_usd": cfg.min_notional_usd,
                 "effective_entry": target_ref,
                 "sl_distance_pct": sl_dist,
             }

@@ -27,7 +27,7 @@ class _FakeAppState:
         self.notify_tasks = set()
 
 
-def _setup(conn_path, *, max_slip=3.0):
+def _setup(conn_path, *, max_slip=3.0, min_notional="0"):
     """Stage app.state + Config so _process_event runs without FastAPI."""
     import os
     # Point Config at the temp DB; cap from the test param.
@@ -37,6 +37,10 @@ def _setup(conn_path, *, max_slip=3.0):
     # a breach skips (not rests a limit). The limit-on-breach path is
     # covered by test_limit_in_zone.py.
     os.environ["KILLERS_ENTRY_LIMIT_IN_ZONE"] = "false"
+    # Always pin the venue-minimum-notional gate so tests are deterministic
+    # regardless of execution order. "0" disables it for legacy-contract
+    # tests; the gate has its own dedicated test below.
+    os.environ["KILLERS_MIN_NOTIONAL_USD"] = str(min_notional)
     cfg = receiver_main.Config()
     conn = receiver_main.init_db(cfg.db_path)
     state = _FakeAppState(conn, cfg)
@@ -226,6 +230,29 @@ def test_force_enter_embeds_posted_stop_in_entry_tag():
     assert result["action"] == "force_enter"
     assert captured["entry_tag"] == "signal:2144|sl:52"
     assert result["entry_tag"] == captured["entry_tag"]
+
+
+def test_open_skipped_when_risk_sized_notional_below_venue_minimum():
+    """2026-08-25 UNI #2213: wide stop → $1-risk notional below the venue
+    minimum. The receiver must skip cleanly instead of firing a forceenter
+    that Freqtrade's custom_stake_amount backstop will 502."""
+    with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as tf:
+        _setup(tf.name, max_slip=3.0, min_notional="11.3")
+    payload = _hype_fast_path_payload(msg_id=999007)
+
+    async def fake_mark(*args, **kwargs):
+        # SL 52 → adverse stop fill 50.96; distance from 58 ≈ 12.1% →
+        # stake ≈ $8.24 at 1x, notional ≈ $8.24 < $11.3.
+        return 58.0
+
+    with patch.object(receiver_main, "get_execution_mark_price",
+                      side_effect=fake_mark):
+        result = _run(receiver_main._process_event(payload))
+
+    assert result["action"] == "skipped"
+    assert result["reason"] == "below_venue_min_notional"
+    assert result["min_notional_usd"] == 11.3
+    assert result["notional_usd"] < 11.3
 
 
 if __name__ == "__main__":

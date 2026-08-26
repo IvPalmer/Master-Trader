@@ -42,6 +42,11 @@ def _setup(conn_path, *, max_slip=3.0, limit_in_zone=True):
     # Active TP placement off here — we only exercise the entry decision, and
     # leaving it on would try to arm a ladder against a non-running FT.
     os.environ["KILLERS_ACTIVE_TP_LIMITS"] = "false"
+    # These tests assert the limit-in-zone contract with the wide-stop
+    # HYPE fixture; disable the venue-minimum-notional gate (covered by
+    # its own test in test_slippage_integration.py) so it cannot skip
+    # the entry first.
+    os.environ["KILLERS_MIN_NOTIONAL_USD"] = "0"
     cfg = receiver_main.Config()
     conn = receiver_main.init_db(cfg.db_path)
     state = _FakeAppState(conn, cfg)
