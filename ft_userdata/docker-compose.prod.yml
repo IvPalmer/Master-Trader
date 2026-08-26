@@ -121,6 +121,7 @@ services:
       # user_data/configs/KillersScalpV1.json. Risk sizing uses the adverse
       # limit-fill price, not merely the trigger price.
       KILLERS_STOP_LIMIT_RATIO: "0.98"
+      KILLERS_MIN_NOTIONAL_USD: "11.3"
       KILLERS_REQUIRE_POSTED_SL: "true"
       KILLERS_MAX_OPEN: "5"
       # Posted-SL hard-stop mode ON (2026-06-06): force-exit a position once
@@ -251,6 +252,7 @@ services:
       KILLERS_MAX_MARGIN_USD: "10"
       KILLERS_MAX_LEVERAGE: "3"
       KILLERS_STOP_LIMIT_RATIO: "0.98"
+      KILLERS_MIN_NOTIONAL_USD: "11.3"
       KILLERS_REQUIRE_POSTED_SL: "true"
       KILLERS_MAX_OPEN: "5"
       KILLERS_POSTED_SL: "true"
