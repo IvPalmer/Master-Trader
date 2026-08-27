@@ -113,7 +113,11 @@ services:
       # Fresh Hyperliquid epoch; the former Binance dry database remains in
       # the volume as receiver.sqlite for historical audit.
       KILLERS_DB: /var/lib/killers/receiver-hyperliquid.sqlite
-      KILLERS_RISK_USD: "1"
+      # $2 risk (2026-08-27): with the $11.3 venue-minimum notional, $1 risk
+      # capped admissible stop distance at 8.8% while the channel posts
+      # 11.8-13% stops - 3 of the first 4 live signals were structurally
+      # ineligible. $2 admits stops up to 17.7% (~2% of bot equity per trade).
+      KILLERS_RISK_USD: "2"
       KILLERS_MIN_MARGIN_USD: "5"
       KILLERS_MAX_MARGIN_USD: "10"
       KILLERS_MAX_LEVERAGE: "3"
@@ -249,7 +253,10 @@ services:
       KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
       KILLERS_DB: /var/lib/killers/receiver-hyperliquid.sqlite
-      KILLERS_RISK_USD: "1"
+      # $1.50 risk (2026-08-27): same wide-stop admission logic as killers
+      # (admits stops up to 13.3%), scaled to the smaller 50 USDC account
+      # (~3% of bot equity per trade).
+      KILLERS_RISK_USD: "1.5"
       KILLERS_MIN_MARGIN_USD: "5"
       KILLERS_MAX_MARGIN_USD: "10"
       KILLERS_MAX_LEVERAGE: "3"

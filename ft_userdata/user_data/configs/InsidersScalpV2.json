@@ -12,7 +12,8 @@
     "max_open_trades": 5,
     "amount_reserve_percent": 0.05,
     "unfilledtimeout": {
-        "entry": 240,
+        "_entry_note": "24h zone patience (2026-08-27): the channel's retracement zones routinely fill 8-24h after broadcast (ETC #2215 filled 11h in, +4.7% to TP1, missed by the old 4h expiry). A limit crossing toward the SL fills first, so loss stays bounded by the posted-SL warden + native stop.",
+        "entry": 1440,
         "exit": 43200,
         "exit_timeout_count": 0,
         "unit": "minutes"
