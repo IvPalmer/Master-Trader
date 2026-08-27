@@ -48,6 +48,11 @@ log = logging.getLogger("ft-dashboard")
 # Every affected live DB was empty at its cutover.
 KILLERS_ROUND3_EPOCH_TS_MS = 1787589161248  # 2026-08-24T16:32:41.248Z
 INSIDERS_ROUND3_EPOCH_TS_MS = 1787589161684  # 2026-08-24T16:32:41.684Z
+# Round-5 epochs (2026-08-27): risk contract widened to admit the channel's
+# wide stops ($2/$1.50 stop-risk) and entry limits now wait 24h in the zone
+# instead of 4h. Both copy-trader DBs had zero trades at this cutover.
+KILLERS_ROUND5_EPOCH_TS_MS = 1787854748304  # 2026-08-27T18:19:08.304Z
+INSIDERS_ROUND5_EPOCH_TS_MS = 1787854752005  # 2026-08-27T18:19:12.005Z
 OI_ROUND4_EPOCH_TS_MS = 1787619881124  # 2026-08-25T01:04:41.124Z
 
 BOTS: list[dict[str, Any]] = [
@@ -171,16 +176,16 @@ BOTS: list[dict[str, Any]] = [
         # deterministic quant strategy; the dashboard should show realised
         # performance without comparing it to an invented backtest baseline.
         "venue": "hyperliquid",
-        "epoch_start_ts_ms": KILLERS_ROUND3_EPOCH_TS_MS,
-        "epoch_label": "round 3 · post-mark risk sizing",
-        "strategy_version": "KillersScalpV1 · r3",
+        "epoch_start_ts_ms": KILLERS_ROUND5_EPOCH_TS_MS,
+        "epoch_label": "round 5 · wide-stop admission · 24h zone patience",
+        "strategy_version": "KillersScalpV1 · r5",
         "entry_gate_label": "external signal + valid zone + posted stop",
         "receiver_url": "http://killers-receiver:8089",
         "lineage": {
             "legacy_db": "tradesv3.dryrun.KillersScalpV1.sqlite",
             "legacy_starting_capital": 200.0,
-            "transition_ts_ms": KILLERS_ROUND3_EPOCH_TS_MS,
-            "transition_label": "live + post-mark risk sizing",
+            "transition_ts_ms": KILLERS_ROUND5_EPOCH_TS_MS,
+            "transition_label": "live + wide-stop admission",
             "legacy_label": "Binance futures dry-run",
             "live_label": "Hyperliquid live",
         },
@@ -204,16 +209,16 @@ BOTS: list[dict[str, Any]] = [
         "account_group": "hyperliquid-insiders",
         "strategy_kind": "copy-trader",
         "venue": "hyperliquid",
-        "epoch_start_ts_ms": INSIDERS_ROUND3_EPOCH_TS_MS,
-        "epoch_label": "round 3 · post-mark risk sizing",
-        "strategy_version": "InsidersScalp · r3",
+        "epoch_start_ts_ms": INSIDERS_ROUND5_EPOCH_TS_MS,
+        "epoch_label": "round 5 · wide-stop admission · 24h zone patience",
+        "strategy_version": "InsidersScalp · r5",
         "entry_gate_label": "external signal + valid zone + posted stop",
         "receiver_url": "http://insiders-receiver:8089",
         "lineage": {
             "legacy_db": "tradesv3.dryrun.InsidersScalpV2.sqlite",
             "legacy_starting_capital": 200.0,
-            "transition_ts_ms": INSIDERS_ROUND3_EPOCH_TS_MS,
-            "transition_label": "live + post-mark risk sizing",
+            "transition_ts_ms": INSIDERS_ROUND5_EPOCH_TS_MS,
+            "transition_label": "live + wide-stop admission",
             "legacy_label": "Binance futures dry-run",
             "live_label": "Hyperliquid live",
         },
