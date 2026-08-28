@@ -1,0 +1,16 @@
+{
+  "id": "20260823_224432",
+  "timestamp": "2026-08-23T22:44:32Z",
+  "note": "test snapshot",
+  "parameters": {
+    "stoploss": -0.045,
+    "trailing_stop": "False",
+    "timeframe": "1h",
+    "minimal_roi": "\"0\":    0.08,\n        \"360\":  0.05,\n        \"720\":  0.03,\n        \"1440\": 0.02,",
+    "_file_hash": "c5775aad8e99"
+  },
+  "config": {},
+  "metrics": {
+    "error": "no database found"
+  }
+}

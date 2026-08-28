@@ -1,0 +1,24 @@
+{
+  "id": "20260823_224432",
+  "timestamp": "2026-08-23T22:44:32Z",
+  "note": "test snapshot",
+  "parameters": {
+    "stoploss": -0.1,
+    "trailing_stop": "False",
+    "timeframe": "5m",
+    "can_short": "True",
+    "minimal_roi": "\"0\": 100.0",
+    "_file_hash": "840108c6f682"
+  },
+  "config": {
+    "dry_run": true,
+    "dry_run_wallet": 200,
+    "max_open_trades": 5,
+    "stake_amount": "unlimited",
+    "stoploss_on_exchange": true,
+    "trading_mode": "futures"
+  },
+  "metrics": {
+    "error": "no database found"
+  }
+}
