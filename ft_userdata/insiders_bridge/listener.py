@@ -67,6 +67,9 @@ class Config:
         self.receiver_url = os.getenv(
             "INSIDERS_RECEIVER_URL", "http://insiders-receiver:8089/event"
         )
+        # Receiver ingress bearer. Empty → the receiver answers 401, which the
+        # non-retryable 4xx branch in _post_to_receiver logs at ERROR.
+        self.receiver_token = os.getenv("INSIDERS_RECEIVER_TOKEN", "")
         self.event_store = os.getenv(
             "INSIDERS_EVENT_STORE", "/var/lib/insiders/events.sqlite"
         )
@@ -190,9 +193,11 @@ async def run(config: Config, conn: sqlite3.Connection) -> None:
             "reason": reason,
             "last_msg_at": datetime.now(timezone.utc).isoformat(),
         }
+        token = getattr(config, "receiver_token", "")
+        headers = {"Authorization": f"Bearer {token}"} if token else None
         try:
             async with aiohttp.ClientSession() as s:
-                async with s.post(url, json=body,
+                async with s.post(url, json=body, headers=headers,
                                   timeout=aiohttp.ClientTimeout(total=5)) as r:
                     logger.info("session-status POST connected=%s → HTTP %d",
                                 connected, r.status)
@@ -330,11 +335,13 @@ async def _post_to_receiver(conn, config, payload):
     """
     import aiohttp
     msg_id = payload["msg_id"]
+    token = getattr(config, "receiver_token", "")
+    headers = {"Authorization": f"Bearer {token}"} if token else None
     async with aiohttp.ClientSession() as session:
         for attempt_num, backoff in enumerate(RETRY_BACKOFFS, start=1):
             try:
                 async with session.post(
-                    config.receiver_url, json=payload,
+                    config.receiver_url, json=payload, headers=headers,
                     timeout=aiohttp.ClientTimeout(total=10),
                 ) as r:
                     body = await r.text()

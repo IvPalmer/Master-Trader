@@ -30,7 +30,7 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import httpx
 import yaml
@@ -181,6 +181,7 @@ BOTS: list[dict[str, Any]] = [
         "strategy_version": "KillersScalpV1 · r5",
         "entry_gate_label": "external signal + valid zone + posted stop",
         "receiver_url": "http://killers-receiver:8089",
+        "receiver_token_env": "KILLERS_RECEIVER_TOKEN",
         "lineage": {
             "legacy_db": "tradesv3.dryrun.KillersScalpV1.sqlite",
             "legacy_starting_capital": 200.0,
@@ -214,6 +215,7 @@ BOTS: list[dict[str, Any]] = [
         "strategy_version": "InsidersScalp · r5",
         "entry_gate_label": "external signal + valid zone + posted stop",
         "receiver_url": "http://insiders-receiver:8089",
+        "receiver_token_env": "INSIDERS_RECEIVER_TOKEN",
         "lineage": {
             "legacy_db": "tradesv3.dryrun.InsidersScalpV2.sqlite",
             "legacy_starting_capital": 200.0,
@@ -397,9 +399,40 @@ def _bot_events(bot_key: str) -> list[dict]:
 
 
 # ── HTTP ───────────────────────────────────────────────────────────────────
+# Per-bot Freqtrade API credentials, keyed by the host in each bot's url (the
+# container name on the compose network). Mirrors api_utils.SERVICE_API_SLUGS;
+# the dashboard is built from its own context and cannot import it, so
+# tests/test_fleet_hardening_2026_08_30.py locks the two together with compose.
+# A bot with no per-bot secret issued falls through to the shared pair, so
+# adoption is incremental and a fleet with none set behaves as it always did.
+SERVICE_API_SLUGS = {
+    "ft-keltner-bounce": "KELTNER",
+    "keltnerbouncev1": "KELTNER",
+    "ft-funding-fade": "FUNDINGFADE",
+    "fundingfadev1": "FUNDINGFADE",
+    "ft-oi-trend-pullback": "OITREND",
+    "oi-trend-pullback": "OITREND",
+    "ft-killers-scalp": "KILLERS",
+    "ft-insiders-scalp": "INSIDERS",
+    "ft-short-keltner-hl-live": "SHORTKELTNER",
+}
+
+
+def _api_auth(url: str) -> tuple[str, str]:
+    """Credentials for one bot: its own if issued, else the fleet pair."""
+    host = urlparse(url).hostname or ""
+    slug = SERVICE_API_SLUGS.get(host)
+    if slug:
+        user = os.environ.get(f"FT_API_USER_{slug}")
+        password = os.environ.get(f"FT_API_PASS_{slug}")
+        if user and password:
+            return (user, password)
+    return (API_USER, API_PASS)
+
+
 async def _get(client: httpx.AsyncClient, url: str, path: str) -> tuple[Any, str | None]:
     try:
-        r = await client.get(f"{url}/api/v1/{path}", auth=(API_USER, API_PASS), timeout=REQUEST_TIMEOUT)
+        r = await client.get(f"{url}/api/v1/{path}", auth=_api_auth(url), timeout=REQUEST_TIMEOUT)
         if r.status_code == 200:
             return r.json(), None
         return None, f"HTTP {r.status_code}"
@@ -407,10 +440,29 @@ async def _get(client: httpx.AsyncClient, url: str, path: str) -> tuple[Any, str
         return None, f"{type(exc).__name__}: {exc}"
 
 
-async def _get_plain(client: httpx.AsyncClient, url: str, path: str) -> tuple[Any, str | None]:
+def _receiver_headers(bot: dict) -> dict[str, str]:
+    """Bearer header for a bot's signal receiver, empty when unconfigured.
+
+    The receivers authenticate every route but /healthz. Each has its own
+    token so a leak of one cannot drive the other funded account, hence the
+    per-bot env name rather than one shared value.
+    """
+    env_name = bot.get("receiver_token_env")
+    token = os.environ.get(env_name, "").strip() if env_name else ""
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+async def _get_plain(
+    client: httpx.AsyncClient,
+    url: str,
+    path: str,
+    headers: dict[str, str] | None = None,
+) -> tuple[Any, str | None]:
     """GET a dashboard-adjacent service without the Freqtrade URL prefix."""
     try:
-        r = await client.get(f"{url}/{path.lstrip('/')}", timeout=REQUEST_TIMEOUT)
+        r = await client.get(
+            f"{url}/{path.lstrip('/')}", timeout=REQUEST_TIMEOUT, headers=headers
+        )
         if r.status_code == 200:
             return r.json(), None
         return None, f"HTTP {r.status_code}"
@@ -1128,11 +1180,15 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
 
     readiness: dict
     if bot.get("receiver_url"):
+        # /healthz stays unauthenticated on purpose (Docker healthcheck), so
+        # reachability is still reported even if the token is misconfigured —
+        # the ingress error then localises the fault to auth, not the network.
+        receiver_headers = _receiver_headers(bot)
         receiver_health, receiver_health_err = await _get_plain(
             client, bot["receiver_url"], "healthz"
         )
         receiver_ingress, receiver_ingress_err = await _get_plain(
-            client, bot["receiver_url"], "ingress?limit=100"
+            client, bot["receiver_url"], "ingress?limit=100", receiver_headers
         )
         readiness = _receiver_readiness(
             bot, receiver_health, receiver_ingress,
@@ -1882,7 +1938,7 @@ async def api_candles(bot_key: str, pair: str, timeframe: str = "1h", limit: int
         async with httpx.AsyncClient() as client:
             r = await client.get(
                 f"{bot['url']}/api/v1/pair_candles",
-                auth=(API_USER, API_PASS),
+                auth=_api_auth(bot['url']),
                 params={"pair": pair, "timeframe": timeframe, "limit": limit},
                 timeout=REQUEST_TIMEOUT,
             )

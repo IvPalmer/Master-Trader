@@ -63,6 +63,12 @@ class Config:
         # Receiver translates to Freqtrade Futures REST. Leave unset to run
         # in pure observe-mode (Phase 1).
         self.receiver_url = os.getenv("KILLERS_RECEIVER_URL", "")
+        # Bearer token the receiver requires on every route. Per-receiver:
+        # the insiders fan-out overrides it below so a leak of one token
+        # cannot drive the other funded account. Deliberately NO fallback to
+        # the killers token — a missing insiders token must fail loudly (401,
+        # logged, not retried) rather than silently cross-authenticate.
+        self.receiver_token = os.getenv("KILLERS_RECEIVER_TOKEN", "")
         # Channel-specific classifier prompt + fast-path. Defaults are the
         # Killers VIP settings; the insiders fan-out overrides both (Dennis's
         # "Market Mastery" format is different and the strict-open rule parser
@@ -242,7 +248,8 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     # Receiver is the source of truth for actual trades; paper sim stays
     # for audit + offline comparison.
     if config.receiver_url:
-        await _post_to_receiver(config.receiver_url, msg_dict, classification)
+        await _post_to_receiver(config.receiver_url, msg_dict, classification,
+                                getattr(config, "receiver_token", ""))
 
     # Shadow Claude after the fast-path decision is already in flight. Logs
     # disagreement but never blocks the receiver POST. Skip if Claude was
@@ -292,8 +299,14 @@ async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
                        msg_dict.get("id"), e)
 
 
-async def _post_to_receiver(url: str, msg: dict, classification: dict) -> None:
+async def _post_to_receiver(url: str, msg: dict, classification: dict,
+                            token: str = "") -> None:
     """POST classified event to killers-receiver with bounded retry.
+
+    `token` is the receiver's required ingress bearer. An empty token still
+    posts — the receiver answers 401, which the 4xx branch below logs at ERROR
+    and does NOT retry. That is the intended shape: a misconfigured token is a
+    loud, immediate, non-trading failure rather than a silent retry storm.
 
     Bug discovered 2026-05-27 19:38: receiver crashed 500 on a real signal,
     observer logged and moved on, msg lost silently. Retry policy:
@@ -319,6 +332,10 @@ async def _post_to_receiver(url: str, msg: dict, classification: dict) -> None:
                      msg.get("id"), e)
         return
 
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
     backoffs = [0.0, 2.0, 5.0]
     last_err: Optional[str] = None
     for attempt, base_delay in enumerate(backoffs, start=1):
@@ -330,7 +347,7 @@ async def _post_to_receiver(url: str, msg: dict, classification: dict) -> None:
             async with aiohttp.ClientSession() as s:
                 async with s.post(
                     url, data=body_json,
-                    headers={"Content-Type": "application/json"},
+                    headers=headers,
                     timeout=aiohttp.ClientTimeout(total=8),
                 ) as r:
                     body = await r.text()
@@ -427,6 +444,7 @@ def _insiders_config() -> "Optional[Config]":
     ins.channel_id_override = cid
     ins.channel_username = None
     ins.receiver_url = os.getenv("INSIDERS_RECEIVER_URL", "http://127.0.0.1:8090/event")
+    ins.receiver_token = os.getenv("INSIDERS_RECEIVER_TOKEN", "")
     ins.db_path = os.getenv("INSIDERS_OBSERVER_DB", "/home/ubuntu/insiders-bot/state.sqlite")
     # Dennis / Market Mastery format ≠ Killers VIP. Use the insiders-tuned prompt
     # and disable the Killers-only strict-open rule parser (it would never match

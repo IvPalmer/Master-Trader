@@ -33,6 +33,12 @@ from pandas import DataFrame
 
 logger = logging.getLogger(__name__)
 RECEIVER_URL = os.getenv("SIGNAL_RECEIVER_URL", "http://killers-receiver:8089")
+# Bearer token the receiver now requires on every route but /healthz. Missing
+# or wrong → 401 → _fetch_receiver_stop returns None and custom_stoploss falls
+# back to the immutable stop embedded in the entry tag, so the position stays
+# protected; only a receiver-*moved* stop would be missed. Logged at ERROR
+# because a 401 is a deployment fault, never a transient.
+RECEIVER_TOKEN = os.getenv("SIGNAL_RECEIVER_TOKEN", "")
 
 
 class KillersScalpV1(IStrategy):
@@ -141,10 +147,13 @@ class KillersScalpV1(IStrategy):
     @staticmethod
     def _fetch_receiver_stop(trade_id: int) -> Optional[float]:
         """Fetch the latest absolute stop; always called off the bot loop."""
+        headers = {"Accept": "application/json"}
+        if RECEIVER_TOKEN:
+            headers["Authorization"] = f"Bearer {RECEIVER_TOKEN}"
         try:
             request = urllib.request.Request(
                 f"{RECEIVER_URL}/position/by_ft_id/{trade_id}",
-                headers={"Accept": "application/json"},
+                headers=headers,
             )
             with urllib.request.urlopen(request, timeout=0.5) as response:
                 payload = json.load(response)
@@ -153,7 +162,15 @@ class KillersScalpV1(IStrategy):
                 return None
             return float(sl_price)
         except urllib.error.HTTPError as exc:
-            if exc.code != 404:
+            if exc.code in (401, 403):
+                logger.error(
+                    "Receiver rejected SL lookup for trade %s with HTTP %s — "
+                    "SIGNAL_RECEIVER_TOKEN is missing or does not match the "
+                    "receiver's KILLERS_INGRESS_TOKEN. Falling back to the "
+                    "entry-tag stop; receiver-moved stops will NOT be applied.",
+                    trade_id, exc.code,
+                )
+            elif exc.code != 404:
                 logger.warning("Receiver SL HTTP %s for trade %s", exc.code, trade_id)
             return None
         except Exception as exc:
@@ -175,19 +192,26 @@ class KillersScalpV1(IStrategy):
         def done(completed) -> None:
             try:
                 sl_price = completed.result()
-                if sl_price is not None:
-                    with self._sl_lock:
+                with self._sl_lock:
+                    # Stamp the attempt even when it failed, so the TTL
+                    # throttles retries. Previously only a SUCCESSFUL lookup
+                    # set this, so `if updated and ...` never short-circuited
+                    # during a receiver outage and custom_stoploss scheduled a
+                    # fresh HTTP call on every bot loop, for every open trade.
+                    self._sl_cache_updated[trade_id] = time.monotonic()
+                    if sl_price is not None:
                         self._sl_cache[trade_id] = sl_price
-                        self._sl_cache_updated[trade_id] = time.monotonic()
-                        if len(self._sl_cache) > self._sl_cache_max_entries:
-                            oldest = min(
-                                self._sl_cache,
-                                key=lambda key: self._sl_cache_updated.get(key, 0.0),
-                            )
-                            self._sl_cache.pop(oldest, None)
-                            self._sl_cache_updated.pop(oldest, None)
+                    if len(self._sl_cache_updated) > self._sl_cache_max_entries:
+                        oldest = min(
+                            self._sl_cache_updated,
+                            key=lambda key: self._sl_cache_updated.get(key, 0.0),
+                        )
+                        self._sl_cache.pop(oldest, None)
+                        self._sl_cache_updated.pop(oldest, None)
             except Exception as exc:
                 logger.info("Receiver SL refresh failed for trade %s: %s", trade_id, exc)
+                with self._sl_lock:
+                    self._sl_cache_updated[trade_id] = time.monotonic()
             finally:
                 with self._sl_lock:
                     self._sl_refreshing.discard(trade_id)

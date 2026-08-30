@@ -15,8 +15,15 @@ trade_id so close events can find the right position to exit.
 
 Env vars:
   KILLERS_FT_BASE_URL       Freqtrade REST base (http://ft-killers-scalp:8080)
-  KILLERS_FT_USERNAME       REST basic-auth
-  KILLERS_FT_PASSWORD       REST basic-auth
+  KILLERS_FT_USERNAME       REST basic-auth (falls back to
+                            FREQTRADE__API_SERVER__USERNAME)
+  KILLERS_FT_PASSWORD       REST basic-auth (falls back to
+                            FREQTRADE__API_SERVER__PASSWORD)
+  KILLERS_INGRESS_TOKEN     REQUIRED. Bearer token every caller must present
+                            on every route except /healthz. Startup fails
+                            without it — this process can open leveraged
+                            positions and shares a Docker network with
+                            unrelated applications.
   KILLERS_DB                SQLite path for position graph
   KILLERS_RISK_USD          target loss at the signal's posted stop
   KILLERS_MIN_MARGIN_USD    venue minimum; signal is skipped if budget is smaller
@@ -40,8 +47,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+import secrets
+
 import aiohttp
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 logging.basicConfig(
@@ -58,14 +67,53 @@ logger = logging.getLogger(os.environ.get("KILLERS_BOT_LABEL") or "killers-recei
 
 # ── Config ─────────────────────────────────────────────────────────────────
 
+# Long enough that guessing is hopeless, short enough that
+# `openssl rand -hex 24` (48 chars) clears it without thought.
+_MIN_INGRESS_TOKEN_LEN = 24
+
 
 class Config:
     def __init__(self):
         self.ft_base = os.environ.get(
             "KILLERS_FT_BASE_URL", "http://ft-killers-scalp:8080"
         )
-        self.ft_user = os.environ.get("KILLERS_FT_USERNAME", "freqtrader")
-        self.ft_pass = os.environ.get("KILLERS_FT_PASSWORD", "mastertrader")
+        # Per-bot credentials when provided, else the fleet-wide pair that
+        # docker-compose already injects. Keeping the fallback here (rather
+        # than in compose interpolation) means a deploy that has not yet
+        # created the per-bot secrets behaves exactly as before.
+        self.ft_user = (
+            os.environ.get("KILLERS_FT_USERNAME")
+            or os.environ.get("FREQTRADE__API_SERVER__USERNAME")
+            or "freqtrader"
+        )
+        self.ft_pass = (
+            os.environ.get("KILLERS_FT_PASSWORD")
+            or os.environ.get("FREQTRADE__API_SERVER__PASSWORD")
+            or "mastertrader"
+        )
+        # Ingress authentication. Both receivers sit on the shared external
+        # dokploy-network next to ~25 unrelated containers, and POST /event
+        # moves real money on a funded Hyperliquid account. Required, not
+        # optional: an unset token raises here so the container dies loudly at
+        # startup instead of quietly serving an open trading endpoint. Replay
+        # is already bounded by the UNIQUE msg_id ingress dedup, so a static
+        # bearer token — not an HMAC — is the proportionate control.
+        self.ingress_token = os.environ.get("KILLERS_INGRESS_TOKEN", "").strip()
+        if not self.ingress_token:
+            raise RuntimeError(
+                "KILLERS_INGRESS_TOKEN is required — refusing to start an "
+                "unauthenticated trading ingress. Set it on this container and "
+                "on every client: observer (KILLERS_RECEIVER_TOKEN / "
+                "INSIDERS_RECEIVER_TOKEN), Freqtrade (SIGNAL_RECEIVER_TOKEN), "
+                "dashboard (KILLERS_RECEIVER_TOKEN / INSIDERS_RECEIVER_TOKEN)."
+            )
+        if len(self.ingress_token) < _MIN_INGRESS_TOKEN_LEN:
+            raise RuntimeError(
+                f"KILLERS_INGRESS_TOKEN must be at least "
+                f"{_MIN_INGRESS_TOKEN_LEN} characters "
+                f"(got {len(self.ingress_token)}); generate one with "
+                f"`openssl rand -hex 24`"
+            )
         self.db_path = os.environ.get(
             "KILLERS_DB", "/var/lib/killers/receiver.sqlite"
         )
@@ -1633,7 +1681,56 @@ async def lifespan(app: FastAPI):
         await app.state.public_session.close()
 
 
-app = FastAPI(lifespan=lifespan)
+# Only the liveness probe is reachable without a token. It returns no state,
+# and Docker's healthcheck plus the dashboard's reachability probe both need
+# it. Everything else — including read-only routes — leaks position and P&L
+# data to whatever else shares dokploy-network, so it is authenticated too.
+_PUBLIC_PATHS = frozenset({"/healthz"})
+
+
+async def _require_ingress_token(request: Request) -> None:
+    """Authenticate every request except the liveness probe.
+
+    Registered as an app-level dependency rather than per-route on purpose:
+    the failure mode being defended against is a future endpoint that nobody
+    remembers to annotate. Default-deny means a new route is protected the
+    moment it exists.
+    """
+    if request.url.path in _PUBLIC_PATHS:
+        return
+    cfg: Optional[Config] = getattr(request.app.state, "cfg", None)
+    expected = getattr(cfg, "ingress_token", "") if cfg is not None else ""
+    if not expected:
+        # Lifespan has not run, or something replaced cfg without a token.
+        # Refuse rather than fall open.
+        raise HTTPException(status_code=503, detail="receiver not ready")
+    scheme, _, presented = request.headers.get("authorization", "").partition(" ")
+    # compare_digest on bytes: str inputs raise TypeError on non-ASCII, which
+    # a hostile caller controls. Encoding first keeps the comparison total.
+    if scheme.lower() != "bearer" or not secrets.compare_digest(
+        presented.strip().encode("utf-8", "ignore"), expected.encode("utf-8")
+    ):
+        logger.warning(
+            "Rejected unauthenticated %s %s from %s",
+            request.method, request.url.path,
+            request.client.host if request.client else "?",
+        )
+        raise HTTPException(
+            status_code=401, detail="invalid or missing ingress token"
+        )
+
+
+# docs_url/redoc_url/openapi_url are OFF because app-level dependencies do not
+# apply to FastAPI's auto-generated documentation routes — they answered 200
+# without a token and published the whole route list and payload schemas to
+# anything sharing dokploy-network. Nothing human consumes them here.
+app = FastAPI(
+    lifespan=lifespan,
+    dependencies=[Depends(_require_ingress_token)],
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 
 @app.get("/healthz")

@@ -35,7 +35,11 @@ def _client():
     import app.main as m
     reload(m)
     from fastapi.testclient import TestClient
-    with TestClient(m.app) as c:
+    from tests.conftest import auth_headers
+    # Every route but /healthz now requires the ingress bearer. Setting it as
+    # a client default keeps these tests about the handler, not about auth —
+    # auth itself is covered by test_ingress_auth.py.
+    with TestClient(m.app, headers=auth_headers()) as c:
         yield c, m
 
 
@@ -166,8 +170,9 @@ def test_notify_task_actually_scheduled_and_called():
         notify_calls.append(text)
         # Don't actually hit the URL — just record.
 
+    from tests.conftest import auth_headers
     with patch.object(m, "_notify_telegram", side_effect=spy_notify):
-        with TestClient(m.app) as client:
+        with TestClient(m.app, headers=auth_headers()) as client:
             r = client.post("/event", json={
                 "msg": {"id": 88888,
                         "date": "2026-05-27T20:00:00+00:00",

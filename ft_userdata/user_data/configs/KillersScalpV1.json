@@ -152,10 +152,10 @@
         "listen_port": 8080,
         "verbosity": "error",
         "enable_openapi": true,
-        "jwt_secret_key": "killers-scalp-dev-key-change-for-prod",
+        "jwt_secret_key": "OVERRIDE_VIA_ENV",
         "CORS_origins": [],
-        "username": "freqtrader",
-        "password": "mastertrader"
+        "username": "OVERRIDE_VIA_ENV",
+        "password": "OVERRIDE_VIA_ENV"
     },
     "bot_name": "KillersScalp",
     "initial_state": "running",

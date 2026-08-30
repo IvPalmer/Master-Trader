@@ -52,6 +52,23 @@ class ShortKeltnerV2HL(IStrategy):
     rsi_overbought = 60
     btc_slope_lookback = 24
 
+    # Single source of truth for the macro bear gate's informative inputs.
+    # populate_indicators builds btc_bear from a frame reindexed to exactly
+    # these columns and the fail-closed watchdog checks exactly these columns,
+    # so the two cannot drift apart. They did drift once: the gate read
+    # btc_usdc_sma50_slope_1h while the watchdog did not check it, so a NaN
+    # slope forced btc_bear to 0 and blocked every entry with no warning —
+    # the precise silent failure the watchdog exists to make visible.
+    # populate_exit_trend's inputs (close_1h, sma50_1h) are a subset, so
+    # covering this list also covers the exit path's macro inputs.
+    MACRO_GATE_COLUMNS = (
+        "btc_usdc_close_1h",
+        "btc_usdc_sma50_1h",
+        "btc_usdc_sma200_1h",
+        "btc_usdc_sma50_slope_1h",
+        "btc_usdc_sma200_1d",
+    )
+
     @property
     def protections(self):
         return [
@@ -85,21 +102,28 @@ class ShortKeltnerV2HL(IStrategy):
         dataframe["vol_sma"] = dataframe["volume"].rolling(self.vol_sma_period).mean()
         dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
 
+        # Reindex to the declared gate columns: a column the informative never
+        # produced becomes all-NaN instead of raising, so every comparison
+        # below is False and the gate fails CLOSED. The watchdog then reports
+        # it as a missing/NaN input rather than the bot dying each candle.
+        gate = dataframe.reindex(columns=list(self.MACRO_GATE_COLUMNS))
         dataframe["btc_bear"] = (
-            (dataframe["btc_usdc_close_1h"] < dataframe["btc_usdc_sma50_1h"])
-            & (dataframe["btc_usdc_close_1h"] < dataframe["btc_usdc_sma200_1h"])
-            & (dataframe["btc_usdc_sma50_slope_1h"] < 0)
-            & (dataframe["btc_usdc_close_1h"] < dataframe["btc_usdc_sma200_1d"])
+            (gate["btc_usdc_close_1h"] < gate["btc_usdc_sma50_1h"])
+            & (gate["btc_usdc_close_1h"] < gate["btc_usdc_sma200_1h"])
+            & (gate["btc_usdc_sma50_slope_1h"] < 0)
+            & (gate["btc_usdc_close_1h"] < gate["btc_usdc_sma200_1d"])
         ).astype(int)
 
         # Fail-closed observability: NaN gate inputs force btc_bear to 0,
         # indistinguishable from a legitimately closed gate. HL serves limited
         # history, so a short informative fetch would silently zero entries
         # forever. Warn while the condition persists.
-        last = dataframe.iloc[-1]
-        gate_cols = ["btc_usdc_close_1h", "btc_usdc_sma50_1h",
-                     "btc_usdc_sma200_1h", "btc_usdc_sma200_1d"]
-        nan_cols = [c for c in gate_cols if pd.isna(last[c])]
+        #
+        # sma50_slope needs btc_sma50_period + btc_slope_lookback = 74 BTC 1h
+        # candles and sma200_1d needs 200 BTC daily candles — both deeper than
+        # the pair's own 250-candle startup, so this is the realistic fault.
+        last = gate.iloc[-1]
+        nan_cols = [c for c in self.MACRO_GATE_COLUMNS if pd.isna(last[c])]
         if nan_cols:
             logger.warning(
                 "ShortKeltnerV2HL %s: macro-gate inputs NaN at last bar (%s) — "
