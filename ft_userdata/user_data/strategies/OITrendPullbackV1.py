@@ -41,7 +41,27 @@ class OITrendPullbackV1(IStrategy):
     use_exit_signal = True
     exit_profit_only = False
 
-    oi_min_growth = 0.02
+    # Recalibrated 2026-08-30 against 30 days of Binance openInterestHist for
+    # the live whitelist. The 2% threshold sat ABOVE the 99th percentile of the
+    # actual 45-minute OI-growth distribution (p50 +0.01%, p90 +0.39%,
+    # p99 +1.46%, max +6.76%), so it was not a filter — it was an off switch:
+    # the TA conjunction produced 76 setups in that window and the gate
+    # admitted zero, which matches the live record of no trade since
+    # 2026-08-23.
+    #
+    # 0.0 is chosen on mechanism, not on being the sweep's argmax: it means
+    # "open interest is not contracting", i.e. participation holds while price
+    # reclaims the EMA20 — which is the continuation thesis. A +2% spike over
+    # 45 minutes is a liquidation/squeeze signature, close to the opposite
+    # setup. The sweep agrees and, importantly, degrades on both sides of it
+    # (0.25% -> 3 trades/mo; 0.0 -> 20 trades/mo at PF 2.46; -0.5% -> 29
+    # trades/mo but PF 1.34), so this is an interior optimum rather than
+    # "looser is always better".
+    #
+    # NOT a proven edge: 20 trades in one 30-day regime, simulated on 1h bars
+    # without fees or slippage. Registered as a hypothesis under
+    # oi-gate-recalibration-2026-08-30 with an explicit review gate.
+    oi_min_growth = 0.0
     oi_sample_interval_s = 300
     oi_lookback_s = 45 * 60
     oi_max_age_s = 15 * 60

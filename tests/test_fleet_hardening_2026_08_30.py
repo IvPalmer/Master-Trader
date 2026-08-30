@@ -564,17 +564,41 @@ def test_oi_entry_funnel_refactor_did_not_change_the_signal():
     # where unset — the original code did exactly the same, so normalise
     # before comparing rather than asserting a dtype the strategy never had.
     got = after["enter_long"].fillna(0).astype(int)
-    assert got.equals(before(frame)), "entry signal changed"
+    # Reference uses the strategy's OWN threshold: this test proves the
+    # named-terms refactor is inert, not that any value is correct. The
+    # threshold itself is pinned separately, with its rationale.
+    assert got.equals(
+        before(frame, module.OITrendPullbackV1.oi_min_growth)
+    ), "entry signal changed"
 
     # The backtest case: OI is live-only, so it is NaN for every row and the
     # whole conjunction must be False — the exact blindness the funnel logger
     # exists to make visible.
     blind = frame.copy()
-    blind["oi_growth"] = float("nan")
+    blind["oi_growth"] = float("nan")  # NaN fails >= at any threshold
     strategy._funnel_last_log = {}
     out = strategy.populate_entry_trend(blind, {"pair": "SOL/USDT"})
     assert out["enter_long"].fillna(0).sum() == 0
-    assert before(blind).sum() == 0
+    assert before(blind, module.OITrendPullbackV1.oi_min_growth).sum() == 0
+
+
+def test_oi_growth_threshold_is_the_recalibrated_value():
+    """Pin the 2026-08-30 recalibration so a revert is deliberate.
+
+    0.02 sat above the 99th percentile of the real 45-minute OI-growth
+    distribution (p99 +1.46% over 30 days x 8 pairs), so it admitted nothing
+    and the bot took zero trades while its TA conjunction produced 76 setups.
+    0.0 means "open interest is not contracting", which is the continuation
+    thesis. Rationale and limits: prereg oi-gate-recalibration-2026-08-30.
+    """
+    module = _load_strategy("OITrendPullbackV1.py")
+    assert module.OITrendPullbackV1.oi_min_growth == 0.0
+
+    prereg = json.loads((FT_DIR / "preregistrations.json").read_text())
+    entry = next((p for p in prereg["preregistrations"]
+                  if p.get("id") == "oi-gate-recalibration-2026-08-30"), None)
+    assert entry is not None, "a live parameter change must carry a prereg"
+    assert entry["status"] == "open" and entry["min_closed_trades"] >= 25
 
 
 def test_oi_entry_funnel_names_the_binding_constraint(caplog):
