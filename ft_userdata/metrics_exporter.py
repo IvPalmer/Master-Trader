@@ -17,6 +17,7 @@ from requests.auth import HTTPBasicAuth
 from prometheus_client import start_http_server, Gauge, Info
 
 from api_utils import api_get as _api_get_with_retry
+from api_utils import auth_candidates_for
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,6 +56,11 @@ def _load_bots_config() -> list[dict]:
                 "KeltnerBounceV1": "keltnerbouncev1",
                 "FundingFadeV1": "fundingfadev1",
                 "FundingShortV1": "fundingshortv1",
+                # Compose names this service oi-trend-pullback, not
+                # oitrendpullback. Without the mapping the exporter resolved a
+                # hostname that does not exist, so a LIVE bot silently sat
+                # outside the circuit breaker's capital math.
+                "OITrendPullbackV1": "oi-trend-pullback",
             }
             service = service_map.get(name, service)
             bots.append({"service": service, "strategy": name})
@@ -348,12 +354,21 @@ def scrape_all() -> tuple[float | None, float | None]:
 def stop_bot(bot: dict) -> bool:
     """Stop a bot via the Freqtrade API."""
     base = f"http://{bot['service']}:{API_PORT}/api/v1"
+    # Same credential resolution the scrape path uses: per-bot first, shared
+    # next. The circuit breaker must not be the one call that 401s because a
+    # bot was moved onto its own credentials.
+    candidates = auth_candidates_for(bot["service"]) or (AUTH,)
     try:
-        resp = requests.post(f"{base}/stop", auth=AUTH, timeout=10)
-        if resp.status_code == 200:
+        resp = None
+        for auth in candidates:
+            resp = requests.post(f"{base}/stop", auth=auth, timeout=10)
+            if resp.status_code != 401:
+                break
+        if resp is not None and resp.status_code == 200:
             log.info("Stopped %s", bot["strategy"])
             return True
-        log.warning("Failed to stop %s: HTTP %d", bot["strategy"], resp.status_code)
+        log.warning("Failed to stop %s: HTTP %s", bot["strategy"],
+                    resp.status_code if resp is not None else "no-credentials")
         return False
     except Exception as exc:
         log.error("Error stopping %s: %s", bot["strategy"], exc)

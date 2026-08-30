@@ -6,6 +6,26 @@ x-healthcheck: &a2
   timeout: 10s
   retries: 5
   start_period: 120s
+x-fleet-api-creds: &a3
+  # Per-bot Freqtrade API credentials, consumed by the two components that
+  # talk to every bot. Each is optional: unset means that bot still uses the
+  # shared FREQTRADE__API_SERVER__* pair, so the fleet can be migrated one bot
+  # at a time instead of in a flag-day rotation. Slugs are locked to
+  # api_utils.SERVICE_API_SLUGS and the dashboard's copy by tests.
+  FT_API_USER_KELTNER: ${FT_API_USER_KELTNER:-}
+  FT_API_PASS_KELTNER: ${FT_API_PASS_KELTNER:-}
+  FT_API_USER_FUNDINGFADE: ${FT_API_USER_FUNDINGFADE:-}
+  FT_API_PASS_FUNDINGFADE: ${FT_API_PASS_FUNDINGFADE:-}
+  FT_API_USER_OITREND: ${FT_API_USER_OITREND:-}
+  FT_API_PASS_OITREND: ${FT_API_PASS_OITREND:-}
+  FT_API_USER_KILLERS: ${FT_API_USER_KILLERS:-}
+  FT_API_PASS_KILLERS: ${FT_API_PASS_KILLERS:-}
+  FT_API_USER_INSIDERS: ${FT_API_USER_INSIDERS:-}
+  FT_API_PASS_INSIDERS: ${FT_API_PASS_INSIDERS:-}
+  FT_API_USER_SHORTKELTNER: ${FT_API_USER_SHORTKELTNER:-}
+  FT_API_PASS_SHORTKELTNER: ${FT_API_PASS_SHORTKELTNER:-}
+  # freqtrade's public default credentials are NOT tried unless this is on.
+  FT_ALLOW_LEGACY_API_CREDS: ${FT_ALLOW_LEGACY_API_CREDS:-false}
 x-bot-env: &a1
   FREQTRADE__EXCHANGE__KEY: ${FREQTRADE__EXCHANGE__KEY}
   FREQTRADE__EXCHANGE__SECRET: ${FREQTRADE__EXCHANGE__SECRET}
@@ -17,7 +37,11 @@ services:
     image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
     container_name: ft-keltner-bounce
-    environment: *a1
+    environment:
+      <<: *a1
+      FREQTRADE__API_SERVER__USERNAME: ${FT_API_USER_KELTNER:-${FREQTRADE__API_SERVER__USERNAME}}
+      FREQTRADE__API_SERVER__PASSWORD: ${FT_API_PASS_KELTNER:-${FREQTRADE__API_SERVER__PASSWORD}}
+      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FT_API_JWT_KELTNER:-${FREQTRADE__API_SERVER__JWT_SECRET_KEY}}
     volumes:
       - ft_user_data:/freqtrade/user_data
       - ./user_data/configs:/freqtrade/user_data/configs:ro
@@ -40,7 +64,11 @@ services:
     image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
     container_name: ft-funding-fade
-    environment: *a1
+    environment:
+      <<: *a1
+      FREQTRADE__API_SERVER__USERNAME: ${FT_API_USER_FUNDINGFADE:-${FREQTRADE__API_SERVER__USERNAME}}
+      FREQTRADE__API_SERVER__PASSWORD: ${FT_API_PASS_FUNDINGFADE:-${FREQTRADE__API_SERVER__PASSWORD}}
+      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FT_API_JWT_FUNDINGFADE:-${FREQTRADE__API_SERVER__JWT_SECRET_KEY}}
     volumes:
       - ft_user_data:/freqtrade/user_data
       - ./user_data/configs:/freqtrade/user_data/configs:ro
@@ -61,7 +89,11 @@ services:
     image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
     container_name: ft-oi-trend-pullback
-    environment: *a1
+    environment:
+      <<: *a1
+      FREQTRADE__API_SERVER__USERNAME: ${FT_API_USER_OITREND:-${FREQTRADE__API_SERVER__USERNAME}}
+      FREQTRADE__API_SERVER__PASSWORD: ${FT_API_PASS_OITREND:-${FREQTRADE__API_SERVER__PASSWORD}}
+      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FT_API_JWT_OITREND:-${FREQTRADE__API_SERVER__JWT_SECRET_KEY}}
     volumes:
       - ft_user_data:/freqtrade/user_data
       - ./user_data/configs:/freqtrade/user_data/configs:ro
@@ -105,11 +137,15 @@ services:
       - dokploy-network
     environment:
       KILLERS_FT_BASE_URL: http://ft-killers-scalp:8080
+      # REQUIRED. The receiver refuses to start without it: POST /event opens
+      # leveraged positions and this container shares dokploy-network with
+      # ~25 unrelated applications. Generate with `openssl rand -hex 24`.
+      KILLERS_INGRESS_TOKEN: ${KILLERS_INGRESS_TOKEN:-}
       # Read from the shared anchor — sibling Freqtrade containers inherit
       # *a1 which sets FREQTRADE__API_SERVER__USERNAME/PASSWORD. Hardcoding
       # would 401 against rotated creds.
-      KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
-      KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+      KILLERS_FT_USERNAME: ${FT_API_USER_KILLERS:-${FREQTRADE__API_SERVER__USERNAME}}
+      KILLERS_FT_PASSWORD: ${FT_API_PASS_KILLERS:-${FREQTRADE__API_SERVER__PASSWORD}}
       # Fresh Hyperliquid epoch; the former Binance dry database remains in
       # the volume as receiver.sqlite for historical audit.
       KILLERS_DB: /var/lib/killers/receiver-hyperliquid.sqlite
@@ -154,15 +190,16 @@ services:
     restart: always
     container_name: ft-killers-scalp
     environment:
-      FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
-      FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
-      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FREQTRADE__API_SERVER__JWT_SECRET_KEY}
       # Dedicated master account + agent wallet.  Do not point multiple bots
       # at the same master address: Hyperliquid nets positions per account.
+      FREQTRADE__API_SERVER__USERNAME: ${FT_API_USER_KILLERS:-${FREQTRADE__API_SERVER__USERNAME}}
+      FREQTRADE__API_SERVER__PASSWORD: ${FT_API_PASS_KILLERS:-${FREQTRADE__API_SERVER__PASSWORD}}
+      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FT_API_JWT_KILLERS:-${FREQTRADE__API_SERVER__JWT_SECRET_KEY}}
       FREQTRADE__EXCHANGE__WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
       FREQTRADE__EXCHANGE__PRIVATE_KEY: ${HYPERLIQUID_KILLERS_PRIVATE_KEY:-}
       FREQTRADE__DRY_RUN: ${HYPERLIQUID_KILLERS_DRY_RUN:-true}
       SIGNAL_RECEIVER_URL: http://killers-receiver:8089
+      SIGNAL_RECEIVER_TOKEN: ${KILLERS_INGRESS_TOKEN:-}
     volumes:
       - ft_user_data:/freqtrade/user_data
       - ./user_data/configs:/freqtrade/user_data/configs:ro
@@ -198,13 +235,14 @@ services:
     restart: always
     container_name: ft-insiders-scalp
     environment:
-      FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
-      FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
-      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FREQTRADE__API_SERVER__JWT_SECRET_KEY}
+      FREQTRADE__API_SERVER__USERNAME: ${FT_API_USER_INSIDERS:-${FREQTRADE__API_SERVER__USERNAME}}
+      FREQTRADE__API_SERVER__PASSWORD: ${FT_API_PASS_INSIDERS:-${FREQTRADE__API_SERVER__PASSWORD}}
+      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FT_API_JWT_INSIDERS:-${FREQTRADE__API_SERVER__JWT_SECRET_KEY}}
       FREQTRADE__EXCHANGE__WALLET_ADDRESS: ${HYPERLIQUID_INSIDERS_WALLET_ADDRESS:-}
       FREQTRADE__EXCHANGE__PRIVATE_KEY: ${HYPERLIQUID_INSIDERS_PRIVATE_KEY:-}
       FREQTRADE__DRY_RUN: ${HYPERLIQUID_INSIDERS_DRY_RUN:-true}
       SIGNAL_RECEIVER_URL: http://insiders-receiver:8089
+      SIGNAL_RECEIVER_TOKEN: ${INSIDERS_INGRESS_TOKEN:-}
     volumes:
       - ft_user_data:/freqtrade/user_data
       - ./user_data/configs:/freqtrade/user_data/configs:ro
@@ -247,9 +285,12 @@ services:
       - dokploy-network
     environment:
       KILLERS_FT_BASE_URL: http://ft-insiders-scalp:8080
+      # REQUIRED, and deliberately a DIFFERENT value from the killers token:
+      # the two receivers drive two separately funded accounts.
+      KILLERS_INGRESS_TOKEN: ${INSIDERS_INGRESS_TOKEN:-}
       KILLERS_BOT_LABEL: insiders-scalp
-      KILLERS_FT_USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
-      KILLERS_FT_PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+      KILLERS_FT_USERNAME: ${FT_API_USER_INSIDERS:-${FREQTRADE__API_SERVER__USERNAME}}
+      KILLERS_FT_PASSWORD: ${FT_API_PASS_INSIDERS:-${FREQTRADE__API_SERVER__PASSWORD}}
       KILLERS_DB: /var/lib/killers/receiver-hyperliquid.sqlite
       # $1.50 risk (2026-08-27): same wide-stop admission logic as killers
       # (admits stops up to 13.3%), scaled to the smaller 50 USDC account
@@ -284,9 +325,9 @@ services:
     restart: always
     container_name: ft-short-keltner-hl-live
     environment:
-      FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
-      FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
-      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FREQTRADE__API_SERVER__JWT_SECRET_KEY}
+      FREQTRADE__API_SERVER__USERNAME: ${FT_API_USER_SHORTKELTNER:-${FREQTRADE__API_SERVER__USERNAME}}
+      FREQTRADE__API_SERVER__PASSWORD: ${FT_API_PASS_SHORTKELTNER:-${FREQTRADE__API_SERVER__PASSWORD}}
+      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FT_API_JWT_SHORTKELTNER:-${FREQTRADE__API_SERVER__JWT_SECRET_KEY}}
       FREQTRADE__EXCHANGE__WALLET_ADDRESS: ${HYPERLIQUID_SHORT_KELTNER_WALLET_ADDRESS:-}
       FREQTRADE__EXCHANGE__PRIVATE_KEY: ${HYPERLIQUID_SHORT_KELTNER_PRIVATE_KEY:-}
       FREQTRADE__DRY_RUN: ${HYPERLIQUID_SHORT_KELTNER_DRY_RUN:-true}
@@ -366,6 +407,7 @@ services:
     restart: unless-stopped
     container_name: ft-metrics-exporter
     environment:
+      <<: *a3
       FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
     volumes:
@@ -409,6 +451,12 @@ services:
       - default
       - dokploy-network
     environment:
+      <<: *a3
+      # Receiver ingress bearers — the dashboard reads /ingress, which is now
+      # authenticated. /healthz stays open so reachability is still reported
+      # when a token is wrong, which localises the fault to auth.
+      KILLERS_RECEIVER_TOKEN: ${KILLERS_INGRESS_TOKEN:-}
+      INSIDERS_RECEIVER_TOKEN: ${INSIDERS_INGRESS_TOKEN:-}
       FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
       POLL_INTERVAL: "30"
