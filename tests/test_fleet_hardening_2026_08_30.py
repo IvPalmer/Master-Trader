@@ -514,3 +514,90 @@ def test_receivers_authenticate_to_their_own_bot(compose, service, slug):
     assert env["KILLERS_FT_PASSWORD"] == (
         f"${{FT_API_PASS_{slug}:-${{FREQTRADE__API_SERVER__PASSWORD}}}}"
     )
+
+
+# ── OITrend entry-funnel instrumentation (2026-08-30) ─────────────────────
+
+
+def test_oi_entry_funnel_refactor_did_not_change_the_signal():
+    """Naming the entry terms must not change which candles enter.
+
+    The conjunction was rewritten into a dict of named terms so the funnel
+    logger can attribute a rejection. That is observability; if it moved the
+    signal it would be a live-money change disguised as instrumentation.
+    """
+    np = pytest.importorskip("numpy")
+    pd = pytest.importorskip("pandas")
+
+    rng = np.random.default_rng(11)
+    n = 600
+    frame = pd.DataFrame({
+        "ema20": rng.normal(100, 3, n), "ema50": rng.normal(100, 3, n),
+        "ema200": rng.normal(100, 3, n), "close": rng.normal(100, 3, n),
+        "rsi": rng.uniform(20, 90, n), "volume": rng.uniform(0, 5000, n),
+        "vol_sma": rng.uniform(500, 3000, n),
+        "oi_growth": np.where(rng.random(n) < 0.4, np.nan,
+                              rng.normal(0.01, 0.03, n)),
+        "btc_trend": rng.integers(0, 2, n),
+    })
+
+    def before(d, oi_min=0.02):
+        out = pd.Series(0, index=d.index)
+        out.loc[(
+            (d["ema50"] > d["ema200"]) & (d["close"] > d["ema200"])
+            & (d["close"] > d["ema20"])
+            & (d["close"].shift(1) <= d["ema20"].shift(1))
+            & (d["close"] <= d["ema20"] * 1.02)
+            & (d["rsi"].between(45, 68))
+            & (d["volume"] > d["vol_sma"] * 1.10)
+            & (d["oi_growth"] >= oi_min) & (d["btc_trend"] == 1)
+            & (d["volume"] > 0)
+        )] = 1
+        return out
+
+    module = _load_strategy("OITrendPullbackV1.py")
+    strategy = module.OITrendPullbackV1.__new__(module.OITrendPullbackV1)
+    strategy._funnel_last_log = {}
+    after = strategy.populate_entry_trend(frame.copy(), {"pair": "SOL/USDT"})
+
+    # `.loc[mask, "enter_long"] = 1` creates the column as float with NaN
+    # where unset — the original code did exactly the same, so normalise
+    # before comparing rather than asserting a dtype the strategy never had.
+    got = after["enter_long"].fillna(0).astype(int)
+    assert got.equals(before(frame)), "entry signal changed"
+
+    # The backtest case: OI is live-only, so it is NaN for every row and the
+    # whole conjunction must be False — the exact blindness the funnel logger
+    # exists to make visible.
+    blind = frame.copy()
+    blind["oi_growth"] = float("nan")
+    strategy._funnel_last_log = {}
+    out = strategy.populate_entry_trend(blind, {"pair": "SOL/USDT"})
+    assert out["enter_long"].fillna(0).sum() == 0
+    assert before(blind).sum() == 0
+
+
+def test_oi_entry_funnel_names_the_binding_constraint(caplog):
+    """The log must say WHICH term blocked, not just that nothing entered."""
+    pd = pytest.importorskip("pandas")
+    module = _load_strategy("OITrendPullbackV1.py")
+    strategy = module.OITrendPullbackV1.__new__(module.OITrendPullbackV1)
+    strategy._funnel_last_log = {}
+
+    n = 30
+    # Everything passes except OI, which is the live-only term.
+    # close alternates just under / just over ema20 so `reclaim_ema20` fires
+    # on half the candles. Without that it also scores zero and ties with the
+    # OI term, and the "binding constraint" would be ambiguous.
+    frame = pd.DataFrame({
+        "ema20": [100.0] * n, "ema50": [110.0] * n, "ema200": [90.0] * n,
+        "close": [99.5 if i % 2 == 0 else 100.5 for i in range(n)],
+        "rsi": [55.0] * n,
+        "volume": [2000.0] * n, "vol_sma": [1000.0] * n,
+        "oi_growth": [float("nan")] * n, "btc_trend": [1] * n,
+    })
+    with caplog.at_level("INFO"):
+        strategy.populate_entry_trend(frame, {"pair": "SOL/USDT"})
+
+    assert "OI entry funnel" in caplog.text
+    assert "binding constraint=oi_growth_2pct" in caplog.text, caplog.text

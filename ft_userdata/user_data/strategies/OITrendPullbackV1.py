@@ -49,6 +49,11 @@ class OITrendPullbackV1(IStrategy):
     _oi_growth: dict[str, float] = {}
     _oi_growth_updated: dict[str, float] = {}
     _last_oi_poll = 0.0
+    # Entry-funnel diagnostics. Per-pair throttle so a 1h strategy logs the
+    # funnel roughly hourly rather than on every candle-processing call.
+    FUNNEL_LOG_INTERVAL_S = 3600
+    FUNNEL_WINDOW_CANDLES = 500
+    _funnel_last_log: dict[str, float] = {}
     _oi_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="oi-poll")
     _oi_futures: dict[str, Future] = {}
 
@@ -169,22 +174,66 @@ class OITrendPullbackV1(IStrategy):
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        dataframe.loc[
-            (
-                (dataframe["ema50"] > dataframe["ema200"])
-                & (dataframe["close"] > dataframe["ema200"])
-                & (dataframe["close"] > dataframe["ema20"])
-                & (dataframe["close"].shift(1) <= dataframe["ema20"].shift(1))
-                & (dataframe["close"] <= dataframe["ema20"] * 1.02)
-                & (dataframe["rsi"].between(45, 68))
-                & (dataframe["volume"] > dataframe["vol_sma"] * 1.10)
-                & (dataframe["oi_growth"] >= self.oi_min_growth)
-                & (dataframe["btc_trend"] == 1)
-                & (dataframe["volume"] > 0)
-            ),
-            "enter_long",
-        ] = 1
+        # Named terms so the funnel below can attribute a rejection. The
+        # conjunction is byte-for-byte the same set of conditions as before —
+        # this is instrumentation, not a signal change.
+        terms = {
+            "uptrend_50_200": dataframe["ema50"] > dataframe["ema200"],
+            "above_ema200": dataframe["close"] > dataframe["ema200"],
+            "above_ema20": dataframe["close"] > dataframe["ema20"],
+            "reclaim_ema20": dataframe["close"].shift(1) <= dataframe["ema20"].shift(1),
+            "near_ema20_2pct": dataframe["close"] <= dataframe["ema20"] * 1.02,
+            "rsi_45_68": dataframe["rsi"].between(45, 68),
+            "volume_1_10x": dataframe["volume"] > dataframe["vol_sma"] * 1.10,
+            "oi_growth_2pct": dataframe["oi_growth"] >= self.oi_min_growth,
+            "btc_trend": dataframe["btc_trend"] == 1,
+            "volume_positive": dataframe["volume"] > 0,
+        }
+
+        signal = None
+        for condition in terms.values():
+            signal = condition if signal is None else (signal & condition)
+        dataframe.loc[signal, "enter_long"] = 1
+
+        self._log_entry_funnel(dataframe, metadata, terms, signal)
         return dataframe
+
+    def _log_entry_funnel(self, dataframe: DataFrame, metadata: dict,
+                          terms: dict, signal) -> None:
+        """Report which condition is actually blocking entries.
+
+        Zero trades can mean "the market never set up" or "this gate can never
+        be satisfied", and the two demand opposite responses. Without
+        attribution they are indistinguishable, which is exactly the position
+        this strategy was in: live since 2026-08-23 with no trade and no way
+        to tell which. The OI term is the suspect one — it is populated only
+        by a live HTTP poll, so it is NaN in every backtest and the whole
+        conjunction is silently False.
+
+        Emitted once per pair per FUNNEL_LOG_INTERVAL_S, at INFO. Cheap:
+        boolean sums over an in-memory frame already built above.
+        """
+        pair = metadata.get("pair", "?")
+        now = time.time()
+        if now - self._funnel_last_log.get(pair, 0.0) < self.FUNNEL_LOG_INTERVAL_S:
+            return
+        self._funnel_last_log[pair] = now
+
+        window = min(len(dataframe), self.FUNNEL_WINDOW_CANDLES)
+        if window == 0:
+            return
+        passes = {name: int(term.tail(window).fillna(False).sum())
+                  for name, term in terms.items()}
+        # The binding constraint is whichever term passed least often.
+        scarcest = min(passes, key=passes.get)
+        logger.info(
+            "OI entry funnel %s (last %d candles): %s | entries=%d | "
+            "binding constraint=%s (%d/%d)",
+            pair, window,
+            " ".join(f"{k}={v}" for k, v in passes.items()),
+            int(signal.tail(window).fillna(False).sum()),
+            scarcest, passes[scarcest], window,
+        )
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # Keep dataframe exits empty. Freqtrade rejects an entry whenever the
