@@ -226,13 +226,29 @@ class OITrendPullbackV1(IStrategy):
                   for name, term in terms.items()}
         # The binding constraint is whichever term passed least often.
         scarcest = min(passes, key=passes.get)
+
+        # oi_growth is a single live reading broadcast across every row, so its
+        # count is NOT a historical frequency like the others — it is the
+        # current value replicated, and reads 0 or `window`. Report the value
+        # itself, which is the number that tells you whether the 2% threshold
+        # is near or hopeless, and say how far off it is.
+        current_oi = self._fresh_oi_growth(pair)
+        if current_oi is None:
+            oi_note = ("oi_growth=UNAVAILABLE (no fresh reading; a restart "
+                       "clears the 45m baseline and blocks entries until it "
+                       "refills)")
+        else:
+            oi_note = (f"oi_growth={current_oi * 100:+.2f}% vs threshold "
+                       f"{self.oi_min_growth * 100:.2f}% "
+                       f"(gap {(self.oi_min_growth - current_oi) * 100:+.2f}pp)")
+
         logger.info(
             "OI entry funnel %s (last %d candles): %s | entries=%d | "
-            "binding constraint=%s (%d/%d)",
+            "binding constraint=%s (%d/%d) | %s",
             pair, window,
             " ".join(f"{k}={v}" for k, v in passes.items()),
             int(signal.tail(window).fillna(False).sum()),
-            scarcest, passes[scarcest], window,
+            scarcest, passes[scarcest], window, oi_note,
         )
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
