@@ -395,7 +395,7 @@
     {
       "id": "oi-gate-recalibration-2026-08-30",
       "bot": "OITrendPullbackV1",
-      "status": "open",
+      "status": "closed",
       "registered": "2026-08-30",
       "review_by": "2026-10-15",
       "min_closed_trades": 25,
@@ -419,7 +419,18 @@
         "If <10 closed trades by review_by, the gate is still binding somewhere else — read the entry-funnel log for the new binding constraint before touching any parameter",
         "Zero-deployable-edge remains an acceptable pre-registered outcome"
       ],
-      "notes": "The entry-funnel instrumentation (same commit) is what makes rule 2 checkable: it names the binding term hourly per pair."
+      "notes": "The entry-funnel instrumentation (same commit) is what makes rule 2 checkable: it names the binding term hourly per pair.",
+      "closed": "2026-08-30",
+      "resolution": "EVIDENCE WITHDRAWN the same day, before any trade was taken. An independent verification pass found the calibration script did not reproduce the deployed contract on four counts: (1) OI window misaligned by one hour — the sim scored each candle against OI over [T-45m, T] while the live bot reads [T+15m, T+1h] at the decision point, so the two windows are disjoint; (2) max_open_trades=1 was not simulated, the sim ran 8 concurrent pair slots and overstated trade count ~2.5x; (3) custom_exit (ema50_break) was not simulated at all despite the docstring claiming the strategy's own exit rules; (4) prices came from fapi perpetual klines for a SPOT strategy, with no fees or slippage and 1h-bar resolution on a ROI+stop+trailing exit stack, violating the standing --timeframe-detail 1m rule. Corrected, the same 30 days give PF 0.74 and -4.0% instead of PF 2.46 and +16.3%, and a placebo mask of equal pass rate scores median PF 0.69 — the gate sits at the 57th percentile of its own null, i.e. no demonstrated discriminative power.",
+      "what_survives": "The DISTRIBUTION finding is untouched and does not depend on the simulation: 45-minute OI growth over 30 days x 8 pairs is p50 +0.01%, p90 +0.39%, p99 +1.46%, and the deployed threshold was 2.00%. A 2% gate admits essentially nothing, which is why the bot took zero trades. Reverting to 0.02 would knowingly restore an off switch, so the threshold stays at 0.0 — but the bot moves to DRY-RUN, because 'not an off switch' is not the same as 'profitable' and the profitability claim is void.",
+      "bot_state": "OITrendPullbackV1 demoted live -> dry-run 2026-08-30. Zero trades were taken under the recalibrated gate, so no capital was exposed to the withdrawn evidence.",
+      "redo_requirements": [
+        "Read OI at the decision point the bot actually uses, not one hour earlier",
+        "Simulate max_open_trades=1, custom_exit/ema50_break, fees and slippage",
+        "Use SPOT klines for a spot strategy",
+        "Use --timeframe-detail 1m, per feedback_1m_detail_required",
+        "Include a placebo/null comparison — a gate that cannot beat a random mask of the same pass rate is not a gate"
+      ]
     },
     {
       "id": "shortkeltner-demotion-2026-08-30",

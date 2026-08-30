@@ -1,5 +1,5 @@
 {
-  "dry_run": false,
+  "dry_run": true,
   "cancel_open_orders_on_exit": true,
   "trading_mode": "spot",
   "margin_mode": "",

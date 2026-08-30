@@ -582,14 +582,19 @@ def test_oi_entry_funnel_refactor_did_not_change_the_signal():
     assert before(blind, module.OITrendPullbackV1.oi_min_growth).sum() == 0
 
 
-def test_oi_growth_threshold_is_the_recalibrated_value():
-    """Pin the 2026-08-30 recalibration so a revert is deliberate.
+def test_oi_gate_threshold_and_its_withdrawn_evidence():
+    """The threshold stayed at 0.0; the profitability claim did not.
 
-    0.02 sat above the 99th percentile of the real 45-minute OI-growth
-    distribution (p99 +1.46% over 30 days x 8 pairs), so it admitted nothing
-    and the bot took zero trades while its TA conjunction produced 76 setups.
-    0.0 means "open interest is not contracting", which is the continuation
-    thesis. Rationale and limits: prereg oi-gate-recalibration-2026-08-30.
+    Reverting to 0.02 would knowingly restore an off switch — that threshold
+    sits above the 99th percentile of the real 45-minute OI-growth
+    distribution, and THAT finding does not depend on the simulation. But the
+    simulation that claimed PF 2.46 did not reproduce the deployed contract
+    (OI window off by an hour, max_open_trades=1 unmodelled, custom_exit
+    unmodelled, perp klines for a spot bot), and corrected it shows a loss.
+
+    So: gate stays open, bot goes to dry-run, prereg closed with the evidence
+    withdrawn. This test pins that combination so none of the three drifts
+    apart from the others.
     """
     module = _load_strategy("OITrendPullbackV1.py")
     assert module.OITrendPullbackV1.oi_min_growth == 0.0
@@ -598,7 +603,16 @@ def test_oi_growth_threshold_is_the_recalibrated_value():
     entry = next((p for p in prereg["preregistrations"]
                   if p.get("id") == "oi-gate-recalibration-2026-08-30"), None)
     assert entry is not None, "a live parameter change must carry a prereg"
-    assert entry["status"] == "open" and entry["min_closed_trades"] >= 25
+    assert entry["status"] == "closed", "the evidence was withdrawn"
+    assert "EVIDENCE WITHDRAWN" in entry["resolution"]
+    assert entry["redo_requirements"], "say what a valid redo would require"
+
+    # A bot running on withdrawn evidence must not hold capital.
+    cfg = _config("OITrendPullbackV1.live.json")
+    assert cfg["dry_run"] is True, (
+        "OITrend must stay dry until the calibration is redone against the "
+        "contract the bot actually runs"
+    )
 
 
 def test_oi_entry_funnel_names_the_binding_constraint(caplog):

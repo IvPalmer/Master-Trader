@@ -38,7 +38,14 @@ def _load_bots_config() -> list[dict]:
             data = json.load(f)
         bots = []
         for name, info in data["bots"].items():
-            if not info.get("active", True):
+            # `active` selects autonomous-strategy tooling; receiver-managed
+            # bots are marked production_live instead (see bots_config _doc).
+            # The exporter must scrape BOTH: a live funded bot that is not
+            # scraped contributes nothing to the circuit breaker's capital
+            # math and cannot be halted by it. KillersScalpV1 — the only
+            # leveraged bot in the fleet — sat outside the breaker for exactly
+            # this reason.
+            if not (info.get("active", True) or info.get("production_live")):
                 continue
             service = info.get("service", name.lower().replace("v1", "").replace("strategy", ""))
             # Handle known service name mappings
@@ -55,6 +62,8 @@ def _load_bots_config() -> list[dict]:
                 "BollingerBounceV1": "bollingerbouncev1",
                 "KeltnerBounceV1": "keltnerbouncev1",
                 "FundingFadeV1": "fundingfadev1",
+                "KillersScalpV1": "ft-killers-scalp",
+                "InsidersScalpV1": "ft-insiders-scalp",
                 "FundingShortV1": "fundingshortv1",
                 # Compose names this service oi-trend-pullback, not
                 # oitrendpullback. Without the mapping the exporter resolved a

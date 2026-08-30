@@ -137,11 +137,32 @@ continuation thesis. A +2% move in 45 minutes is a liquidation/squeeze
 signature, plausibly the opposite regime. That the sweep degrades on both
 sides of zero is corroboration, not the argument.
 
-**This is a hypothesis, not a validated edge**: 20 trades in one 30-day
-regime, no fees or slippage (~3pp/mo of drag), 28% of OI observations missing.
-Prereg `oi-gate-recalibration-2026-08-30` sets review at 25 closed trades,
-PF ≥ 1.3 to continue, and forbids re-tuning on this same window if it fails.
-Script: `ft_userdata/research/oi_gate_calibration_2026-08-30.py`.
+**The profitability evidence was WITHDRAWN the same day.** An independent
+verification pass found the calibration script did not reproduce the deployed
+contract on four counts:
+
+1. **OI window off by an hour.** The sim scored each candle against OI over
+   `[T−45m, T]`; the live bot reads `[T+15m, T+1h]` at the decision point.
+   Disjoint windows — the sim tested a different rule than the one running.
+2. **`max_open_trades: 1` not modelled** — the sim ran eight concurrent pair
+   slots, overstating trade count ~2.5×.
+3. **`custom_exit` (`ema50_break`) not simulated at all**, despite the
+   docstring claiming the strategy's own exit rules.
+4. **Perpetual klines for a spot strategy**, no fees, no slippage, 1h bars on
+   a ROI+stop+trailing exit stack — a direct violation of the standing
+   `--timeframe-detail 1m` rule.
+
+Corrected, the same 30 days give **PF 0.74 and −4.0%**. A placebo mask of
+equal pass rate scores median PF 0.69, putting the gate at the **57th
+percentile of its own null** — no demonstrated discriminative power.
+
+**What survives:** the distribution finding, which does not depend on the
+simulation. 2.00% really does sit above the 99th percentile, so reverting
+there would knowingly restore an off switch. The threshold therefore stays at
+0.0 **and the bot moved to dry-run** — "not an off switch" is not "profitable".
+Zero trades were taken under the recalibrated gate, so no capital was exposed
+to the withdrawn evidence. Prereg `oi-gate-recalibration-2026-08-30` is closed
+with the withdrawal recorded and the requirements for a valid redo.
 
 ### KeltnerBounceV1 → deliberately unchanged
 
@@ -160,8 +181,35 @@ and the 3.60% vs 3.84% contradiction is recorded as three separate triggers in
 
 ## Fleet after this session
 
-**Live (4):** KeltnerBounceV1 · FundingFadeV1 · OITrendPullbackV1 · KillersScalpV1
-**Dry (2):** InsidersScalpV2 · ShortKeltnerV2HLlive
+**Live (3):** KeltnerBounceV1 · FundingFadeV1 · KillersScalpV1
+**Dry (3):** InsidersScalpV2 · ShortKeltnerV2HLlive · OITrendPullbackV1
+
+## What the end-of-day verification caught
+
+A four-lens independent pass over everything deployed. It confirmed the
+security work, the demotions, the token wiring and the test baseline — and it
+caught three things worth more than the rest of this document:
+
+**The OI calibration was void** (above). Caught before a single trade.
+
+**I broke the observer's supervision.** There was a `killers-observer.service`
+systemd **user** unit with `Restart=on-failure` managing the process. I killed
+it and started a bare `setsid nohup` orphan, leaving the unit enabled but dead
+— so a user-manager restart would have started a *second* observer against the
+same Telethon session. My check missed it because `systemctl list-units`
+without `--user` does not list user units. Restored: single PID under systemd,
+`Restart=on-failure`, verified.
+
+**KillersScalpV1 — the only leveraged live bot — sat outside the circuit
+breaker.** `bots_config.json` marks receiver-managed bots `active: false` by
+design, and the exporter skipped on exactly that flag, so Killers was never
+scraped: its losses did not count toward the 10% trip threshold and the
+breaker could not halt it. Fixed at the exporter (`active OR production_live`)
+rather than by flipping the flag, which would have broken 22 config tests that
+correctly assume `active` means autonomous-strategy.
+
+The real pre-existing test baseline is **33 failures**, not the 47 used
+earlier in the session.
 
 ## Killers position sizing — analysed, not applied
 
