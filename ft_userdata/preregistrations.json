@@ -420,6 +420,19 @@
         "Zero-deployable-edge remains an acceptable pre-registered outcome"
       ],
       "notes": "The entry-funnel instrumentation (same commit) is what makes rule 2 checkable: it names the binding term hourly per pair."
+    },
+    {
+      "id": "shortkeltner-demotion-2026-08-30",
+      "bot": "ShortKeltnerV2HLlive",
+      "status": "closed",
+      "registered": "2026-08-30",
+      "closed": "2026-08-30",
+      "decision": "Demoted from live to dry-run. ~36 USDC of allocation released.",
+      "basis": "docs/research/2026-08-29-perps-hyperliquid-shortkeltner.md, already accepted: the entry conjunction produced 4 signals in 20 months across BTC/ETH/SOL (0.20/month). At that rate N=30 takes ~12.5 years, and the strategy's ceiling (~6.5%/yr at an impossible 100% hit rate) sits BELOW the venue's own ~10.4% APR short funding carry — i.e. holding the capital idle in HL's funding beat running the bot even under perfect execution.",
+      "root_cause": "Design contradiction, not a threshold: the trigger needs a local overbought rejection while the macro gate needs a confirmed downtrend, and those states are close to mutually exclusive. The gate was closed for every hour of the 2025-10-10 cascade. Loosening the gate would be selecting a variant on in-sample counts, which the research note explicitly refuses.",
+      "live_record": "Zero trades taken 2026-08-23..2026-08-30. Native HL stop placement was never observed end-to-end because there was never an organic fill.",
+      "reversal_condition": "Only via a preregistered REDESIGN committing to ONE regime — either a counter-trend fade gated on volatility/funding extremes, or a trend-continuation short triggered on breakdowns rather than upper-band rejections. Not by relaxing the existing gate.",
+      "notes": "Demoted, not deleted: config, strategy and DB retained, and the dry curve keeps accruing as evidence for whichever redesign is eventually specified."
     }
   ]
 }
