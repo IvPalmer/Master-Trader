@@ -35,9 +35,23 @@ def _load_active_bots() -> list:
 ACTIVE_BOTS = _load_active_bots()
 
 
+def config_path(name):
+    """Resolve a bot to its config, preferring the deployed .live.json.
+
+    This resolution used to be `{name}.json` only, so FundingFadeV1 and
+    OITrendPullbackV1 — whose deployed files are {name}.live.json — raised
+    FileNotFoundError in every parametrised test in this module. Sixteen
+    failures that read as known baseline noise, while the safety invariants
+    they carry (no committed API keys, stoploss/exchange-mode agreement,
+    stoploss width, required fields) silently never ran for two of the live
+    bots. Prefer .live.json, since that is the file the fleet actually runs.
+    """
+    live = CONFIG_DIR / f"{name}.live.json"
+    return live if live.exists() else CONFIG_DIR / f"{name}.json"
+
+
 def load_config(name):
-    path = CONFIG_DIR / f"{name}.json"
-    with open(path) as f:
+    with open(config_path(name)) as f:
         return json.load(f)
 
 
@@ -52,7 +66,7 @@ def load_strategy_source(name):
 @pytest.mark.parametrize("bot", ACTIVE_BOTS)
 def test_config_is_valid_json(bot):
     """Every active bot must have a parseable JSON config."""
-    path = CONFIG_DIR / f"{bot}.json"
+    path = config_path(bot)
     assert path.exists(), f"Config file missing: {path}"
     with open(path) as f:
         config = json.load(f)  # Will raise on invalid JSON

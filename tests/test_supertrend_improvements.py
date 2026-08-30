@@ -1,3 +1,20 @@
+"""OBSOLETE — kept as a record, not as a gate. See the skip reason below."""
+import pytest
+
+pytestmark = pytest.mark.skip(reason=(
+    "Asserts features that were REMOVED FOR CAUSE from a RETIRED strategy. "
+    "SupertrendStrategy is active=false in bots_config.json, and these tests "
+    "demand n_bar_lookback and use_custom_stoploss=True back. N-bar trailing "
+    "was measured catastrophic (feedback_nbar_trailing_disaster): 1252 fires, "
+    "20.5% win rate, -$150 over a full-year backtest, against +$42 and 102 "
+    "trades for the built-in trailing that replaced it. So these 11 tests fail "
+    "precisely BECAUSE the right change was made — they would go green only if "
+    "the harmful feature were restored. Left 11 permanent failures in the "
+    "baseline, which is how genuinely new breakage stayed invisible. Skipped "
+    "rather than deleted so the history and the reasoning survive; delete the "
+    "module outright if SupertrendStrategy is ever removed from the repo."
+))
+
 """
 Tests for SupertrendStrategy N-bar trailing stop improvement.
 
