@@ -61,6 +61,14 @@
           "op": ">",
           "threshold": 8.0,
           "action": "Kill (commit 34ec07b text) — breaches on the full-run reading only; see amendment 2026-07-31"
+        },
+        {
+          "id": "kill-consecutive-losses-5",
+          "metric": "max_consecutive_losses",
+          "op": ">=",
+          "threshold": 5,
+          "action": "Kill (commit 34ec07b text, clause that was never encoded)",
+          "note": "The commit's kill clause is 'DD > 8% OR 5+ consecutive losses OR PF < 0.7 over 30+ trades'. Only the DD thresholds were ever turned into triggers, so the consecutive-loss clause could not fire automatically. It had in fact already fired."
         }
       ],
       "amendments": [
@@ -88,6 +96,16 @@
             "InsidersScalpV2"
           ],
           "cutover_state": "Zero open and zero closed live trades for both bots; no observation was discarded."
+        },
+        {
+          "date": "2026-08-30",
+          "reason": "Contradiction resolved — by neither contested text.",
+          "resolution": "The 3.60%-rollback vs 3.84%-demote dispute is moot: a HIGHER-PRECEDENCE clause from the same commit had already fired and was never encoded. Measured over the 24 closed live trades: MaxDD 7.82% (kill line 8.00%), and SEVEN consecutive losses against a kill clause of '5+ consecutive losses'. The kill condition was met.",
+          "why_not_rollback": "Rolling back gate v2 is affirmatively refuted, not merely unchosen: in backtest gate v2 DOMINATED baseline on both axes (+19.05% vs +14.01% return, 2.40% vs 3.91% MaxDD). Loosening the filter as a response to a drawdown would move to a configuration that tested worse on the very metric that triggered.",
+          "why_not_demote_to_regime_halt": "Also moot. Both contested texts argue about WHICH filter to run, while the record says the signal stopped working WITH gate v2 active: first 12 closed trades PF 4.77 (+$5.81), last 12 PF 0.08 (-$7.13, 11 losses in 12). The filter built to prevent exactly that regime did not prevent it. Changing filter configuration does not address that.",
+          "action_taken": "FundingFadeV1 demoted live -> dry-run 2026-08-30.",
+          "why_the_pre_v2_record_counts": "The 2026-08-23 V2 epoch changed EXECUTION (custom_exit activation, exchange-resident stops), not the entry signal or the macro gate. The trades that produced PF 0.08 would be selected identically under V2, so the pre-V2 record is informative about V2's signal quality. V2 itself has 1 trade in 7 days — no evidence either way.",
+          "reversal_condition": "Re-fund only on a preregistered change to the SIGNAL or the gate, justified out of sample, not on a favourable dry stretch. The strategy is regime-dependent by design (docstring: 2024 PF 1.80, 2026 PF 0.74); a good month is expected noise, not evidence."
         }
       ],
       "notes": "Original window said '90d or 75 trades, whichever first' — at the gate-v2 backtest rate (1.67 trades/wk) 75 trades takes ~10 months, so the trade arm was vacuous. Live rate since redeploy is ZERO trades in 21d (BTC below SMA50/200 — mostly the pre-existing v1 base gate). Audited 2026-06-09. PAUSED 2026-07-31 — see amendments.",
@@ -444,6 +462,42 @@
       "live_record": "Zero trades taken 2026-08-23..2026-08-30. Native HL stop placement was never observed end-to-end because there was never an organic fill.",
       "reversal_condition": "Only via a preregistered REDESIGN committing to ONE regime — either a counter-trend fade gated on volatility/funding extremes, or a trend-continuation short triggered on breakdowns rather than upper-band rejections. Not by relaxing the existing gate.",
       "notes": "Demoted, not deleted: config, strategy and DB retained, and the dry curve keeps accruing as evidence for whichever redesign is eventually specified."
+    },
+    {
+      "id": "shortkeltner-redesign-proposal-2026-08-30",
+      "bot": "ShortKeltnerV2HL",
+      "status": "proposed",
+      "registered": "2026-08-30",
+      "requires": "operator sign-off before any code is written",
+      "problem": "The deployed entry is a conditional-probability trap: it needs a local overbought REJECTION at the same time as a confirmed multi-timeframe DOWNTREND, and those states barely co-occur. Measured over 20 months on BTC/ETH/SOL: 4 signals, 0.20/month, N=30 in 12.3 years. The macro gate is open 18.1% of hours — the gate is not the problem, the trigger disagrees with it.",
+      "proposal": {
+        "keep": "The macro bear gate unchanged (BTC < SMA50 and < SMA200 on 1h, SMA50 slope < 0 over 24 bars, close < SMA200 on 1d). It is a sound regime definition and is NOT being loosened.",
+        "keep_also": "The volume filter (volume > 1.75 x SMA20) and the Keltner geometry (period 25, ATR mult 2.5).",
+        "replace": "The trigger. Today: close crosses back DOWN inside the UPPER band after RSI was overbought — a FADE. Proposed: close crosses DOWN through the LOWER band on volume expansion — a BREAKDOWN.",
+        "drop": "The RSI-overbought precondition, which exists only to define the fade and which the 2026-08-29 research measured as removing 0 of 149 candidates anyway."
+      },
+      "why_this_direction_and_not_the_other": [
+        "The research note offers two coherent designs — a counter-trend fade gated on volatility/funding extremes, or a trend-continuation short triggered on breakdowns. Continuation is the better fit HERE for a venue-specific reason: Hyperliquid pays roughly 10.4% APR to hold a short. A design that holds through a downtrend is PAID to wait; a fast fade collects almost none of that carry. The same funding carry is what made the current design's ceiling uneconomic.",
+        "The current design was closed for every hour of the 2025-10-10 cascade — it structurally misses the events a short strategy exists to capture. A breakdown trigger fires DURING cascades.",
+        "It is the minimal change: the gate, the volume filter and the channel geometry are all reused, so exactly one term moves and the redesign stays attributable."
+      ],
+      "measured_frequency": {
+        "method": "Reconstructed both triggers against the SAME macro gate over 14,400 hourly bars (2025-01-07..2026-08-30) on BTC/ETH/SOL. Frequency only — deliberately no P&L, no exit modelling, no threshold sweep.",
+        "validation": "The reconstruction reproduces the 2026-08-29 research note's headline exactly (4 signals, 0.20/month), which is what licenses trusting the comparison.",
+        "result": "A (deployed, rejection): 4 signals, 0.20/month, N=30 in 12.3 years. B (proposed, breakdown): 158 signals, 8.01/month, N=30 in ~4 months. Without the volume filter B would be 272 / 13.78 per month, so volume is doing real work and stays.",
+        "per_pair": "BTC 1 -> 64, ETH 2 -> 49, SOL 1 -> 45."
+      },
+      "explicitly_not_claimed": [
+        "NO profitability claim. This measures whether the design can be VALIDATED at all, not whether it wins. Today's OI recalibration is the cautionary case: a P&L number from a simulation that did not reproduce the deployed contract.",
+        "Binance USDT klines are a proxy for Hyperliquid USDC candles. Volume distributions are NOT comparable and volume is a binding filter, so HL counts will differ.",
+        "8 signals/month across 3 pairs may prove too many once costs are applied. That is a validatable rate, which is the entire point — 0.20/month is not."
+      ],
+      "if_approved": [
+        "Implement as a NEW strategy file, not an edit to ShortKeltnerV2HL — the dry curve of the current design stays intact as lineage",
+        "Validate at --timeframe-detail 1m per feedback_1m_detail_required, with fees and slippage, before any capital",
+        "Include a placebo/null comparison: a trigger that cannot beat a random mask of equal pass rate is not a trigger",
+        "Exit design is OPEN and must be specified before validation — the current ROI ladder and 36h time-exit were built for a fade and are probably wrong for a continuation hold that is collecting funding"
+      ]
     }
   ]
 }
