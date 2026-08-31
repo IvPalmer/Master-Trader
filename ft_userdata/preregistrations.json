@@ -68,7 +68,9 @@
           "op": ">=",
           "threshold": 5,
           "action": "Kill (commit 34ec07b text, clause that was never encoded)",
-          "note": "The commit's kill clause is 'DD > 8% OR 5+ consecutive losses OR PF < 0.7 over 30+ trades'. Only the DD thresholds were ever turned into triggers, so the consecutive-loss clause could not fire automatically. It had in fact already fired."
+          "note": "The commit's kill clause is 'DD > 8% OR 5+ consecutive losses OR PF < 0.7 over 30+ trades'. Only the DD thresholds were ever turned into triggers, so the consecutive-loss clause could not fire automatically. It had in fact already fired.",
+          "scope": "CURRENT epoch DB only; must be date-ordered and gap-aware. Adjacent rows in a result list are not a streak.",
+          "status": "active, corrected 2026-08-31"
         }
       ],
       "amendments": [
@@ -106,6 +108,17 @@
           "action_taken": "FundingFadeV1 demoted live -> dry-run 2026-08-30.",
           "why_the_pre_v2_record_counts": "The 2026-08-23 V2 epoch changed EXECUTION (custom_exit activation, exchange-resident stops), not the entry signal or the macro gate. The trades that produced PF 0.08 would be selected identically under V2, so the pre-V2 record is informative about V2's signal quality. V2 itself has 1 trade in 7 days — no evidence either way.",
           "reversal_condition": "Re-fund only on a preregistered change to the SIGNAL or the gate, justified out of sample, not on a favourable dry stretch. The strategy is regime-dependent by design (docstring: 2024 PF 1.80, 2026 PF 0.74); a good month is expected noise, not evidence."
+        },
+        {
+          "date": "2026-08-31",
+          "reason": "The 2026-08-30 demotion is REVERSED. It was based on a miscount.",
+          "error": "The claim was '7 consecutive losses against a kill clause of 5+'. The losses were counted consecutive in a result-ordered list WITHOUT checking dates. By date they are two separate blocks with a 52-day no-trade gap between them: 2026-05-11/13/15/15/16 (five), then nothing until 2026-07-11/12 (two). Not one streak, and the clause was never met by the second block.",
+          "double_jeopardy": "The May 10-16 block IS the 5-SL streak that already triggered its own remediation — gate v2, deployed 2026-05-19. The operator's response at the time was to fix, not to kill. Re-applying a kill clause to the same streak three months later judges the same event twice.",
+          "known_cause_already_fixed": "The two July losses (HBAR 07-11, ADA 07-12) were diagnosed as the stale-funding defect — ADA traded on funding data 10h old — and fixed 2026-07-13 (commit 177cdd1, hourly :10 refresh). Counting them as evidence against the strategy counts a data bug as a signal failure.",
+          "why_the_pf_figure_was_also_wrong": "The quoted 'last 12 trades PF 0.08' spans BOTH sides of the 2026-05-19 gate-v2 deploy and both sides of the 2026-07-13 funding fix, so it aggregates three different versions of the strategy. Post-gate-v2 AND post-funding-fix there are only four closed trades (SUI 07-24, ZEC 07-27, LTC 07-29, NEAR 07-31). That is not a sample; it is not evidence of failure either.",
+          "action_taken": "FundingFadeV1 restored to live 2026-08-31.",
+          "what_is_actually_true": "There is essentially NO post-remediation sample for this strategy. The honest position is neither 'it failed' nor 'it works' — it is unmeasured. The V2 epoch DB (from 2026-08-23) is the correct measurement object and holds one open trade.",
+          "corrected_trigger_scope": "Drawdown and consecutive-loss triggers must be evaluated on the CURRENT epoch DB only (tradesv3.live.FundingFadeV1.v2.sqlite), never on the frozen pre-V2 curve, and consecutive-loss counting must be date-ordered with a maximum gap, not merely adjacent rows in a result list."
         }
       ],
       "notes": "Original window said '90d or 75 trades, whichever first' — at the gate-v2 backtest rate (1.67 trades/wk) 75 trades takes ~10 months, so the trade arm was vacuous. Live rate since redeploy is ZERO trades in 21d (BTC below SMA50/200 — mostly the pre-existing v1 base gate). Audited 2026-06-09. PAUSED 2026-07-31 — see amendments.",
