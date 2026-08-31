@@ -1,9 +1,29 @@
-"""Calibrate OITrendPullbackV1's oi_min_growth against 30 days of real data.
+"""SUPERSEDED 2026-08-30 — the P&L this script produces is WRONG. Do not cite it.
 
-Reconstructs the deployed entry conjunction exactly, then sweeps the OI
-threshold. Reports not just signal COUNT (which any loosening raises) but the
-simulated P&L under the strategy's own exit rules, so a looser gate has to
-earn its place.
+Kept only so the error is reproducible. An independent verification found four
+ways it fails to reproduce the contract the bot actually runs:
+
+  1. OI window misaligned by one hour. It scores each candle against OI over
+     [T-45m, T]; the live strategy reads [T+15m, T+1h] at the decision point.
+     Disjoint windows — this tests a different rule than the deployed one.
+  2. max_open_trades=1 is not modelled; it runs eight concurrent pair slots,
+     overstating trade count roughly 2.5x.
+  3. custom_exit / ema50_break is not simulated at all, despite the original
+     docstring claiming "the strategy's own exit rules".
+  4. Prices come from fapi PERPETUAL klines for a SPOT strategy, with no fees
+     or slippage, at 1h resolution on a ROI+stop+trailing exit stack — against
+     the project's standing --timeframe-detail 1m rule.
+
+Corrected, the same 30 days give PF 0.74 and -4.0%, not PF 2.46 and +16.3%,
+and a placebo mask of equal pass rate scores median PF 0.69 — the gate lands
+at the 57th percentile of its own null.
+
+What survives, because it never depended on the simulation: the DISTRIBUTION.
+45-minute OI growth over the window is p50 +0.01%, p90 +0.39%, p99 +1.46%,
+against a deployed threshold of 2.00%. That threshold admitted nothing.
+
+A valid redo must fix all four items above and include a placebo comparison.
+See preregistration oi-gate-recalibration-2026-08-30.
 """
 import json, time, urllib.request, datetime as dt
 import numpy as np, pandas as pd

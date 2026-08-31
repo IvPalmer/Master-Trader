@@ -701,3 +701,29 @@ def test_breaker_peak_rebases_when_the_live_set_changes(monkeypatch, tmp_path):
     # A REAL drawdown on the new base must still trip it.
     me.check_circuit_breaker(-20.0)
     assert stopped, "a genuine 12% drawdown must still stop the live bots"
+
+
+@pytest.mark.parametrize("name", LIVE_CONFIGS)
+def test_dry_run_and_database_name_agree(name):
+    """A dry bot must not write into a live database.
+
+    OITrendPullbackV1 was demoted to dry-run while still pointed at
+    tradesv3.live.OITrendPullbackV1.sqlite, so any simulated trade would have
+    landed in the live equity curve — exactly the lineage contamination the
+    frozen-DB convention exists to prevent. The Hyperliquid services switch
+    DB_URL in their entrypoint; the spot services have no such branch, so the
+    coupling lives in the config and is enforced here instead of by habit.
+    """
+    cfg = _config(name)
+    db = cfg.get("db_url", "")
+    if not db:
+        pytest.skip(f"{name} takes its database from the environment")
+    if cfg["dry_run"]:
+        assert "dryrun" in db, (
+            f"{name}: dry_run is true but db_url is {db!r} — simulated trades "
+            f"would contaminate the live curve"
+        )
+    else:
+        assert "dryrun" not in db, (
+            f"{name}: dry_run is false but db_url is {db!r}"
+        )

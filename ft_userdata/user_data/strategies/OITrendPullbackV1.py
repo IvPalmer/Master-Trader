@@ -41,26 +41,25 @@ class OITrendPullbackV1(IStrategy):
     use_exit_signal = True
     exit_profit_only = False
 
-    # Recalibrated 2026-08-30 against 30 days of Binance openInterestHist for
-    # the live whitelist. The 2% threshold sat ABOVE the 99th percentile of the
-    # actual 45-minute OI-growth distribution (p50 +0.01%, p90 +0.39%,
-    # p99 +1.46%, max +6.76%), so it was not a filter — it was an off switch:
-    # the TA conjunction produced 76 setups in that window and the gate
-    # admitted zero, which matches the live record of no trade since
-    # 2026-08-23.
+    # 0.0 means "open interest is not CONTRACTING" while price reclaims the
+    # EMA20 inside a 50/200 uptrend — participation holding through the
+    # pullback, which is the continuation thesis this strategy is named for.
     #
-    # 0.0 is chosen on mechanism, not on being the sweep's argmax: it means
-    # "open interest is not contracting", i.e. participation holds while price
-    # reclaims the EMA20 — which is the continuation thesis. A +2% spike over
-    # 45 minutes is a liquidation/squeeze signature, close to the opposite
-    # setup. The sweep agrees and, importantly, degrades on both sides of it
-    # (0.25% -> 3 trades/mo; 0.0 -> 20 trades/mo at PF 2.46; -0.5% -> 29
-    # trades/mo but PF 1.34), so this is an interior optimum rather than
-    # "looser is always better".
+    # It replaced 0.02 because that threshold sat ABOVE the 99th percentile of
+    # the real 45-minute OI-growth distribution (p50 +0.01%, p90 +0.39%, p99
+    # +1.46% over 30 days x 8 pairs). It was not a filter, it was an off
+    # switch: the TA conjunction produced 76 setups in that window and the gate
+    # admitted zero, matching the live record of no trade since 2026-08-23.
+    # That distribution finding stands on its own and is why reverting to 0.02
+    # would knowingly restore the off switch.
     #
-    # NOT a proven edge: 20 trades in one 30-day regime, simulated on 1h bars
-    # without fees or slippage. Registered as a hypothesis under
-    # oi-gate-recalibration-2026-08-30 with an explicit review gate.
+    # The accompanying PROFITABILITY claim was WITHDRAWN the same day — the
+    # calibration did not reproduce the deployed contract (wrong OI window,
+    # max_open_trades and custom_exit unmodelled, perp klines for a spot bot).
+    # Corrected it shows a loss, and the gate cannot beat a placebo mask of
+    # equal pass rate. So "not an off switch" is NOT "profitable", and the bot
+    # runs DRY until a valid calibration exists.
+    # See preregistration oi-gate-recalibration-2026-08-30.
     oi_min_growth = 0.0
     oi_sample_interval_s = 300
     oi_lookback_s = 45 * 60

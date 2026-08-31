@@ -73,5 +73,5 @@
   "initial_state": "running",
   "force_entry_enable": false,
   "internals": {"process_throttle_secs": 5},
-  "db_url": "sqlite:////freqtrade/user_data/tradesv3.live.OITrendPullbackV1.sqlite"
+  "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.OITrendPullbackV1.sqlite"
 }
