@@ -1,3 +1,7 @@
+> **Partly superseded.** Written mid-session; its OITrend section and fleet
+> table did not survive the day. Read
+> [2026-08-31-session-postmortem.md](2026-08-31-session-postmortem.md) first.
+
 # Fleet review, hardening and recalibration — 2026-08-30
 
 One session, three phases: a code review of the live strategies, a security
