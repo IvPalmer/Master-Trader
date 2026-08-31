@@ -639,3 +639,65 @@ def test_oi_entry_funnel_names_the_binding_constraint(caplog):
 
     assert "OI entry funnel" in caplog.text
     assert "binding constraint=oi_growth_2pct" in caplog.text, caplog.text
+
+
+# ── Circuit breaker composition invariance (2026-08-31) ───────────────────
+
+
+def test_breaker_peak_rebases_when_the_live_set_changes(monkeypatch, tmp_path):
+    """Demoting a bot must not read as a drawdown.
+
+    On 2026-08-30 22:00 the breaker held a $254.96 peak from a three-live-bot
+    fleet. Demoting FundingFadeV1 to dry dropped the live base to $165.53, and
+    the breaker called the $89 difference a 35% drawdown and stopped BOTH
+    remaining live bots — with total P&L at -$0.11. It left a bot holding an
+    open leveraged position with no exchange-resident stop unmanaged for
+    fifteen hours.
+    """
+    import importlib
+
+    # Stub prometheus_client rather than importorskip it: this test was
+    # silently SKIPPED on any machine without the package, which is the same
+    # "test that does not test" failure this suite exists to prevent. The
+    # gauges are write-only sinks here, so a no-op stub is faithful.
+    class _Gauge:
+        def __init__(self, *a, **k): pass
+        def set(self, *a, **k): pass
+        def labels(self, *a, **k): return self
+        def inc(self, *a, **k): pass
+    stub = types.ModuleType("prometheus_client")
+    stub.Gauge = stub.Info = stub.Counter = _Gauge
+    stub.start_http_server = lambda *a, **k: None
+    monkeypatch.setitem(sys.modules, "prometheus_client", stub)
+
+    monkeypatch.setenv("PEAK_STATE_FILE", str(tmp_path / "peak.json"))
+    monkeypatch.syspath_prepend(str(FT_DIR))
+    me = importlib.reload(importlib.import_module("metrics_exporter"))
+
+    stopped = []
+    monkeypatch.setattr(me, "stop_bot", lambda bot: stopped.append(bot["strategy"]) or True)
+    monkeypatch.setattr(me, "send_circuit_breaker_alert", lambda *a, **k: None)
+
+    # Three live bots, flat P&L: the peak seeds at the base.
+    me._live_bots = [{"strategy": s, "service": s.lower()} for s in ("A", "B", "C")]
+    me._live_initial_capital = 254.96
+    me._portfolio_peak = 0.0
+    me._peak_basis = 0.0
+    me._circuit_breaker_triggered = False
+    me.check_circuit_breaker(0.0)
+    assert me._portfolio_peak == pytest.approx(254.96)
+    assert not stopped
+
+    # One bot demoted to dry. Base shrinks by $89.43; no money was lost.
+    me._live_bots = me._live_bots[:2]
+    me._live_initial_capital = 165.53
+    me.check_circuit_breaker(-0.11)
+
+    assert not stopped, (
+        f"a composition change must not trip the breaker; stopped={stopped}"
+    )
+    assert me._portfolio_peak == pytest.approx(165.53), "peak must rebase with the base"
+
+    # A REAL drawdown on the new base must still trip it.
+    me.check_circuit_breaker(-20.0)
+    assert stopped, "a genuine 12% drawdown must still stop the live bots"

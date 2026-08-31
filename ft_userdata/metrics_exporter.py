@@ -113,6 +113,11 @@ _live_bots: list[dict] = []  # Subset of BOTS that report dry_run=False
 _capital_refresh_counter = 0
 
 _portfolio_peak = 0.0
+# The live-capital base the peak was recorded against. The peak is an ABSOLUTE
+# dollar figure (base + pnl), so it is only comparable to a portfolio_value
+# computed on the same base. Promoting or demoting a bot changes that base and
+# would otherwise read as profit or loss that never happened.
+_peak_basis = 0.0
 _circuit_breaker_triggered = False
 _last_trigger_time = 0.0
 
@@ -121,12 +126,13 @@ def _load_peak_state() -> None:
     """Restore high-water mark from disk so a restart mid-drawdown doesn't
     erase the real peak. Without this, _portfolio_peak resets every restart
     and the breaker silently shifts its threshold downward."""
-    global _portfolio_peak, _circuit_breaker_triggered, _last_trigger_time
+    global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time
     try:
         if PEAK_STATE_FILE.exists():
             with open(PEAK_STATE_FILE) as f:
                 state = json.load(f)
             _portfolio_peak = float(state.get("peak", 0.0))
+            _peak_basis = float(state.get("peak_basis", 0.0))
             _circuit_breaker_triggered = bool(state.get("triggered", False))
             _last_trigger_time = float(state.get("last_trigger_time", 0.0))
             log.info(
@@ -145,6 +151,7 @@ def _save_peak_state() -> None:
         with open(tmp, "w") as f:
             json.dump({
                 "peak": _portfolio_peak,
+                "peak_basis": _peak_basis,
                 "triggered": _circuit_breaker_triggered,
                 "last_trigger_time": _last_trigger_time,
                 "saved_at": time.time(),
@@ -413,7 +420,7 @@ def check_circuit_breaker(live_pnl: float) -> None:
     Inputs are scoped to live (non-dry-run) bots only. The dry-run sleeve has
     no real money and must not influence the breaker.
     """
-    global _portfolio_peak, _circuit_breaker_triggered, _last_trigger_time
+    global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time
 
     if _live_initial_capital <= 0 or not _live_bots:
         # No live bots configured — breaker is a no-op. Don't update Prometheus
@@ -421,6 +428,30 @@ def check_circuit_breaker(live_pnl: float) -> None:
         return
 
     portfolio_value = _live_initial_capital + live_pnl
+
+    # Rebase the peak when the live set changes. On 2026-08-30 22:00 the peak
+    # stood at $254.96 from a three-live-bot fleet; demoting FundingFadeV1 to
+    # dry-run dropped the base to $165.53, and the breaker read the $89
+    # difference as a 35% drawdown and stopped BOTH remaining live bots —
+    # while total P&L was -$0.11. It halted a bot holding an open leveraged
+    # position with no exchange-resident stop, for fifteen hours.
+    #
+    # Shifting the peak by exactly the capital that entered or left keeps the
+    # comparison denominated in the same base, so a composition change moves
+    # drawdown by zero. Only real P&L can move it.
+    if _peak_basis <= 0:
+        _peak_basis = _live_initial_capital
+    elif abs(_live_initial_capital - _peak_basis) > 0.01:
+        delta = _live_initial_capital - _peak_basis
+        log.info(
+            "Live capital base changed $%.2f -> $%.2f; rebasing breaker peak "
+            "$%.2f -> $%.2f (composition change, not P&L)",
+            _peak_basis, _live_initial_capital,
+            _portfolio_peak, _portfolio_peak + delta,
+        )
+        _portfolio_peak += delta
+        _peak_basis = _live_initial_capital
+        _save_peak_state()
 
     if portfolio_value > _portfolio_peak:
         _portfolio_peak = portfolio_value
