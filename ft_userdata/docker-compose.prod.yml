@@ -56,7 +56,7 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-      - sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KeltnerBounceV1.log --config /freqtrade/user_data/configs/KeltnerBounceV1.json --strategy KeltnerBounceV1
+      - python /freqtrade/user_data/configs/guard_db_mode.py --config /freqtrade/user_data/configs/KeltnerBounceV1.json && sleep 60 && exec freqtrade trade --logfile /freqtrade/user_data/logs/KeltnerBounceV1.log --config /freqtrade/user_data/configs/KeltnerBounceV1.json --strategy KeltnerBounceV1
   fundingfadev1:
     # Re-enabled 2026-05-19 after macro gate v2 (slope + regime halt) upgrade.
     # Pause was triggered by the May 10-16 5-SL streak; new gate's bootstrap
@@ -83,7 +83,7 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-      - sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1
+      - python /freqtrade/user_data/configs/guard_db_mode.py --config /freqtrade/user_data/configs/FundingFadeV1.live.json && sleep 70 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingFadeV1.log --config /freqtrade/user_data/configs/FundingFadeV1.live.json --strategy FundingFadeV1
 
   oi-trend-pullback:
     image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
@@ -108,7 +108,7 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-      - sleep 80 && exec freqtrade trade --logfile /freqtrade/user_data/logs/OITrendPullbackV1.log --config /freqtrade/user_data/configs/OITrendPullbackV1.live.json --strategy OITrendPullbackV1
+      - python /freqtrade/user_data/configs/guard_db_mode.py --config /freqtrade/user_data/configs/OITrendPullbackV1.live.json && sleep 80 && exec freqtrade trade --logfile /freqtrade/user_data/logs/OITrendPullbackV1.log --config /freqtrade/user_data/configs/OITrendPullbackV1.live.json --strategy OITrendPullbackV1
   # cascadefaderv1: RETIRED 2026-07-13. Fill-stress study (prereg
   # cascade-fill-stress-2026-07): PF 1.42 at ideal fills collapses to 0.98 at
   # 0.5% entry slippage / 0.93 adversarial — the edge was a next-bar-open fill
@@ -225,6 +225,7 @@ services:
             ;;
           *) echo "invalid HYPERLIQUID_KILLERS_DRY_RUN value" >&2; exit 64 ;;
         esac
+        python /freqtrade/user_data/configs/guard_db_mode.py --config /freqtrade/user_data/configs/KillersScalpV1.json
         sleep 60
         exec freqtrade trade --logfile /freqtrade/user_data/logs/KillersScalpV1.log --config /freqtrade/user_data/configs/KillersScalpV1.json --strategy KillersScalpV1
 
@@ -268,6 +269,7 @@ services:
             ;;
           *) echo "invalid HYPERLIQUID_INSIDERS_DRY_RUN value" >&2; exit 64 ;;
         esac
+        python /freqtrade/user_data/configs/guard_db_mode.py --config /freqtrade/user_data/configs/InsidersScalpV2.json
         sleep 60
         exec freqtrade trade --logfile /freqtrade/user_data/logs/InsidersScalpV2.log --config /freqtrade/user_data/configs/InsidersScalpV2.json --strategy KillersScalpV1
 
@@ -358,6 +360,7 @@ services:
             ;;
           *) echo "invalid HYPERLIQUID_SHORT_KELTNER_DRY_RUN value" >&2; exit 64 ;;
         esac
+        python /freqtrade/user_data/configs/guard_db_mode.py --config /freqtrade/user_data/configs/ShortKeltnerV2HL-live.json
         sleep 60
         exec freqtrade trade --logfile /freqtrade/user_data/logs/ShortKeltnerV2HLlive.log --config /freqtrade/user_data/configs/ShortKeltnerV2HL-live.json --strategy ShortKeltnerV2HL
 

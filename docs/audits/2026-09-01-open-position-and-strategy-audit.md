@@ -8,10 +8,16 @@ temporarily in dry-run mode. Its entry order id starts with `dry_run_`, while
 the live Binance wallet reports zero TRX. The live process consequently loops
 on insufficient-funds stop and exit attempts.
 
-The dashboard now treats this as a critical position-ledger fault. It excludes
-the simulated record from live exposure, unrealized P&L, capital at risk, and
-equity/drawdown marks. The underlying Freqtrade database record still requires
-an explicitly authorized production cleanup.
+The dashboard treats this as a critical position-ledger fault. It excludes the
+simulated record from live exposure, unrealized P&L, capital at risk, and
+equity/drawdown marks.
+
+The operator authorized cleanup later on 2026-09-01. An online backup was
+written to
+`user_data/backups/tradesv3.live.FundingFadeV1.v2.pre-phantom-cleanup-20260901T2032Z.sqlite`
+and passed `PRAGMA integrity_check`. Freqtrade then deleted only trade `#2`
+through `DELETE /api/v1/trades/2`. FundingFade remained running, its warning
+loop stopped, Binance still reported zero TRX, and the fleet returned green.
 
 ## Root cause timeline
 
@@ -47,6 +53,9 @@ optimization, and doing so would turn observation into curve fitting.
 - A live bot containing a `dry_run_` open order is red at fleet level and gets
   a dedicated position-ledger fault panel.
 - Phantom records are never counted as open positions or financial exposure.
+- Every active production bot now runs `guard_db_mode.py` before Freqtrade on
+  its next start. The guard blocks mismatched live/dry database names and
+  refuses to start a live process when an open order id starts with `dry_run_`.
 
 ## Verification
 
