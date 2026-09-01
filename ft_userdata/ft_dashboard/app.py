@@ -736,6 +736,48 @@ def _capital_at_risk(open_trades: list[dict]) -> dict:
     return {"abs_loss": round(risk, 2), "open_count": len(open_trades), "open_notional": round(notional, 2)}
 
 
+def _split_open_trade_records(
+    open_trades: list[dict], is_dry_run: bool
+) -> tuple[list[dict], list[dict]]:
+    """Separate real exposure from dry-run records inherited by a live bot.
+
+    Freqtrade stores simulated entry order ids with a ``dry_run_`` prefix. If
+    the same database is later reopened with ``dry_run=false``, the API reports
+    the simulated trade as open even though the exchange wallet owns no asset.
+    Counting that record as live exposure corrupts P&L and makes the live bot
+    repeatedly attempt impossible stop/exit orders.
+    """
+    if is_dry_run:
+        return list(open_trades), []
+
+    exposure: list[dict] = []
+    issues: list[dict] = []
+    for trade in open_trades:
+        orders = trade.get("orders") or []
+        simulated_orders = [
+            order for order in orders
+            if str(order.get("order_id") or "").lower().startswith("dry_run_")
+        ]
+        if simulated_orders:
+            issues.append({
+                "kind": "dry-run-record-in-live-db",
+                "severity": "critical",
+                "trade_id": trade.get("trade_id"),
+                "pair": trade.get("pair"),
+                "open_date": trade.get("open_date"),
+                "open_timestamp": trade.get("open_timestamp"),
+                "reported_profit_pct": trade.get("profit_pct"),
+                "reported_profit_abs": trade.get("profit_abs"),
+                "detail": (
+                    "simulated entry record inherited by a live process; "
+                    "excluded from exposure and marked P&L"
+                ),
+            })
+            continue
+        exposure.append(trade)
+    return exposure, issues
+
+
 def _equity_curve_live(
     closed_trades: list[dict],
     open_trades: list[dict],
@@ -799,8 +841,10 @@ def _epoch_stats(
     per_pair = _per_pair_pnl(closed_trades)
     pnl = {
         "closed": round(closed_pnl, 2),
+        "unrealized": round(unrealized, 2),
         "all_coin": round(all_pnl, 2),
         "closed_pct": round(closed_pnl / starting_capital * 100, 2) if starting_capital else 0.0,
+        "unrealized_pct": round(unrealized / starting_capital * 100, 2) if starting_capital else 0.0,
         "all_pct": round(all_pnl / starting_capital * 100, 2) if starting_capital else 0.0,
     }
     stats = {
@@ -1164,7 +1208,11 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     if err:
         return {"key": bot["key"], "error": err, "reachable": False}
 
-    open_trades = status if isinstance(status, list) else []
+    tracked_open_trades = status if isinstance(status, list) else []
+    is_dry_run = bool((cfg or {}).get("dry_run"))
+    open_trades, position_issues = _split_open_trade_records(
+        tracked_open_trades, is_dry_run
+    )
     epoch_start_ts_ms = int(
         bot.get("epoch_start_ts_ms")
         or (bot.get("lineage") or {}).get("transition_ts_ms")
@@ -1212,7 +1260,6 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
 
     starting_capital = float((balance or {}).get("starting_capital") or 0.0)
     bot_owned = float((balance or {}).get("total_bot") or 0.0)
-    is_dry_run = bool((cfg or {}).get("dry_run"))
     runtime_start_ts = (profit or {}).get("bot_start_timestamp", 0) / 1000.0
     bot_start_ts = (
         epoch_start_ts_ms / 1000.0 if epoch_start_ts_ms else runtime_start_ts
@@ -1224,6 +1271,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         closed_trades, open_trades, starting_capital
     )
     bot_start_ts_ms = int(bot_start_ts * 1000) if bot_start_ts else 0
+    realized_equity = _equity_curve_live(closed_trades, [], starting_capital, bot_start_ts_ms)
     live_equity = _equity_curve_live(closed_trades, open_trades, starting_capital, bot_start_ts_ms)
     drawdown_curve = _drawdown_curve(live_equity)
 
@@ -1332,6 +1380,20 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         },
         "readiness": readiness,
         "native_stop": _native_stop_verification(bot, open_trades, closed_trades),
+        "position_integrity": {
+            "status": "critical" if position_issues else "ok",
+            "label": (
+                f"{len(position_issues)} phantom dry-run record(s)"
+                if position_issues else "position ledger consistent"
+            ),
+            "detail": (
+                "live database contains simulated open trades; excluded from live exposure"
+                if position_issues else "tracked open trades match the current execution mode"
+            ),
+            "issues": position_issues,
+            "tracked_open_count": len(tracked_open_trades),
+            "exposure_open_count": len(open_trades),
+        },
         # Public transition metadata only. The DB path is deliberately kept
         # server-side; the equity endpoint exposes the sanitized curve data.
         "lineage": ({k: v for k, v in bot.get("lineage", {}).items()
@@ -1343,7 +1405,9 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
                   if baseline_comparable else None),
         "gate3": (_gate3(all_trades, baseline) if baseline_comparable else None),
         "baseline": baseline,
+        "equity_realized": realized_equity,
         "equity_live": live_equity,
+        "drawdown_realized": _drawdown_curve(realized_equity),
         "drawdown_curve": drawdown_curve,
         "whitelist_size": len((whitelist or {}).get("whitelist", [])) if whitelist else None,
         # ── NEW: additive fields (frontend feature-detects these) ──────────
@@ -1425,6 +1489,7 @@ def _fleet_status() -> dict:
     now = time.time()
     stale_bots: list[str] = []
     any_live_unreachable = False
+    position_faults: list[str] = []
 
     for bot in BOTS:
         key = bot["key"]
@@ -1432,6 +1497,9 @@ def _fleet_status() -> dict:
         last_ok = _cache["last_reachable_at"].get(key)
         is_stale = (last_ok is None) or ((now - last_ok) > STALE_THRESHOLD_S)
         is_live = not snap.get("dry_run", True)
+
+        if is_live and (snap.get("position_integrity") or {}).get("status") == "critical":
+            position_faults.append(key)
 
         if is_stale:
             stale_bots.append(key)
@@ -1442,6 +1510,9 @@ def _fleet_status() -> dict:
         level = "red"
         summary = (f"live bot unreachable: {', '.join(stale_bots)}"
                    if stale_bots else "live bot unreachable")
+    elif position_faults:
+        level = "red"
+        summary = f"live position ledger fault: {', '.join(position_faults)}"
     elif stale_bots:
         level = "yellow"
         summary = f"{len(stale_bots)} bot(s) stale: {', '.join(stale_bots)}"
@@ -1450,7 +1521,12 @@ def _fleet_status() -> dict:
         n = len([b for b in _cache["bots"].values() if b.get("reachable")])
         summary = f"all {n} bots reachable"
 
-    return {"level": level, "summary": summary, "stale_bots": stale_bots}
+    return {
+        "level": level,
+        "summary": summary,
+        "stale_bots": stale_bots,
+        "position_faults": position_faults,
+    }
 
 
 # ── App ────────────────────────────────────────────────────────────────────
@@ -1596,8 +1672,10 @@ def _lineage_payload(meta: dict, snap: dict) -> dict | None:
         legacy_curve.append([transition_ts - 1, round(legacy_end, 4)])
 
     live_actual = snap.get("equity_live") or []
+    realized_actual = snap.get("equity_realized") or live_actual
     live_start = float((snap.get("wallet") or {}).get("starting_capital") or 0.0)
     live_curve: list[list] = []
+    realized_curve: list[list] = []
     scale = None
     # A transient API balance near zero used to amplify the chart by hundreds
     # of times. Refuse implausible normalization inputs and keep the lineage
@@ -1611,15 +1689,24 @@ def _lineage_payload(meta: dict, snap: dict) -> dict | None:
             equity_value = float(equity)
             if math.isfinite(equity_value):
                 live_curve.append([int(ts), round(equity_value * scale, 4)])
+        for ts, equity in realized_actual:
+            equity_value = float(equity)
+            if math.isfinite(equity_value):
+                realized_curve.append([int(ts), round(equity_value * scale, 4)])
     if not live_curve:
         live_curve = [[transition_ts, round(legacy_end, 4)]]
     elif live_curve[0][0] > transition_ts:
         live_curve.insert(0, [transition_ts, round(legacy_end, 4)])
+    if not realized_curve:
+        realized_curve = [[transition_ts, round(legacy_end, 4)]]
+    elif realized_curve[0][0] > transition_ts:
+        realized_curve.insert(0, [transition_ts, round(legacy_end, 4)])
 
     joined = legacy_curve + [point for point in live_curve if point[0] >= transition_ts]
     return {
         "legacy": legacy_curve,
         "live": live_curve,
+        "realized": realized_curve,
         "drawdown": _drawdown_curve(joined),
         "transition": {
             "ts": transition_ts,
@@ -1683,8 +1770,11 @@ async def api_equity(bot_key: str):
     lineage = _lineage_payload(meta, snap)
     return JSONResponse({
         "starting_capital": starting,
+        "realized": snap.get("equity_realized", []),
         "live": snap.get("equity_live", []),
+        "drawdown_realized": snap.get("drawdown_realized", []),
         "drawdown": snap.get("drawdown_curve", []),
+        "pnl": snap.get("pnl", {}),
         "expected": expected,
         "bot_start_ts_ms": bot_start_ts_ms,
         "lineage": lineage,

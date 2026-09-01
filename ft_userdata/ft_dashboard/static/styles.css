@@ -168,7 +168,7 @@ button { font: inherit; }
 
 /* Consolidated portfolio analysis. */
 .portfolio-metrics {
-  display: grid; grid-template-columns: repeat(8, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(10, minmax(0, 1fr));
   gap: 1px; overflow: hidden; background: var(--border);
   border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--el2);
 }
@@ -283,7 +283,7 @@ button { font: inherit; }
 /* ═══════════════════════════════════════════════
    VITALS STRIP — compact fleet numbers
    ═══════════════════════════════════════════════ */
-.vitals-strip { display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--border);
+.vitals-strip { display:grid; grid-template-columns:repeat(8,1fr); gap:1px; background:var(--border);
                 border:1px solid var(--border); border-radius:var(--r); overflow:hidden; box-shadow:var(--el2);
                 transition: opacity 0.2s; }
 /* When incidents exist, strip is secondary */
@@ -327,7 +327,7 @@ button { font: inherit; }
 
 /* Full-width comparison table: primary decision surface on Overview. */
 .bot-table-wrap { width: 100%; overflow-x: auto; scrollbar-width: thin; }
-.bot-table { width: 100%; min-width: 1180px; border-collapse: collapse; }
+.bot-table { width: 100%; min-width: 1360px; border-collapse: collapse; }
 .bot-table th {
   padding: 0.55rem 0.8rem; background: var(--surface-2); border-bottom: 1px solid var(--border);
   color: var(--text-2); font-size: 9px; font-weight: 650; letter-spacing: .06em;
@@ -415,6 +415,19 @@ button { font: inherit; }
 @media (max-width: 720px) {
   .portfolio-head { flex-direction: column; gap: 0.75rem; }
   .portfolio-health > div { align-items: flex-start; }
+  .cmd-row-main {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) 16px;
+    align-items: start;
+    gap: 0.55rem 0.7rem;
+    padding: 0.75rem;
+  }
+  .cmd-icon { grid-column: 1; grid-row: 1; }
+  .cmd-body { grid-column: 2; grid-row: 1; }
+  .cmd-subject { white-space: normal; }
+  .cmd-reason { line-height: 1.35; }
+  .cmd-actions { grid-column: 2 / 4; grid-row: 2; flex-wrap: wrap; }
+  .cmd-chevron { grid-column: 3; grid-row: 1; }
   .vitals-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .portfolio-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vital-cell { padding: 11px 12px; }
@@ -543,7 +556,7 @@ button { font: inherit; }
   display: flex; flex-wrap: wrap; gap: 0.25rem 0.45rem; margin-top: 3px;
   color: var(--text-2); font-size: 10.5px;
 }
-.bis-summary { display: grid; grid-template-columns: repeat(4, auto); gap: 1.25rem; }
+.bis-summary { display: grid; grid-template-columns: repeat(5, auto); gap: 1.25rem; }
 .bis-stat { display: flex; flex-direction: column; min-width: 58px; }
 .bis-stat-k {
   color: var(--text-2); font-size: 8.5px; font-weight: 600; letter-spacing: .055em;
@@ -554,6 +567,24 @@ button { font: inherit; }
 .bis-stat strong.neg { color: var(--neg); }
 .bis-stat-wide { min-width: 132px; }
 .bis-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+.position-fault {
+  display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 1.2fr);
+  gap: 1rem; align-items: center; padding: .85rem 1rem;
+  background: var(--neg-soft); border: 1px solid rgba(210,71,58,.28);
+  border-radius: var(--r); color: var(--neg);
+}
+.position-fault > div:first-child,
+.position-fault-record { min-width: 0; }
+.position-fault strong,
+.position-fault span { display: block; }
+.position-fault strong { font-size: 12px; font-weight: 700; }
+.position-fault > div:first-child > span { margin-top: 2px; color: #8f3028; font-size: 10.5px; }
+.position-fault-record {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .75rem;
+  align-items: center; padding: .55rem .7rem; background: rgba(255,254,251,.58);
+  border-radius: var(--r-sm); color: #8f3028; font-size: 10.5px;
+}
+.position-fault-record > span:nth-child(2) { overflow-wrap: anywhere; }
 
 .observation-strip {
   display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
@@ -599,6 +630,8 @@ button { font: inherit; }
   .bis-summary { grid-column: 1; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
   .bis-stat-wide { grid-column: 1 / -1; }
   .bis-actions { grid-column: 1; grid-row: 3; }
+  .position-fault { grid-template-columns: 1fr; }
+  .position-fault-record { grid-template-columns: 1fr; gap: .2rem; }
   .bot-waiting-facts { padding-left: 0; gap: 0.75rem; }
   .observation-strip { grid-template-columns:1fr; }
   .obs-item { border-right:0; border-bottom:1px solid var(--hairline); }

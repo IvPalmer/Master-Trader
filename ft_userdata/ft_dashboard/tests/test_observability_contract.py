@@ -17,12 +17,75 @@ def test_epoch_stats_ignore_lifetime_values_and_use_complete_trade_set():
     )
 
     assert closed_pnl == 2.0
-    assert pnl == {"closed": 2.0, "all_coin": 2.5, "closed_pct": 2.0, "all_pct": 2.5}
+    assert pnl == {
+        "closed": 2.0,
+        "unrealized": 0.5,
+        "all_coin": 2.5,
+        "closed_pct": 2.0,
+        "unrealized_pct": 0.5,
+        "all_pct": 2.5,
+    }
     assert stats["closed_trade_count"] == 2
     assert stats["winning_trades"] == 1
     assert stats["losing_trades"] == 1
     assert stats["profit_factor"] == 3.0
     assert stats["scope"] == "epoch"
+
+
+def test_live_bot_excludes_inherited_dry_run_trade_records():
+    records = [
+        {
+            "trade_id": 7,
+            "pair": "TRX/USDT",
+            "profit_abs": -0.55,
+            "orders": [{"order_id": "dry_run_buy_TRX/USDT_deadbeef"}],
+        },
+        {
+            "trade_id": 8,
+            "pair": "ETH/USDT",
+            "profit_abs": 0.25,
+            "orders": [{"order_id": "123456789"}],
+        },
+    ]
+
+    exposure, issues = app._split_open_trade_records(records, is_dry_run=False)
+
+    assert [trade["trade_id"] for trade in exposure] == [8]
+    assert issues == [{
+        "kind": "dry-run-record-in-live-db",
+        "severity": "critical",
+        "trade_id": 7,
+        "pair": "TRX/USDT",
+        "open_date": None,
+        "open_timestamp": None,
+        "reported_profit_pct": None,
+        "reported_profit_abs": -0.55,
+        "detail": "simulated entry record inherited by a live process; excluded from exposure and marked P&L",
+    }]
+
+    dry_exposure, dry_issues = app._split_open_trade_records(records, is_dry_run=True)
+    assert dry_exposure == records
+    assert dry_issues == []
+
+
+def test_fleet_status_is_red_for_live_position_ledger_fault(monkeypatch):
+    bot = {"key": "live-bot"}
+    snapshot = {
+        "reachable": True,
+        "dry_run": False,
+        "position_integrity": {"status": "critical"},
+    }
+    monkeypatch.setattr(app, "BOTS", [bot])
+    monkeypatch.setattr(app, "_cache", {
+        "bots": {"live-bot": snapshot},
+        "last_reachable_at": {"live-bot": time.time()},
+    })
+
+    status = app._fleet_status()
+
+    assert status["level"] == "red"
+    assert status["position_faults"] == ["live-bot"]
+    assert "position ledger fault" in status["summary"]
 
 
 def test_trade_history_paginates_until_epoch_boundary(monkeypatch):

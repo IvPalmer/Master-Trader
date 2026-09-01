@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css?v=22">
+<link rel="stylesheet" href="/static/styles.css?v=23">
 <script defer
         src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
         integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
@@ -152,9 +152,17 @@
         <span class="vital-val num" x-text="fmtUsd(hero.walletNow)">—</span>
       </button>
       <button class="vital-cell accent" @click="document.getElementById('chart-equity')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">net p&l</span>
+        <span class="vital-label">marked p&l</span>
         <span class="vital-val num" :class="hero.totalPnl >= 0 ? 'pos' : 'neg'"
               x-text="fmtUsdSigned(hero.totalPnl) + ' (' + fmtPctSigned(hero.totalPct) + ')'">—</span>
+      </button>
+      <button class="vital-cell" @click="document.getElementById('chart-equity')?.scrollIntoView({behavior:'smooth'})">
+        <span class="vital-label">closed p&l</span>
+        <span class="vital-val num" :class="hero.totalRealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalRealizedPnl)">—</span>
+      </button>
+      <button class="vital-cell" @click="openPositionsTab()">
+        <span class="vital-label">open p&l</span>
+        <span class="vital-val num" :class="hero.totalUnrealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)">—</span>
       </button>
       <button class="vital-cell" @click="document.getElementById('chart-candles')?.scrollIntoView({behavior:'smooth'})">
         <span class="vital-label">open positions</span>
@@ -171,10 +179,6 @@
       <button class="vital-cell" @click="document.querySelector('.ledger')?.scrollIntoView({behavior:'smooth'})">
         <span class="vital-label">closed trades</span>
         <span class="vital-val num" x-text="hero.closedTrades">0</span>
-      </button>
-      <button class="vital-cell" @click="document.querySelector('.ledger')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">win rate</span>
-        <span class="vital-val num" x-text="fmtPct(hero.winRate * 100, 1)">—</span>
       </button>
     </div>
 
@@ -197,7 +201,9 @@
               <th>strategy</th>
               <th>execution</th>
               <th class="right">capital</th>
-              <th class="right">net p&amp;l</th>
+              <th class="right">closed p&amp;l</th>
+              <th class="right">open p&amp;l</th>
+              <th class="right">marked p&amp;l</th>
               <th class="right">return</th>
               <th class="right">max dd</th>
               <th class="right">trades</th>
@@ -228,6 +234,8 @@
                   <span class="table-primary num" x-text="fmtUsd(bot.wallet?.bot_owned)">—</span>
                   <span class="table-secondary" x-show="bot.account_group === 'binance-spot'" x-cloak>shared</span>
                 </td>
+                <td class="right num" :class="(bot.pnl?.closed || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.closed)">—</td>
+                <td class="right num" :class="(bot.pnl?.unrealized || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.unrealized)">—</td>
                 <td class="right num" :class="(bot.pnl?.all_coin || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.all_coin)">—</td>
                 <td class="right num" :class="(bot.pnl?.all_pct || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(bot.pnl?.all_pct)">—</td>
                 <td class="right num" x-text="fmtPct(-Math.abs((bot.stats?.max_drawdown || 0) * 100), 2)">—</td>
@@ -293,7 +301,11 @@
         <div class="selection-kv">
           <span>capital</span>
           <strong class="num" x-text="fmtUsd(selectedEquityBot ? selectedEquityBot.wallet?.bot_owned : hero.walletNow)">—</strong>
-          <span>net p&amp;l</span>
+          <span>closed p&amp;l</span>
+          <strong class="num" :class="selectedRealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(selectedRealizedPnl)">—</strong>
+          <span>open p&amp;l</span>
+          <strong class="num" :class="selectedUnrealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(selectedUnrealizedPnl)">—</strong>
+          <span>marked p&amp;l</span>
           <strong class="num" :class="selectedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(selectedPnl)">—</strong>
           <span>return</span>
           <strong class="num" :class="selectedReturn >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(selectedReturn)">—</strong>
@@ -319,7 +331,7 @@
         <div class="card-head">
           <div>
             <div class="card-title">drawdown · <span x-text="equitySelectionLabel">fleet</span></div>
-            <div class="card-sub">selected performance curve · risk below running peak</div>
+            <div class="card-sub">closed equity plus the current mark on open positions · risk below peak</div>
           </div>
         </div>
         <div class="chart short" id="chart-drawdown"></div>
@@ -443,7 +455,13 @@
         <span>capital</span><strong class="num" x-text="fmtUsd(hero.walletNow)">—</strong>
       </div>
       <div class="portfolio-metric">
-        <span>net p&amp;l</span><strong class="num" :class="hero.totalPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalPnl)">—</strong>
+        <span>marked p&amp;l</span><strong class="num" :class="hero.totalPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalPnl)">—</strong>
+      </div>
+      <div class="portfolio-metric">
+        <span>closed p&amp;l</span><strong class="num" :class="hero.totalRealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalRealizedPnl)">—</strong>
+      </div>
+      <div class="portfolio-metric">
+        <span>open p&amp;l</span><strong class="num" :class="hero.totalUnrealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)">—</strong>
       </div>
       <div class="portfolio-metric">
         <span>return</span><strong class="num" :class="hero.totalPct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(hero.totalPct)">—</strong>
@@ -470,7 +488,7 @@
         <div class="card-head">
           <div>
             <div class="card-title">consolidated equity</div>
-            <div class="card-sub">realized results sequenced across all live strategies</div>
+            <div class="card-sub">closed equity with a dashed current mark for all open positions</div>
           </div>
           <span class="tag live">live</span>
         </div>
@@ -486,6 +504,9 @@
         </div>
         <div class="portfolio-state-row">
           <span>open positions</span><strong class="num" x-text="hero.openCount">0</strong>
+        </div>
+        <div class="portfolio-state-row">
+          <span>open p&amp;l</span><strong class="num" :class="hero.totalUnrealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)">—</strong>
         </div>
         <div class="portfolio-state-row">
           <span>open notional</span><strong class="num" x-text="fmtUsd(hero.openNotional)">—</strong>
@@ -516,7 +537,7 @@
         <div class="card-head">
           <div>
             <div class="card-title">portfolio drawdown</div>
-            <div class="card-sub">underwater curve from the consolidated realized-equity peak</div>
+            <div class="card-sub">underwater curve including the current mark on open positions</div>
           </div>
         </div>
         <div class="chart short" id="chart-portfolio-dd"></div>
@@ -550,7 +571,7 @@
         <div class="card-head">
           <div>
             <div class="card-title">strategy contribution</div>
-            <div class="card-sub">net realized P&amp;L attributed to each live bot</div>
+            <div class="card-sub">closed contribution plus current open-position mark</div>
           </div>
         </div>
         <div class="chart" id="chart-portfolio-strategy"></div>
@@ -1080,8 +1101,12 @@
             <strong class="num" x-text="fmtUsd(bot.wallet?.bot_owned)">—</strong>
           </span>
           <span class="bis-stat">
-            <span class="bis-stat-k">p&l</span>
+            <span class="bis-stat-k">marked p&l</span>
             <strong class="num" :class="(bot.pnl?.all_coin || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.all_coin)">—</strong>
+          </span>
+          <span class="bis-stat">
+            <span class="bis-stat-k">open p&l</span>
+            <strong class="num" :class="(bot.pnl?.unrealized || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.unrealized)">—</strong>
           </span>
           <span class="bis-stat">
             <span class="bis-stat-k">open</span>
@@ -1099,6 +1124,20 @@
           </template>
         </div>
       </div>
+
+      <section class="position-fault" x-show="bot.position_integrity?.status === 'critical'" x-cloak aria-label="Position ledger fault">
+        <div>
+          <strong x-text="bot.position_integrity?.label || 'position ledger fault'">position ledger fault</strong>
+          <span x-text="bot.position_integrity?.detail || 'open record does not match exchange execution mode'">open record does not match exchange execution mode</span>
+        </div>
+        <template x-for="issue in (bot.position_integrity?.issues || [])" :key="issue.kind + ':' + issue.trade_id">
+          <div class="position-fault-record">
+            <span class="num" x-text="issue.pair || 'unknown pair'">pair</span>
+            <span x-text="issue.detail">simulated record inherited by live process</span>
+            <span class="num" :class="(issue.reported_profit_abs || 0) >= 0 ? 'pos' : 'neg'" x-text="'reported ' + fmtUsdSigned(issue.reported_profit_abs) + ' · not real exposure'">—</span>
+          </div>
+        </template>
+      </section>
 
       <section class="observation-strip" aria-label="Live observation contract">
         <div class="obs-item obs-epoch">
@@ -1177,7 +1216,7 @@
                         <span class="aopen" :class="(ot.profit_pct||0)<0?'l':''" x-show="!ot.booked_pct" x-text="'100% open'"></span>
                         <span class="aspacer"></span>
                         <span class="atp" x-show="ot.tps_total" x-text="ot.tps_hit+'/'+ot.tps_total+(ot.next_tp ? ' → '+fmtRate(ot.next_tp) : '')"></span>
-                        <span class="apnl num" :class="(ot.profit_pct||0)>=0?'pos':'neg'" x-text="fmtPctSigned(ot.profit_pct)">—</span>
+                        <span class="apnl num" :class="(ot.profit_pct||0)>=0?'pos':'neg'" x-text="fmtUsdSigned(ot.profit_abs)+' · '+fmtPctSigned(ot.profit_pct)">—</span>
                         <span class="aage" x-text="fmtMin(ot.ageMin)">—</span>
                       </div>
                     </div>
@@ -1197,6 +1236,9 @@
             <span class="k">p&l</span>
               <span class="v" :class="(bot.pnl?.all_pct ?? 0) >= 0 ? 'pos' : 'neg'"
                     x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '%' + (!bot.baseline_comparable ? '' : ' · expected ' + (bot.gate2?.profit?.expected_pct ?? bot.baseline?.annual_return_pct ?? 0).toFixed(2) + '%')">—</span>
+            <span class="k">closed / open</span>
+              <span class="v" :class="(bot.pnl?.all_coin ?? 0) >= 0 ? 'pos' : 'neg'"
+                    x-text="fmtUsdSigned(bot.pnl?.closed) + ' / ' + fmtUsdSigned(bot.pnl?.unrealized)">—</span>
             <span class="k">profit factor</span>
               <span class="v" x-text="(bot.stats?.profit_factor?.toFixed(2) ?? '—') + (bot.baseline_comparable && bot.baseline?.profit_factor ? ' · lab ' + bot.baseline.profit_factor : '')">—</span>
             <span class="k">win rate</span>
@@ -1230,14 +1272,14 @@
         <div class="card col-8">
           <div class="card-head">
             <div class="card-title">equity curve</div>
-            <div class="card-sub" x-text="bot.lineage ? 'historical lineage → isolated live epoch' : (bot.baseline_comparable ? 'live equity vs backtest expectation' : 'forward live equity · collecting trades')">forward live equity</div>
+            <div class="card-sub" x-text="bot.lineage ? 'historical lineage → closed live equity · dashed tip is open P&L' : (bot.baseline_comparable ? 'closed live equity vs expectation · dashed tip is open P&L' : 'closed live equity · dashed tip is current open P&L')">forward live equity</div>
           </div>
           <div class="chart tall" :id="'chart-detail-equity-'+bot.key"></div>
         </div>
         <div class="card col-4">
           <div class="card-head">
             <div class="card-title">drawdown</div>
-            <div class="card-sub">% below running peak</div>
+            <div class="card-sub">% below running peak · includes current open mark</div>
           </div>
           <div class="chart short" :id="'chart-detail-dd-'+bot.key"></div>
         </div>
@@ -1319,6 +1361,6 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=38"></script>
+<script src="/static/dashboard.js?v=39"></script>
 </body>
 </html>

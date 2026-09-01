@@ -43,6 +43,7 @@ def test_lineage_stitches_closed_dry_run_to_rebased_live(tmp_path, monkeypatch):
     }
     snap = {
         "wallet": {"starting_capital": 50.0},
+        "equity_realized": [[transition, 50.0], [transition + 500, 52.0]],
         "equity_live": [[transition, 50.0], [transition + 1_000, 55.0]],
     }
 
@@ -52,6 +53,7 @@ def test_lineage_stitches_closed_dry_run_to_rebased_live(tmp_path, monkeypatch):
     assert lineage["legacy_ending_equity"] == 205.0
     assert lineage["legacy"][-1] == [transition - 1, 205.0]
     assert lineage["live"] == [[transition, 205.0], [transition + 1_000, 225.5]]
+    assert lineage["realized"] == [[transition, 205.0], [transition + 500, 213.2]]
     assert lineage["transition"]["label"] == "live + strategy v2"
     assert lineage["drawdown"][-1][1] == 0.0
     assert lineage["normalized"] is True
