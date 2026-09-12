@@ -12,6 +12,22 @@ from pathlib import Path
 
 FT_DIR = Path(__file__).parent.parent / "ft_userdata"
 TRACKER = FT_DIR / "bot_evolution_tracker.py"
+BOTS_CONFIG = FT_DIR / "bots_config.json"
+
+ACTIVE_BOTS = [
+    name
+    for name, info in json.loads(BOTS_CONFIG.read_text())["bots"].items()
+    if info.get("active", True)
+]
+
+
+@pytest.fixture(scope="module", autouse=True)
+def evolution_dir(tmp_path_factory):
+    """Redirect the tracker's data dir so the suite never writes into ft_userdata/evolution/."""
+    path = tmp_path_factory.mktemp("evolution")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setenv("MT_EVOLUTION_DIR", str(path))
+        yield path
 
 
 def run_tracker(*args):
@@ -23,6 +39,16 @@ def run_tracker(*args):
         timeout=30,
     )
     return result
+
+
+@pytest.fixture(scope="module")
+def snapshot_result(evolution_dir):
+    return run_tracker("snapshot", "--note", "test snapshot")
+
+
+@pytest.fixture(scope="module")
+def changelog_result(evolution_dir):
+    return run_tracker("changelog", ACTIVE_BOTS[0], "test change entry")
 
 
 # ── Tracker script validity ───────────────────────────────────────
@@ -54,11 +80,10 @@ def test_dashboard_runs():
 
 
 def test_dashboard_shows_all_bots():
+    assert ACTIVE_BOTS, "No active bots in bots_config.json"
     result = run_tracker("dashboard")
-    assert "SupertrendStrategy" in result.stdout
-    assert "MasterTraderV1" in result.stdout
-    assert "AlligatorTrendV1" in result.stdout
-    assert "GaussianChannelV1" in result.stdout
+    for bot in ACTIVE_BOTS:
+        assert bot in result.stdout, f"{bot} is active but missing from the dashboard"
 
 
 # ── Graduation command ────────────────────────────────────────────
@@ -78,19 +103,18 @@ def test_graduation_shows_gates():
 # ── Snapshot command ──────────────────────────────────────────────
 
 
-def test_snapshot_runs():
-    result = run_tracker("snapshot", "--note", "test snapshot")
-    assert result.returncode == 0
-    assert "Snapshot" in result.stdout
-    assert "saved" in result.stdout
+def test_snapshot_runs(snapshot_result):
+    assert snapshot_result.returncode == 0
+    assert "Snapshot" in snapshot_result.stdout
+    assert "saved" in snapshot_result.stdout
 
 
-def test_snapshot_creates_files():
+def test_snapshot_creates_files(evolution_dir, snapshot_result):
     """Snapshot should create per-bot and combined JSON files."""
-    evolution_dir = FT_DIR / "evolution"
+    assert ACTIVE_BOTS, "No active bots in bots_config.json"
     assert evolution_dir.exists()
 
-    for bot in ["SupertrendStrategy", "MasterTraderV1", "BollingerRSIMeanReversion"]:
+    for bot in ACTIVE_BOTS:
         bot_dir = evolution_dir / bot
         assert bot_dir.exists(), f"No evolution dir for {bot}"
         snapshots = list(bot_dir.glob("2*.json"))
@@ -108,14 +132,13 @@ def test_snapshot_creates_files():
 # ── Changelog command ─────────────────────────────────────────────
 
 
-def test_changelog_runs():
-    result = run_tracker("changelog", "SupertrendStrategy", "test change entry")
-    assert result.returncode == 0
-    assert "Logged change" in result.stdout
+def test_changelog_runs(changelog_result):
+    assert changelog_result.returncode == 0
+    assert "Logged change" in changelog_result.stdout
 
 
-def test_changelog_persists():
-    changelog_file = FT_DIR / "evolution" / "SupertrendStrategy" / "changelog.json"
+def test_changelog_persists(evolution_dir, changelog_result):
+    changelog_file = evolution_dir / ACTIVE_BOTS[0] / "changelog.json"
     assert changelog_file.exists()
     with open(changelog_file) as f:
         entries = json.load(f)
@@ -126,8 +149,9 @@ def test_changelog_persists():
 # ── History command ───────────────────────────────────────────────
 
 
+@pytest.mark.usefixtures("snapshot_result")
 def test_history_runs():
-    result = run_tracker("history", "SupertrendStrategy")
+    result = run_tracker("history", ACTIVE_BOTS[0])
     assert result.returncode == 0
     assert "EVOLUTION TIMELINE" in result.stdout
 
@@ -145,3 +169,41 @@ def test_peak_file_created_for_profitable_bots():
         assert "metrics" in peak
         assert "parameters" in peak
         assert peak["metrics"]["profit_factor"] > 0
+
+
+# Data directory resolution
+
+
+def resolve_data_dir():
+    result = subprocess.run(
+        [sys.executable, "-c", "import bot_evolution_tracker as t; print(t.DATA_DIR)"],
+        capture_output=True,
+        text=True,
+        cwd=str(FT_DIR),
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    return result.stdout.strip()
+
+
+@pytest.mark.parametrize("override", [None, ""], ids=["unset", "empty"])
+def test_data_dir_defaults_to_repo_evolution(override, monkeypatch):
+    """Unset or empty MT_EVOLUTION_DIR must still resolve to ft_userdata/evolution/."""
+    if override is None:
+        monkeypatch.delenv("MT_EVOLUTION_DIR", raising=False)
+    else:
+        monkeypatch.setenv("MT_EVOLUTION_DIR", override)
+    assert resolve_data_dir() == str(FT_DIR / "evolution")
+
+
+def test_data_dir_honours_override(tmp_path, monkeypatch):
+    monkeypatch.setenv("MT_EVOLUTION_DIR", str(tmp_path))
+    assert resolve_data_dir() == str(tmp_path)
+
+
+def test_override_creates_missing_parent_dirs(tmp_path, monkeypatch):
+    target = tmp_path / "nested" / "evolution"
+    monkeypatch.setenv("MT_EVOLUTION_DIR", str(target))
+    result = run_tracker("snapshot", "--note", "nested path check")
+    assert result.returncode == 0, result.stderr
+    assert target.exists()
