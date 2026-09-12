@@ -97,6 +97,8 @@ class OITrendPullbackV1(IStrategy):
 
     def bot_loop_start(self, current_time: datetime, **kwargs) -> None:
         """Collect OI asynchronously and expire failed/stale confirmations."""
+        if not self._uses_live_oi():
+            return
         now = time.time()
 
         # Never block Freqtrade's strategy loop on public HTTP. A completed
@@ -107,16 +109,17 @@ class OITrendPullbackV1(IStrategy):
             results = []
             for pair, future in self._oi_futures.items():
                 try:
-                    _, oi = future.result()
+                    _, oi, observed_at = future.result()
                 except Exception as exc:
                     logger.warning("OI future failed for %s: %s", pair, exc)
                     oi = None
-                results.append((pair, oi))
+                    observed_at = None
+                results.append((pair, oi, observed_at))
             self._oi_futures = {}
-            for pair, oi in results:
-                self._record_oi_result(pair, oi, now)
-            valid = sum(oi is not None for _, oi in results)
-            ready = sum(self._fresh_oi_growth(pair, now) is not None for pair, _ in results)
+            for pair, oi, observed_at in results:
+                self._record_oi_result(pair, oi, now, observed_at)
+            valid = sum(oi is not None for _, oi, _ in results)
+            ready = sum(self._fresh_oi_growth(pair, now) is not None for pair, _, _ in results)
             logger.info(
                 "OI snapshot: valid=%d/%d growth_ready=%d",
                 valid, len(results), ready,
@@ -130,25 +133,41 @@ class OITrendPullbackV1(IStrategy):
             pair: self._oi_executor.submit(self._fetch_oi, pair) for pair in pairs
         }
 
-    def _record_oi_result(self, pair: str, oi: float | None, now: float) -> None:
-        """Apply one fetch result; failures invalidate the entry gate."""
-        if oi is None:
+    def _uses_live_oi(self) -> bool:
+        mode = self.config.get("runmode")
+        return getattr(mode, "value", mode) in ("live", "dry_run")
+
+    def _record_oi_result(
+        self, pair: str, oi: float | None, now: float, observed_at: float | None,
+    ) -> None:
+        """Use exchange observation times for both endpoints and freshness."""
+        if (
+            oi is None or not np.isfinite(oi) or oi <= 0
+            or observed_at is None or not np.isfinite(observed_at)
+            or not 0 <= now - observed_at <= self.oi_max_age_s
+        ):
             self._oi_growth.pop(pair, None)
             self._oi_growth_updated.pop(pair, None)
             return
         history = self._oi_history.setdefault(pair, [])
-        history.append((now, oi))
-        cutoff = now - 2 * 3600
+        # A delayed or repeated response must not manufacture a new endpoint.
+        if history and observed_at <= history[-1][0]:
+            self._fresh_oi_growth(pair, now)
+            return
+        history.append((observed_at, oi))
+        cutoff = observed_at - 2 * 3600
         history[:] = [(ts, value) for ts, value in history if ts >= cutoff]
+        baseline_end = observed_at - self.oi_lookback_s
         eligible = [
             (ts, value) for ts, value in history
-            if ts <= now - self.oi_lookback_s
+            if baseline_end - self.oi_sample_interval_s <= ts <= baseline_end
         ]
-        # Nearest sample at/before 45m — not the oldest point in the 2h buffer.
+        # At most one poll interval before the 45m endpoint. An outage must
+        # not turn a two-hour change into a seemingly fresh 45m confirmation.
         baseline = max(eligible, key=lambda item: item[0])[1] if eligible else None
         if baseline and baseline > 0:
             self._oi_growth[pair] = oi / baseline - 1.0
-            self._oi_growth_updated[pair] = now
+            self._oi_growth_updated[pair] = observed_at
         else:
             self._oi_growth.pop(pair, None)
             self._oi_growth_updated.pop(pair, None)
@@ -156,14 +175,14 @@ class OITrendPullbackV1(IStrategy):
     def _fresh_oi_growth(self, pair: str, now: float | None = None) -> float | None:
         now = time.time() if now is None else now
         updated = self._oi_growth_updated.get(pair)
-        if updated is None or now - updated > self.oi_max_age_s:
+        if updated is None or not 0 <= now - updated <= self.oi_max_age_s:
             self._oi_growth.pop(pair, None)
             self._oi_growth_updated.pop(pair, None)
             return None
         return self._oi_growth.get(pair)
 
     @staticmethod
-    def _fetch_oi(pair: str) -> tuple[str, float | None]:
+    def _fetch_oi(pair: str) -> tuple[str, float | None, float | None]:
         symbol = pair.split("/")[0].replace("1000", "1000") + "USDT"
         url = "https://fapi.binance.com/fapi/v1/openInterest?" + urllib.parse.urlencode(
             {"symbol": symbol}
@@ -173,10 +192,13 @@ class OITrendPullbackV1(IStrategy):
             with urllib.request.urlopen(req, timeout=2.0) as response:
                 payload = json.load(response)
             value = float(payload["openInterest"])
-            return pair, value if value > 0 else None
+            # Binance's `time` is the OI observation time in milliseconds,
+            # not the time this asynchronous result is harvested by the bot.
+            observed_at = float(payload["time"]) / 1000.0
+            return pair, value, observed_at
         except Exception as exc:
             logger.warning("OI fetch failed for %s: %s", pair, exc)
-            return pair, None
+            return pair, None, None
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe["ema20"] = ta.EMA(dataframe, timeperiod=20)
@@ -184,8 +206,14 @@ class OITrendPullbackV1(IStrategy):
         dataframe["ema200"] = ta.EMA(dataframe, timeperiod=200)
         dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
         dataframe["vol_sma"] = dataframe["volume"].rolling(20).mean()
-        fresh_growth = self._fresh_oi_growth(metadata["pair"])
-        dataframe["oi_growth"] = fresh_growth if fresh_growth is not None else np.nan
+        dataframe["oi_growth"] = np.nan
+        # The live observation confirms only the current decision. Copying it
+        # onto old candles fabricates a historical OI series. Backtests need
+        # their own causal OI history and must not consult the live endpoint.
+        if self._uses_live_oi() and not dataframe.empty:
+            fresh_growth = self._fresh_oi_growth(metadata["pair"])
+            if fresh_growth is not None:
+                dataframe.iloc[-1, dataframe.columns.get_loc("oi_growth")] = fresh_growth
         dataframe["btc_trend"] = (
             (dataframe["btc_usdt_close_1h"] > dataframe["btc_usdt_ema200_1h"])
             & (dataframe["btc_usdt_ema50_1h"] > dataframe["btc_usdt_ema200_1h"])
@@ -243,15 +271,14 @@ class OITrendPullbackV1(IStrategy):
             return
         passes = {name: int(term.tail(window).fillna(False).sum())
                   for name, term in terms.items()}
-        # The binding constraint is whichever term passed least often.
-        scarcest = min(passes, key=passes.get)
-
-        # oi_growth is a single live reading broadcast across every row, so its
-        # count is NOT a historical frequency like the others — it is the
-        # current value replicated, and reads 0 or `window`. Report the value
-        # itself, which is the number that tells you whether the 2% threshold
-        # is near or hopeless, and say how far off it is.
+        # OI is attached only to the latest decision, so its count is not a
+        # historical frequency like the TA terms. Report its current value.
         current_oi = self._fresh_oi_growth(pair)
+        historical_passes = {name: count for name, count in passes.items()
+                             if name != "oi_growth_2pct"}
+        scarcest = min(historical_passes, key=historical_passes.get)
+        if current_oi is None or current_oi < self.oi_min_growth:
+            scarcest = "oi_growth_2pct"
         if current_oi is None:
             oi_note = ("oi_growth=UNAVAILABLE (no fresh reading; a restart "
                        "clears the 45m baseline and blocks entries until it "

@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import sqlite3
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -91,3 +92,60 @@ def test_environment_overrides_are_the_effective_mode_and_database(tmp_path, mon
 def test_every_active_bot_entrypoint_runs_the_guard():
     compose = (ROOT / "ft_userdata/docker-compose.prod.yml").read_text()
     assert compose.count("guard_db_mode.py --config") == 6
+
+
+@pytest.mark.parametrize(
+    "service",
+    ["ft-killers-scalp", "ft-insiders-scalp", "ft-short-keltner-hl-live"],
+)
+@pytest.mark.parametrize("dry_run", ["true", "false"])
+@pytest.mark.parametrize("guard_status", [0, 78])
+def test_hyperliquid_entrypoint_stops_before_trading_when_guard_fails(
+    tmp_path, service, dry_run, guard_status
+):
+    """Execute the deployed shell flow with harmless guard/trader substitutes.
+
+    Merely containing a guard command does not make a multiline entrypoint
+    fail closed: a failed guard used to fall through to sleep and Freqtrade.
+    """
+    yaml = pytest.importorskip("yaml")
+    compose = yaml.safe_load((ROOT / "ft_userdata/docker-compose.prod.yml").read_text())
+    entrypoint = compose["services"][service]["entrypoint"]
+    assert entrypoint[:2] == ["/bin/sh", "-c"]
+    # Compose converts doubled dollars before passing the script to /bin/sh.
+    script = entrypoint[2].replace("$$", "$")
+    trader = tmp_path / "freqtrade"
+    trader.write_text(
+        '#!/bin/sh\n'
+        'printf "trader-started %s %s\\n" "$FREQTRADE__DB_URL" '
+        '"${FREQTRADE__ORDER_TYPES__STOPLOSS_ON_EXCHANGE:-unchanged}"\n'
+    )
+    trader.chmod(0o700)
+    substitutes = (
+        'python() { printf "guard-called\\n"; return "$GUARD_STATUS"; }\n'
+        'sleep() { printf "sleep-called\\n"; }\n'
+    )
+    result = subprocess.run(
+        ["/bin/sh", "-c", substitutes + script],
+        env={
+            "PATH": str(tmp_path),
+            "FREQTRADE__DRY_RUN": dry_run,
+            "GUARD_STATUS": str(guard_status),
+        },
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    assert "guard-called" in result.stdout
+    assert result.returncode == guard_status, result.stderr
+    if guard_status:
+        assert "sleep-called" not in result.stdout
+        assert "trader-started" not in result.stdout
+    else:
+        assert "sleep-called" in result.stdout
+        assert "trader-started" in result.stdout
+        marker = ".dryrun." if dry_run == "true" else ".live."
+        assert marker in result.stdout
+        expected_stop_mode = "false" if dry_run == "true" else "unchanged"
+        assert result.stdout.rstrip().endswith(expected_stop_mode)

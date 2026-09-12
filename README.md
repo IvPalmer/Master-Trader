@@ -1,13 +1,20 @@
 # Master Trader — Multi-Bot Algorithmic Trading System
 
-A self-improving multi-strategy crypto trading system built on [Freqtrade](https://www.freqtrade.io/). Runs six bounded live bots with automated health monitoring, strategy evolution, and consolidated portfolio analytics.
+A multi-strategy crypto trading system built on [Freqtrade](https://www.freqtrade.io/). The September 11 production review found three live bots and three dry-run bots, with health monitoring and consolidated portfolio analytics. Current revisions are still collecting evidence; reachability alone does not establish execution readiness or profitability.
 
 Current production fleet:
 
-| Venue | Bots | Execution |
+| Venue | Bots | Observed mode |
 |---|---|---|
-| Binance spot | FundingFadeV1, KeltnerBounceV1, OITrendPullbackV1 | Shared spot wallet; independent strategy stakes and databases |
-| Hyperliquid futures | KillersScalpV1, InsidersScalpV2, ShortKeltnerV2HLlive | Dedicated accounts; isolated margin; native exchange stops |
+| Binance spot | FundingFadeV1, KeltnerBounceV1 | Live; shared wallet |
+| Hyperliquid futures | KillersScalpV1 | Live; native stop-limit orders verified |
+| Binance spot | OITrendPullbackV1 | Dry-run |
+| Hyperliquid futures | InsidersScalpV2, ShortKeltnerV2HLlive | Dry-run |
+
+The [September 11 paper and fleet review](docs/audits/2026-09-11-order-flow-and-fleet-review.md)
+records execution faults, local remediation, unresolved accounting issues,
+and the proposed order-flow research protocol. Consult runtime configuration
+for current modes; local fixes described in that review are not yet deployed.
 
 The current authorization, known limitations, remediation status, and next
 review are recorded in

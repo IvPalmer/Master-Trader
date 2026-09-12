@@ -250,26 +250,12 @@ CONCENTRATION_WARN, CONCENTRATION_DANGER = 0.40, 0.50
 # How long since last successful poll before a bot is considered stale.
 STALE_THRESHOLD_S = 60
 
-# Treatment B: a TP fill below this percent of the position is treated as
-# fee-dust shrinkage, not a real partial exit.
-FEE_DUST_PCT = 0.5
+def compute_booked_pct(amount, filled_entry_amount, nr_successful_entries=None):
+    """Percentage exited from actual fills, with unknown quantities left null.
 
-
-def compute_booked_pct(amount, amount_requested, nr_successful_entries=None):
-    """Fraction of an open position already closed, as a percent (0..100).
-
-    Derived from Freqtrade /status: original filled size (`amount_requested`)
-    vs. what remains (`amount`). Correct ONLY for trades without position
-    adjustment (the Killers copy-trader blocks adjustment; other fleet bots
-    are single-exit). Returns None when the denominator is unknown or the
-    entry hasn't filled — the frontend renders a plain "open" bar then.
-
-    NOTE: for a partially-filled limit entry (entry order still live),
-    amount < amount_requested before any TP fill, which would produce a false
-    booked_pct. The Killers copy-trader uses limit-in-zone entries (ordertype
-    limit, unfilledtimeout.entry 240min) so this is real, not hypothetical —
-    gated below on `nr_of_successful_entries` (0 until the entry fully fills).
-    Pass it from the call site; omit (default None) to leave the check off.
+    Both quantities must come from filled orders: ``amount`` is filled entry
+    quantity minus filled exits. Requested quantities include rounding and
+    unfilled volume and must never be used as the denominator.
     """
     # Entry not yet complete (e.g. a resting/partial limit entry) → booked is
     # not meaningful yet; report None so the UI shows "100% open", not "booked".
@@ -280,7 +266,7 @@ def compute_booked_pct(amount, amount_requested, nr_successful_entries=None):
         except (TypeError, ValueError):
             return None
     try:
-        ar = float(amount_requested) if amount_requested is not None else 0.0
+        ar = float(filled_entry_amount) if filled_entry_amount is not None else 0.0
         a = float(amount) if amount is not None else 0.0
     except (TypeError, ValueError):
         return None
@@ -293,18 +279,53 @@ def compute_booked_pct(amount, amount_requested, nr_successful_entries=None):
         pct = 0.0
     elif pct > 100:
         pct = 100.0
-    if pct < FEE_DUST_PCT:
-        pct = 0.0
     return round(pct, 1)
 
 
-def killers_tp_ladder(db_path: str) -> dict[int, dict]:
+def booked_pct_from_fills(trade: dict) -> float | None:
+    """Account for real partial fills, including canceled partial exits."""
+    entry_side = "sell" if trade.get("is_short") else "buy"
+    exit_side = "buy" if trade.get("is_short") else "sell"
+    entered = exited = 0.0
+    for order in trade.get("orders") or []:
+        try:
+            filled = float(order.get("filled") or 0)
+        except (ValueError, TypeError):
+            return None
+        if not math.isfinite(filled) or filled < 0:
+            return None
+        side = str(order.get("ft_order_side") or "").lower()
+        if side == entry_side:
+            entered += filled
+        elif side in {exit_side, "stoploss"}:
+            exited += filled
+        elif filled:
+            return None
+    try:
+        entries = float(trade.get("nr_of_successful_entries") or 0)
+        exits = float(trade.get("nr_of_successful_exits") or 0)
+    except (ValueError, TypeError):
+        return None
+    if not entered:
+        # A fully filled entry with no exits is unambiguous even on older
+        # API responses that omit orders; any claimed exit needs fill data.
+        return 0.0 if entries >= 1 and exits == 0 else None
+    if (exits > 0 and not exited) or exited > entered:
+        return None
+    if exited == entered:
+        return 100.0
+    return compute_booked_pct(entered - exited, entered, entries)
+
+
+def killers_tp_ladder(db_path: str, *, strict: bool = False) -> dict[int, dict]:
     """Map {ft_trade_id: {tps_total, tps_hit, next_tp}} for OPEN killers
     positions, read from the live receiver.sqlite. Read-only, busy-timeout'd,
     and fully guarded: any failure (missing/locked DB, query error) returns {}
     so the caller degrades to a bar-only render and never fails the snapshot.
     """
     if not db_path or not Path(db_path).exists():
+        if strict:
+            raise FileNotFoundError("receiver target ledger unavailable")
         return {}
     try:
         conn = _sqlite.connect(f"file:{db_path}?mode=ro", uri=True, timeout=2.0)
@@ -317,6 +338,8 @@ def killers_tp_ladder(db_path: str) -> dict[int, dict]:
             "ORDER BY p.ft_trade_id, t.idx ASC"
         ).fetchall()
     except _sqlite.Error:
+        if strict:
+            raise
         return {}
     finally:
         try:
@@ -330,14 +353,62 @@ def killers_tp_ladder(db_path: str) -> dict[int, dict]:
     for ftid, rungs in by_trade.items():
         active = [x for x in rungs if x["state"] == "active"]
         pending = [x for x in rungs if x["state"] == "pending"]
-        nxt = (active[0]["price"] if active else
-               pending[0]["price"] if pending else None)
+        counts = {state: sum(x["state"] == state for x in rungs)
+                  for state in {x["state"] for x in rungs}}
+        failure = any(counts.get(state) for state in ("rejected", "blocked"))
+        known_states = {"active", "pending", "filled", "cancelled", "skipped",
+                        "rejected", "blocked"}
+        uncertain = any(state not in known_states for state in counts)
+        if failure:
+            status = "degraded" if active else "blocked"
+        elif uncertain:
+            status = "degraded"
+        elif active:
+            status = "active"
+        elif pending:
+            status = "pending"
+        elif counts.get("filled", 0) == len(rungs):
+            status = "complete"
+        elif all(state in {"filled", "cancelled", "skipped"} for state in counts):
+            status = "cancelled"
+        else:
+            status = "unknown"
         out[ftid] = {
             "tps_total": len(rungs),
             "tps_hit": sum(1 for x in rungs if x["state"] == "filled"),
-            "next_tp": nxt,
+            # A planned target is not an active exchange order.
+            "next_tp": active[0]["price"] if active else None,
+            "planned_next_tp": pending[0]["price"] if pending else None,
+            "status": status,
+            "counts": counts,
         }
     return out
+
+
+def _tp_execution_health(open_trades: list[dict], ladders: dict[int, dict],
+                         ledger_error: str | None = None) -> dict:
+    issues = []
+    for trade in open_trades:
+        if not int(trade.get("nr_of_successful_entries") or 0):
+            continue
+        ladder = ladders.get(trade.get("trade_id"))
+        status = (ladder or {}).get("status", "unavailable")
+        if status in {"active", "complete", "cancelled"}:
+            continue
+        issues.append({
+            "trade_id": trade.get("trade_id"), "pair": trade.get("pair"),
+            "status": status,
+            "severity": "critical" if status == "blocked" else "warning",
+            "counts": (ladder or {}).get("counts", {}),
+        })
+    severity = ("critical" if any(i["severity"] == "critical" for i in issues)
+                else "warning" if issues else "ok")
+    return {
+        "status": severity,
+        "label": (f"{len(issues)} position(s) need TP execution review" if issues
+                  else "no TP execution fault observed"),
+        "issues": issues, "ledger_error": ledger_error,
+    }
 
 
 _cache: dict[str, Any] = {
@@ -1290,15 +1361,20 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     )
 
     tp_ladder = {}
-    if bot.get("key") == "killers-ft" and KILLERS_RECEIVER_DB:
+    tp_ledger_error = None
+    if bot.get("key") == "killers-ft":
         try:
-            tp_ladder = killers_tp_ladder(KILLERS_RECEIVER_DB)
+            tp_ladder = killers_tp_ladder(KILLERS_RECEIVER_DB, strict=True)
         except Exception:
-            tp_ladder = {}
+            tp_ledger_error = "receiver target ledger unavailable"
+    execution_health = (
+        _tp_execution_health(open_trades, tp_ladder, tp_ledger_error)
+        if bot.get("key") == "killers-ft" else None
+    )
 
     open_trades_out = []
     for t in open_trades:
-        bp = compute_booked_pct(t.get("amount"), t.get("amount_requested"), t.get("nr_of_successful_entries"))
+        bp = booked_pct_from_fills(t)
         row = {
             "trade_id": t.get("trade_id"),
             "pair": t.get("pair"),
@@ -1322,6 +1398,10 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             row["tps_total"] = tp["tps_total"]
             row["tps_hit"] = tp["tps_hit"]
             row["next_tp"] = tp["next_tp"]
+            row["tp_execution"] = {
+                "status": tp["status"], "counts": tp["counts"],
+                "planned_next_tp": tp["planned_next_tp"],
+            }
         open_trades_out.append(row)
 
     return {
@@ -1379,6 +1459,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             "partial_count_discarded": (len(fetched_trades) if not history_complete else 0),
         },
         "readiness": readiness,
+        "execution_health": execution_health,
         "native_stop": _native_stop_verification(bot, open_trades, closed_trades),
         "position_integrity": {
             "status": "critical" if position_issues else "ok",
@@ -1480,9 +1561,9 @@ async def _poll_loop():
 def _fleet_status() -> dict:
     """Compute top-level status level for the fleet.
 
-    green  — all bots reachable, none stale.
-    yellow — one or more dry-run bots stale/unreachable.
-    red    — any live bot unreachable, or any bot stale > threshold AND live.
+    green  — reachable bots with no observed operational fault.
+    yellow — stale dry-run bots or uncertain/degraded execution.
+    red    — live reachability, position ledger, or blocked execution fault.
 
     live bot = dry_run is False in its snapshot.
     """
@@ -1490,6 +1571,8 @@ def _fleet_status() -> dict:
     stale_bots: list[str] = []
     any_live_unreachable = False
     position_faults: list[str] = []
+    execution_faults: list[str] = []
+    execution_warnings: list[str] = []
 
     for bot in BOTS:
         key = bot["key"]
@@ -1500,6 +1583,11 @@ def _fleet_status() -> dict:
 
         if is_live and (snap.get("position_integrity") or {}).get("status") == "critical":
             position_faults.append(key)
+        execution_status = (snap.get("execution_health") or {}).get("status")
+        if is_live and execution_status == "critical":
+            execution_faults.append(key)
+        elif execution_status in {"critical", "warning"}:
+            execution_warnings.append(key)
 
         if is_stale:
             stale_bots.append(key)
@@ -1513,9 +1601,15 @@ def _fleet_status() -> dict:
     elif position_faults:
         level = "red"
         summary = f"live position ledger fault: {', '.join(position_faults)}"
+    elif execution_faults:
+        level = "red"
+        summary = f"live TP execution blocked: {', '.join(execution_faults)}"
     elif stale_bots:
         level = "yellow"
         summary = f"{len(stale_bots)} bot(s) stale: {', '.join(stale_bots)}"
+    elif execution_warnings:
+        level = "yellow"
+        summary = f"TP execution needs review: {', '.join(execution_warnings)}"
     else:
         level = "green"
         n = len([b for b in _cache["bots"].values() if b.get("reachable")])
@@ -1526,6 +1620,8 @@ def _fleet_status() -> dict:
         "summary": summary,
         "stale_bots": stale_bots,
         "position_faults": position_faults,
+        "execution_faults": execution_faults,
+        "execution_warnings": execution_warnings,
     }
 
 

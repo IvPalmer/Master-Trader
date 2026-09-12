@@ -310,21 +310,16 @@ class FundingFadeV1(IStrategy):
                 logger.warning("BTC funding load failed for regime gate: %s — FAIL-CLOSED this bar", e)
                 return pd.Series(float("nan"), index=dataframe.index)
 
-        # Reindex onto the dataframe's 1h dates with forward-fill
-        # (funding posts every 8h, so any 1h bar inherits the most recent value).
+        # Align both the rate and its observation time. Freshness belongs to
+        # each bar's resolved event, including outages followed by recovery.
         dates = pd.to_datetime(dataframe["date"], utc=True) if "date" in dataframe.columns else dataframe.index
-        aligned = cls._btc_funding_30d_series.reindex(dates, method="ffill")
-
-        # Staleness mask: ffill must not extend past the feather's last funding
-        # event forever. Bars beyond last_event + _BTC_FUNDING_MAX_AGE_H get NaN
-        # → btc_funding_ok False → entries blocked. Without this, a dead
-        # ft-funding-refresh leaves the regime gate running on frozen data
-        # indefinitely (fail-open) while the contract above promises fail-closed.
-        if len(cls._btc_funding_30d_series.index) == 0:
+        funding = cls._btc_funding_30d_series
+        if funding.empty:
             return pd.Series(float("nan"), index=dataframe.index)
-        last_event = cls._btc_funding_30d_series.index[-1]
-        cutoff = last_event + pd.Timedelta(hours=self._BTC_FUNDING_MAX_AGE_H)
-        stale_mask = pd.DatetimeIndex(dates) > cutoff
+        aligned = funding.reindex(dates, method="ffill")
+        event_times = pd.Series(funding.index, index=funding.index).reindex(dates, method="ffill")
+        event_age = pd.DatetimeIndex(dates) - pd.DatetimeIndex(event_times)
+        stale_mask = event_age > pd.Timedelta(hours=self._BTC_FUNDING_MAX_AGE_H)
         values = aligned.values
         if stale_mask.any():
             values = values.copy()
@@ -335,7 +330,7 @@ class FundingFadeV1(IStrategy):
                 logger.error(
                     "STALE BTC funding feather (last event %s, max age %dh) — macro "
                     "gate v2 FAIL-CLOSED for %d bar(s). Check ft-funding-refresh.",
-                    last_event, self._BTC_FUNDING_MAX_AGE_H, int(stale_mask.sum()),
+                    funding.index[-1], self._BTC_FUNDING_MAX_AGE_H, int(stale_mask.sum()),
                 )
                 self._missing_funding_last_warn["__BTC_REGIME_STALE__"] = now
         return pd.Series(values, index=dataframe.index)

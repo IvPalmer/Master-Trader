@@ -19,8 +19,8 @@ def test_pending_entry_amount_zero_is_none():
 def test_string_numerics_coerced():
     assert compute_booked_pct("0.143", "0.488") == 70.7
 
-def test_fee_dust_floored_to_zero():
-    assert compute_booked_pct(0.999, 1.0) == 0.0  # 0.1% shrink < dust threshold
+def test_small_actual_exit_is_not_hidden_as_fee_dust():
+    assert compute_booked_pct(0.999, 1.0) == 0.1
 
 def test_amount_exceeds_requested_clamps_zero():
     assert compute_booked_pct(1.2, 1.0) == 0.0
@@ -73,7 +73,11 @@ def _make_receiver_db(path):
 def test_tp_ladder_counts_and_next(tmp_path):
     db = tmp_path / "receiver.sqlite"; _make_receiver_db(str(db))
     out = killers_tp_ladder(str(db))
-    assert out[11] == {"tps_total": 7, "tps_hit": 5, "next_tp": 295.0}
+    assert out[11] == {
+        "tps_total": 7, "tps_hit": 5, "next_tp": 295.0,
+        "planned_next_tp": 320.0, "status": "active",
+        "counts": {"filled": 5, "active": 1, "pending": 1},
+    }
 
 def test_tp_ladder_ignores_closed_positions(tmp_path):
     db = tmp_path / "receiver.sqlite"; _make_receiver_db(str(db))
@@ -82,7 +86,7 @@ def test_tp_ladder_ignores_closed_positions(tmp_path):
 def test_tp_ladder_missing_db_returns_empty(tmp_path):
     assert killers_tp_ladder(str(tmp_path / "nope.sqlite")) == {}
 
-def test_tp_ladder_next_falls_back_to_pending(tmp_path):
+def test_tp_ladder_distinguishes_planned_from_active_targets(tmp_path):
     db = tmp_path / "r2.sqlite"
     conn = sqlite3.connect(str(db))
     conn.executescript("CREATE TABLE positions (pos_id INTEGER, ft_trade_id INTEGER, state TEXT);"
@@ -91,4 +95,7 @@ def test_tp_ladder_next_falls_back_to_pending(tmp_path):
     conn.execute("INSERT INTO target_orders VALUES (1,1,0,5.0,'pending')")
     conn.execute("INSERT INTO target_orders VALUES (2,1,1,6.0,'pending')")
     conn.commit(); conn.close()
-    assert killers_tp_ladder(str(db))[7] == {"tps_total": 2, "tps_hit": 0, "next_tp": 5.0}
+    assert killers_tp_ladder(str(db))[7] == {
+        "tps_total": 2, "tps_hit": 0, "next_tp": None,
+        "planned_next_tp": 5.0, "status": "pending", "counts": {"pending": 2},
+    }

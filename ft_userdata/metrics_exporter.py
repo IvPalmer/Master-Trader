@@ -40,12 +40,16 @@ def _load_bots_config() -> list[dict]:
         for name, info in data["bots"].items():
             # `active` selects autonomous-strategy tooling; receiver-managed
             # bots are marked production_live instead (see bots_config _doc).
-            # The exporter must scrape BOTH: a live funded bot that is not
+            # `monitor` also includes deployed observation bots without
+            # opting them into autonomous strategy tooling. Runtime dry_run,
+            # not a registry flag, determines live circuit-breaker membership.
+            # The exporter must scrape all of these: a live funded bot that is not
             # scraped contributes nothing to the circuit breaker's capital
             # math and cannot be halted by it. KillersScalpV1 — the only
             # leveraged bot in the fleet — sat outside the breaker for exactly
             # this reason.
-            if not (info.get("active", True) or info.get("production_live")):
+            if not (info.get("active", True) or info.get("production_live")
+                    or info.get("monitor")):
                 continue
             service = info.get("service", name.lower().replace("v1", "").replace("strategy", ""))
             # Handle known service name mappings
@@ -103,7 +107,7 @@ CIRCUIT_BREAKER_PCT = 10.0
 CIRCUIT_BREAKER_COOLDOWN = 3600
 WEBHOOK_URL = os.environ.get(
     "CIRCUIT_BREAKER_WEBHOOK_URL",
-    "http://trade-webhook:8088/webhooks/freqtrade",
+    "http://trade-webhook:8088/freqtrade/event",
 )
 CAPITAL_REFRESH_EVERY = 60  # rescrape /show_config + /balance every N scrapes
 PEAK_STATE_FILE = Path(os.environ.get("PEAK_STATE_FILE", "/state/portfolio_peak.json"))
@@ -404,8 +408,8 @@ def send_circuit_breaker_alert(portfolio_value: float, drawdown_pct: float) -> N
         f"Review positions before restarting."
     )
     try:
-        payload = {"type": "status", "status": message}
-        resp = requests.post(WEBHOOK_URL, data=payload, timeout=10)
+        payload = {"type": "status", "bot_name": "fleet-circuit-breaker", "status": message}
+        resp = requests.post(WEBHOOK_URL, json=payload, timeout=10)
         if resp.status_code in (200, 201, 204):
             log.info("Circuit breaker alert sent to Telegram")
         else:

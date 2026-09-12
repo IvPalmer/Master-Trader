@@ -215,6 +215,7 @@ services:
       - /bin/sh
       - -c
       - |
+        set -e
         case "$${FREQTRADE__DRY_RUN}" in
           true|1|yes)
             export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.dryrun.KillersScalpV1.hyperliquid.sqlite
@@ -259,6 +260,7 @@ services:
       - /bin/sh
       - -c
       - |
+        set -e
         case "$${FREQTRADE__DRY_RUN}" in
           true|1|yes)
             export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.dryrun.InsidersScalpV2.hyperliquid.sqlite
@@ -350,6 +352,7 @@ services:
       - /bin/sh
       - -c
       - |
+        set -e
         case "$${FREQTRADE__DRY_RUN}" in
           true|1|yes)
             export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.dryrun.ShortKeltnerV2HLlive.sqlite

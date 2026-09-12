@@ -53,6 +53,8 @@ import aiohttp
 from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
+from .tp_plan import executable_targets
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s | %(message)s",
@@ -526,6 +528,8 @@ CREATE TABLE IF NOT EXISTS target_orders (
     placed_at   TEXT,
     filled_at   TEXT,
     last_check_at TEXT,
+    submitted_at TEXT,
+    prior_order_ids TEXT,
     notes       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_target_orders_pos ON target_orders(pos_id, state);
@@ -547,6 +551,10 @@ def init_db(path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(path, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.executescript(POSITION_SCHEMA)
+    target_columns = {r[1] for r in conn.execute("PRAGMA table_info(target_orders)")}
+    for column in ("submitted_at", "prior_order_ids"):
+        if column not in target_columns:
+            conn.execute(f"ALTER TABLE target_orders ADD COLUMN {column} TEXT")
     # Migration: ALTER TABLE adds `pct_open` column to legacy databases that
     # predate the partial-close tracking. DEFAULT 100 means existing rows are
     # treated as fully open, which matches their pre-migration semantics.
@@ -969,6 +977,22 @@ async def _place_target_limits(
     targets: list[float], slice_amount: float,
     session=None,
 ) -> list[dict]:
+    """Serialize creation, including the read/plan/insert steps."""
+    lock = _phase2_lock()
+    if lock is not None:
+        async with lock:
+            return await _place_target_limits_inner(
+                cfg, conn, pos_id, ft_trade_id, targets, slice_amount, session)
+    return await _place_target_limits_inner(
+        cfg, conn, pos_id, ft_trade_id, targets, slice_amount, session)
+
+
+async def _place_target_limits_inner(
+    cfg: Config, conn: sqlite3.Connection,
+    pos_id: int, ft_trade_id: int,
+    targets: list[float], slice_amount: float,
+    session=None,
+) -> list[dict]:
     """Persist the TP ladder and place ONLY the first target as a limit exit.
 
     Freqtrade allows exactly one open exit order per trade — posting N
@@ -980,44 +1004,57 @@ async def _place_target_limits(
 
     Returns a list shaped like the caller's audit/log expects:
       [{target_id, idx, price, amount, state, ft_order_id?}, ...]
-    where exactly one entry is 'active' (the first placeable target) and
-    the rest are 'pending'. On placement failure of idx=0, that entry's
-    state becomes 'rejected' and the rest remain 'pending' for operator
-    review.
+    At most one entry is active. Hyperliquid allocations are grouped using
+    actual fills and venue precision; unplannable rows are blocked. Read
+    outages and confirmed throttling are retryable, while ambiguous POST
+    outcomes require order reconciliation before any further submission.
     """
     if session is None:
         session = getattr(app.state, "ft_session", None)
+    existing = conn.execute(
+        "SELECT target_id,idx,price,amount,state,ft_order_id FROM target_orders "
+        "WHERE pos_id=? ORDER BY idx", (pos_id,),
+    ).fetchall()
+    if existing:
+        return [dict(row) for row in existing]
     placed: list[dict] = []
-    target_ids: list[int] = []
+    trade_snapshot = None
+    plan = [(idx, float(price), round(float(slice_amount), 8))
+            for idx, price in enumerate(targets)]
+    planning_error = None
+    if execution_venue() == "hyperliquid":
+        trade_snapshot = await ft_get_trade(cfg, ft_trade_id, session=session)
+        if trade_snapshot is None:
+            return []  # delayed-fill reconciliation will retry the read
+        try:
+            plan = executable_targets(trade_snapshot, targets, min_notional=10)
+        except (ValueError, ArithmeticError, TypeError) as exc:
+            planning_error = str(exc)
+            plan = [(idx, float(price), 0.0) for idx, price in enumerate(targets)]
+        if not plan:
+            return []  # entry is not filled yet; never allocate requested size
     # Step 1: persist every target as 'pending'. UNIQUE not enforced at
     # the schema level; (pos_id, idx) is unique by construction here.
-    for idx, tp_price in enumerate(targets):
+    for idx, tp_price, planned_amount in plan:
+        state = "blocked" if planning_error else "pending"
         cur = conn.execute(
-            "INSERT INTO target_orders (pos_id, idx, price, amount, state) "
-            "VALUES (?, ?, ?, ?, 'pending')",
-            (pos_id, idx, float(tp_price), round(float(slice_amount), 8)),
+            "INSERT INTO target_orders (pos_id, idx, price, amount, state, notes) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (pos_id, idx, float(tp_price), planned_amount, state,
+             planning_error or "executable target allocation"),
         )
-        target_ids.append(cur.lastrowid)
         placed.append({
             "target_id": cur.lastrowid, "idx": idx, "price": float(tp_price),
-            "amount": round(float(slice_amount), 8), "state": "pending",
+            "amount": planned_amount, "state": state,
             "ft_order_id": None,
         })
 
-    # Step 2: ask the cascade helper to either adopt an existing open exit
-    # order or POST a new one for the lowest-idx pending target. If this
-    # fails, the row is marked 'rejected' inside the helper and the rest
-    # remain 'pending' for reconciler retry or operator action.
-    lock = _phase2_lock()
-    if lock is not None:
-        async with lock:
-            activated = await _adopt_or_post_next_tp(
-                cfg, conn, pos_id, ft_trade_id, session=session,
-            )
-    else:
-        activated = await _adopt_or_post_next_tp(
-            cfg, conn, pos_id, ft_trade_id, session=session,
-        )
+    # Adopt an existing exit or submit the first pending allocation. The
+    # outer lock covers the entire creation path, including its snapshot.
+    activated = await _adopt_or_post_next_tp(
+        cfg, conn, pos_id, ft_trade_id, session=session,
+        trade_snapshot=trade_snapshot,
+    )
     if activated is not None:
         # Patch our return list to reflect the activated/rejected row.
         for entry in placed:
@@ -1030,7 +1067,7 @@ async def _place_target_limits(
 async def _adopt_or_post_next_tp(
     cfg: Config, conn: sqlite3.Connection,
     pos_id: int, ft_trade_id: int,
-    session=None,
+    session=None, trade_snapshot=None,
 ) -> Optional[dict]:
     """Make exactly one target row 'active' on the trade.
 
@@ -1045,15 +1082,20 @@ async def _adopt_or_post_next_tp(
          not a trade snapshot — so re-GET `/trade/{id}` immediately after
          to discover the freshly-created order_id by matching limit price.
 
-    Returns the patched dict for the affected target row (state in
-    {'active','rejected'}) or None if there are no pending rows.
+    Returns the affected target state, or None when another active order
+    or a terminal ladder state prevents submission.
     """
     if session is None:
         session = getattr(app.state, "ft_session", None)
 
+    if conn.execute(
+        "SELECT 1 FROM target_orders WHERE pos_id=? "
+        "AND state IN ('active','rejected','blocked','cancelled') LIMIT 1", (pos_id,),
+    ).fetchone():
+        return None  # invalid plans and operator cancellations need explicit review
     pending_rows = conn.execute(
-        "SELECT target_id, idx, price, amount FROM target_orders "
-        "WHERE pos_id=? AND state='pending' ORDER BY idx ASC",
+        "SELECT target_id, idx, price, amount, state, submitted_at, prior_order_ids FROM target_orders "
+        "WHERE pos_id=? AND state IN ('pending','retry','unknown','placing') ORDER BY idx ASC",
         (pos_id,),
     ).fetchall()
     if not pending_rows:
@@ -1064,8 +1106,20 @@ async def _adopt_or_post_next_tp(
     tp_price = float(next_row["price"])
     slice_amount = float(next_row["amount"])
 
+    def mark(state, reason):
+        conn.execute(
+            "UPDATE target_orders SET state=?, notes=?, last_check_at=? WHERE target_id=?",
+            (state, reason, datetime.now(timezone.utc).isoformat(), target_id),
+        )
+        return {"target_id": target_id, "idx": idx, "price": tp_price,
+                "amount": slice_amount, "state": state, "reason": reason}
+
     # ── Step A: try to adopt an existing open limit exit ──────────────
-    trade = await ft_get_trade(cfg, ft_trade_id, session=session)
+    trade = trade_snapshot if trade_snapshot is not None else await ft_get_trade(
+        cfg, ft_trade_id, session=session)
+    if trade is None:
+        return mark("unknown" if next_row["state"] in ("unknown", "placing") else "retry",
+                    "trade lookup unavailable; no order submitted")
     if trade is not None:
         # Side filter: long-close=sell, short-close=buy. Prevents adopting
         # an unrelated same-price limit on the wrong side (codex
@@ -1075,6 +1129,8 @@ async def _adopt_or_post_next_tp(
         existing = _find_open_limit_exit_at_price(
             trade.get("orders") or [], tp_price, is_short=is_short,
         )
+        if existing is None and next_row["state"] in ("unknown", "placing"):
+            existing = _find_submitted_exit(trade, next_row)
         if existing is not None:
             actual_amount = float(existing.get("amount") or slice_amount)
             order_id = existing.get("order_id")
@@ -1097,7 +1153,33 @@ async def _adopt_or_post_next_tp(
                 "ft_order_id": order_id,
             }
 
+    if trade.get("is_open") is False:
+        return mark("cancelled", "trade already closed without identifiable target fill")
+    if next_row["state"] in ("unknown", "placing"):
+        if _exit_orders_since_submission(trade, next_row):
+            return mark("unknown", "previous submission outcome unknown; unidentified exit order present")
+        return mark("retry", "previous submission produced no exit order; retrying after cooldown")
+    if _has_open_limit_exit(trade.get("orders") or [], bool(trade.get("is_short"))):
+        return mark("retry", "another open exit exists; refusing to replace it")
+    if execution_venue() == "hyperliquid":
+        try:
+            if slice_amount <= 0 or slice_amount > float(trade.get("amount") or 0):
+                return mark("blocked", "allocation exceeds remaining filled position")
+            if slice_amount * tp_price < 10:
+                return mark("blocked", "allocation below Hyperliquid minimum notional")
+        except (ValueError, TypeError):
+            return mark("blocked", "invalid remaining position amount")
+
     # ── Step B: POST a new limit exit ────────────────────────────────
+    # Commit intent BEFORE awaiting. A crash/timeout must never become a
+    # blind duplicate submission after restart.
+    conn.execute(
+        "UPDATE target_orders SET submitted_at=?,prior_order_ids=? WHERE target_id=?",
+        (datetime.now(timezone.utc).isoformat(),
+         json.dumps([str(o["order_id"]) for o in trade.get("orders", []) if o.get("order_id")]),
+         target_id),
+    )
+    mark("placing", "submitting limit exit")
     try:
         resp = await ft_force_exit_limit(
             cfg, ft_trade_id, slice_amount, tp_price, session=session,
@@ -1105,30 +1187,19 @@ async def _adopt_or_post_next_tp(
     except Exception as e:
         logger.exception("[PHASE2] /forceexit limit raised for pos=%d idx=%d",
                          pos_id, idx)
-        conn.execute(
-            "UPDATE target_orders SET state='rejected', notes=?, "
-            "last_check_at=? WHERE target_id=?",
-            (f"exception: {e}", datetime.now(timezone.utc).isoformat(), target_id),
-        )
-        return {"target_id": target_id, "idx": idx, "price": tp_price,
-                "state": "rejected", "reason": str(e)}
+        return mark("unknown", f"submission exception: {e}")
 
     ok = 200 <= resp["status"] < 300
     if not ok:
         logger.error(
-            "[PHASE2] target idx=%d price=%g REJECTED pos=%d ft_trade=%d "
+            "[PHASE2] target idx=%d price=%g SUBMISSION FAILED pos=%d ft_trade=%d "
             "status=%d body=%s",
             idx, tp_price, pos_id, ft_trade_id, resp["status"],
             (resp.get("body") or "")[:200],
         )
-        conn.execute(
-            "UPDATE target_orders SET state='rejected', notes=?, "
-            "last_check_at=? WHERE target_id=?",
-            (f"ft_status={resp['status']} body={resp.get('body','')[:300]}",
-             datetime.now(timezone.utc).isoformat(), target_id),
-        )
-        return {"target_id": target_id, "idx": idx, "price": tp_price,
-                "state": "rejected", "ft_status": resp["status"]}
+        state = "retry" if resp["status"] == 429 else (
+            "unknown" if resp["status"] == 0 or resp["status"] >= 500 else "rejected")
+        return mark(state, f"ft_status={resp['status']} body={resp.get('body','')[:300]}")
 
     # FT accepted. Body is `{"result": "..."}` not a trade snapshot, so
     # re-fetch /trade and locate the new open limit exit by price. The
@@ -1143,11 +1214,17 @@ async def _adopt_or_post_next_tp(
         found = _find_open_limit_exit_at_price(
             trade2.get("orders") or [], tp_price, is_short=is_short2,
         )
+        if found is None:
+            submitted = conn.execute("SELECT * FROM target_orders WHERE target_id=?",
+                                     (target_id,)).fetchone()
+            found = _find_submitted_exit(trade2, submitted)
         if found is not None:
             new_order_id = found.get("order_id")
             actual_amount = float(found.get("amount") or slice_amount)
 
     now = datetime.now(timezone.utc).isoformat()
+    if not new_order_id:
+        return mark("unknown", "executor accepted request but order not yet observed")
     conn.execute(
         "UPDATE target_orders SET state='active', ft_order_id=?, amount=?, "
         "placed_at=?, last_check_at=? WHERE target_id=?",
@@ -1163,6 +1240,81 @@ async def _adopt_or_post_next_tp(
         "amount": actual_amount, "state": "active",
         "ft_order_id": new_order_id,
     }
+
+
+# Exchange order timestamps and the receiver's submitted_at come from
+# different clocks; allow modest skew before treating an order as older
+# than the submission it might belong to.
+_SUBMISSION_CLOCK_TOLERANCE_MS = 5000
+
+
+def _exit_orders_since_submission(trade: dict, row) -> bool:
+    """True while a submission's outcome cannot be ruled out from the snapshot.
+
+    Missing intent metadata means the outcome is unknowable here. Otherwise
+    any exit-side order absent before the submission keeps the row
+    unresolved; a snapshot with none proves the executor created nothing,
+    so the row may retry after the cooldown instead of freezing the ladder
+    and deferring every later channel close.
+    """
+    if not row["submitted_at"] or row["prior_order_ids"] is None:
+        return True
+    try:
+        prior = set(json.loads(row["prior_order_ids"]))
+        submitted_ms = datetime.fromisoformat(row["submitted_at"]).timestamp() * 1000
+    except (ValueError, TypeError):
+        return True
+    expected_side = "buy" if trade.get("is_short") else "sell"
+    for order in trade.get("orders") or []:
+        if not isinstance(order, dict):
+            continue
+        oid = order.get("order_id")
+        if oid and str(oid) in prior:
+            continue
+        if order.get("ft_order_side") != expected_side:
+            continue
+        ts = order.get("order_timestamp")
+        try:
+            if ts is not None and float(ts) < submitted_ms - _SUBMISSION_CLOCK_TOLERANCE_MS:
+                continue
+        except (ValueError, TypeError):
+            pass
+        return True
+    return False
+
+
+def _find_submitted_exit(trade: dict, row) -> Optional[dict]:
+    """Identify an immediate fill without mistaking an older TP for it.
+
+    Ambiguous/missing identity remains unknown. A discovered closed order
+    enters the normal active-order reconciler, which records its fill and
+    cascades on the next tick without another submission.
+    """
+    if not row["submitted_at"] or row["prior_order_ids"] is None:
+        return None
+    try:
+        prior = set(json.loads(row["prior_order_ids"]))
+        submitted_ms = datetime.fromisoformat(row["submitted_at"]).timestamp() * 1000
+        expected_side = "buy" if trade.get("is_short") else "sell"
+        matches = []
+        for order in trade.get("orders") or []:
+            oid = order.get("order_id")
+            if not oid or str(oid) in prior:
+                continue
+            if order.get("order_type") != "limit" or order.get("ft_order_side") != expected_side:
+                continue
+            if str(order.get("status", "")).lower() != "closed" or float(order.get("filled") or 0) <= 0:
+                continue
+            if float(order.get("order_timestamp") or 0) < submitted_ms - _SUBMISSION_CLOCK_TOLERANCE_MS:
+                continue
+            price = float(order.get("price") or order.get("safe_price") or 0)
+            amount = float(order.get("amount") or 0)
+            if (math.isclose(price, float(row["price"]), rel_tol=.001)
+                    and math.isclose(amount, float(row["amount"]), rel_tol=.01)):
+                matches.append(order)
+        return matches[0] if len(matches) == 1 else None
+    except (ValueError, TypeError, ArithmeticError):
+        return None
 
 
 def _find_open_limit_exit_at_price(
@@ -1265,8 +1417,6 @@ async def _reconcile_target_orders_inner(
         "FROM target_orders t JOIN positions p ON p.pos_id = t.pos_id "
         "WHERE t.state = 'active' AND p.state = 'open'"
     ).fetchall()
-    if not rows:
-        return summary
 
     # pos_ids whose active target transitioned to filled this tick — we
     # cascade a new TP after the per-row loop completes, so we hold one
@@ -1348,6 +1498,26 @@ async def _reconcile_target_orders_inner(
             logger.exception("[PHASE2 CASCADE] failed for pos=%d", pos_id)
             continue
         if activated is not None and activated.get("state") == "active":
+            summary["cascaded"] += 1
+    # Recover confirmed rejections (429) and read outages even if there is
+    # no active row. Unknown outcomes are observation-only; invalid plans
+    # and explicit cancellations are never automatically rearmed.
+    retry_before = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
+    recover = conn.execute(
+        "SELECT DISTINCT t.pos_id, p.ft_trade_id FROM target_orders t "
+        "JOIN positions p ON p.pos_id=t.pos_id WHERE p.state='open' "
+        "AND p.ft_trade_id IS NOT NULL AND t.state IN ('pending','retry','unknown','placing') "
+        "AND (t.last_check_at IS NULL OR t.last_check_at < ?) "
+        "AND NOT EXISTS (SELECT 1 FROM target_orders a WHERE a.pos_id=t.pos_id "
+        "AND a.state IN ('active','cancelled','rejected','blocked')) "
+        "AND NOT EXISTS (SELECT 1 FROM target_orders w WHERE w.pos_id=t.pos_id "
+        "AND w.state IN ('retry','unknown','placing') AND w.last_check_at >= ?)",
+        (retry_before, retry_before),
+    ).fetchall()
+    for row in recover:
+        activated = await _adopt_or_post_next_tp(
+            cfg, conn, row["pos_id"], row["ft_trade_id"], session=session)
+        if activated and activated.get("state") == "active":
             summary["cascaded"] += 1
     return summary
 
@@ -1451,7 +1621,7 @@ async def _check_posted_sl(cfg: Config, conn: sqlite3.Connection, ft_session=Non
             conn.execute(
                 "UPDATE target_orders SET state='cancelled', "
                 "notes=COALESCE(notes,'') || ' | posted-sl-exit', last_check_at=? "
-                "WHERE pos_id=? AND state IN ('pending','active')",
+                "WHERE pos_id=? AND state IN ('pending','active','retry','unknown','placing','blocked','rejected')",
                 (now, pos["pos_id"]),
             )
             conn.execute("COMMIT")
@@ -2276,6 +2446,18 @@ def _ingress_log_finish(conn: sqlite3.Connection, ingress_id: Optional[int],
 
 
 async def _process_event(payload: EventPayload):
+    # A channel close/update must not race the cascade between its order
+    # snapshot and submission. Opens use entry_lock and acquire this lock
+    # only when creating their ladder.
+    kind = payload.classification.get("kind")
+    lock = _phase2_lock() if kind in ("close_partial", "close_full", "signal_update") else None
+    if lock is not None:
+        async with lock:
+            return await _process_event_inner(payload, phase2_locked=True)
+    return await _process_event_inner(payload)
+
+
+async def _process_event_inner(payload: EventPayload, phase2_locked=False):
     cfg: Config = app.state.cfg
     conn: sqlite3.Connection = app.state.conn
     msg = payload.msg
@@ -2735,12 +2917,26 @@ async def _process_event(payload: EventPayload):
         if kind == "close_partial" and cfg.active_tp_limits:
             ft_session = getattr(app.state, "ft_session", None)
             try:
-                await _reconcile_target_orders(cfg, conn, session=ft_session)
+                reconcile = (_reconcile_target_orders_inner if phase2_locked
+                             else _reconcile_target_orders)
+                await reconcile(cfg, conn, session=ft_session)
             except Exception as e:
                 logger.warning("inline reconcile before close_partial failed: %s", e)
+            uncertain = conn.execute(
+                "SELECT 1 FROM target_orders WHERE pos_id=? "
+                "AND state IN ('unknown','placing') LIMIT 1", (pos["pos_id"],),
+            ).fetchone()
+            if uncertain:
+                conn.execute(
+                    "UPDATE events SET response=? WHERE pos_id=? AND msg_id=? AND kind=?",
+                    (json.dumps({"status": "pending", "deferred_reason": "tp_submission_unknown"}),
+                     pos["pos_id"], msg_id, kind),
+                )
+                return {"action": "deferred", "reason": "tp_submission_unknown",
+                        "pos_id": pos["pos_id"], "kind": kind}
             phase2_rows = conn.execute(
                 "SELECT COUNT(*) FROM target_orders WHERE pos_id=? "
-                "AND state IN ('pending','active','filled')",
+                "AND state IN ('pending','active','filled','retry','unknown','placing')",
                 (pos["pos_id"],),
             ).fetchone()[0]
             live_limit = False
@@ -2785,7 +2981,7 @@ async def _process_event(payload: EventPayload):
                 # to double against).
                 active_local = conn.execute(
                     "SELECT COUNT(*) FROM target_orders "
-                    "WHERE pos_id=? AND state='active'",
+                    "WHERE pos_id=? AND state IN ('active','unknown','placing')",
                     (pos["pos_id"],),
                 ).fetchone()[0]
                 if active_local > 0:
@@ -2854,7 +3050,7 @@ async def _process_event(payload: EventPayload):
             conn.execute(
                 "UPDATE target_orders SET state='cancelled', "
                 "notes=COALESCE(notes,'') || ' | position-closed', "
-                "last_check_at=? WHERE pos_id=? AND state IN ('pending','active')",
+                "last_check_at=? WHERE pos_id=? AND state IN ('pending','active','retry','unknown','placing','blocked','rejected')",
                 (datetime.now(timezone.utc).isoformat(), pos["pos_id"]),
             )
         elif ft_ok:
@@ -2973,7 +3169,7 @@ async def _process_event(payload: EventPayload):
                 conn.execute(
                     "UPDATE target_orders SET state='cancelled', "
                     "notes=COALESCE(notes,'') || ' | signal-update-close', "
-                    "last_check_at=? WHERE pos_id=? AND state IN ('pending','active')",
+                    "last_check_at=? WHERE pos_id=? AND state IN ('pending','active','retry','unknown','placing','blocked','rejected')",
                     (now_iso, pos["pos_id"]))
                 logger.info(
                     "[SIGNAL_UPDATE close] pos_id=%d signal=#%s %s ft_trade_id=%d "
@@ -2996,25 +3192,42 @@ async def _process_event(payload: EventPayload):
 
         # instruction == "close_at_target_1"
         # ── Resolve TP1 price ─────────────────────────────────────────────
-        # Prefer the lowest-idx target_orders rung not yet filled/cancelled;
-        # fall back to the persisted targets_remaining ladder (phase-2 off).
-        tp_row = conn.execute(
-            "SELECT price FROM target_orders WHERE pos_id=? "
-            "AND state NOT IN ('filled','cancelled') ORDER BY idx ASC LIMIT 1",
-            (pos["pos_id"],)).fetchone()
+        if conn.execute(
+            "SELECT 1 FROM target_orders WHERE pos_id=? "
+            "AND state IN ('unknown','placing') LIMIT 1", (pos["pos_id"],),
+        ).fetchone():
+            conn.execute(
+                "UPDATE events SET response=? WHERE pos_id=? AND msg_id=? AND kind=?",
+                (json.dumps({"status": "pending", "deferred_reason": "tp_submission_unknown"}),
+                 pos["pos_id"], msg_id, kind),
+            )
+            return {"action": "deferred", "reason": "tp_submission_unknown",
+                    "pos_id": pos["pos_id"], "kind": kind}
+        # Explicit TP1 instructions refer to the original signal, not the
+        # first executable group (which might be TP5 or TP8).
         tp1: Optional[float] = None
-        if tp_row is not None:
-            tp1 = float(tp_row["price"])
-        else:
+        original = conn.execute(
+            "SELECT payload FROM events WHERE pos_id=? AND kind='open' ORDER BY event_id LIMIT 1",
+            (pos["pos_id"],),
+        ).fetchone()
+        for encoded in (original["payload"] if original else None,
+                        pos.get("targets_remaining")):
             try:
-                rem = json.loads(pos.get("targets_remaining") or "[]")
-            except (TypeError, ValueError):
-                rem = []
-            if rem:
-                try:
+                rem = json.loads(encoded or "[]")
+                if isinstance(rem, dict):
+                    rem = rem.get("signal_targets") or []
+                if rem:
                     tp1 = float(rem[0])
-                except (TypeError, ValueError):
-                    tp1 = None
+                    break
+            except (TypeError, ValueError):
+                continue
+        if tp1 is None:
+            tp_row = conn.execute(
+                "SELECT price FROM target_orders WHERE pos_id=? AND idx=0 LIMIT 1",
+                (pos["pos_id"],),
+            ).fetchone()
+            if tp_row is not None:
+                tp1 = float(tp_row["price"])
         if tp1 is None or tp1 <= 0:
             logger.warning(
                 "[SIGNAL_UPDATE close_at_target_1] pos_id=%d signal=#%s %s — "
@@ -3093,7 +3306,7 @@ async def _process_event(payload: EventPayload):
             return {"action": "deferred", "reason": "amount_unavailable",
                     "pos_id": pos["pos_id"], "kind": kind}
 
-        lock = _phase2_lock()
+        lock = None if phase2_locked else _phase2_lock()
         if lock is not None:
             await lock.acquire()
         try:
@@ -3122,7 +3335,7 @@ async def _process_event(payload: EventPayload):
             conn.execute(
                 "UPDATE target_orders SET state='cancelled', "
                 "notes=COALESCE(notes,'') || ' | superseded by signal_update TP1', "
-                "last_check_at=? WHERE pos_id=? AND state IN ('pending','active')",
+                "last_check_at=? WHERE pos_id=? AND state IN ('pending','active','retry','unknown','placing','blocked','rejected')",
                 (now_iso, pos["pos_id"]))
             # 3. Post the consolidated full-remaining limit at TP1. Coerce a
             #    raised network/timeout error into a status-0 dict so an
