@@ -171,8 +171,8 @@ class TestBotsConfig:
     def test_port_8093(self, config):
         assert config["bots"]["BearCrashShortV1"]["port"] == 8093
 
-    def test_marked_active(self, config):
-        assert config["bots"]["BearCrashShortV1"]["active"] is True
+    def test_marked_inactive(self, config):
+        assert config["bots"]["BearCrashShortV1"]["active"] is False
 
     def test_futures_mode(self, config):
         assert config["bots"]["BearCrashShortV1"]["trading_mode"] == "futures"

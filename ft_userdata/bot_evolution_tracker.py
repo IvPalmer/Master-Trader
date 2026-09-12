@@ -22,7 +22,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-DATA_DIR = Path(__file__).parent / "evolution"
+DATA_DIR = Path(os.environ.get("MT_EVOLUTION_DIR") or Path(__file__).parent / "evolution")
 STRATEGY_DIR = Path(__file__).parent / "user_data" / "strategies"
 CONFIG_DIR = Path(__file__).parent / "user_data" / "configs"
 TRADE_DB_DIR = Path(__file__).parent / "user_data"
@@ -62,7 +62,7 @@ GRADUATION = {
 
 
 def ensure_dirs():
-    DATA_DIR.mkdir(exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     for bot in ACTIVE_BOTS:
         (DATA_DIR / bot).mkdir(exist_ok=True)
 
