@@ -1197,8 +1197,14 @@ async def _adopt_or_post_next_tp(
             idx, tp_price, pos_id, ft_trade_id, resp["status"],
             (resp.get("body") or "")[:200],
         )
-        state = "retry" if resp["status"] == 429 else (
-            "unknown" if resp["status"] == 0 or resp["status"] >= 500 else "rejected")
+        if resp["status"] == 429:
+            state = "retry"
+        elif _ft_rpc_rejection(resp):
+            state = "rejected"
+        elif resp["status"] == 0 or resp["status"] >= 500:
+            state = "unknown"
+        else:
+            state = "rejected"
         return mark(state, f"ft_status={resp['status']} body={resp.get('body','')[:300]}")
 
     # FT accepted. Body is `{"result": "..."}` not a trade snapshot, so
@@ -1240,6 +1246,21 @@ async def _adopt_or_post_next_tp(
         "amount": actual_amount, "state": "active",
         "ft_order_id": new_order_id,
     }
+
+
+def _ft_rpc_rejection(resp: dict) -> bool:
+    """Freqtrade answers a refused RPC call (its own validation, or an
+    exchange InvalidOrder it caught) with HTTP 502 and a JSON error body.
+    No order exists in that case, so the row is rejected rather than
+    unknown. A bare 502 without that body (a proxy, a crash) stays unknown.
+    """
+    if resp.get("status") != 502:
+        return False
+    try:
+        body = json.loads(resp.get("body") or "")
+    except (ValueError, TypeError):
+        return False
+    return isinstance(body, dict) and isinstance(body.get("error"), str)
 
 
 # Exchange order timestamps and the receiver's submitted_at come from

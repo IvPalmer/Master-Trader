@@ -27,12 +27,35 @@ def _step(precision, mode, contract_size=1):
     return step * _positive(contract_size)
 
 
-def executable_targets(trade, targets, min_notional):
+def _partial_exit_reserve(trade, amount_reserve_percent):
+    """Freqtrade's remaining-amount rule for a partial exit.
+
+    /forceexit with an amount below the position refuses when the remainder,
+    valued at the ORDER's price, is under the venue minimum times
+    (1 + amount_reserve_percent) / (1 - |stop_loss_ratio|), capped at 1.5.
+    The ratio moves with the trade, so the cap is used when it is missing.
+    """
+    ratio = trade.get("stop_loss_ratio")
+    try:
+        ratio = abs(Decimal(str(ratio))) if ratio is not None else None
+    except (ValueError, ArithmeticError, TypeError):
+        ratio = None
+    cap = Decimal("1.5")
+    if ratio is None or not ratio.is_finite() or ratio >= 1:
+        return cap
+    reserve = (1 + Decimal(str(amount_reserve_percent))) / (1 - ratio)
+    return min(cap, max(Decimal(1), reserve))
+
+
+def executable_targets(trade, targets, min_notional, amount_reserve_percent=0.05):
     """Return (original target index, rounded price, base amount) groups.
 
     Metadata comes from the executor's trade snapshot, not inferred from
     displayed decimals. Missing metadata fails closed. Only completed entry
     fills may be allocated; a pending entry is not available inventory.
+    Each non-final group must also leave a remainder Freqtrade will accept
+    for a partial exit (see _partial_exit_reserve); otherwise allocations
+    keep accumulating toward the last target.
     """
     if not targets or int(trade.get("nr_of_successful_entries") or 0) < 1:
         return []
@@ -50,6 +73,7 @@ def executable_targets(trade, targets, min_notional):
     total = (_positive(trade.get("amount")) / quantum).to_integral_value(
         rounding=ROUND_FLOOR) * quantum
     minimum = _positive(min_notional)
+    residual_minimum = minimum * _partial_exit_reserve(trade, amount_reserve_percent)
     rounding = ROUND_FLOOR if short else ROUND_CEILING
     prices = [(_positive(p) / price_step).to_integral_value(rounding=rounding)
               * price_step for p in targets]
@@ -64,11 +88,13 @@ def executable_targets(trade, targets, min_notional):
             rounding=ROUND_FLOOR) * quantum
         amount = cumulative - allocated
         remainder = total - cumulative
-        # Do not strand a final sub-minimum allocation. Keep accumulating
-        # through the last target instead of selling its allocation early.
+        # Do not strand a remainder the executor refuses to leave behind.
+        # Freqtrade values the remainder at this order's price, not at the
+        # last target. Keep accumulating through the last target instead of
+        # selling its allocation early.
         if amount <= 0 or amount * price < minimum:
             continue
-        if remainder and remainder * prices[-1] < minimum:
+        if remainder and remainder * price < residual_minimum:
             continue
         plan.append((index, float(price), float(amount)))
         allocated = cumulative

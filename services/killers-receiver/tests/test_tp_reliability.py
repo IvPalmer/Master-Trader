@@ -22,9 +22,10 @@ def restore_state():
         receiver.app.state = saved
 
 
-def trade(amount=65, short=False, orders=None):
+def trade(amount=65, short=False, orders=None, stop_loss_ratio=-0.16):
     return {"amount": amount, "amount_requested": 65.41, "is_open": True,
             "nr_of_successful_entries": 1, "is_short": short,
+            "stop_loss_ratio": stop_loss_ratio,
             "amount_precision": 1, "precision_mode": 4,
             "price_precision": .00001, "precision_mode_price": 4,
             "contract_size": 1, "orders": orders or []}
@@ -74,6 +75,25 @@ def test_unfilled_or_still_filling_entry_never_allocated():
     t["nr_of_successful_entries"] = 1
     t["orders"] = [{"is_open": True, "ft_order_side": "buy", "filled": 10}]
     assert executable_targets(t, [.35], 10) == []
+
+
+def test_remainder_is_valued_at_the_group_price_with_freqtrade_reserve():
+    """2026-09-12 re-arm: DOT 19 planned 10.5@1.06 + 8.5@1.40 and GRAM 11
+    planned 6@1.80 + 5@2.25; Freqtrade refused both ("Remaining amount of
+    9.01 would be too small"): it values the remainder at the order price
+    and requires min_cost * (1.05 / (1 - |stop_loss_ratio|)), capped 1.5."""
+    dot = trade(19, stop_loss_ratio=-0.4248)
+    dot.update(amount_precision=0.1, price_precision=1e-5)
+    assert executable_targets(dot, [.86, .9, .95, 1.0, 1.06, 1.13, 1.21, 1.3, 1.4], 10) == [(8, 1.4, 19)]
+    gram = trade(11, stop_loss_ratio=-0.1726)
+    gram.update(price_precision=1e-4)
+    assert executable_targets(gram, [1.425, 1.5, 1.575, 1.675, 1.8, 1.95, 2.1, 2.25], 10) == [(7, 2.25, 11)]
+    # TRX passed: remainder 33 * 0.39 = 12.87 >= 10 * 1.05 / (1 - 0.159) = 12.49.
+    trx = trade(65, stop_loss_ratio=-0.1592)
+    assert executable_targets(trx, [.35, .362, .375, .39, .41, .435, .465, .5], 10)[0] == (3, .39, 32)
+    # Missing ratio falls back to the 1.5 cap and fails the same TRX split.
+    assert executable_targets(trade(65, stop_loss_ratio=None),
+                              [.35, .362, .375, .39, .41, .435, .465, .5], 10) == [(7, .5, 65)]
 
 
 def test_reject_unexecutable_entire_position():
@@ -137,6 +157,8 @@ def test_read_outage_never_posts_then_recovers_without_active_row():
 
 @pytest.mark.parametrize("response,state", [({"status": 429}, "retry"),
     ({"status": 400, "body": "minimum notional"}, "rejected"),
+    ({"status": 502, "body": '{"error":"Error querying /api/v1/forceexit: Remaining amount of 9.01 would be too small."}'}, "rejected"),
+    ({"status": 502, "body": "<html>bad gateway</html>"}, "unknown"),
     ({"status": 502}, "unknown"), ({"status": 200}, "unknown")])
 def test_response_classification_and_cooldown(response, state):
     cfg, conn, pos_id = _setup_db()
