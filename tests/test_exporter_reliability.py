@@ -107,3 +107,30 @@ def test_emergency_alert_matches_trade_webhook_json_contract(exporter, monkeypat
     assert "15.0%" in payload["status"]
     assert "ExampleBot" in payload["status"]
     assert json.loads(json.dumps(payload)) == payload
+
+
+def test_shared_wallet_counts_once_in_breaker_capital(exporter):
+    """FundingFadeV1 and KeltnerBounceV1 trade one Binance wallet. Each
+    reports the whole wallet as starting_capital; the breaker must not add
+    them twice, and the earliest snapshot is the account's base."""
+    live = [
+        {"service": "fundingfadev1", "strategy": "FundingFadeV1",
+         "capital_account": "binance-spot", "starting_capital": 89.3788},
+        {"service": "keltnerbouncev1", "strategy": "KeltnerBounceV1",
+         "capital_account": "binance-spot", "starting_capital": 90.3356},
+        {"service": "ft-killers-scalp", "strategy": "KillersScalpV1",
+         "capital_account": "hyperliquid-killers", "starting_capital": 84.5705},
+    ]
+    assert exporter.account_starting_capital(live) == pytest.approx(89.3788 + 84.5705)
+    # A bot without a declared account is its own account.
+    assert exporter.account_starting_capital(
+        [{"service": "a", "strategy": "A", "starting_capital": 10.0},
+         {"service": "b", "strategy": "B", "starting_capital": 10.0}]
+    ) == pytest.approx(20.0)
+
+
+def test_registry_declares_the_shared_binance_wallet():
+    data = json.loads((FT_DIR / "bots_config.json").read_text())["bots"]
+    shared = {name for name, info in data.items() if info.get("capital_account") == "binance-spot"}
+    assert {"FundingFadeV1", "KeltnerBounceV1"} <= shared
+    assert data["KillersScalpV1"].get("capital_account") != "binance-spot"

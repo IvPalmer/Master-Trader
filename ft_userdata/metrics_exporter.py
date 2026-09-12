@@ -76,7 +76,8 @@ def _load_bots_config() -> list[dict]:
                 "OITrendPullbackV1": "oi-trend-pullback",
             }
             service = service_map.get(name, service)
-            bots.append({"service": service, "strategy": name})
+            bots.append({"service": service, "strategy": name,
+                         "capital_account": info.get("capital_account") or service})
         return bots
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return [
@@ -274,14 +275,41 @@ def refresh_live_capital() -> None:
             )
             continue
         live.append({**bot, "starting_capital": meta["starting_capital"]})
-        total += meta["starting_capital"]
 
     _live_bots = live
-    _live_initial_capital = total
+    _live_initial_capital = account_starting_capital(live)
     log.info(
         "Circuit breaker capital refreshed: %d live bots, $%.2f total starting capital",
         len(_live_bots), _live_initial_capital,
     )
+
+
+def account_starting_capital(live_bots: list[dict]) -> float:
+    """Sum starting capital once per exchange account, not once per bot.
+
+    Freqtrade reports `starting_capital` as the wallet balance it saw when
+    the bot started. Two bots on one wallet (FundingFadeV1 and
+    KeltnerBounceV1 share the Binance spot account) each report the whole
+    wallet, so summing per bot doubled the breaker's denominator and halved
+    every drawdown percentage. Bots sharing an account contribute the
+    smallest reported figure: the earliest snapshot, before the other bots'
+    P&L moved the wallet, so `initial + sum(bot P&L)` reconstructs the
+    wallet without deposits.
+    """
+    by_account: dict[str, list[dict]] = {}
+    for bot in live_bots:
+        by_account.setdefault(bot.get("capital_account") or bot["service"], []).append(bot)
+    total = 0.0
+    for account, members in by_account.items():
+        capital = min(b["starting_capital"] for b in members)
+        if len(members) > 1:
+            log.info(
+                "Account %s shared by %s: counting $%.2f once (reported %s)",
+                account, ", ".join(b["strategy"] for b in members), capital,
+                ", ".join(f"${b['starting_capital']:.2f}" for b in members),
+            )
+        total += capital
+    return total
 
 
 def scrape_bot(bot: dict) -> float | None:
