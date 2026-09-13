@@ -102,3 +102,25 @@ def test_queue_timeout_never_sends_request_and_is_visible():
         assert session.calls == 0
         assert gateway.health()['clients']['killers']['queue_timeout'] == 1
     asyncio.run(check())
+
+
+def test_candle_reservation_bounds_requested_window_and_keeps_fallback():
+    body = {'type': 'candleSnapshot', 'req': {'interval': '5m', 'startTime': 0, 'endTime': 3000000}}
+    assert g.cost('info', body) == 21
+    body['req']['endTime'] = 5000 * 300000
+    assert g.cost('info', body) == 104
+    body['req']['interval'] = 'invalid'
+    assert g.cost('info', body) == 104
+
+
+def test_only_background_reads_wait_across_a_budget_window():
+    async def check():
+        gateway = g.Gateway(Session())
+        gateway.budget.acquire = AsyncMock(return_value=None)
+        await gateway.forward('killers', 'exchange', {})
+        assert gateway.budget.acquire.call_args.kwargs['timeout'] == 12
+        await gateway.forward('killers', 'info', {'type': 'orderStatus'})
+        assert gateway.budget.acquire.call_args.kwargs['timeout'] == 12
+        await gateway.forward('short', 'info', {'type': 'candleSnapshot'})
+        assert gateway.budget.acquire.call_args.kwargs['timeout'] == 70
+    asyncio.run(check())

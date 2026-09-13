@@ -168,6 +168,11 @@ BOTS: list[dict[str, Any]] = [
         "label": "killers-scalp",
         "url": "http://ft-killers-scalp:8080",
         "account_group": "hyperliquid-killers",
+        # Verified 2026-09-13 from the exchange ledger: 98 USDC transferred
+        # to perps at 1787524880866; zero fills/funding before round 5 and
+        # no subsequent transfers. This fixed epoch basis must not drift
+        # with Freqtrade's available-margin-derived starting_capital.
+        "performance_starting_capital": 98.0,
         "strategy_kind": "copy-trader",
         # Copy-trader of the Binance Killers VIP private channel, executed on
         # Hyperliquid because Binance Futures is unavailable to the operator.
@@ -1270,12 +1275,12 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     paths = ["profit", "status", "balance", "show_config", "whitelist"]
     results = await asyncio.gather(*[_get(client, bot["url"], p) for p in paths])
     profit, profit_err = results[0]
-    status, _ = results[1]
+    status, status_err = results[1]
     balance, balance_err = results[2]
     cfg, cfg_err = results[3]
     whitelist, _ = results[4]
 
-    err = profit_err or balance_err or cfg_err
+    err = profit_err or status_err or balance_err or cfg_err
     if err:
         return {"key": bot["key"], "error": err, "reachable": False}
 
@@ -1330,6 +1335,8 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         )
 
     starting_capital = float((balance or {}).get("starting_capital") or 0.0)
+    if not is_dry_run and bot.get("performance_starting_capital") is not None:
+        starting_capital = float(bot["performance_starting_capital"])
     bot_owned = float((balance or {}).get("total_bot") or 0.0)
     runtime_start_ts = (profit or {}).get("bot_start_timestamp", 0) / 1000.0
     bot_start_ts = (
@@ -1406,7 +1413,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
 
     return {
         "key": bot["key"], "name": bot["name"], "label": bot["label"],
-        "reachable": True, "dry_run": is_dry_run,
+        "reachable": True, "dry_run": is_dry_run, "observed_at": time.time(),
         "bot_start_ts": bot_start_ts, "days_running": round(days_running, 1),
         "wallet": {
             "starting_capital": round(starting_capital, 2),
@@ -2055,6 +2062,43 @@ async def api_closed_trades():
             })
     out.sort(key=lambda x: x.get("close_ts") or 0, reverse=True)
     return JSONResponse({"trades": out, "count": len(out)})
+
+
+@app.get("/api/trade_candles/{bot_key}")
+async def api_trade_candles(bot_key: str, pair: str, timeframe: str = "1h",
+                            limit: int = 500, start_ms: int | None = None,
+                            end_ms: int | None = None):
+    """Fetch candles from the execution venue, with a bounded request window."""
+    bot = _bot_meta(bot_key)
+    if not bot:
+        return JSONResponse({"error": "unknown bot"}, status_code=404)
+    if bot.get("venue") != "hyperliquid":
+        return await api_binance_candles(pair, timeframe, limit, start_ms, end_ms)
+    pair = pair.strip().upper()
+    if not _PAIR_RE.fullmatch(pair) or not pair.endswith("/USDC:USDC"):
+        return JSONResponse({"error": "invalid Hyperliquid pair"}, status_code=400)
+    if timeframe not in _ALLOWED_TIMEFRAMES:
+        return JSONResponse({"error": "invalid timeframe"}, status_code=400)
+    interval_ms = int(timeframe[:-1]) * {"m": 60_000, "h": 3_600_000, "d": 86_400_000}[timeframe[-1]]
+    limit = max(10, min(limit, 500))
+    end = min(int(end_ms or time.time() * 1000), int(time.time() * 1000))
+    start = max(int(start_ms or 0), end - (limit - 1) * interval_ms)
+    if start >= end or start < 0:
+        return JSONResponse({"error": "invalid candle window"}, status_code=400)
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post("http://hl-gateway:8080/accounting/info", json={
+                "type": "candleSnapshot", "req": {"coin": pair.split("/")[0],
+                "interval": timeframe, "startTime": start, "endTime": end}}, timeout=90)
+            r.raise_for_status()
+            rows = r.json()
+            candles = sorted([[int(c["t"]), float(c["o"]), float(c["c"]),
+                               float(c["l"]), float(c["h"]), float(c["v"])]
+                              for c in rows if start <= int(c["t"]) <= end])[-limit:]
+    except (httpx.HTTPError, ValueError, TypeError, KeyError):
+        return JSONResponse({"error": "Hyperliquid candles unavailable; retry shortly"}, status_code=502)
+    return JSONResponse({"pair": pair, "timeframe": timeframe, "source": "Hyperliquid",
+                         "candles": candles, "start_ms": start, "end_ms": end})
 
 
 @app.get("/api/binance_candles")

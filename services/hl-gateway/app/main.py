@@ -37,7 +37,20 @@ def cost(path, body):
     base = 2 if kind in LOW_COST else 60 if kind == 'userRole' else 20
     # Reserve the documented maximum response weight before sending. Refund
     # unused weight afterwards. This also bounds a startup history burst.
-    return base + (100 if kind in VARIABLE else 84 if kind == 'candleSnapshot' else 0)
+    candle_rows = 5000
+    if kind == 'candleSnapshot':
+        req = body.get('req') or {}
+        interval = req.get('interval', '')
+        try:
+            interval_ms = int(interval[:-1]) * {'m': 60000, 'h': 3600000, 'd': 86400000}[interval[-1]]
+            # Include both boundary candles. An absent/invalid window keeps
+            # the conservative exchange maximum reservation.
+            span = int(req['endTime']) - int(req['startTime'])
+            if interval_ms > 0 and span >= 0:
+                candle_rows = min(5000, span // interval_ms + 2)
+        except (ValueError, TypeError, KeyError, IndexError):
+            pass
+    return base + (100 if kind in VARIABLE else math.ceil(candle_rows / 60) if kind == 'candleSnapshot' else 0)
 
 
 def actual_cost(path, body, result):
@@ -127,7 +140,10 @@ class Gateway:
         if key and key in self.cache and self.cache[key][0] > started:
             self.event(client, kind, 'cached')
             return self.cache[key][1]
-        reservation = await self.budget.acquire(cost(path, body), priority(client, path, body))
+        tier = priority(client, path, body)
+        # Public startup history can wait across a budget window; exit/order
+        # reads and actions retain the short deadline and reserved capacity.
+        reservation = await self.budget.acquire(cost(path, body), tier, timeout=70 if tier == 2 else 12)
         if reservation is None:
             self.event(client, kind, 'queue_timeout', time.monotonic() - started)
             return 429, b'{"error":"fleet request budget busy; request not forwarded"}'

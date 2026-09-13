@@ -239,7 +239,8 @@
                   <span class="table-secondary" x-text="accountLabel(bot)">account</span>
                 </td>
                 <td class="right">
-                  <span class="table-primary num" x-text="fmtUsd(bot.wallet?.bot_owned)">—</span>
+                  <span class="table-primary num" x-text="fmtUsd(botCapital(bot))">—</span>
+                  <span class="table-secondary" x-show="!bot.reachable" x-cloak x-text="bot.observed_at ? 'Last observed ' + new Date(bot.observed_at * 1000).toLocaleTimeString() : 'Awaiting first observation'"></span>
                   <span class="table-secondary" x-show="bot.account_group === 'binance-spot'" x-cloak>shared</span>
                 </td>
                 <td class="right num" :class="(bot.pnl?.closed || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.closed)">—</td>
@@ -1048,8 +1049,8 @@
           </template>
           <template x-if="trade.is_open && trade.tps_total">
             <div style="margin:0 12px 8px;">
-              <span class="pill" :class="trade.tps_hit ? '' : 'zero'"
-                    x-text="trade.tps_hit+' / '+trade.tps_total+' TPs'+(trade.next_tp ? ' · next @ '+fmtRate(trade.next_tp) : '')"></span>
+              <span class="pill tp-progress"
+                    x-text="trade.tps_hit+' / '+trade.tps_total+' targets filled'+(trade.next_tp ? ' · next @ '+fmtRate(trade.next_tp) : '')"></span>
             </div>
           </template>
           <div class="trade-card-detail">
@@ -1068,7 +1069,17 @@
               </template>
             </div>
           </div>
-          <div class="trade-chart" :id="tradeChartId(trade)"></div>
+          <div class="trade-chart-source">
+            <span x-text="venueLabel(raw.bots[trade.bot_key])"></span>
+            <span x-show="tradeChartStatus(trade).clipped" x-cloak>Latest 500 candles; entry is outside this window</span>
+          </div>
+          <div class="trade-chart-wrap" :aria-busy="!!tradeChartStatus(trade).loading">
+            <div class="trade-chart" :id="tradeChartId(trade)"></div>
+            <div class="trade-chart-message" x-show="tradeChartStatus(trade).loading || tradeChartStatus(trade).error" role="status">
+              <span x-text="tradeChartStatus(trade).loading ? 'Loading price chart…' : tradeChartStatus(trade).error"></span>
+              <button class="cmd-btn" x-show="tradeChartStatus(trade).error" @click="retryTradeChart(trade)">Retry chart</button>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -1281,7 +1292,7 @@
         <div class="card col-8">
           <div class="card-head">
             <div class="card-title">equity curve</div>
-            <div class="card-sub" x-text="bot.lineage ? 'historical lineage → closed live equity · dashed tip is open P&L' : (bot.baseline_comparable ? 'closed live equity vs expectation · dashed tip is open P&L' : 'closed live equity · dashed tip is current open P&L')">forward live equity</div>
+            <div class="card-sub" x-text="bot.lineage ? equityExplanation(bot) : (bot.baseline_comparable ? 'closed live equity vs expectation · dashed tip is open P&L' : 'closed live equity · dashed tip is current open P&L')">forward live equity</div>
           </div>
           <div class="chart tall" :id="'chart-detail-equity-'+bot.key"></div>
         </div>

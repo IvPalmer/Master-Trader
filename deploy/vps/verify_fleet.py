@@ -49,6 +49,14 @@ def verify():
 j=json.load(urllib.request.urlopen('http://localhost:8000/api/state'))
 print(json.dumps({k:j.get(k) for k in ['status','poll_age_s','account_health']}))''')
     result['gateway'] = exec_json('ft-hl-gateway', "import json,urllib.request; print(urllib.request.urlopen('http://localhost:8080/healthz').read().decode())")
+    result['routing'] = {}
+    for name, client in [('ft-killers-scalp', 'killers'), ('ft-insiders-scalp', 'insiders'), ('ft-short-keltner-hl-live', 'short')]:
+        effective = exec_json(name, '''import json
+from freqtrade.configuration.environment_vars import environment_vars_to_dict
+c=environment_vars_to_dict()
+print(json.dumps({'urls':c['exchange'].get('ccxt_config',{}).get('urls'), 'cancel_on_exit':c.get('cancel_open_orders_on_exit')}))''')
+        expected = 'http://hl-gateway:8080/' + client
+        result['routing'][name] = effective['urls'] == {'api': {'public': expected, 'private': expected}} and effective['cancel_on_exit'] is False
     result['runtime_source_matches'] = {}
     for name, deployed, source in [('killers-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),
             ('insiders-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),

@@ -44,6 +44,8 @@ def test_live_positions_have_native_exit_coverage(fleet):
 
 def test_actual_account_marks_and_request_health_are_observed(fleet):
     assert fleet['gateway']['ok']
+    assert fleet['gateway']['status'] == 'ok', fleet['gateway']
+    assert all(fleet['routing'].values()), fleet['routing']
     assert fleet['dashboard']['poll_age_s'] < 180
     assert fleet['dashboard']['account_health']['complete']
     assert fleet['dashboard']['account_health']['equity'] > 0

@@ -37,6 +37,18 @@ function toMs(ts) {
   return ts > 1e12 ? ts : ts * 1000;
 }
 
+// Closed P&L persists between fills. Extend only to the latest observation;
+// the vertical dashed tip is a snapshot, never invented unrealized history.
+function closedEquityThroughMark(realized, marked) {
+  const points = realized.map(p => [new Date(p[0]), p[1]]);
+  const last = points[points.length - 1];
+  const end = marked[marked.length - 1]?.[0];
+  if (last && end && Number(new Date(end)) > Number(last[0])) {
+    points.push([new Date(end), last[1]]);
+  }
+  return points;
+}
+
 function dash() {
   return {
     raw: { bots: {}, errors: {}, last_poll: null },
@@ -56,6 +68,9 @@ function dash() {
     _chartResizeTimers: [],
     _equityData: {},
     _tradeCandles: {},
+    _tradeChartState: {},
+    _tradeChartRequest: {},
+    _tradeChartsBusy: false,
     _killersSL: {},   // {symbol: posted channel SL} for copy-trader open positions
     _attentionExpanded: false,
     // Command bar: dismissed incident keys (session-local)
@@ -271,7 +286,7 @@ function dash() {
           if ((t.profit_pct || 0) <= -3) {
             items.push({
               color: 'red', icon: '▼',
-              subject: `${t.pair} bleeding ${this.fmtPctSigned(t.profit_pct)}`,
+              subject: `${t.pair} unrealized ${this.fmtPctSigned(t.profit_pct)}`,
               reason: `${b.label} · open position · ${this.fmtAge(Math.max(0, Math.floor((Date.now() - toMs(t.open_timestamp)) / 1000)))} open`,
               cta: 'open detail',
               logsHint: b.links?.logs_hint || null,
@@ -469,7 +484,7 @@ function dash() {
       return stale.some(item => (typeof item === 'string' ? item : (item.key || item.bot_key)) === bot.key);
     },
     botStatus(bot) {
-      if (!bot?.reachable) return { label: 'offline', cls: 'offline' };
+      if (!bot?.reachable) return { label: 'unreachable', cls: 'offline' };
       if (this.isBotStale(bot)) return { label: 'stale', cls: 'stale' };
       if (bot.position_integrity?.status === 'critical') return { label: 'position fault', cls: 'offline' };
       return { label: 'running', cls: 'running' };
@@ -526,15 +541,24 @@ function dash() {
     get equitySelectionLabel() {
       return this.selectedEquityBot?.label || 'fleet';
     },
+    botCapital(bot) {
+      const account = this.raw.account_health?.accounts?.[bot.account_group];
+      if (!bot.dry_run && bot.account_group !== 'binance-spot' && account) return account.equity;
+      return bot.wallet?.bot_owned;
+    },
     get equityTitle() {
       return this.selectedEquityBot ? `${this.selectedEquityBot.label} equity curve` : 'portfolio equity curve';
     },
     get equitySubtitle() {
       const bot = this.selectedEquityBot;
       if (!bot) return 'solid line = closed trades · dashed tip = current mark on open positions';
-      if (bot.lineage) return 'historical lineage → closed live equity · dashed tip includes open P&L';
+      if (bot.lineage) return this.equityExplanation(bot);
       if (bot.baseline?.annual_return_pct) return 'closed live equity vs expectation · dashed tip includes open P&L';
       return 'closed live equity · dashed tip includes current open P&L';
+    },
+    equityExplanation(bot) {
+      const closed = bot?.stats?.closed_trade_count || 0;
+      return `Historical dry-run + rebased live returns · comparison scale, not account balance. ${closed ? closed + ' closed live trades' : 'No closed live trades: solid line stays flat'}; dashed tip = current open P&L.`;
     },
     get equityHasHistory() {
       return this.selectedEquityBot
@@ -555,7 +579,7 @@ function dash() {
         : this.hero.totalUnrealizedPnl;
     },
     get selectedReturn() {
-      return this.selectedEquityBot?.pnl?.all_pct ?? this.hero.totalPct;
+      return this.selectedEquityBot ? this.selectedEquityBot.pnl?.all_pct : this.hero.totalPct;
     },
     get selectedMaxDrawdown() {
       return this.selectedEquityBot
@@ -1053,13 +1077,26 @@ function dash() {
       } catch (e) { console.warn('fetchClosedTrades', e); }
     },
 
-    renderTradesCharts() {
-      this.filteredTrades.forEach(t => this.renderTradeChart(t));
+    async renderTradesCharts() {
+      if (this._tradeChartsBusy) return;
+      this._tradeChartsBusy = true;
+      try {
+        for (const trade of this.filteredTrades) await this.renderTradeChart(trade);
+      } finally { this._tradeChartsBusy = false; }
+    },
+    tradeChartStatus(trade) { return this._tradeChartState[this.tradeChartId(trade)] || { loading: true }; },
+    retryTradeChart(trade) {
+      const prefix = trade.bot_key + ':' + trade.pair + ':';
+      Object.keys(this._tradeCandles).filter(k => k.startsWith(prefix)).forEach(k => delete this._tradeCandles[k]);
+      this.renderTradeChart(trade);
     },
 
     async renderTradeChart(trade) {
       const chartId = this.tradeChartId(trade);
       const tf = this.tradeTimeframe(trade);
+      const request = (this._tradeChartRequest[chartId] || 0) + 1;
+      this._tradeChartRequest[chartId] = request;
+      this._tradeChartState[chartId] = { loading: true };
       // Key by open_ts too so distinct trades on the same bot/pair/tf (e.g. two
       // SUI scalps) don't share a window. Open trades skip the cache so the
       // chart keeps up with the live candle on each poll.
@@ -1079,17 +1116,25 @@ function dash() {
           const tfMs = { '5m': 5*60_000, '15m': 15*60_000, '1h': 60*60_000, '4h': 4*60*60_000 }[tf] || 60*60_000;
           const padCandles = 100;
           // Bug fix B3: use toMs for open_ts / close_ts
-          const startMs = toMs(trade.open_ts) - padCandles * tfMs;
-          const endMs = toMs(trade.close_ts) + padCandles * tfMs;
-          const url = `/api/binance_candles?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=500&start_ms=${startMs}&end_ms=${endMs}`;
-          const r = await fetch(url, { cache: 'no-store' });
-          if (!r.ok) return;
+          const endMs = Math.min(Date.now(), toMs(trade.close_ts) + padCandles * tfMs);
+          const startMs = Math.max(toMs(trade.open_ts) - padCandles * tfMs, endMs - 499 * tfMs);
+          const url = `/api/trade_candles/${encodeURIComponent(trade.bot_key)}?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=500&start_ms=${startMs}&end_ms=${endMs}`;
+          const r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(95000) });
+          if (!r.ok) throw new Error('Candles unavailable');
           const data = await r.json();
           candles = data.candles || [];
           this._tradeCandles[cacheKey] = { ts: Date.now(), candles };
-        } catch { return; }
+        } catch {
+          if (this._tradeChartRequest[chartId] === request) this._tradeChartState[chartId] = { error: 'Price chart unavailable. Retry shortly.' };
+          return;
+        }
       }
-      if (!candles.length) return;
+      if (this._tradeChartRequest[chartId] !== request) return;
+      if (!candles.length) {
+        this._tradeChartState[chartId] = { error: 'No candles in this window. Try a longer timeframe.' };
+        return;
+      }
+      this._tradeChartState[chartId] = { loading: false, clipped: candles[0][0] > toMs(trade.open_ts) };
 
       const span = toMs(trade.close_ts) - toMs(trade.open_ts);
       const visiblePadMs = Math.max(span * 0.5, 30 * 60 * 1000);
@@ -1303,7 +1348,7 @@ function dash() {
       const liveName = lineage ? `${lineage.live_label} · closed` : 'closed equity';
       const legacy = (lineage?.legacy || []).map(p => [new Date(p[0]), p[1]]);
       const marked = (lineage?.live || data?.live || []).map(p => [new Date(p[0]), p[1]]);
-      const live = (lineage?.realized || data?.realized || data?.live || []).map(p => [new Date(p[0]), p[1]]);
+      const live = closedEquityThroughMark(lineage?.realized || data?.realized || data?.live || [], marked);
       const hasOpenMark = isFleet ? this.hero.openCount > 0 : (bot?.open_trades?.length || 0) > 0;
       const markToMarket = hasOpenMark && live.length && marked.length
         ? [live[live.length - 1], marked[marked.length - 1]]
@@ -1378,7 +1423,7 @@ function dash() {
             lineStyle: { color: COLORS.text3, width: 1.7 }, itemStyle: { color: COLORS.text3 }, z: 1 }] : []),
           ...(expected.length ? [{ name: 'backtest expected', type: 'line', data: expected, showSymbol: false,
             lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.4, opacity: 0.7 }, itemStyle: { color: COLORS.text3 }, z: 1 }] : []),
-          { name: liveName, type: 'line', data: live, smooth: false, showSymbol: false,
+          { name: liveName, type: 'line', data: live, step: 'end', smooth: false, showSymbol: false,
             lineStyle: { color: COLORS.accent, width: 2 },
             areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
               { offset: 0, color: 'rgba(14, 135, 163, 0.18)' }, { offset: 1, color: 'rgba(14, 135, 163, 0.0)' },
@@ -1818,7 +1863,7 @@ function dash() {
         const liveName = lineage ? `${lineage.live_label} · closed` : 'closed equity';
         const legacy   = (lineage?.legacy || []).map(p => [new Date(p[0]), p[1]]);
         const marked   = (lineage?.live || data?.live || []).map(p => [new Date(p[0]), p[1]]);
-        const live     = (lineage?.realized || data?.realized || data?.live || []).map(p => [new Date(p[0]), p[1]]);
+        const live     = closedEquityThroughMark(lineage?.realized || data?.realized || data?.live || [], marked);
         const markToMarket = (bot.open_trades?.length || 0) && live.length && marked.length
           ? [live[live.length - 1], marked[marked.length - 1]] : [];
         const lastLiveTs = marked.length ? marked[marked.length-1][0].getTime() : Date.now();
@@ -1844,7 +1889,7 @@ function dash() {
             ...(lineage ? [{ name: legacyName, type: 'line', data: legacy, showSymbol: false,
               lineStyle: { color: COLORS.text3, width: 1.7 } }] : []),
             ...(expected.length ? [{ name: 'backtest expected', type: 'line', data: expected, showSymbol: false, lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.2 } }] : []),
-            { name: liveName, type: 'line', data: live, showSymbol: false,
+            { name: liveName, type: 'line', data: live, step: 'end', showSymbol: false,
               lineStyle: { color: COLORS.info, width: 2 },
               areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14,135,163,0.18)' }, { offset: 1, color: 'rgba(14,135,163,0)' }]) },
               markLine: transitionTs ? { silent: true, symbol: 'none', data: [{ xAxis: transitionTs,

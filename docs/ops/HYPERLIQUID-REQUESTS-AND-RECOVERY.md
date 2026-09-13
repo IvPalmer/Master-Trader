@@ -25,3 +25,37 @@ The 10% breaker halts new entries via `/stopentry`, leaving exit management runn
 ## Planned restart with resting exits
 
 Production sets `cancel_open_orders_on_exit=false` so routine future restarts preserve resting take-profits. The initial migration from the old `true` setting needs special handling: pause receivers, capture and back up order/database state, stop the old Killers process without executing its cancellation cleanup, then recreate only that service with the new setting. Verify the exact exchange order IDs and five position quantities afterwards. The one-time abrupt stop relies on SQLite transaction recovery and exchange-resident stops, so it must never replace normal graceful restarts after the new setting is loaded. Never run a broad compose recreate or change volumes.
+
+### 2026-09-13 completion and dashboard follow-up
+
+The delayed rollout resumed at 15:14 UTC with a fresh backup at
+`/home/ubuntu/master-trader/state/backups/fleet-completion-20260913T151409Z`.
+All five Killers positions and all ten exchange exit order IDs survived the
+one-time ungraceful restart. The old unmanaged Short container is retained,
+stopped with restart disabled. Managed observation bots remain dry-run.
+
+Runtime verification caught Freqtrade ignoring a JSON-valued uppercase
+`CCXT_CONFIG` environment variable. Routing now uses nested environment leaves
+(`CCXT_CONFIG__urls__api__public`, `private`, and lowercase `timeout`) and the
+production verifier checks the parsed Freqtrade configuration. Background
+history may queue for 70 seconds across a budget window; transport is bounded
+to 15 seconds and Freqtrade waits up to 90. Exit reads/actions retain their
+12-second queue deadline and reserved budget. Candle reservations use a bounded
+requested interval rather than reserving 5,000 candles for every short request.
+
+The Killers performance denominator is fixed at **98 USDC**: the exchange
+non-funding ledger reports that amount transferred into perps at
+`1787524880866`, with no subsequent ledger updates through this audit. Exchange
+fills and funding queries from that transfer through the round-5 epoch returned
+zero records. Freqtrade's reported starting capital (~73.15 during this audit)
+varies with available collateral and must not normalize this performance curve.
+The historical dry-run comparison is retained and explicitly labeled rebased;
+it is not the current account balance. The solid realized series extends to
+its latest observation, while a vertical dashed tip shows current open P&L.
+There is no reconstructed intratrade P&L history. Actual account equity is
+observed separately and can differ from trade P&L due to fees/funding and timing.
+
+Trade-card candles now use their execution venue through the shared gateway,
+including GRAM and other Hyperliquid markets unavailable on Binance. Cards wrap
+at three/two/one columns and include loading, error, retry, and truncated-window
+states. Stale bot measurements carry their last observed time.
