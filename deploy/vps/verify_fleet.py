@@ -54,11 +54,28 @@ print(json.dumps({k:j.get(k) for k in ['status','poll_age_s','account_health']})
         effective = exec_json(name, '''import json
 from freqtrade.configuration.environment_vars import environment_vars_to_dict
 c=environment_vars_to_dict()
-print(json.dumps({'urls':c['exchange'].get('ccxt_config',{}).get('urls'), 'cancel_on_exit':c.get('cancel_open_orders_on_exit'), 'candle_limits':c['exchange'].get('_ft_has_params',{}).get('ohlcv_candle_limit_per_timeframe',{})}))''')
+print(json.dumps({'urls':c['exchange'].get('ccxt_config',{}).get('urls'), 'cancel_on_exit':c.get('cancel_open_orders_on_exit'), 'candle_limits':c['exchange'].get('_ft_has_params',{}).get('ohlcv_candle_limit_per_timeframe',{}), 'subscriptions':c['exchange'].get('pair_whitelist')}))''')
         expected = 'http://hl-gateway:8080/' + client
         result['routing'][name] = effective['urls'] == {'api': {'public': expected, 'private': expected}} and effective['cancel_on_exit'] is False
         if client in {'killers', 'insiders'}:
-            result['routing'][name] = result['routing'][name] and effective['candle_limits'].get('5m') == 100
+            result['routing'][name] = result['routing'][name] and '5m' not in effective['candle_limits'] and effective['subscriptions'] == ['BTC/USDC:USDC']
+    # Exercise only validation/subscription functions against in-memory fakes.
+    # Never invoke order submission, an exchange client, or a real RPC sender.
+    result['copier_subscription_contract'] = exec_json('ft-killers-scalp', '''import json
+from types import SimpleNamespace as NS
+from freqtrade.rpc.rpc import RPC
+from freqtrade.freqtradebot import FreqtradeBot
+from freqtrade.enums import State, TradingMode, SignalDirection
+pair='GRAM/USDC:USDC'
+bot=NS(config={'force_entry_enable':True,'stake_currency':'USDC'}, state=State.RUNNING,
+    trading_mode=TradingMode.FUTURES,
+    exchange=NS(get_markets=lambda **kw:{pair:{}}, get_pair_quote_currency=lambda p:'USDC'),
+    pairlists=NS(whitelist=['BTC/USDC:USDC'],refresh_pairlist=lambda:None),
+    rpc=NS(send_msg=lambda message:None))
+rpc=RPC.__new__(RPC); rpc._freqtrade=bot
+rpc._force_entry_validations(pair,SignalDirection.LONG)
+active=FreqtradeBot._refresh_active_whitelist(bot,[NS(pair=pair)])
+print(json.dumps(pair in active and 'BTC/USDC:USDC' in active))''')
     result['runtime_source_matches'] = {}
     for name, deployed, source in [('killers-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),
             ('insiders-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),

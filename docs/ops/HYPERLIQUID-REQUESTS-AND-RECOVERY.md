@@ -69,12 +69,11 @@ so live traffic is not charged twice against the background allowance. Public
 asset contexts cache for five seconds. Expired cached responses are pruned on
 every request, with an 8 MiB response-byte cap and 128 entries.
 
-Both pass-through copiers require only 10 startup candles, but CCXT's default
-limit fetched 5,000 per pair repeatedly. Their five-minute OHLCV request limit
-is now 100 through Freqtrade's `_ft_has_params` override. Other timeframes and
-funding-history limits are unchanged, as are all signal/exit rules. This bounds
-routine candle response cost near 22 units rather than 104 per pair. Account
-membership failures retry on the next exporter cycle instead of waiting an hour.
+The attempted five-minute page-size override was removed after runtime source
+inspection exposed a shared funding-mark history path: shortening pages made
+old open positions fan out into dozens of historical requests. The exchange's
+native history-page size is retained. Account membership failures retry on the
+next exporter cycle instead of waiting an hour.
 
 The copier candle subscription list is BTC plus Freqtrade's automatically
 included open positions. Source verification of the deployed Freqtrade RPC
@@ -82,5 +81,4 @@ shows force-entry admission checks the exchange's tradable markets and quote
 currency, not the subscription whitelist. Neither copier reads indicators.
 Thus newly signaled tradable pairs remain admissible; their open-position feeds
 are added automatically. Keeping every possible signal pair subscribed caused
-100 concurrent candle requests every five minutes across two copiers even after
-limiting history depth. Autonomous strategy pairlists remain unchanged.
+100 concurrent candle requests every five minutes across two copiers with the full exchange history page. Autonomous strategy pairlists remain unchanged.
