@@ -1066,7 +1066,9 @@ button { font: inherit; }
 /* Keep the complete masthead inside a phone viewport. */
 @media (max-width: 600px) {
   .topbar { flex-wrap: wrap; gap: 0.65rem; }
-  .brand { flex: 1; min-width: 0; }
+  .brand { flex: 1 1 calc(100% - 110px); min-width: 0; }
+  .brand-name { white-space: nowrap; }
+  .brand-name span { display: none; }
   .brand-logo { flex-shrink: 0; }
   .topbar-spacer { display: none; }
   .topbar-meta { order: 3; flex: 1; flex-wrap: wrap; gap: 0.5rem; font-size: 10px; }
