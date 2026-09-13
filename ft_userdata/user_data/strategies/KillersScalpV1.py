@@ -6,8 +6,8 @@ come from the killers-receiver service via Freqtrade's REST API
 pass-throughs that prevent automatic trading decisions.
 
 The bot's only job is to:
-  1. Maintain OHLCV data subscriptions for the pair_whitelist (so when
-     a force_enter arrives, current price + history is available).
+  1. Maintain a bootstrap OHLCV feed plus all open-position feeds. REST
+     entry validation uses tradable markets, not the candle subscription list.
   2. Execute REST-issued orders against the configured live/dry wallet.
   3. Track positions, fire webhook events on entry/exit/cancel.
 

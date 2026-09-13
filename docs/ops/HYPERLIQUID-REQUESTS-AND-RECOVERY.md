@@ -75,3 +75,12 @@ is now 100 through Freqtrade's `_ft_has_params` override. Other timeframes and
 funding-history limits are unchanged, as are all signal/exit rules. This bounds
 routine candle response cost near 22 units rather than 104 per pair. Account
 membership failures retry on the next exporter cycle instead of waiting an hour.
+
+The copier candle subscription list is BTC plus Freqtrade's automatically
+included open positions. Source verification of the deployed Freqtrade RPC
+shows force-entry admission checks the exchange's tradable markets and quote
+currency, not the subscription whitelist. Neither copier reads indicators.
+Thus newly signaled tradable pairs remain admissible; their open-position feeds
+are added automatically. Keeping every possible signal pair subscribed caused
+100 concurrent candle requests every five minutes across two copiers even after
+limiting history depth. Autonomous strategy pairlists remain unchanged.
