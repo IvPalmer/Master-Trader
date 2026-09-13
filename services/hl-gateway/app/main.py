@@ -66,7 +66,9 @@ def actual_cost(path, body, result):
 def priority(client, path, body):
     if path == 'exchange':
         return 0
-    if client in {'killers', 'accounting'} and body.get('type') in LOW_COST | VARIABLE | {'openOrders', 'frontendOpenOrders'}:
+    # CCXT fetch_ticker(s) uses asset contexts, not just allMids/l2Book.
+    # Price reads used by live status and exits must not wait behind candles.
+    if client in {'killers', 'accounting'} and body.get('type') in LOW_COST | VARIABLE | {'openOrders', 'frontendOpenOrders', 'metaAndAssetCtxs', 'spotMetaAndAssetCtxs'}:
         return 1
     return 2
 

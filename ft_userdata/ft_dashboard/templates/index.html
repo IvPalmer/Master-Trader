@@ -1085,7 +1085,7 @@
 
       <div class="empty" x-show="!filteredTrades.length">
         <div class="icon">∅</div>
-        <span x-text="tradesView === 'open' ? 'no open positions' : 'no closed trades yet'">no closed trades yet</span>
+        <span x-text="tradesView === 'open' ? (tradeDataIncomplete ? 'Position data is incomplete. Waiting for bot connections.' : 'no open positions') : 'no closed trades yet'">no closed trades yet</span>
         <button class="cmd-btn" x-show="tradesView === 'open' && closedTrades.length" x-cloak
                 @click="setTradesView('closed')">view <span x-text="closedTrades.length">0</span> closed trades</button>
       </div>

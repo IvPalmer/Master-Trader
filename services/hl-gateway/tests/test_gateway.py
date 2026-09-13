@@ -124,3 +124,9 @@ def test_only_background_reads_wait_across_a_budget_window():
         await gateway.forward('short', 'info', {'type': 'candleSnapshot'})
         assert gateway.budget.acquire.call_args.kwargs['timeout'] == 70
     asyncio.run(check())
+
+
+def test_live_ticker_contexts_have_exit_priority():
+    for kind in ['metaAndAssetCtxs', 'spotMetaAndAssetCtxs', 'l2Book']:
+        assert g.priority('killers', 'info', {'type': kind}) == 1
+    assert g.priority('killers', 'info', {'type': 'candleSnapshot'}) == 2

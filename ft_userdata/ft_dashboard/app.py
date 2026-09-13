@@ -1865,6 +1865,8 @@ async def api_equity(bot_key: str):
     meta = _bot_meta(bot_key)
     if not snap or not meta:
         return JSONResponse({"error": "not found"}, status_code=404)
+    if not snap.get("wallet"):
+        return JSONResponse({"error": "awaiting first successful bot observation"}, status_code=503)
 
     starting = snap["wallet"]["starting_capital"]
     bot_start_ts_ms = int(snap.get("bot_start_ts", 0) * 1000)

@@ -960,11 +960,9 @@ function dash() {
       for (const b of this.allBots) {
         for (const t of (b.open_trades || [])) {
           const openMs = toMs(t.open_timestamp || 0);
-          // Stop line: copy-trader (observational) bots run no hard stop —
-          // Freqtrade's stop_loss_abs is the -99%/liquidation level, which is
-          // not what the position is managed to. Prefer the channel's POSTED
-          // SL for the symbol; fall back to the Freqtrade stop for quant bots
-          // (where stop_loss_abs IS the real strategy stop).
+          // Copy-trader posted stops are also exchange resident. Prefer the
+          // channel's exact level when available; retain Freqtrade's observed
+          // stop as the fallback for every bot.
           // Only the killers copy-trader has channel-posted SLs — gate on its
           // exact key (short-keltner-hl is also observational but has none).
           // Best-effort match: latest OPEN signal per symbol; aliased bases
@@ -1013,13 +1011,16 @@ function dash() {
     get tradesTotalPnl() {
       return this.filteredTrades.reduce((s, t) => s + (t.profit_abs || 0), 0);
     },
+    get tradeDataIncomplete() {
+      return Object.keys(this.raw.errors || {}).length > 0;
+    },
     get tradesRecentSummary() {
       const f = this.filteredTrades;
       const wr = f.length ? ((f.filter(t => t.is_win).length / f.length) * 100).toFixed(0) : 0;
       const pnl = f.reduce((s, t) => s + (t.profit_abs || 0), 0);
       const pnlStr = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toFixed(2);
       if (this.tradesView === 'open') {
-        return `${f.length} open position${f.length === 1 ? '' : 's'} · unrealized ${pnlStr}`;
+        return this.tradeDataIncomplete ? `${f.length} observed positions · awaiting unavailable bots` : `${f.length} open position${f.length === 1 ? '' : 's'} · unrealized ${pnlStr}`;
       }
       // estimate days window for the filter
       if (this.tradesFilter === 'recent24h') {
