@@ -490,6 +490,7 @@ function dash() {
       return { label: 'running', cls: 'running' };
     },
     botActivity(bot) {
+      if (!bot?.reachable) return 'Last known state · reconnecting';
       const open = bot?.open_trades?.length || 0;
       if (open) return `managing ${open} open position${open === 1 ? '' : 's'}`;
       if (bot?.readiness?.label) return bot.readiness.label;

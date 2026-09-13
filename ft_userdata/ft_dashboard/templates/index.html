@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/styles.css?v=23">
+<link rel="stylesheet" href="/static/styles.css?v=24">
 <script defer
         src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
         integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
@@ -309,7 +309,7 @@
         </div>
         <div class="selection-kv">
           <span>capital</span>
-          <strong class="num" x-text="fmtUsd(selectedEquityBot ? selectedEquityBot.wallet?.bot_owned : hero.walletNow)">—</strong>
+          <strong class="num" x-text="fmtUsd(selectedEquityBot ? botCapital(selectedEquityBot) : hero.walletNow)">—</strong>
           <span>closed p&amp;l</span>
           <strong class="num" :class="selectedRealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(selectedRealizedPnl)">—</strong>
           <span>open p&amp;l</span>
@@ -1118,7 +1118,7 @@
         <div class="bis-summary">
           <span class="bis-stat">
             <span class="bis-stat-k" x-text="botCapitalLabel(bot)">capital</span>
-            <strong class="num" x-text="fmtUsd(bot.wallet?.bot_owned)">—</strong>
+            <strong class="num" x-text="fmtUsd(botCapital(bot))">—</strong>
           </span>
           <span class="bis-stat">
             <span class="bis-stat-k">marked p&l</span>
@@ -1282,7 +1282,7 @@
         </div>
         <div class="bot-waiting-facts">
           <span><strong class="num" x-text="bot.whitelist_size || 0">0</strong> pairs watched</span>
-          <span><strong class="num" x-text="fmtUsd(bot.wallet?.bot_owned)">—</strong> capital</span>
+          <span><strong class="num" x-text="fmtUsd(botCapital(bot))">—</strong> capital</span>
           <span><strong class="num" x-text="fmtUsd(bot.capital_at_risk?.abs_loss || 0)">$0.00</strong> at risk</span>
         </div>
       </div>

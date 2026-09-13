@@ -38,7 +38,7 @@ def test_live_positions_have_native_exit_coverage(fleet):
     for trade in killers['open_trades']:
         coin = trade['pair'].split('/')[0]
         orders = [o for o in fleet['exchange_orders'] if o['coin'] == coin and o['reduceOnly']]
-        assert any(o['orderType'] == 'Stop Limit' for o in orders), coin
+        assert any(o['orderType'] == 'Stop Limit' and float(o['sz']) >= trade['amount'] for o in orders), coin
         assert any(o['orderType'] == 'Limit' for o in orders), coin
 
 

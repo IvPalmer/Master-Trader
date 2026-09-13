@@ -54,9 +54,11 @@ print(json.dumps({k:j.get(k) for k in ['status','poll_age_s','account_health']})
         effective = exec_json(name, '''import json
 from freqtrade.configuration.environment_vars import environment_vars_to_dict
 c=environment_vars_to_dict()
-print(json.dumps({'urls':c['exchange'].get('ccxt_config',{}).get('urls'), 'cancel_on_exit':c.get('cancel_open_orders_on_exit')}))''')
+print(json.dumps({'urls':c['exchange'].get('ccxt_config',{}).get('urls'), 'cancel_on_exit':c.get('cancel_open_orders_on_exit'), 'candle_limits':c['exchange'].get('_ft_has_params',{}).get('ohlcv_candle_limit_per_timeframe',{})}))''')
         expected = 'http://hl-gateway:8080/' + client
         result['routing'][name] = effective['urls'] == {'api': {'public': expected, 'private': expected}} and effective['cancel_on_exit'] is False
+        if client in {'killers', 'insiders'}:
+            result['routing'][name] = result['routing'][name] and effective['candle_limits'].get('5m') == 100
     result['runtime_source_matches'] = {}
     for name, deployed, source in [('killers-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),
             ('insiders-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),

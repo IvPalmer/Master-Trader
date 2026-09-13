@@ -882,8 +882,13 @@ def _equity_curve_live(
         cum += pnl
         out.append([ts, round(starting_capital + cum, 4)])
     unrealized = sum(float(t.get("profit_abs") or 0) for t in open_trades)
+    now_ms = int(time.time() * 1000)
+    if out and now_ms > out[-1][0]:
+        # Carry realized P&L forward. The open mark belongs only at now;
+        # connecting the last close straight to it fabricates a return path.
+        out.append([now_ms, round(starting_capital + cum, 4)])
     if unrealized:
-        out.append([int(time.time() * 1000), round(starting_capital + cum + unrealized, 4)])
+        out.append([now_ms, round(starting_capital + cum + unrealized, 4)])
     return sorted(out, key=lambda point: point[0])
 
 

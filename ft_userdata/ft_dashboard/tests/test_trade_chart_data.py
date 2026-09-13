@@ -53,3 +53,9 @@ def test_killers_return_basis_is_verified_funding_not_available_margin():
     assert basis == 98.0
     pnl, _, _ = app._epoch_stats([], [{'profit_abs': 5.22}], basis)
     assert pnl['all_pct'] == 5.33
+
+
+def test_open_mark_does_not_imply_a_linear_return_path(monkeypatch):
+    monkeypatch.setattr(app.time, 'time', lambda: 1800000010)
+    curve = app._equity_curve_live([], [{'profit_abs': 5}], 98, 1800000000000)
+    assert curve == [[1800000000000, 98], [1800000010000, 98], [1800000010000, 103]]
