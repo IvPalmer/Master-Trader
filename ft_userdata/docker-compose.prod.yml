@@ -209,7 +209,9 @@ services:
     environment:
       # All REST clients share an IP budget; websocket reconnect storms cannot bypass it.
       FREQTRADE__EXCHANGE__ENABLE_WS: "false"
-      FREQTRADE__EXCHANGE__CCXT_CONFIG: '{"urls":{"api":{"public":"http://hl-gateway:8080/killers","private":"http://hl-gateway:8080/killers"}},"timeout":30000}'
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/killers"
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/killers"
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "30000"
       FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
       # Preserve resting reduce-only exits through planned restarts.
       FREQTRADE__CANCEL_OPEN_ORDERS_ON_EXIT: "false"
@@ -261,7 +263,9 @@ services:
     environment:
       # All REST clients share an IP budget; websocket reconnect storms cannot bypass it.
       FREQTRADE__EXCHANGE__ENABLE_WS: "false"
-      FREQTRADE__EXCHANGE__CCXT_CONFIG: '{"urls":{"api":{"public":"http://hl-gateway:8080/insiders","private":"http://hl-gateway:8080/insiders"}},"timeout":30000}'
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/insiders"
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/insiders"
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "30000"
       FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
       # Preserve resting reduce-only exits through planned restarts.
       FREQTRADE__CANCEL_OPEN_ORDERS_ON_EXIT: "false"
@@ -362,7 +366,9 @@ services:
     environment:
       # All REST clients share an IP budget; websocket reconnect storms cannot bypass it.
       FREQTRADE__EXCHANGE__ENABLE_WS: "false"
-      FREQTRADE__EXCHANGE__CCXT_CONFIG: '{"urls":{"api":{"public":"http://hl-gateway:8080/short","private":"http://hl-gateway:8080/short"}},"timeout":30000}'
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/short"
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/short"
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "30000"
       FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
       # Preserve resting reduce-only exits through planned restarts.
       FREQTRADE__CANCEL_OPEN_ORDERS_ON_EXIT: "false"
