@@ -209,6 +209,8 @@ services:
     environment:
       # All REST clients share an IP budget; websocket reconnect storms cannot bypass it.
       FREQTRADE__EXCHANGE__ENABLE_WS: "false"
+      # Pass-through copier requires 10 candles; avoid fetching 5000 per pair.
+      FREQTRADE__EXCHANGE___FT_HAS_PARAMS__OHLCV_CANDLE_LIMIT_PER_TIMEFRAME__5m: "100"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/killers"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/killers"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "90000"
@@ -263,6 +265,8 @@ services:
     environment:
       # All REST clients share an IP budget; websocket reconnect storms cannot bypass it.
       FREQTRADE__EXCHANGE__ENABLE_WS: "false"
+      # Pass-through copier requires 10 candles; avoid fetching 5000 per pair.
+      FREQTRADE__EXCHANGE___FT_HAS_PARAMS__OHLCV_CANDLE_LIMIT_PER_TIMEFRAME__5m: "100"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/insiders"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/insiders"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "90000"

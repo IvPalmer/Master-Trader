@@ -2,7 +2,7 @@
 
 The production `hl-gateway` service is a fixed-upstream REST gateway on the private compose network. It holds no signing keys, exposes no host port, and never retries or caches exchange actions. Freqtrade still signs orders. Observation clients cannot submit actions. The old unmanaged `ft-short-keltner-hl` must remain stopped; preserve its data as historical evidence.
 
-Hyperliquid documents 1200 weighted REST units per IP per minute, with separate websocket and address-action limits. The gateway limits fleet traffic to 900, caps background traffic at 600, and reserves capacity for live order/account management and exchange actions. It reserves response-dependent weights before dispatch and refunds unused weight after observation. Market data alone may be cached briefly; order, fill and account observations are never cached. A 429 imposes a shared ten-second cooldown. A request that cannot obtain budget within twelve seconds is rejected locally before forwarding. Upstream requests have a fifteen-second timeout and are never replayed. See [Hyperliquid's published limits](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits-and-user-limits).
+Hyperliquid documents 1200 weighted REST units per IP per minute, with separate websocket and address-action limits. The gateway limits fleet traffic to 900, caps background traffic at 600, and reserves capacity for live order/account management and exchange actions. It reserves response-dependent weights before dispatch and refunds unused weight after observation. Market data alone may be cached briefly; order, fill and account observations are never cached. A 429 imposes a shared ten-second cooldown. Live reads/actions wait at most twelve seconds; background history waits at most seventy seconds before a local rejection. Upstream requests have a fifteen-second timeout and are never replayed. See [Hyperliquid's published limits](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits-and-user-limits).
 
 All three managed Hyperliquid bots use the gateway for their sync and async CCXT REST clients. Websocket candle subscriptions are disabled so reconnect storms cannot bypass the shared budget. Freqtrade housekeeping runs every 30 seconds; receiver channel execution stays event-driven. Protecting live positions has priority over warming historical candles for dry-run observation. A saturated budget may delay observation data; such failures are visible rather than silently bypassing the limiter.
 
@@ -59,3 +59,19 @@ Trade-card candles now use their execution venue through the shared gateway,
 including GRAM and other Hyperliquid markets unavailable on Binance. Cards wrap
 at three/two/one columns and include loading, error, retry, and truncated-window
 states. Stale bot measurements carry their last observed time.
+
+
+The completion soak exposed hourly Killers restarts with SQLAlchemy pool
+exhaustion while slow price/history requests held RPC resources. Live CCXT asset
+context reads now receive exit-management priority. Background usage is capped
+at 600 independently of live usage (combined reads <=850, all requests <=900),
+so live traffic is not charged twice against the background allowance. Public
+asset contexts cache for five seconds. Expired cached responses are pruned on
+every request, with an 8 MiB response-byte cap and 128 entries.
+
+Both pass-through copiers require only 10 startup candles, but CCXT's default
+limit fetched 5,000 per pair repeatedly. Their five-minute OHLCV request limit
+is now 100 through Freqtrade's `_ft_has_params` override. Other timeframes and
+funding-history limits are unchanged, as are all signal/exit rules. This bounds
+routine candle response cost near 22 units rather than 104 per pair. Account
+membership failures retry on the next exporter cycle instead of waiting an hour.
