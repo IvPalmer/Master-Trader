@@ -1,0 +1,4 @@
+{
+  "_doc": "Audited external cash flows AFTER the accounts-v1 equity migration only. Add a unique id, account (binance-spot or hyperliquid-killers), observed_at UTC timestamp, and signed amount in the account's stake currency (deposit positive, withdrawal negative). Trading P&L, fees, funding and internal margin changes are not transfers. Pre-migration funding is already in the opening observation. Never infer cash flows from balance differences.",
+  "transfers": []
+}

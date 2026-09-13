@@ -77,9 +77,9 @@ def test_prometheus_config_exists():
     assert prom_config.exists(), "prometheus.yml missing"
 
 
-def test_grafana_dashboards_exist():
-    """At least one Grafana dashboard must exist."""
-    dashboard_dir = FT_DIR / "grafana" / "dashboards"
-    assert dashboard_dir.exists(), "Grafana dashboards directory missing"
-    dashboards = list(dashboard_dir.glob("*.json"))
-    assert len(dashboards) > 0, "No Grafana dashboard JSON files found"
+def test_deployed_dashboard_assets_exist():
+    """Production uses ft-dashboard; Grafana is no longer deployed."""
+    prod = yaml.safe_load((FT_DIR / 'docker-compose.prod.yml').read_text())
+    assert 'ft-dashboard' in prod['services']
+    for name in ['templates/index.html', 'static/dashboard.js', 'static/styles.css']:
+        assert (FT_DIR / 'ft_dashboard' / name).is_file()

@@ -399,6 +399,33 @@
           ],
           "supersedes_for_current_measurement": "The OITrendPullbackV1 effective_at value in the prior amendment; Killers and Insiders timestamps are unchanged.",
           "cutover_state": "Zero open and zero closed live OI trades; no observation was discarded."
+        },
+        {
+          "id": "executable-exits-and-request-budget-2026-09-13",
+          "date": "2026-09-13",
+          "reason": "The user authorized completion of execution, accounting and monitoring fixes. Exchange minimums and Freqtrade partial-exit reserve rules make most small Killers positions single final-target exits. This is an explicit executable contract, not evidence that the channel ladder was faithfully reproduced.",
+          "affected_bots": [
+            "KillersScalpV1",
+            "InsidersScalpV1",
+            "ShortKeltnerV2HL"
+          ],
+          "exit_contract": {
+            "grouping_effective_at": "2026-09-12T00:46:00Z",
+            "allocation": "Equal original target allocations accumulate at the last target in their group until venue precision, $10 minimum notional and Freqtrade remainder reserve are satisfied. No allocation is moved to an earlier target. A small position can therefore have one full-size exit at its last target. Later groups are submitted only after observed fills. Channel close/stop instructions still apply.",
+            "verified_2026_09_12_2345_utc": {
+              "DOT": "19 @ 1.40",
+              "GRAM": "11 @ 2.25",
+              "TRX": "32 @ 0.39; 33 @ 0.50 pending",
+              "JUP": "60 @ 0.40",
+              "FIL": "20.9 @ 1.35"
+            },
+            "unknown_submission": "Freeze and reconcile an ambiguous write; absence in Freqtrade is not proof that the exchange rejected it. Never rearm automatically from an empty executor ledger.",
+            "cancelled_exit": "Keep cancelled exits cancelled and surface missing coverage for an open position."
+          },
+          "sizing_contract": "For new Hyperliquid entries only, use integer leverage within the existing cap and recompute margin for the desired stop-risk notional; round stake down, keep existing $2 risk, $10 margin and 3x caps, reject below-minimum orders. Existing positions retain their leverage and quantity. Do not increase stake or capital to obtain more ladder rungs.",
+          "observation_contract": "REST requests use one bounded per-IP fleet budget with reserved capacity for live order management. Disable CCXT websocket candle subscriptions to prevent reconnect traffic bypassing that budget. Freqtrade housekeeping runs every 30 seconds; receiver channel execution remains event-driven and native stops remain exchange-resident.",
+          "measurement": "Preserve every existing trade, baseline and epoch boundary. Segment evaluation by actual exit-planner version and integer-sizing deployment time from the deployment record. Trades opened before a change remain in the earlier entry cohort, with exit-policy changes annotated. Do not reset P&L history or combine stop-only and grouped-TP operation as one unchanged strategy.",
+          "capital_accounting": "Mark each unique live account from current wallet/clearinghouse equity. Retain dollar drawdown at migration. Record subsequent external transfers explicitly; never infer them from changes in balance or bot stake."
         }
       ],
       "notes": "This registration records the actual operator decision after the fact because the 2026-08-23 deployment preceded the governance update. It is deliberately not a claim that the old reports were wrong or that all six strategies are profitable. Remediation audit: docs/audits/2026-08-24-live-fleet-review-remediation.md."

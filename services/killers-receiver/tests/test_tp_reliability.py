@@ -159,6 +159,7 @@ def test_read_outage_never_posts_then_recovers_without_active_row():
     ({"status": 400, "body": "minimum notional"}, "rejected"),
     ({"status": 502, "body": '{"error":"Error querying /api/v1/forceexit: Remaining amount of 9.01 would be too small."}'}, "rejected"),
     ({"status": 502, "body": "<html>bad gateway</html>"}, "unknown"),
+    ({"status": 502, "body": '{"error":"exchange timed out"}'}, "unknown"),
     ({"status": 502}, "unknown"), ({"status": 200}, "unknown")])
 def test_response_classification_and_cooldown(response, state):
     cfg, conn, pos_id = _setup_db()
@@ -183,13 +184,14 @@ def test_timeout_or_crash_never_blindly_resubmits():
         assert _run(receiver._adopt_or_post_next_tp(cfg, conn, pos_id, 42))["state"] == "unknown"
         conn.execute("UPDATE target_orders SET state='placing',last_check_at=NULL")
         _run(receiver._reconcile_target_orders(cfg, conn))
-        # The snapshot proves nothing was created: no resubmission in the
-        # same tick, but the row leaves the dead end and waits for cooldown.
+        # An empty executor ledger cannot exclude a successful venue order
+        # whose response was lost. Repeated observations must never repost.
         assert submit.call_count == 1
-        assert conn.execute("SELECT state FROM target_orders").fetchone()[0] == "retry"
-        conn.execute("UPDATE target_orders SET last_check_at=NULL")
-        _run(receiver._reconcile_target_orders(cfg, conn))
-    assert submit.call_count == 2
+        assert conn.execute("SELECT state FROM target_orders").fetchone()[0] == "unknown"
+        for _ in range(3):
+            conn.execute("UPDATE target_orders SET last_check_at=NULL")
+            _run(receiver._reconcile_target_orders(cfg, conn))
+    assert submit.call_count == 1
 
 
 @pytest.mark.parametrize("state", ["unknown", "placing"])

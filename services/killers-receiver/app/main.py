@@ -41,6 +41,7 @@ import json
 import logging
 import math
 import os
+import re
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -408,7 +409,7 @@ async def get_hyperliquid_mark_price(symbol: str,
     coin = to_hyperliquid_coin(symbol)
     if not coin:
         return None
-    url = "https://api.hyperliquid.xyz/info"
+    url = os.environ.get("HYPERLIQUID_INFO_URL", "https://api.hyperliquid.xyz/info")
     timeout = aiohttp.ClientTimeout(total=3)
     try:
         if session is not None:
@@ -726,6 +727,12 @@ def compute_stake(
     else:
         leverage = min(raw_leverage, cfg.max_leverage)
         stake = cfg.risk_usd / (sl_dist * leverage)
+    if execution_venue() == "hyperliquid":
+        # The venue only accepts integer leverage. Round up within the
+        # existing cap and recompute margin for the SAME desired notional.
+        notional = stake * leverage
+        leverage = max(1, min(math.ceil(leverage), math.floor(cfg.max_leverage)))
+        stake = notional / leverage
     stake = min(max_margin, stake)
     # Never increase risk merely to satisfy the venue's minimum order size.
     # The caller skips an entry whose risk budget cannot fund the minimum.
@@ -1158,7 +1165,7 @@ async def _adopt_or_post_next_tp(
     if next_row["state"] in ("unknown", "placing"):
         if _exit_orders_since_submission(trade, next_row):
             return mark("unknown", "previous submission outcome unknown; unidentified exit order present")
-        return mark("retry", "previous submission produced no exit order; retrying after cooldown")
+        return mark("unknown", "executor has no matching order; exchange outcome remains unproven; manual reconciliation required")
     if _has_open_limit_exit(trade.get("orders") or [], bool(trade.get("is_short"))):
         return mark("retry", "another open exit exists; refusing to replace it")
     if execution_venue() == "hyperliquid":
@@ -1249,10 +1256,9 @@ async def _adopt_or_post_next_tp(
 
 
 def _ft_rpc_rejection(resp: dict) -> bool:
-    """Freqtrade answers a refused RPC call (its own validation, or an
-    exchange InvalidOrder it caught) with HTTP 502 and a JSON error body.
-    No order exists in that case, so the row is rejected rather than
-    unknown. A bare 502 without that body (a proxy, a crash) stays unknown.
+    """Only a recognized pre-order validation error proves rejection.
+
+    Generic JSON 502 responses remain unknown, just like proxy failures.
     """
     if resp.get("status") != 502:
         return False
@@ -1260,7 +1266,11 @@ def _ft_rpc_rejection(resp: dict) -> bool:
         body = json.loads(resp.get("body") or "")
     except (ValueError, TypeError):
         return False
-    return isinstance(body, dict) and isinstance(body.get("error"), str)
+    message = body.get("error") if isinstance(body, dict) else None
+    # Only a positively identified pre-order validation error proves that
+    # no order was created. A generic JSON error may still follow a write.
+    return isinstance(message, str) and bool(re.search(
+        r"Remaining amount of [0-9.]+ would be too small\.?$", message))
 
 
 # Exchange order timestamps and the receiver's submitted_at come from
@@ -1274,9 +1284,8 @@ def _exit_orders_since_submission(trade: dict, row) -> bool:
 
     Missing intent metadata means the outcome is unknowable here. Otherwise
     any exit-side order absent before the submission keeps the row
-    unresolved; a snapshot with none proves the executor created nothing,
-    so the row may retry after the cooldown instead of freezing the ladder
-    and deferring every later channel close.
+    unresolved; absence from the executor is not proof of absence at the venue.
+    Never use this helper to authorize resubmission.
     """
     if not row["submitted_at"] or row["prior_order_ids"] is None:
         return True
@@ -1461,7 +1470,10 @@ async def _reconcile_target_orders_inner(
         order = _find_matching_order(trade.get("orders") or [],
                                      r["ft_order_id"], r["price"], r["amount"])
         if order is None:
-            summary["still_active"] += 1
+            conn.execute(
+                "UPDATE target_orders SET state='unknown',notes=?,last_check_at=? WHERE target_id=?",
+                ("recorded exchange order absent from executor snapshot; reconcile before replacing",
+                 datetime.now(timezone.utc).isoformat(), r["target_id"]))
             continue
         status = (order.get("status") or "").lower()
         filled = float(order.get("filled") or 0)

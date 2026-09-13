@@ -10,6 +10,7 @@ import json
 import os
 import time
 import logging
+import math
 from pathlib import Path
 
 import requests
@@ -77,7 +78,8 @@ def _load_bots_config() -> list[dict]:
             }
             service = service_map.get(name, service)
             bots.append({"service": service, "strategy": name,
-                         "capital_account": info.get("capital_account") or service})
+                         "capital_account": info.get("capital_account") or service,
+                         "capital_owner": info.get("capital_owner", False)})
         return bots
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return [
@@ -116,6 +118,7 @@ PEAK_STATE_FILE = Path(os.environ.get("PEAK_STATE_FILE", "/state/portfolio_peak.
 _live_initial_capital = 0.0  # Sum of starting_capital across LIVE bots
 _live_bots: list[dict] = []  # Subset of BOTS that report dry_run=False
 _capital_refresh_counter = 0
+_membership_complete = False
 
 _portfolio_peak = 0.0
 # The live-capital base the peak was recorded against. The peak is an ABSOLUTE
@@ -125,13 +128,17 @@ _portfolio_peak = 0.0
 _peak_basis = 0.0
 _circuit_breaker_triggered = False
 _last_trigger_time = 0.0
+_equity_basis = "legacy"
+_account_transfer_total = 0.0
+ACCOUNT_STATE_FILE = PEAK_STATE_FILE.with_name("account_health.json")
+GATEWAY_URL = os.environ.get("HL_GATEWAY_URL", "http://hl-gateway:8080")
 
 
 def _load_peak_state() -> None:
     """Restore high-water mark from disk so a restart mid-drawdown doesn't
     erase the real peak. Without this, _portfolio_peak resets every restart
     and the breaker silently shifts its threshold downward."""
-    global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time
+    global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time, _equity_basis, _account_transfer_total
     try:
         if PEAK_STATE_FILE.exists():
             with open(PEAK_STATE_FILE) as f:
@@ -140,6 +147,8 @@ def _load_peak_state() -> None:
             _peak_basis = float(state.get("peak_basis", 0.0))
             _circuit_breaker_triggered = bool(state.get("triggered", False))
             _last_trigger_time = float(state.get("last_trigger_time", 0.0))
+            _equity_basis = state.get("equity_basis", "legacy")
+            _account_transfer_total = float(state.get("account_transfer_total", 0))
             log.info(
                 "Restored portfolio peak from %s: $%.2f (triggered=%s)",
                 PEAK_STATE_FILE, _portfolio_peak, _circuit_breaker_triggered,
@@ -160,6 +169,8 @@ def _save_peak_state() -> None:
                 "triggered": _circuit_breaker_triggered,
                 "last_trigger_time": _last_trigger_time,
                 "saved_at": time.time(),
+                "equity_basis": _equity_basis,
+                "account_transfer_total": _account_transfer_total,
             }, f)
         os.replace(tmp, PEAK_STATE_FILE)
     except Exception as exc:
@@ -222,7 +233,7 @@ portfolio_drawdown_pct = Gauge(
 )
 portfolio_value_total = Gauge(
     "freqtrade_portfolio_value_total",
-    "Total portfolio value (initial capital + P&L) in USDT",
+    "Observed equity summed once per live exchange account in USD stablecoin units",
 )
 
 
@@ -254,26 +265,22 @@ def refresh_live_capital() -> None:
     """Rebuild the list of LIVE (non-dry-run) bots and sum their starting
     capital. Called on startup and periodically — a config change or a bot
     being added/removed propagates without an exporter restart."""
-    global _live_bots, _live_initial_capital
+    global _live_bots, _live_initial_capital, _membership_complete
     live = []
-    total = 0.0
+    _membership_complete = True
     for bot in BOTS:
         meta = fetch_bot_meta(bot["service"])
         if meta is None:
-            log.warning(
-                "Could not read meta for %s — excluding from breaker until next refresh",
-                bot["strategy"],
-            )
+            _membership_complete = False
+            log.warning("Mode unavailable for %s; preserving membership, freezing account checks", bot["strategy"])
+            live.extend(b for b in _live_bots if b["service"] == bot["service"])
             continue
         if meta["dry_run"]:
             log.debug("Excluding %s from breaker (dry_run)", bot["strategy"])
             continue
-        if meta["starting_capital"] <= 0:
-            log.warning(
-                "%s reports starting_capital=$%.2f — excluding from breaker",
-                bot["strategy"], meta["starting_capital"],
-            )
-            continue
+        if not math.isfinite(meta["starting_capital"]):
+            _membership_complete = False
+            meta["starting_capital"] = 0
         live.append({**bot, "starting_capital": meta["starting_capital"]})
 
     _live_bots = live
@@ -285,31 +292,96 @@ def refresh_live_capital() -> None:
 
 
 def account_starting_capital(live_bots: list[dict]) -> float:
-    """Sum starting capital once per exchange account, not once per bot.
+    """Diagnostic baseline only; the breaker uses observed account equity.
 
-    Freqtrade reports `starting_capital` as the wallet balance it saw when
-    the bot started. Two bots on one wallet (FundingFadeV1 and
-    KeltnerBounceV1 share the Binance spot account) each report the whole
-    wallet, so summing per bot doubled the breaker's denominator and halved
-    every drawdown percentage. Bots sharing an account contribute the
-    smallest reported figure: the earliest snapshot, before the other bots'
-    P&L moved the wallet, so `initial + sum(bot P&L)` reconstructs the
-    wallet without deposits.
+    Shared accounts elect an explicit representative. Neither the smallest
+    nor largest balance establishes chronology or account ownership.
     """
-    by_account: dict[str, list[dict]] = {}
+    groups = {}
     for bot in live_bots:
-        by_account.setdefault(bot.get("capital_account") or bot["service"], []).append(bot)
+        groups.setdefault(bot.get("capital_account") or bot["service"], []).append(bot)
     total = 0.0
-    for account, members in by_account.items():
-        capital = min(b["starting_capital"] for b in members)
-        if len(members) > 1:
-            log.info(
-                "Account %s shared by %s: counting $%.2f once (reported %s)",
-                account, ", ".join(b["strategy"] for b in members), capital,
-                ", ".join(f"${b['starting_capital']:.2f}" for b in members),
-            )
-        total += capital
+    for members in groups.values():
+        owners = [b for b in members if b.get("capital_owner")]
+        if len(members) > 1 and len(owners) != 1:
+            raise ValueError("shared capital account needs exactly one representative")
+        total += (owners[0] if owners else members[0])["starting_capital"]
     return total
+
+
+def observe_accounts() -> dict:
+    """Actual wallet marks, once per live account. Partial data never marks equity."""
+    result = {"observed_at": time.time(), "complete": _membership_complete,
+              "accounts": {}, "errors": [], "gateway": None}
+    try:
+        response = requests.get(GATEWAY_URL + "/healthz", timeout=5)
+        response.raise_for_status()
+        result["gateway"] = response.json()
+    except (requests.RequestException, ValueError):
+        result["errors"].append("Hyperliquid request telemetry unavailable")
+    groups = {}
+    for bot in _live_bots:
+        groups.setdefault(bot.get("capital_account") or bot["service"], []).append(bot)
+    for account, members in groups.items():
+        try:
+            owners = [b for b in members if b.get("capital_owner")]
+            if len(members) > 1 and len(owners) != 1:
+                raise ValueError("ambiguous account representative")
+            owner = owners[0] if owners else members[0]
+            if account == "hyperliquid-killers":
+                response = requests.get(GATEWAY_URL + "/account/killers", timeout=20)
+                response.raise_for_status()
+                mark = response.json()
+            elif account == "binance-spot":
+                bal = fetch_json(owner["service"], "balance")
+                if not isinstance(bal, dict):
+                    raise ValueError("balance unavailable")
+                mark = {"equity": float(bal["total"]), "observed_at": time.time(),
+                        "free": sum(float(c.get("free") or 0) for c in bal.get("currencies", [])
+                                    if c.get("currency") == bal.get("stake")),
+                        "margin": None, "notional": None}
+            else:
+                raise ValueError("no verified account valuation adapter")
+            if not math.isfinite(mark["equity"]) or mark["equity"] < 0:
+                raise ValueError("invalid equity")
+            if time.time() - mark["observed_at"] > 90:
+                raise ValueError("stale account observation")
+            result["accounts"][account] = mark
+        except (KeyError, TypeError, ValueError, requests.RequestException):
+            result["complete"] = False
+            result["errors"].append(f"Account equity unavailable: {account}")
+    try:
+        ledger = json.loads(Path(__file__).with_name("account_transfers.json").read_text())["transfers"]
+        ids = [row["id"] for row in ledger]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate transfer")
+        result["net_transfers"] = sum(float(row["amount"]) for row in ledger if row["account"] in groups)
+        if not math.isfinite(result["net_transfers"]):
+            raise ValueError("invalid transfer")
+    except (OSError, ValueError, KeyError, TypeError):
+        result["complete"] = False
+        result["errors"].append("External cash-flow ledger unavailable or invalid")
+    if not groups:
+        result["complete"] = False
+    result["equity"] = (sum(a["equity"] for a in result["accounts"].values())
+                        if result["complete"] else None)
+    if not _membership_complete:
+        result["errors"].append("Live account membership is not fully observed")
+    return result
+
+
+def save_account_health(observation):
+    observation["breaker_triggered"] = _circuit_breaker_triggered
+    observation["peak"] = _portfolio_peak
+    if observation.get("complete") and _portfolio_peak > 0:
+        observation["drawdown_pct"] = max(0, (_portfolio_peak - observation["equity"]) / _portfolio_peak * 100)
+    try:
+        ACCOUNT_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp = ACCOUNT_STATE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(observation))
+        os.replace(tmp, ACCOUNT_STATE_FILE)
+    except OSError:
+        log.exception("Could not persist account health")
 
 
 def scrape_bot(bot: dict) -> float | None:
@@ -358,9 +430,8 @@ def scrape_bot(bot: dict) -> float | None:
         bot_true_pnl = closed_pnl + open_pnl
         true_pnl.labels(strategy=strategy).set(round(bot_true_pnl, 2))
     else:
-        trades_open.labels(strategy=strategy).set(0)
-        unrealized_pnl.labels(strategy=strategy).set(0)
-        true_pnl.labels(strategy=strategy).set(closed_pnl)
+        bot_up.labels(strategy=strategy).set(0)
+        return None  # missing open marks must not silently become zero P&L
 
     # ── /balance ─────────────────────────────────────────────────
     bal_data = fetch_json(service, "balance")
@@ -383,6 +454,7 @@ def scrape_all() -> tuple[float | None, float | None]:
     total_pnl = 0.0
     live_pnl = 0.0
     reachable = 0
+    live_seen = set()
     live_services = {b["service"] for b in _live_bots}
     for bot in BOTS:
         try:
@@ -392,11 +464,12 @@ def scrape_all() -> tuple[float | None, float | None]:
                 reachable += 1
                 if bot["service"] in live_services:
                     live_pnl += pnl
+                    live_seen.add(bot["service"])
         except Exception as exc:
             log.error("Unexpected error scraping %s: %s", bot["strategy"], exc)
     if reachable == 0:
         return None, None
-    return total_pnl, live_pnl
+    return total_pnl, live_pnl if live_seen == live_services else None
 
 
 def stop_bot(bot: dict) -> bool:
@@ -409,11 +482,11 @@ def stop_bot(bot: dict) -> bool:
     try:
         resp = None
         for auth in candidates:
-            resp = requests.post(f"{base}/stop", auth=auth, timeout=10)
+            resp = requests.post(f"{base}/stopentry", auth=auth, timeout=10)
             if resp.status_code != 401:
                 break
         if resp is not None and resp.status_code == 200:
-            log.info("Stopped %s", bot["strategy"])
+            log.info("Stopped new entries for %s; exits remain managed", bot["strategy"])
             return True
         log.warning("Failed to stop %s: HTTP %s", bot["strategy"],
                     resp.status_code if resp is not None else "no-credentials")
@@ -426,14 +499,11 @@ def stop_bot(bot: dict) -> bool:
 def send_circuit_breaker_alert(portfolio_value: float, drawdown_pct: float) -> None:
     """Send emergency alert via webhook to Telegram."""
     message = (
-        f"CIRCUIT BREAKER TRIGGERED\n\n"
-        f"Live portfolio drawdown: {drawdown_pct:.1f}% (threshold: {CIRCUIT_BREAKER_PCT}%)\n"
-        f"Live portfolio value: ${portfolio_value:,.2f} "
-        f"(starting: ${_live_initial_capital:,.2f})\n"
-        f"Loss: ${_live_initial_capital - portfolio_value:,.2f}\n\n"
-        f"LIVE BOTS STOPPED ({', '.join(b['strategy'] for b in _live_bots)}). "
-        f"Manual restart required.\n"
-        f"Review positions before restarting."
+        f"CIRCUIT BREAKER: live account drawdown {drawdown_pct:.1f}%\n"
+        f"Account equity: ${portfolio_value:,.2f}; peak: ${_portfolio_peak:,.2f}\n"
+        f"Entry halt requested for {', '.join(b['strategy'] for b in _live_bots)}. "
+        f"Exits remain managed. Unreachable bots require verification.\n"
+        f"Review positions and account data before resuming entries."
     )
     try:
         payload = {"type": "status", "bot_name": "fleet-circuit-breaker", "status": message}
@@ -446,20 +516,39 @@ def send_circuit_breaker_alert(portfolio_value: float, drawdown_pct: float) -> N
         log.error("Failed to send circuit breaker alert: %s", exc)
 
 
-def check_circuit_breaker(live_pnl: float) -> None:
+def check_circuit_breaker(live_pnl: float, account_equity: float | None = None, net_transfers: float = 0) -> None:
     """Check if LIVE portfolio drawdown exceeds threshold and stop LIVE bots if so.
 
     Inputs are scoped to live (non-dry-run) bots only. The dry-run sleeve has
     no real money and must not influence the breaker.
     """
-    global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time
+    global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time, _equity_basis, _account_transfer_total
 
-    if _live_initial_capital <= 0 or not _live_bots:
+    if not _live_bots or (account_equity is None and _live_initial_capital <= 0):
         # No live bots configured — breaker is a no-op. Don't update Prometheus
         # gauges so a stale 'all good' signal doesn't show on Grafana.
         return
 
-    portfolio_value = _live_initial_capital + live_pnl
+    portfolio_value = _live_initial_capital + live_pnl if account_equity is None else account_equity
+    if not math.isfinite(portfolio_value) or portfolio_value < 0:
+        return
+    if account_equity is not None:
+        if _equity_basis != "accounts-v1":
+            # Preserve the previously measured dollar drawdown at migration;
+            # changing valuation must not erase an existing loss or trip the
+            # breaker because the old margin estimate was wrong.
+            legacy_value = _peak_basis + live_pnl
+            prior_drawdown = max(0, _portfolio_peak - legacy_value) if _portfolio_peak else 0
+            _portfolio_peak = portfolio_value + prior_drawdown
+            _equity_basis = "accounts-v1"
+            _account_transfer_total = net_transfers
+            log.info("Migrated to actual account equity; retained $%.2f drawdown", prior_drawdown)
+            _save_peak_state()
+        flow_delta = net_transfers - _account_transfer_total
+        if flow_delta:
+            _portfolio_peak = max(0, _portfolio_peak + flow_delta)
+            _account_transfer_total = net_transfers
+            _save_peak_state()
 
     # Rebase the peak when the live set changes. On 2026-08-30 22:00 the peak
     # stood at $254.96 from a three-live-bot fleet; demoting FundingFadeV1 to
@@ -471,7 +560,9 @@ def check_circuit_breaker(live_pnl: float) -> None:
     # Shifting the peak by exactly the capital that entered or left keeps the
     # comparison denominated in the same base, so a composition change moves
     # drawdown by zero. Only real P&L can move it.
-    if _peak_basis <= 0:
+    if account_equity is not None:
+        pass  # actual marks do not rebase when a bot reports a different starting balance
+    elif _peak_basis <= 0:
         _peak_basis = _live_initial_capital
     elif abs(_live_initial_capital - _peak_basis) > 0.01:
         delta = _live_initial_capital - _peak_basis
@@ -508,11 +599,10 @@ def check_circuit_breaker(live_pnl: float) -> None:
                 drawdown_pct, CIRCUIT_BREAKER_PCT, portfolio_value,
                 _portfolio_peak, _live_initial_capital,
             )
-            for bot in _live_bots:
-                stop_bot(bot)
+            succeeded = [stop_bot(bot) for bot in _live_bots]
             send_circuit_breaker_alert(portfolio_value, drawdown_pct)
             _circuit_breaker_triggered = True
-            _last_trigger_time = now
+            _last_trigger_time = now if all(succeeded) else 0  # retry failed entry halts next cycle
             _save_peak_state()
     elif _circuit_breaker_triggered and drawdown_pct < CIRCUIT_BREAKER_PCT * 0.5:
         _circuit_breaker_triggered = False
@@ -542,9 +632,13 @@ def main() -> None:
                 "Scrape complete. Total P&L: $%.2f, Live P&L: $%.2f. Sleeping %ds.",
                 total_pnl, live_pnl or 0.0, SCRAPE_INTERVAL,
             )
-            if live_pnl is not None:
-                check_circuit_breaker(live_pnl)
-        else:
+        observation = observe_accounts()
+        if live_pnl is None:
+            observation["errors"].append("Live bot status or P&L observation unavailable")
+        if observation["complete"] and (live_pnl is not None or _equity_basis == "accounts-v1"):
+            check_circuit_breaker(live_pnl or 0.0, observation["equity"], observation["net_transfers"])
+        save_account_health(observation)
+        if total_pnl is None:
             log.warning("No bots reachable. Sleeping %ds.", SCRAPE_INTERVAL)
 
         _capital_refresh_counter += 1

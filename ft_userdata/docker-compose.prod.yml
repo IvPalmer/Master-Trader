@@ -33,6 +33,22 @@ x-bot-env: &a1
   FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
   FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FREQTRADE__API_SERVER__JWT_SECRET_KEY}
 services:
+  hl-gateway:
+    build: ../services/hl-gateway
+    restart: unless-stopped
+    container_name: ft-hl-gateway
+    environment:
+      KILLERS_WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
   keltnerbouncev1:
     image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
     restart: always
@@ -136,6 +152,7 @@ services:
       - default
       - dokploy-network
     environment:
+      HYPERLIQUID_INFO_URL: http://hl-gateway:8080/killers/info
       KILLERS_FT_BASE_URL: http://ft-killers-scalp:8080
       # REQUIRED. The receiver refuses to start without it: POST /event opens
       # leveraged positions and this container shares dokploy-network with
@@ -190,6 +207,12 @@ services:
     restart: always
     container_name: ft-killers-scalp
     environment:
+      # All REST clients share an IP budget; websocket reconnect storms cannot bypass it.
+      FREQTRADE__EXCHANGE__ENABLE_WS: "false"
+      FREQTRADE__EXCHANGE__CCXT_CONFIG: '{"urls":{"api":{"public":"http://hl-gateway:8080/killers","private":"http://hl-gateway:8080/killers"}},"timeout":30000}'
+      FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
+      # Preserve resting reduce-only exits through planned restarts.
+      FREQTRADE__CANCEL_OPEN_ORDERS_ON_EXIT: "false"
       # Dedicated master account + agent wallet.  Do not point multiple bots
       # at the same master address: Hyperliquid nets positions per account.
       FREQTRADE__API_SERVER__USERNAME: ${FT_API_USER_KILLERS:-${FREQTRADE__API_SERVER__USERNAME}}
@@ -227,7 +250,6 @@ services:
           *) echo "invalid HYPERLIQUID_KILLERS_DRY_RUN value" >&2; exit 64 ;;
         esac
         python /freqtrade/user_data/configs/guard_db_mode.py --config /freqtrade/user_data/configs/KillersScalpV1.json
-        sleep 60
         exec freqtrade trade --logfile /freqtrade/user_data/logs/KillersScalpV1.log --config /freqtrade/user_data/configs/KillersScalpV1.json --strategy KillersScalpV1
 
   ft-insiders-scalp:
@@ -237,6 +259,12 @@ services:
     restart: always
     container_name: ft-insiders-scalp
     environment:
+      # All REST clients share an IP budget; websocket reconnect storms cannot bypass it.
+      FREQTRADE__EXCHANGE__ENABLE_WS: "false"
+      FREQTRADE__EXCHANGE__CCXT_CONFIG: '{"urls":{"api":{"public":"http://hl-gateway:8080/insiders","private":"http://hl-gateway:8080/insiders"}},"timeout":30000}'
+      FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
+      # Preserve resting reduce-only exits through planned restarts.
+      FREQTRADE__CANCEL_OPEN_ORDERS_ON_EXIT: "false"
       FREQTRADE__API_SERVER__USERNAME: ${FT_API_USER_INSIDERS:-${FREQTRADE__API_SERVER__USERNAME}}
       FREQTRADE__API_SERVER__PASSWORD: ${FT_API_PASS_INSIDERS:-${FREQTRADE__API_SERVER__PASSWORD}}
       FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FT_API_JWT_INSIDERS:-${FREQTRADE__API_SERVER__JWT_SECRET_KEY}}
@@ -288,6 +316,7 @@ services:
       - default
       - dokploy-network
     environment:
+      HYPERLIQUID_INFO_URL: http://hl-gateway:8080/insiders/info
       KILLERS_FT_BASE_URL: http://ft-insiders-scalp:8080
       # REQUIRED, and deliberately a DIFFERENT value from the killers token:
       # the two receivers drive two separately funded accounts.
@@ -331,6 +360,12 @@ services:
     restart: always
     container_name: ft-short-keltner-hl-live
     environment:
+      # All REST clients share an IP budget; websocket reconnect storms cannot bypass it.
+      FREQTRADE__EXCHANGE__ENABLE_WS: "false"
+      FREQTRADE__EXCHANGE__CCXT_CONFIG: '{"urls":{"api":{"public":"http://hl-gateway:8080/short","private":"http://hl-gateway:8080/short"}},"timeout":30000}'
+      FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
+      # Preserve resting reduce-only exits through planned restarts.
+      FREQTRADE__CANCEL_OPEN_ORDERS_ON_EXIT: "false"
       FREQTRADE__API_SERVER__USERNAME: ${FT_API_USER_SHORTKELTNER:-${FREQTRADE__API_SERVER__USERNAME}}
       FREQTRADE__API_SERVER__PASSWORD: ${FT_API_PASS_SHORTKELTNER:-${FREQTRADE__API_SERVER__PASSWORD}}
       FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FT_API_JWT_SHORTKELTNER:-${FREQTRADE__API_SERVER__JWT_SECRET_KEY}}
@@ -420,6 +455,7 @@ services:
       FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
     volumes:
       - ./metrics_exporter.py:/app/metrics_exporter.py:ro
+      - ./account_transfers.json:/app/account_transfers.json:ro
       - ./api_utils.py:/app/api_utils.py:ro
       - ./bots_config.json:/app/bots_config.json:ro
       - ft_exporter_state:/state
@@ -459,6 +495,7 @@ services:
       - default
       - dokploy-network
     environment:
+      ACCOUNT_HEALTH_FILE: /var/lib/account-health/account_health.json
       <<: *a3
       # Receiver ingress bearers — the dashboard reads /ingress, which is now
       # authenticated. /healthz stays open so reachability is still reported
@@ -473,6 +510,7 @@ services:
       KILLERS_RECEIVER_DB: /var/lib/killers-receiver/receiver-hyperliquid.sqlite
       LINEAGE_DB_DIR: /var/lib/freqtrade-history
     volumes:
+      - ft_exporter_state:/var/lib/account-health:ro
       - ./overlays:/overlays:ro
       # killers_bot SQLite (read-only) so the dashboard can render the
       # observer-bot's state alongside the Freqtrade fleet.

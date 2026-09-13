@@ -115,7 +115,7 @@ def test_shared_wallet_counts_once_in_breaker_capital(exporter):
     them twice, and the earliest snapshot is the account's base."""
     live = [
         {"service": "fundingfadev1", "strategy": "FundingFadeV1",
-         "capital_account": "binance-spot", "starting_capital": 89.3788},
+         "capital_account": "binance-spot", "capital_owner": True, "starting_capital": 89.3788},
         {"service": "keltnerbouncev1", "strategy": "KeltnerBounceV1",
          "capital_account": "binance-spot", "starting_capital": 90.3356},
         {"service": "ft-killers-scalp", "strategy": "KillersScalpV1",
@@ -134,3 +134,84 @@ def test_registry_declares_the_shared_binance_wallet():
     shared = {name for name, info in data.items() if info.get("capital_account") == "binance-spot"}
     assert {"FundingFadeV1", "KeltnerBounceV1"} <= shared
     assert data["KillersScalpV1"].get("capital_account") != "binance-spot"
+
+
+def test_shared_baseline_requires_an_owner_not_minimum(exporter):
+    bots = [{'service': 'a', 'capital_account': 'shared', 'starting_capital': 100, 'capital_owner': True},
+            {'service': 'b', 'capital_account': 'shared', 'starting_capital': 80}]
+    assert exporter.account_starting_capital(bots) == 100
+    bots[0].pop('capital_owner')
+    with pytest.raises(ValueError):
+        exporter.account_starting_capital(bots)
+
+
+def test_incomplete_live_pnl_is_not_a_zero_loss(exporter, monkeypatch):
+    exporter.BOTS = exporter._live_bots = [{'service': 'a', 'strategy': 'A'}, {'service': 'b', 'strategy': 'B'}]
+    monkeypatch.setattr(exporter, 'scrape_bot', lambda b: 2 if b['service'] == 'a' else None)
+    assert exporter.scrape_all() == (2, None)
+
+
+def test_account_equity_deduplicates_shared_wallet_and_uses_venue_margin(exporter, monkeypatch):
+    exporter._membership_complete = True
+    exporter._live_bots = [
+        {'service': 'a', 'capital_account': 'binance-spot', 'capital_owner': True},
+        {'service': 'b', 'capital_account': 'binance-spot'},
+        {'service': 'killers', 'capital_account': 'hyperliquid-killers'}]
+    seen = []
+    def fetch(service, endpoint):
+        seen.append(service)
+        return {'total': 90, 'total_bot': 40, 'stake': 'USDT', 'currencies': [{'currency': 'USDT', 'free': 60}]}
+    monkeypatch.setattr(exporter, 'fetch_json', fetch)
+    class Response:
+        def raise_for_status(self): pass
+        def json(self): return {'equity': 101, 'free': 24, 'margin': 77, 'observed_at': exporter.time.time()}
+    monkeypatch.setattr(exporter.requests, 'get', lambda *a, **k: Response())
+    result = exporter.observe_accounts()
+    assert result['complete']
+    assert result['equity'] == 191
+    assert seen == ['a']
+    assert result['accounts']['hyperliquid-killers']['margin'] == 77
+    monkeypatch.setattr(exporter, 'fetch_json', lambda *a: None)
+    assert exporter.observe_accounts()['equity'] is None
+
+
+def test_missing_membership_does_not_drop_a_live_bot(exporter, monkeypatch):
+    bot = {'service': 'a', 'strategy': 'A', 'starting_capital': 100}
+    exporter.BOTS = [bot]
+    exporter._live_bots = [bot]
+    monkeypatch.setattr(exporter, 'fetch_bot_meta', lambda *a: None)
+    exporter.refresh_live_capital()
+    assert exporter._live_bots == [bot]
+    assert exporter._membership_complete is False
+
+
+def test_account_migration_preserves_drawdown_and_ignores_changing_bot_base(exporter, monkeypatch):
+    exporter._live_initial_capital = exporter._peak_basis = 170
+    exporter._live_bots = [{'service': 'a', 'strategy': 'A'}]
+    exporter._portfolio_peak = 180
+    monkeypatch.setattr(exporter, '_save_peak_state', lambda: None)
+    exporter.check_circuit_breaker(5, 195)
+    assert exporter._portfolio_peak == 200  # preserve the old $5 drawdown
+    exporter._live_initial_capital = 120  # new position altered FT's margin estimate
+    exporter.check_circuit_breaker(5, 195)
+    assert exporter._portfolio_peak == 200
+
+
+def test_entry_halt_keeps_exit_management_running(exporter, monkeypatch):
+    urls = []
+    monkeypatch.setattr(exporter, 'auth_candidates_for', lambda *a: [object()])
+    monkeypatch.setattr(exporter.requests, 'post', lambda url, **k: (urls.append(url) or types.SimpleNamespace(status_code=200)))
+    assert exporter.stop_bot({'service': 'a', 'strategy': 'A'})
+    assert urls == ['http://a:8080/api/v1/stopentry']
+
+
+def test_external_cash_flows_preserve_dollar_drawdown(exporter, monkeypatch):
+    exporter._live_initial_capital = 100
+    exporter._live_bots = [{'service': 'a'}]
+    exporter._equity_basis = 'accounts-v1'
+    exporter._portfolio_peak = 100
+    monkeypatch.setattr(exporter, '_save_peak_state', lambda: None)
+    exporter.check_circuit_breaker(0, 195, net_transfers=100)
+    assert exporter._portfolio_peak == 200
+    exporter.check_circuit_breaker(0, 145, net_transfers=50)
+    assert exporter._portfolio_peak == 150

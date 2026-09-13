@@ -143,7 +143,7 @@ def test_hyperliquid_entrypoint_stops_before_trading_when_guard_fails(
         assert "sleep-called" not in result.stdout
         assert "trader-started" not in result.stdout
     else:
-        assert "sleep-called" in result.stdout
+        # Optional startup staggering must not affect the guard contract.
         assert "trader-started" in result.stdout
         marker = ".dryrun." if dry_run == "true" else ".live."
         assert marker in result.stdout

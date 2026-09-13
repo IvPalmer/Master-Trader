@@ -181,11 +181,14 @@ function dash() {
         const owned = b.wallet?.bot_owned ?? b.wallet?.starting_capital ?? 0;
         accounts.set(group, Math.max(accounts.get(group) ?? 0, owned));
       }
-      const walletNow = [...accounts.values()].reduce((s, v) => s + v, 0);
+      const observed = this.raw.account_health;
+      const walletNow = observed?.complete
+        ? observed.equity
+        : (observed ? null : [...accounts.values()].reduce((s, v) => s + v, 0));
       const totalPnl = live.reduce((s, b) => s + (b.pnl?.all_coin ?? 0), 0);
       const totalRealizedPnl = live.reduce((s, b) => s + (b.pnl?.closed ?? 0), 0);
       const totalUnrealizedPnl = live.reduce((s, b) => s + (b.pnl?.unrealized ?? ((b.pnl?.all_coin ?? 0) - (b.pnl?.closed ?? 0))), 0);
-      const start = walletNow - totalPnl;
+      const start = walletNow == null ? null : walletNow - totalPnl;
       const closedTrades = live.reduce((s, b) => s + (b.stats?.closed_trade_count ?? 0), 0);
       const totalWins = live.reduce((s, b) => s + (b.stats?.winning_trades ?? 0), 0);
       const totalLosses = live.reduce((s, b) => s + (b.stats?.losing_trades ?? 0), 0);
@@ -257,6 +260,11 @@ function dash() {
     get _rawIncidents() {
       const items = [];
       const now = Date.now() / 1000;
+      for (const warning of (this.raw.account_health?.warnings || [])) {
+        items.push({color: 'amber', icon: '!', subject: warning,
+          reason: 'Live request handling or account valuation needs attention.',
+          cta: 'view portfolio', action: () => this.setTab('portfolio'), detailTab: 'portfolio'});
+      }
 
       for (const b of this.liveBots) {
         for (const t of (b.open_trades || [])) {
@@ -361,21 +369,11 @@ function dash() {
         }
       }
 
-      for (const b of this.dryRunBots) {
-        if (b.observational && !b.baseline?.profit_factor) {
-          items.push({
-            color: 'blue', icon: '○',
-            subject: `${b.label} running observational · no baseline gate`,
-            reason: 'observational — graduation gates not active (no transferable baseline)',
-            cta: 'view bot',
-            logsHint: b.links?.logs_hint || null,
-            action: () => { this.setTab('bot:' + b.key); },
-            detailTab: 'bot:' + b.key,
-          });
-        }
-      }
 
       return items;
+    },
+    get observationNotices() {
+      return this.dryRunBots.filter(b => b.observational && !b.baseline?.profit_factor);
     },
     get attentionItems() {
       return this._rawIncidents.filter(item => !this._dismissedIncidents.has(item.subject));
@@ -657,10 +655,15 @@ function dash() {
       return [...accounts.values()]
         .map(account => ({
           ...account,
+          free: this.raw.account_health?.accounts?.[account.key]?.free,
+          margin: this.raw.account_health?.accounts?.[account.key]?.margin,
+          notional: this.raw.account_health?.accounts?.[account.key]?.notional,
+          capital: this.raw.account_health?.accounts?.[account.key]?.equity
+            ?? (this.raw.account_health ? null : account.capital),
           label: account.key === 'binance-spot'
             ? 'Binance spot'
             : (account.bots.length === 1 ? account.bots[0] : account.key),
-          weight: this.hero.walletNow ? account.capital / this.hero.walletNow * 100 : 0,
+          weight: this.hero.walletNow ? (this.raw.account_health?.accounts?.[account.key]?.equity ?? account.capital) / this.hero.walletNow * 100 : 0,
         }))
         .sort((a, b) => b.capital - a.capital);
     },

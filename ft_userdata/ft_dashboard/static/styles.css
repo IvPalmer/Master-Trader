@@ -1042,3 +1042,9 @@ button { font: inherit; }
 .atp { font-size:10px; font-weight:600; color:var(--text-2); background:rgba(255,255,255,.7); padding:1px 7px; border-radius:10px; white-space:nowrap; }
 .apnl { font-size:13px; font-weight:700; min-width:70px; text-align:right; }
 .aage { font-size:10.5px; color:var(--text-3); min-width:32px; text-align:right; }
+
+/* Informational observations are separate from actionable incidents. */
+.observation-notices { margin: 0 0 20px; color: var(--text2, #56606e); font-size: 12px; }
+.observation-notices summary { cursor: pointer; padding: 8px 0; }
+.observation-notices p { max-width: 65ch; margin: 6px 0 12px; }
+.observation-notices button { margin: 0 8px 8px 0; }

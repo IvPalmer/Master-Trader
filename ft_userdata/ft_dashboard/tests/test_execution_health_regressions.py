@@ -97,8 +97,7 @@ def test_uncertain_order_cannot_be_hidden_by_an_active_target(tmp_path):
     assert health["status"] == "warning"
 
 
-@pytest.mark.parametrize("states", [["active", "pending"], ["filled", "filled"],
-                                    ["cancelled", "cancelled"]])
+@pytest.mark.parametrize("states", [["active", "pending"], ["filled", "filled"]])
 def test_active_complete_and_manual_cancellation_are_not_stalled(tmp_path, states):
     path = tmp_path / "receiver.sqlite"
     receiver_db(path, states)
@@ -127,3 +126,22 @@ def test_dry_failures_and_execution_uncertainty_warn(monkeypatch, dry, status, e
         "last_reachable_at": {"bot": time.time()},
     })
     assert app._fleet_status()["level"] == expected
+
+
+def test_cancelled_exit_on_open_trade_warns_without_rearming(tmp_path):
+    path = tmp_path / 'receiver.sqlite'
+    receiver_db(path, ['cancelled', 'cancelled'])
+    assert app._tp_execution_health([trade()], app.killers_tp_ladder(str(path)))['status'] == 'warning'
+
+
+def test_request_degradation_changes_green_fleet_to_yellow(monkeypatch, tmp_path):
+    import json
+    path = tmp_path / 'health.json'
+    path.write_text(json.dumps({'observed_at': time.time(), 'complete': True,
+       'gateway': {'observed_at': time.time(), 'status': 'warning', 'faults': 3}}))
+    monkeypatch.setenv('ACCOUNT_HEALTH_FILE', str(path))
+    monkeypatch.setattr(app, 'BOTS', [])
+    assert app._fleet_status()['level'] == 'yellow'
+    assert '3 failures' in app._fleet_status()['summary']
+    path.unlink()
+    assert app._fleet_status()['level'] == 'yellow'

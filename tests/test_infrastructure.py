@@ -1,229 +1,53 @@
-"""
-Infrastructure tests — Docker, services, monitoring pipeline.
+"""Read-only production checks, explicitly enabled against the canonical VPS.
 
-Run with: pytest tests/test_infrastructure.py -v
-These tests require Docker to be running and bots to be up.
-Mark with @pytest.mark.live so they can be skipped offline.
+MT_VPS_INTEGRATION=1 python3 -m pytest -q tests/test_infrastructure.py
+No local Docker probing, legacy symlinks, hardcoded credentials or retired bots.
 """
-
 import json
 import os
+from pathlib import Path
 import subprocess
 import pytest
-import urllib.request
-import urllib.error
-from pathlib import Path
 
-FT_DIR = Path(__file__).parent.parent / "ft_userdata"
+ROOT = Path(__file__).resolve().parents[1]
 
 
-def is_docker_running():
-    try:
-        result = subprocess.run(
-            ["docker", "info"], capture_output=True, timeout=5
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
+@pytest.fixture(scope='module')
+def fleet():
+    if os.environ.get('MT_VPS_INTEGRATION') != '1':
+        pytest.skip('Opt in to read-only VPS checks with MT_VPS_INTEGRATION=1')
+    script = (ROOT / 'deploy/vps/verify_fleet.py').read_text()
+    result = subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8',
+                             'main-instance', 'python3', '-'], input=script,
+                            capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
 
 
-def api_get(port, endpoint, timeout=5):
-    """Call a Freqtrade API endpoint."""
-    url = f"http://localhost:{port}/api/v1/{endpoint}"
-    req = urllib.request.Request(url)
-    # Basic auth: freqtrader:mastertrader
-    import base64
-    creds = base64.b64encode(b"freqtrader:mastertrader").decode()
-    req.add_header("Authorization", f"Basic {creds}")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read())
-    except Exception:
-        return None
+def test_running_fleet_matches_strategies(fleet):
+    assert len(fleet['bots']) == 6
+    for bot in fleet['bots']:
+        assert 'error' not in bot, bot
+        assert bot['state'] == 'running', bot
+        assert bot['strategy'] == bot['expected_strategy'], bot
+    assert sum(not b['dry_run'] for b in fleet['bots']) == 3
 
 
-live = pytest.mark.skipif(
-    not is_docker_running(),
-    reason="Docker not running"
-)
-
-def _load_bot_ports() -> dict:
-    """Load bot name→port mapping from shared config, fall back to hardcoded defaults."""
-    config_path = Path(__file__).parent.parent / "ft_userdata" / "bots_config.json"
-    try:
-        with open(config_path) as f:
-            data = json.load(f)
-        return {
-            name: info["port"]
-            for name, info in data["bots"].items()
-            if info.get("active", True)
-        }
-    except (FileNotFoundError, json.JSONDecodeError, KeyError):
-        return {
-            "SupertrendStrategy": 8084,
-            "MasterTraderV1": 8086,
-            "AlligatorTrendV1": 8091,
-            "GaussianChannelV1": 8092,
-        }
-
-BOT_PORTS = _load_bot_ports()
+def test_live_positions_have_native_exit_coverage(fleet):
+    killers = next(b for b in fleet['bots'] if b['container'] == 'ft-killers-scalp')
+    for trade in killers['open_trades']:
+        coin = trade['pair'].split('/')[0]
+        orders = [o for o in fleet['exchange_orders'] if o['coin'] == coin and o['reduceOnly']]
+        assert any(o['orderType'] == 'Stop Limit' for o in orders), coin
+        assert any(o['orderType'] == 'Limit' for o in orders), coin
 
 
-# ── Docker containers ─────────────────────────────────────────────
+def test_actual_account_marks_and_request_health_are_observed(fleet):
+    assert fleet['gateway']['ok']
+    assert fleet['dashboard']['poll_age_s'] < 180
+    assert fleet['dashboard']['account_health']['complete']
+    assert fleet['dashboard']['account_health']['equity'] > 0
 
 
-@live
-def test_docker_compose_valid():
-    """docker-compose.yml must parse without errors."""
-    result = subprocess.run(
-        ["docker", "compose", "config", "--quiet"],
-        cwd=str(FT_DIR),
-        capture_output=True,
-        timeout=10,
-    )
-    assert result.returncode == 0, f"docker-compose invalid: {result.stderr.decode()}"
-
-
-@live
-def test_all_containers_running():
-    """All trading bot containers must be running."""
-    result = subprocess.run(
-        ["docker", "compose", "ps", "--format", "json"],
-        cwd=str(FT_DIR),
-        capture_output=True,
-        timeout=10,
-    )
-    output = result.stdout.decode()
-    # Docker compose outputs one JSON object per line
-    containers = []
-    for line in output.strip().split("\n"):
-        if line.strip():
-            containers.append(json.loads(line))
-
-    running = {c["Service"]: c["State"] for c in containers}
-
-    expected_services = [
-        "supertrendstrategy",
-        "mastertraderv1",
-        "alligatortrendv1",
-        "gaussianchannelv1",
-        "bearcrashshortv1",
-        "prometheus",
-        "grafana",
-        "grafana-bridge",
-        "metrics-exporter",
-    ]
-
-    for svc in expected_services:
-        assert svc in running, f"Container '{svc}' not found"
-        assert running[svc] == "running", f"Container '{svc}' state: {running[svc]}"
-
-
-# ── Bot API health ────────────────────────────────────────────────
-
-
-@live
-@pytest.mark.parametrize("bot,port", list(BOT_PORTS.items()))
-def test_bot_api_responds(bot, port):
-    """Each bot's API must respond to health checks."""
-    data = api_get(port, "show_config")
-    assert data is not None, f"{bot} (port {port}): API not responding"
-    assert "bot_name" in data, f"{bot}: API response missing bot_name"
-
-
-@live
-@pytest.mark.parametrize("bot,port", list(BOT_PORTS.items()))
-def test_bot_state_running(bot, port):
-    """Each bot must be in 'running' state, not 'stopped'."""
-    data = api_get(port, "show_config")
-    assert data is not None, f"{bot}: API not responding"
-    state = data.get("state", "")
-    assert state == "running", f"{bot}: state is '{state}', expected 'running'"
-
-
-@live
-@pytest.mark.parametrize("bot,port", list(BOT_PORTS.items()))
-def test_bot_config_matches_strategy(bot, port):
-    """Bot must be running the correct strategy."""
-    data = api_get(port, "show_config")
-    assert data is not None
-    # The strategy name in the API should match what we expect
-    strategy = data.get("strategy", "")
-    assert bot.replace("V1", "") in strategy or strategy in bot, (
-        f"Port {port} running '{strategy}' but expected '{bot}'"
-    )
-
-
-# ── Monitoring pipeline ──────────────────────────────────────────
-
-
-@live
-def test_prometheus_healthy():
-    """Prometheus must be up and scraping."""
-    try:
-        with urllib.request.urlopen("http://localhost:9091/-/healthy", timeout=5) as resp:
-            assert resp.status == 200
-    except Exception as e:
-        pytest.fail(f"Prometheus not healthy: {e}")
-
-
-@live
-def test_metrics_exporter_serving():
-    """Metrics exporter must be serving Freqtrade metrics."""
-    try:
-        with urllib.request.urlopen("http://localhost:9090/metrics", timeout=5) as resp:
-            content = resp.read().decode()
-        assert "freqtrade_balance" in content, "No freqtrade_balance metric found"
-        assert "freqtrade_profit" in content, "No freqtrade_profit metric found"
-    except Exception as e:
-        pytest.fail(f"Metrics exporter not working: {e}")
-
-
-@live
-def test_grafana_healthy():
-    """Grafana must be up and serving."""
-    try:
-        with urllib.request.urlopen("http://localhost:3000/api/health", timeout=5) as resp:
-            data = json.loads(resp.read())
-        assert data.get("database") == "ok", f"Grafana DB not ok: {data}"
-    except Exception as e:
-        pytest.fail(f"Grafana not healthy: {e}")
-
-
-@live
-def test_metrics_balance_reasonable():
-    """Sanity check: reported balances should be reasonable."""
-    try:
-        with urllib.request.urlopen("http://localhost:9090/metrics", timeout=5) as resp:
-            content = resp.read().decode()
-    except Exception:
-        pytest.skip("Metrics exporter not available")
-
-    import re
-    balances = re.findall(r'freqtrade_balance\{strategy="(\w+)"\}\s+([\d.]+)', content)
-    for strategy, balance in balances:
-        bal = float(balance)
-        assert 0 < bal < 100000, (
-            f"{strategy}: balance ${bal} looks wrong (expected $100-$10000 range)"
-        )
-
-
-# ── Symlink integrity ────────────────────────────────────────────
-
-
-def test_ft_userdata_symlink():
-    """~/ft_userdata must be a symlink pointing to the repo."""
-    home = Path.home()
-    link = home / "ft_userdata"
-    assert link.is_symlink(), f"{link} should be a symlink"
-    target = link.resolve()
-    assert target == FT_DIR.resolve(), (
-        f"Symlink points to {target}, expected {FT_DIR.resolve()}"
-    )
-
-
-def test_docker_compose_accessible_via_symlink():
-    """Docker compose file must be accessible through the symlink."""
-    home = Path.home()
-    compose = home / "ft_userdata" / "docker-compose.yml"
-    assert compose.exists(), f"docker-compose.yml not accessible via symlink"
+def test_deployed_code_matches_source(fleet):
+    assert all(fleet['runtime_source_matches'].values()), fleet['runtime_source_matches']

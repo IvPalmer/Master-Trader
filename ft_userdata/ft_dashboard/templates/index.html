@@ -88,11 +88,19 @@
       <div class="portfolio-health" :class="staleClass">
         <span class="bot-state-dot"></span>
         <div>
-          <strong x-text="attentionItems.length ? attentionItems.length + ' active incident' + (attentionItems.length === 1 ? '' : 's') : 'all systems operational'">all systems operational</strong>
+          <strong x-text="attentionItems.length ? attentionItems.length + ' active incident' + (attentionItems.length === 1 ? '' : 's') : 'no active incidents detected'">all systems operational</strong>
           <span>updated <span x-text="lastPollLabel">never</span></span>
         </div>
       </div>
     </header>
+
+    <details class="observation-notices" x-show="observationNotices.length > 0" x-cloak>
+      <summary x-text="'Observation notes · ' + observationNotices.length + ' dry-run bots'"></summary>
+      <p>These bots collect simulated results. Live-promotion gates remain inactive until a suitable baseline is validated.</p>
+      <template x-for="bot in observationNotices" :key="bot.key">
+        <button class="cmd-btn" @click="setTab('bot:' + bot.key)" x-text="bot.label"></button>
+      </template>
+    </details>
 
     <!-- ── A: Command bar (incidents first) ── -->
     <div class="cmd-bar has-incidents" x-show="attentionItems.length > 0" x-cloak>
@@ -148,7 +156,7 @@
     <!-- ── B: Fleet vitals strip (compact, secondary when incidents exist) ── -->
     <div class="vitals-strip" :class="attentionItems.length > 0 ? 'secondary' : ''">
       <button class="vital-cell" @click="document.getElementById('chart-equity')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">deployed capital</span>
+        <span class="vital-label">account equity</span>
         <span class="vital-val num" x-text="fmtUsd(hero.walletNow)">—</span>
       </button>
       <button class="vital-cell accent" @click="document.getElementById('chart-equity')?.scrollIntoView({behavior:'smooth'})">
@@ -546,7 +554,7 @@
       <section class="card col-5">
         <div class="card-head">
           <div>
-            <div class="card-title">capital by account</div>
+            <div class="card-title">equity by account</div>
             <div class="card-sub">shared balances counted once</div>
           </div>
         </div>
@@ -555,6 +563,7 @@
             <div class="account-allocation-row">
               <div>
                 <strong x-text="account.label">account</strong>
+                <span x-show="account.free != null" x-text="'free '+fmtUsd(account.free)+(account.margin != null ? ' · margin '+fmtUsd(account.margin) : '')"></span>
                 <span x-text="account.bots.length + ' strateg' + (account.bots.length === 1 ? 'y' : 'ies')">—</span>
               </div>
               <div class="allocation-bar" aria-hidden="true"><span :style="'width:' + account.weight.toFixed(2) + '%' "></span></div>

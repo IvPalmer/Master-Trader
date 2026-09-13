@@ -393,7 +393,7 @@ def _tp_execution_health(open_trades: list[dict], ladders: dict[int, dict],
             continue
         ladder = ladders.get(trade.get("trade_id"))
         status = (ladder or {}).get("status", "unavailable")
-        if status in {"active", "complete", "cancelled"}:
+        if status in {"active", "complete"}:
             continue
         issues.append({
             "trade_id": trade.get("trade_id"), "pair": trade.get("pair"),
@@ -803,7 +803,7 @@ def _capital_at_risk(open_trades: list[dict]) -> dict:
         stake = t.get("stake_amount") or 0.0
         sl = t.get("stop_loss_ratio") or 0.0
         risk += stake * abs(sl)
-        notional += stake
+        notional += abs(float(t.get("amount") or 0) * float(t.get("current_rate") or t.get("open_rate") or 0))
     return {"abs_loss": round(risk, 2), "open_count": len(open_trades), "open_notional": round(notional, 2)}
 
 
@@ -1558,6 +1558,27 @@ async def _poll_loop():
 
 # ── Status level ──────────────────────────────────────────────────────────────
 
+def _account_health() -> dict | None:
+    path = os.environ.get("ACCOUNT_HEALTH_FILE")
+    if not path:
+        return None
+    try:
+        state = json.loads(Path(path).read_text())
+        if time.time() - state["observed_at"] > 180:
+            raise ValueError("stale")
+        state["warnings"] = list(state.get("errors", []))
+        gateway = state.get("gateway")
+        if not gateway or time.time() - gateway.get("observed_at", 0) > 180:
+            state["warnings"].append("Hyperliquid request telemetry unavailable")
+        elif gateway.get("status") != "ok":
+            state["warnings"].append(f"Hyperliquid request degradation: {gateway.get('faults', 0)} failures in 5 minutes")
+        if not state.get("complete") and not state["warnings"]:
+            state["warnings"].append("Account valuation incomplete")
+        return state
+    except (OSError, ValueError, KeyError, TypeError):
+        return {"complete": False, "accounts": {}, "warnings": ["Account and request telemetry unavailable or stale"]}
+
+
 def _fleet_status() -> dict:
     """Compute top-level status level for the fleet.
 
@@ -1594,6 +1615,8 @@ def _fleet_status() -> dict:
             if is_live:
                 any_live_unreachable = True
 
+    account_health = _account_health()
+    account_warnings = (account_health or {}).get("warnings", [])
     if any_live_unreachable:
         level = "red"
         summary = (f"live bot unreachable: {', '.join(stale_bots)}"
@@ -1604,6 +1627,9 @@ def _fleet_status() -> dict:
     elif execution_faults:
         level = "red"
         summary = f"live TP execution blocked: {', '.join(execution_faults)}"
+    elif account_warnings:
+        level = "yellow"
+        summary = "; ".join(account_warnings)
     elif stale_bots:
         level = "yellow"
         summary = f"{len(stale_bots)} bot(s) stale: {', '.join(stale_bots)}"
@@ -1650,8 +1676,8 @@ async def no_cache_headers(request, call_next):
     return response
 
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
+templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
 @app.get("/healthz")
@@ -1681,6 +1707,7 @@ async def api_state():
         # ── NEW ──────────────────────────────────────────────────────────────
         "events_global": _global_events(),
         "status": _fleet_status(),
+        "account_health": _account_health(),
     })
 
 

@@ -74,3 +74,18 @@ def test_effective_entry_can_make_previously_valid_stake_fail_minimum():
     assert distance == pytest.approx((103.0 - 95.0 * 0.98) / 103.0)
     assert stake >= CFG.min_margin_usd
     assert stake * leverage * distance <= CFG.risk_usd + 1e-6
+
+
+@pytest.mark.parametrize('stop', [81, 88, 91, 94, 96, 98])
+def test_hyperliquid_integer_leverage_preserves_budget(monkeypatch, stop):
+    monkeypatch.setenv('KILLERS_EXECUTION_VENUE', 'binance')
+    old_stake, old_leverage, _ = compute_stake({'entry': 100, 'sl': stop}, CFG)
+    monkeypatch.setenv('KILLERS_EXECUTION_VENUE', 'hyperliquid')
+    stake, leverage, distance = compute_stake({'entry': 100, 'sl': stop}, CFG)
+    assert leverage == int(leverage)
+    assert 1 <= leverage <= CFG.max_leverage
+    assert stake <= CFG.max_margin_usd
+    assert stake * leverage * distance <= CFG.risk_usd + 1e-8
+    # Cent-rounding may preserve slightly more than the already-rounded old
+    # stake, but cannot exceed the pre-rounding stop-risk notional.
+    assert stake * leverage <= CFG.risk_usd / distance + 1e-8

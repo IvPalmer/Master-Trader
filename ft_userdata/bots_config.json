@@ -1,5 +1,5 @@
 {
-  "_doc": "The active flag selects autonomous strategy tooling. Receiver-managed production bots use production_live=true even when active=false. monitor=true enables exporter coverage without enabling autonomous tooling; live risk classification always comes from the runtime dry_run flag. capital_account names the exchange account a bot trades from; bots sharing one account share one starting-capital denominator in the circuit breaker (FundingFadeV1 and KeltnerBounceV1 both run on the same Binance spot wallet). The dashboard/compose registry is the runtime source of truth.",
+  "_doc": "The active flag selects autonomous strategy tooling. Receiver-managed production bots use production_live=true even when active=false. monitor=true enables exporter coverage without enabling autonomous tooling; live risk classification always comes from the runtime dry_run flag. capital_account names the exchange account a bot trades from; bots sharing one account are valued once from actual account equity in the circuit breaker (FundingFadeV1 and KeltnerBounceV1 both run on the same Binance spot wallet). capital_owner declares the representative API reader for a shared wallet; balances never elect the reader. The dashboard/compose registry is the runtime source of truth.",
   "bots": {
     "SupertrendStrategy": {"port": 8084, "timeframe": "1h", "type": "trend-follower", "active": false},
     "MasterTraderV1": {"port": 8086, "timeframe": "1h", "type": "hybrid", "active": false},
@@ -12,12 +12,12 @@
     "BearCrashShortV1": {"port": 8093, "timeframe": "1h", "type": "bear-short", "active": false, "trading_mode": "futures"},
     "BollingerBounceV1": {"port": 8094, "timeframe": "1h", "type": "mean-reversion", "active": false},
     "KeltnerBounceV1": {"capital_account": "binance-spot", "port": 8095, "timeframe": "1h", "type": "mean-reversion", "active": true},
-    "FundingFadeV1": {"capital_account": "binance-spot", "port": 8096, "timeframe": "1h", "type": "funding-divergence", "active": true},
+    "FundingFadeV1": {"capital_account": "binance-spot", "capital_owner": true, "port": 8096, "timeframe": "1h", "type": "funding-divergence", "active": true},
     "OITrendPullbackV1": {"capital_account": "binance-spot", "port": 8102, "timeframe": "1h", "type": "oi-trend-pullback", "active": true},
     "ShortKeltnerV2HL": {"port": 8103, "service": "ft-short-keltner-hl-live", "timeframe": "1h", "type": "bear-short", "active": false, "monitor": true, "runtime_config": "ShortKeltnerV2HL-live.json", "trading_mode": "futures", "venue": "hyperliquid", "_note": "Monitor the deployed bot in either mode; its effective dry_run flag determines inclusion in the live circuit breaker. Autonomous strategy tooling remains disabled."},
     "FundingShortV1": {"port": null, "timeframe": "1h", "type": "bear-short", "active": false, "trading_mode": "futures", "_note": "killed 2026-04-18, port 8097 reused by CascadeFaderV1"},
     "CascadeFaderV1": {"port": null, "timeframe": "1h", "type": "cascade-fader", "active": false, "_note": "retired 2026-07-13 — fill-stress study: PF 0.98 @0.5% slippage, backtest case unreliable (cascade-fill-stress-2026-07)"},
-    "KillersScalpV1": {"port": 8099, "timeframe": "5m", "type": "copy-trader", "active": false, "production_live": true, "trading_mode": "futures", "venue": "hyperliquid", "_note": "Receiver-managed bounded live executor on a dedicated Hyperliquid account; posted-SL risk sizing, native exchange stop, and receiver fallback enabled."},
+    "KillersScalpV1": {"capital_account": "hyperliquid-killers", "capital_owner": true, "port": 8099, "timeframe": "5m", "type": "copy-trader", "active": false, "production_live": true, "trading_mode": "futures", "venue": "hyperliquid", "_note": "Receiver-managed bounded live executor on a dedicated Hyperliquid account; posted-SL risk sizing, native exchange stop, and receiver fallback enabled."},
     "InsidersScalpV1": {"port": 8098, "timeframe": "5m", "type": "copy-trader", "active": false, "production_live": true, "runtime_config": "InsidersScalpV2.json", "runtime_strategy": "KillersScalpV1", "trading_mode": "futures", "venue": "hyperliquid", "_note": "Receiver-managed bounded live executor on a dedicated Hyperliquid account; V2 config uses the shared hardened Killers execution strategy."}
   }
 }
