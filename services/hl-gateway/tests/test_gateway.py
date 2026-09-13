@@ -130,3 +130,22 @@ def test_live_ticker_contexts_have_exit_priority():
     for kind in ['metaAndAssetCtxs', 'spotMetaAndAssetCtxs', 'l2Book']:
         assert g.priority('killers', 'info', {'type': kind}) == 1
     assert g.priority('killers', 'info', {'type': 'candleSnapshot'}) == 2
+
+
+def test_live_usage_does_not_double_charge_background_allowance():
+    budget = g.Budget(lambda: 100)
+    assert budget.reserve(200, 1)
+    assert budget.reserve(600, 2)
+    assert budget.reserve(1, 2) is None
+    assert budget.reserve(50, 1)
+    assert budget.reserve(50, 0)
+    assert budget.total() == 900
+
+
+def test_expired_market_data_is_evicted_on_next_request():
+    async def check():
+        gateway = g.Gateway(Session())
+        gateway.cache['expired'] = (0, (200, b'old'))
+        await gateway.forward('killers', 'info', {'type':'allMids'})
+        assert 'expired' not in gateway.cache
+    asyncio.run(check())

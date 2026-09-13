@@ -25,7 +25,7 @@ VARIABLE = {'recentTrades', 'historicalOrders', 'userFills', 'userFillsByTime',
             'delegatorRewards', 'validatorStats'}
 # Only public market data is cached. Never conceal a new order/fill/account update.
 CACHE_TTL = {'allMids': 1, 'l2Book': .5, 'meta': 300, 'spotMeta': 300,
-             'metaAndAssetCtxs': 2, 'spotMetaAndAssetCtxs': 2, 'candleSnapshot': 2}
+             'metaAndAssetCtxs': 5, 'spotMetaAndAssetCtxs': 5, 'candleSnapshot': 2}
 
 
 def cost(path, body):
@@ -89,11 +89,17 @@ class Budget:
     def reserve(self, weight, tier):
         # 250 weight reserved for managing live exposure; another 50 for
         # exchange actions. 300/min left for non-fleet users on the VPS IP.
-        limit = (900, 850, 600)[tier]
+        total = self.total()
+        # Background has its own 600-unit allowance. Charging live traffic
+        # against that allowance as well double-reserved capacity and starved
+        # candles while hundreds of units remained unused.
+        background = sum(row[1] for row in self.used if row[2] == 2)
+        limit = 900 if tier == 0 else 850
         if (self.clock() < self.cooldown or any(self.waiting[:tier])
-                or self.total() + weight > limit):
+                or total + weight > limit
+                or (tier == 2 and background + weight > 600)):
             return None
-        row = [self.clock(), weight]
+        row = [self.clock(), weight, tier]
         self.used.append(row)
         return row
 
@@ -138,6 +144,7 @@ class Gateway:
         started = time.monotonic()
         kind = body.get('type', 'exchange') if path == 'info' else 'exchange'
         ttl = CACHE_TTL.get(kind, 0) if path == 'info' else 0
+        self.cache = {k: v for k, v in self.cache.items() if v[0] > started}
         key = json.dumps(body, sort_keys=True, separators=(',', ':')) if ttl else None
         if key and key in self.cache and self.cache[key][0] > started:
             self.event(client, kind, 'cached')
@@ -163,11 +170,12 @@ class Gateway:
                 self.budget.cooldown = time.monotonic() + 10
             self.event(client, kind, 'rate_limited' if status == 429 else 'upstream_error' if status >= 400 else 'ok', time.monotonic() - started)
             if ttl and status == 200:
-                if len(self.cache) >= 1024:
-                    self.cache = {k: v for k, v in self.cache.items() if v[0] > time.monotonic()}
-                    if len(self.cache) >= 1024:
-                        self.cache.clear()
-                self.cache[key] = (time.monotonic() + ttl, result)
+                # Bound resident response bytes as well as entry count.
+                if len(data) <= 4 * 1024 * 1024:
+                    while self.cache and (len(self.cache) >= 128 or
+                            sum(len(v[1][1]) for v in self.cache.values()) + len(data) > 8 * 1024 * 1024):
+                        self.cache.pop(next(iter(self.cache)))
+                    self.cache[key] = (time.monotonic() + ttl, result)
             return result
         except (aiohttp.ClientError, asyncio.TimeoutError):
             self.event(client, kind, 'transport_error', time.monotonic() - started)

@@ -642,7 +642,7 @@ def main() -> None:
             log.warning("No bots reachable. Sleeping %ds.", SCRAPE_INTERVAL)
 
         _capital_refresh_counter += 1
-        if _capital_refresh_counter >= CAPITAL_REFRESH_EVERY:
+        if not _membership_complete or _capital_refresh_counter >= CAPITAL_REFRESH_EVERY:
             _capital_refresh_counter = 0
             refresh_live_capital()
 
