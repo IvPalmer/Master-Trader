@@ -1,0 +1,168 @@
+{
+  "modeled_fill_events": 18,
+  "checked_legs": 36,
+  "missing_or_insufficient_top_of_book_legs": 20,
+  "issues": [
+    {
+      "episode": "ep000001",
+      "coin": "ZRO",
+      "event": "exit",
+      "field": "hl_ask_sz",
+      "required_base_qty": 1262.1959685460765,
+      "recorded_base_qty": 653.0
+    },
+    {
+      "episode": "ep000002",
+      "coin": "KAITO",
+      "event": "fill",
+      "field": "bn_ask_sz",
+      "required_base_qty": 980.1038910124473,
+      "recorded_base_qty": 53.7
+    },
+    {
+      "episode": "ep000002",
+      "coin": "KAITO",
+      "event": "exit",
+      "field": "hl_ask_sz",
+      "required_base_qty": 980.1038910124473,
+      "recorded_base_qty": 565.0
+    },
+    {
+      "episode": "ep000002",
+      "coin": "KAITO",
+      "event": "exit",
+      "field": "bn_bid_sz",
+      "required_base_qty": 980.1038910124473,
+      "recorded_base_qty": 13.0
+    },
+    {
+      "episode": "ep000003",
+      "coin": "ZRO",
+      "event": "fill",
+      "field": "hl_bid_sz",
+      "required_base_qty": 1181.7676881078717,
+      "recorded_base_qty": 81.3
+    },
+    {
+      "episode": "ep000003",
+      "coin": "ZRO",
+      "event": "exit",
+      "field": "hl_ask_sz",
+      "required_base_qty": 1181.7676881078717,
+      "recorded_base_qty": 214.6
+    },
+    {
+      "episode": "ep000004",
+      "coin": "ZEC",
+      "event": "fill",
+      "field": "bn_ask_sz",
+      "required_base_qty": 1.7531864163116464,
+      "recorded_base_qty": 0.2
+    },
+    {
+      "episode": "ep000005",
+      "coin": "ASTER",
+      "event": "fill",
+      "field": "hl_bid_sz",
+      "required_base_qty": 1502.2684253222365,
+      "recorded_base_qty": 18.0
+    },
+    {
+      "episode": "ep000006",
+      "coin": "EIGEN",
+      "event": "fill",
+      "field": "hl_bid_sz",
+      "required_base_qty": 4662.004662004662,
+      "recorded_base_qty": 1813.99
+    },
+    {
+      "episode": "ep000006",
+      "coin": "EIGEN",
+      "event": "fill",
+      "field": "bn_ask_sz",
+      "required_base_qty": 4662.004662004662,
+      "recorded_base_qty": 4653.89
+    },
+    {
+      "episode": "ep000006",
+      "coin": "EIGEN",
+      "event": "exit",
+      "field": "hl_ask_sz",
+      "required_base_qty": 4662.004662004662,
+      "recorded_base_qty": 4577.48
+    },
+    {
+      "episode": "ep000006",
+      "coin": "EIGEN",
+      "event": "exit",
+      "field": "bn_bid_sz",
+      "required_base_qty": 4662.004662004662,
+      "recorded_base_qty": 489.37
+    },
+    {
+      "episode": "ep000007",
+      "coin": "GRAM",
+      "event": "fill",
+      "field": "hl_bid_sz",
+      "required_base_qty": 669.5232994108195,
+      "recorded_base_qty": 27.0
+    },
+    {
+      "episode": "ep000004",
+      "coin": "ZEC",
+      "event": "exit",
+      "field": "bn_bid_sz",
+      "required_base_qty": 1.7531864163116464,
+      "recorded_base_qty": 0.2
+    },
+    {
+      "episode": "ep000008",
+      "coin": "PUMP",
+      "event": "fill",
+      "field": "hl_bid_sz",
+      "required_base_qty": 251635.63160543534,
+      "recorded_base_qty": 100654.0
+    },
+    {
+      "episode": "ep000008",
+      "coin": "PUMP",
+      "event": "fill",
+      "field": "bn_ask_sz",
+      "required_base_qty": 251635.63160543534,
+      "recorded_base_qty": 98855.0
+    },
+    {
+      "episode": "ep000008",
+      "coin": "PUMP",
+      "event": "exit",
+      "field": "bn_bid_sz",
+      "required_base_qty": 251635.63160543534,
+      "recorded_base_qty": 8552.0
+    },
+    {
+      "episode": "ep000009",
+      "coin": "TAO",
+      "event": "exit",
+      "field": "hl_ask_sz",
+      "required_base_qty": 3.7551633496057075,
+      "recorded_base_qty": 0.448
+    },
+    {
+      "episode": "ep000009",
+      "coin": "TAO",
+      "event": "exit",
+      "field": "bn_bid_sz",
+      "required_base_qty": 3.7551633496057075,
+      "recorded_base_qty": 1.4417
+    },
+    {
+      "episode": "ep000005",
+      "coin": "ASTER",
+      "event": "exit",
+      "field": "hl_ask_sz",
+      "required_base_qty": 1502.2684253222365,
+      "recorded_base_qty": 574.0
+    }
+  ],
+  "interpretation": "Screen only. Sufficient recorded size does not prove atomic quotes, queue fill or hedge latency."
+}

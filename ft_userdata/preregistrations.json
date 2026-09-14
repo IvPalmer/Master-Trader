@@ -250,7 +250,8 @@
           "reason": "User authorized implementing the strategy review recommendations. Correct implementation errors without tuning the frozen strategy.",
           "change": "Withdraw v1 shadow yields: pre-post fills, wrong short exit quote side, mismatched weekly exposure/return accounting. Preserve original archive; deploy accounting v2 and replay recorded decisions. Entry/exit thresholds, concurrency and study fees unchanged.",
           "promotion_status": "Blocked pending corrected replay and executable depth, quote timing, actual fees/funding notional and capital validation. Positive modeled returns alone do not authorize funded execution.",
-          "artifact": "research/hl_carry_shadow/README.md"
+          "artifact": "research/hl_carry_shadow/README.md",
+          "replay_result": "1510 decisions, 9 completed episodes, modeled net $27.64; 9.20% annualized on matched deployed capital-time, below 12% hurdle; 3.57% on $4500 provisioned. 20/36 legs lack full modeled size at best quote. Research only; no funded executor. See docs/audits/2026-09-14-carry-and-fleet-follow-through.md."
         }
       ]
     },

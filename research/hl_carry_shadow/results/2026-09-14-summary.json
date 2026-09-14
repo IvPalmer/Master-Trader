@@ -1,0 +1,27 @@
+{
+  "accounting_version": 2,
+  "start": "2026-07-13T05:41:18.355414+00:00",
+  "end": "2026-09-14T01:00:48.631418+00:00",
+  "decision_count": 1510,
+  "closed_episodes": 9,
+  "open_episodes": 0,
+  "net_model_usd": 27.63791333777202,
+  "funding_model_usd": 42.0498001,
+  "basis_model_usd": 4.488113237772018,
+  "fees_model_usd": 18.900000000000002,
+  "completed_position_hours": 1754.35,
+  "completed_episode_yield_annual_pct": 9.200297197970109,
+  "provisioned_return_pct": 0.6141758519504893,
+  "provisioned_yield_annual_pct": 3.56935643569347,
+  "cost_stress_extra_5bps_each_of_four_fills_net_usd": 9.63791333777202,
+  "cost_stress_extra_10bps_each_of_four_fills_net_usd": -8.36208666222798,
+  "fills_before_signal": 0,
+  "decision": "RESEARCH_ONLY: execution depth, quote timing, actual fees and funding notional remain unvalidated",
+  "limitations": [
+    "Archived timestamps mark snapshot start; cross-venue quotes are not atomic.",
+    "Funding archive has settlement timestamps but no ingestion timestamps.",
+    "Model uses fixed $1000 funding notional and frozen fee assumptions.",
+    "Trade-through is a paper fill proxy; depth and hedge latency are not simulated.",
+    "Capital model is $1500 per episode, not verified production margin requirements."
+  ]
+}

@@ -125,7 +125,7 @@ BOTS: list[dict[str, Any]] = [
         "epoch_start_ts_ms": OI_ROUND4_EPOCH_TS_MS,
         "epoch_label": "round 4 · price-only exit guard",
         "strategy_version": "OITrendPullbackV1 · r4",
-        "entry_gate_label": "EMA20 reclaim + fresh OI ≥ 2% + BTC trend",
+        "entry_gate_label": "EMA20 reclaim + fresh OI at executor threshold + BTC trend",
         "observational": True,
         "no_baseline": True,
         "baseline": None,

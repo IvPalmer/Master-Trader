@@ -41,3 +41,9 @@ model same-base-quantity legs, funding on marked notional, actual account fees,
 collateral and hedge-failure handling; then re-evaluate the original preregistered
 criteria on fresh evidence. Keep the original archive and v1 results withdrawn.
 Do not optimize thresholds against this correction replay.
+
+`check_depth.py SOURCE REPLAY` screens archived top-of-book quantities against
+the modeled same-base-quantity legs. Versioned results and input checksums are in
+`results/`; the full source archive stays on the VPS. The corrected 2026-09-14
+replay returns 9.20% annualized on modeled deployed capital, below the 12% hurdle,
+and 20/36 legs fail the best-quote depth screen. No funded executor is justified.
