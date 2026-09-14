@@ -207,6 +207,7 @@ class OITrendPullbackV1(IStrategy):
         dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
         dataframe["vol_sma"] = dataframe["volume"].rolling(20).mean()
         dataframe["oi_growth"] = np.nan
+        dataframe["oi_min_growth"] = float(self.oi_min_growth)
         # The live observation confirms only the current decision. Copying it
         # onto old candles fabricates a historical OI series. Backtests need
         # their own causal OI history and must not consult the live endpoint.

@@ -243,7 +243,16 @@
         "conservative maker-fill rate high enough that realistic_default fee scenario holds (else re-evaluate at taker)",
         "minimum evidence: >=5 closed paper episodes OR >=300 active position-hours by review, else shadow CONTINUES (inconclusive, not fail)"
       ],
-      "notes": "Codex-amended (8 points, thread 019f598a). Pilot notional $1000x3 = mechanism validation, not P&L; scaling is a separate operator decision. Depth capture included so scale claims are testable later."
+      "notes": "Codex-amended (8 points, thread 019f598a). Pilot notional $1000x3 = mechanism validation, not P&L; scaling is a separate operator decision. Depth capture included so scale claims are testable later.",
+      "amendments": [
+        {
+          "date": "2026-09-14",
+          "reason": "User authorized implementing the strategy review recommendations. Correct implementation errors without tuning the frozen strategy.",
+          "change": "Withdraw v1 shadow yields: pre-post fills, wrong short exit quote side, mismatched weekly exposure/return accounting. Preserve original archive; deploy accounting v2 and replay recorded decisions. Entry/exit thresholds, concurrency and study fees unchanged.",
+          "promotion_status": "Blocked pending corrected replay and executable depth, quote timing, actual fees/funding notional and capital validation. Positive modeled returns alone do not authorize funded execution.",
+          "artifact": "research/hl_carry_shadow/README.md"
+        }
+      ]
     },
     {
       "id": "killers-fill-realism-2026-07",

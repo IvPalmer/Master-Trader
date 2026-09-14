@@ -209,8 +209,8 @@ def test_oi_readiness_exposes_dominant_gate_and_feed_age():
         "pair": "ETH/USDT",
         "last_analyzed_ts": now_ms // 1000,
         "data_stop_ts": now_ms,
-        "columns": ["date", "oi_growth", "btc_trend", "enter_long"],
-        "data": [[now_ms, 0.013, 1, 0]],
+        "columns": ["date", "oi_growth", "btc_trend", "enter_long", "oi_min_growth"],
+        "data": [[now_ms, -0.013, 1, 0, 0.0]],
     }
     bot = {
         "key": "oi-trend",
@@ -222,8 +222,8 @@ def test_oi_readiness_exposes_dominant_gate_and_feed_age():
     assert readiness["healthy"] is True
     assert readiness["status"] == "blocked"
     assert readiness["label"] == "entry gate blocked"
-    assert "needs 2.00%" in readiness["detail"]
-    assert readiness["metrics"]["oi_growth"] == 0.013
+    assert "needs 0.00%" in readiness["detail"]
+    assert readiness["metrics"]["oi_growth"] == -0.013
 
 
 def test_readiness_aggregates_every_watched_pair():
@@ -233,18 +233,18 @@ def test_readiness_aggregates_every_watched_pair():
     def payload(pair, growth):
         return {
             "pair": pair, "last_analyzed_ts": now_ms // 1000, "data_stop_ts": now_ms,
-            "columns": ["date", "oi_growth", "btc_trend", "enter_long"],
-            "data": [[now_ms, growth, 1, 0]],
+            "columns": ["date", "oi_growth", "btc_trend", "enter_long", "oi_min_growth"],
+            "data": [[now_ms, growth, 1, 0, 0.0]],
         }
 
     readiness = app._fleet_candle_readiness(
-        bot, [payload("BTC/USDT", 0.01), payload("ETH/USDT", 0.03)], "1h"
+        bot, [payload("BTC/USDT", -0.01), payload("ETH/USDT", 0.03)], "1h"
     )
 
     assert readiness["pair_count"] == 2
     assert len(readiness["pairs"]) == 2
     assert readiness["label"] == "1/2 pairs clear OI/BTC gates"
-    assert readiness["metrics"] == {"oi_growth_min": 0.01, "oi_growth_max": 0.03}
+    assert readiness["metrics"] == {"oi_growth_min": -0.01, "oi_growth_max": 0.03}
 
 
 def test_receiver_counts_only_actionable_signal_kinds():
@@ -281,3 +281,18 @@ def test_every_bot_declares_epoch_version_and_gate_contract():
         assert bot["epoch_label"]
         assert bot["strategy_version"]
         assert bot["entry_gate_label"]
+
+
+def test_oi_readiness_uses_reported_threshold_and_does_not_guess():
+    now_ms = int(time.time() * 1000)
+    payload = {
+        'pair': 'BTC/USDT', 'last_analyzed_ts': now_ms,
+        'columns': ['oi_growth', 'oi_min_growth', 'btc_trend'],
+        'data': [[0.005, 0.0, 1]],
+    }
+    bot = {'key': 'oi-trend'}
+    assert app._candle_readiness(bot, payload, '1h')['status'] == 'ready'
+    payload['data'][0][1] = 0.02
+    assert app._candle_readiness(bot, payload, '1h')['status'] == 'blocked'
+    payload['data'][0][1] = None
+    assert app._candle_readiness(bot, payload, '1h')['label'] == 'OI threshold unavailable'

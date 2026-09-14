@@ -998,11 +998,14 @@ def _candle_readiness(bot: dict, payload: dict | None, timeframe: str | None) ->
     if bot["key"] == "oi-trend":
         growth = latest.get("oi_growth")
         btc_trend = latest.get("btc_trend")
+        threshold = latest.get("oi_min_growth")
         if growth is None or (isinstance(growth, float) and math.isnan(growth)):
             status, label, detail = "warming", "building OI baseline", "fresh 45-minute OI baseline not ready"
-        elif float(growth) < 0.02:
+        elif not isinstance(threshold, (int, float)) or not math.isfinite(threshold):
+            status, label, detail = "unavailable", "OI threshold unavailable", "executor threshold telemetry not available"
+        elif float(growth) < threshold:
             status, label = "blocked", "entry gate blocked"
-            detail = f"OI growth {float(growth) * 100:.2f}% · needs 2.00%"
+            detail = f"OI growth {float(growth) * 100:.2f}% · needs {threshold * 100:.2f}%"
         elif float(btc_trend or 0) != 1:
             status, label = "blocked", "entry gate blocked"
             detail = "OI gate passed · BTC trend gate blocked"
@@ -1019,7 +1022,7 @@ def _candle_readiness(bot: dict, payload: dict | None, timeframe: str | None) ->
         "analysis_age_s": age_s, "last_signal_ts_ms": last_signal_ts,
         "signals_in_window": len(signal_rows),
         "metrics": {
-            key: latest.get(key) for key in ("oi_growth", "btc_trend", "funding_rate")
+            key: latest.get(key) for key in ("oi_growth", "oi_min_growth", "btc_trend", "funding_rate")
             if key in latest
         },
     }
@@ -1040,6 +1043,9 @@ def _fleet_candle_readiness(
     if healthy_count < total:
         status, label = "stale", f"pair feeds degraded · {healthy_count}/{total} fresh"
         detail = "one or more watched pairs has stale or unavailable analysis"
+    elif any(state.get("status") == "unavailable" for state in pair_states):
+        status, label = "unavailable", "entry telemetry unavailable"
+        detail = "one or more watched pairs lacks executor threshold telemetry"
     elif recent_signals:
         status, label = "ready", f"signal observed · {recent_signals[0].get('pair') or 'watched pair'}"
         detail = recent_signals[0].get("detail") or bot.get("entry_gate_label")
@@ -1047,8 +1053,8 @@ def _fleet_candle_readiness(
         status = "blocked" if len(blocked) == total else "ready"
         label = ("all entry gates blocked" if len(blocked) == total
                  else f"{total - len(blocked)}/{total} pairs clear OI/BTC gates")
-        oi_below = sum(1 for state in blocked if "needs 2.00%" in str(state.get("detail")))
-        detail = (f"OI growth below 2.00% on {oi_below}/{total} pairs"
+        oi_below = sum(1 for state in blocked if " · needs " in str(state.get("detail")))
+        detail = (f"OI growth below executor threshold on {oi_below}/{total} pairs"
                   if oi_below else blocked[0].get("detail"))
     else:
         status, label = "ready", f"all {total} pair feeds fresh · scanning"
