@@ -59,3 +59,40 @@ def test_open_mark_does_not_imply_a_linear_return_path(monkeypatch):
     monkeypatch.setattr(app.time, 'time', lambda: 1800000010)
     curve = app._equity_curve_live([], [{'profit_abs': 5}], 98, 1800000000000)
     assert curve == [[1800000000000, 98], [1800000010000, 98], [1800000010000, 103]]
+
+
+def test_chart_instances_stay_raw_and_one_failure_does_not_block_other_cards():
+    source = Path(app.__file__).parent / 'static/dashboard.js'
+    script = source.read_text() + '''
+const assert = require('node:assert/strict');
+const el = {};
+const chart = { getDom() { assert.equal(this, chart); return el; },
+  isDisposed() { assert.equal(this, chart); return false; },
+  dispose() { assert.equal(this, chart); } };
+global.document = { getElementById: () => el };
+global.echarts = { init: () => chart };
+function reactive(obj) {
+  return new Proxy(obj, { get(target,key,receiver) {
+    const value = Reflect.get(target,key,receiver);
+    return value && typeof value === 'object' ? reactive(value) : value;
+  }});
+}
+const controller = reactive(dash());
+controller._scheduleChartResize = () => {};
+assert.equal(controller._ensureChart('one'), chart);
+assert.equal(controller._ensureChart('one'), chart);
+controller._disposeCharts();
+controller.tradeChartId = trade => trade.pair;
+const rendered = [];
+controller.renderTradeChart = async trade => {
+  rendered.push(trade.pair);
+  if (trade.pair === 'A') throw new Error('render failed');
+};
+Object.defineProperty(controller, 'filteredTrades', { value: [{pair:'A'}, {pair:'B'}], configurable:true });
+controller.renderTradesCharts().then(() => {
+  assert.deepEqual(rendered, ['A','B']);
+  assert.match(controller._tradeChartState.A.error, /unavailable/);
+  assert.equal(controller._tradeChartsBusy, false);
+}).catch(error => { console.error(error); process.exitCode = 1; });
+'''
+    subprocess.run(['node', '-e', script], check=True, capture_output=True)

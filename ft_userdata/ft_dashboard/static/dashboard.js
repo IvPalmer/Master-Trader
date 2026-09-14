@@ -50,6 +50,9 @@ function closedEquityThroughMark(realized, marked) {
 }
 
 function dash() {
+  // ECharts keeps identity-sensitive internals. Keep instances outside Alpine
+  // reactive state so methods always receive the original instance as `this`.
+  const charts = {};
   return {
     raw: { bots: {}, errors: {}, last_poll: null },
     pollInterval: 30,
@@ -63,7 +66,6 @@ function dash() {
     tradesView: 'open',
     tradesFilter: 'all',
     _tradeTfOverride: {},
-    _charts: {},
     _chartObservers: {},
     _chartResizeTimers: [],
     _equityData: {},
@@ -1083,7 +1085,13 @@ function dash() {
       if (this._tradeChartsBusy) return;
       this._tradeChartsBusy = true;
       try {
-        for (const trade of this.filteredTrades) await this.renderTradeChart(trade);
+        for (const trade of this.filteredTrades) {
+          try { await this.renderTradeChart(trade); }
+          catch (error) {
+            this._tradeChartState[this.tradeChartId(trade)] = { error: 'Price chart unavailable. Retry shortly.' };
+            console.warn('renderTradeChart', trade.pair, error?.message);
+          }
+        }
       } finally { this._tradeChartsBusy = false; }
     },
     tradeChartStatus(trade) { return this._tradeChartState[this.tradeChartId(trade)] || { loading: true }; },
@@ -1254,7 +1262,7 @@ function dash() {
       chart.resize();
     },
 
-    _resizeChart(id, chart = this._charts[id]) {
+    _resizeChart(id, chart = charts[id]) {
       const el = document.getElementById(id);
       if (!el || !chart || !el.isConnected || el.offsetParent === null) return;
       const rect = el.getBoundingClientRect();
@@ -1270,10 +1278,10 @@ function dash() {
       this._chartResizeTimers = [];
       Object.values(this._chartObservers).forEach(observer => observer?.disconnect?.());
       this._chartObservers = {};
-      Object.values(this._charts).forEach(chart => {
+      Object.values(charts).forEach(chart => {
         try { chart?.dispose?.(); } catch {}
       });
-      this._charts = {};
+      Object.keys(charts).forEach(id => delete charts[id]);
     },
 
     _renderTabFresh() {
@@ -1290,7 +1298,7 @@ function dash() {
     _scheduleChartResize(ids = null) {
       this._chartResizeTimers.forEach(timer => clearTimeout(timer));
       const resize = () => requestAnimationFrame(() => {
-        const keys = ids || Object.keys(this._charts);
+        const keys = ids || Object.keys(charts);
         keys.forEach(id => this._resizeChart(id));
       });
       resize();
@@ -1300,13 +1308,13 @@ function dash() {
     _ensureChart(id) {
       const el = document.getElementById(id);
       if (!el) return null;
-      const existing = this._charts[id];
+      const existing = charts[id];
       if (existing && existing.getDom?.() !== el) {
         this._chartObservers[id]?.disconnect?.();
         try { existing.dispose(); } catch {}
-        delete this._charts[id];
+        delete charts[id];
       }
-      if (!this._charts[id] || this._charts[id].isDisposed()) {
+      if (!charts[id] || charts[id].isDisposed()) {
         const chart = echarts.init(el, null, { renderer: 'canvas' });
         if (typeof ResizeObserver !== 'undefined') {
           const ro = new ResizeObserver(entries => {
@@ -1318,10 +1326,10 @@ function dash() {
           this._chartObservers[id]?.disconnect?.();
           this._chartObservers[id] = ro;
         }
-        this._charts[id] = chart;
+        charts[id] = chart;
         this._scheduleChartResize([id]);
       }
-      return this._charts[id];
+      return charts[id];
     },
 
     async _fetchEquity(botKey) {
