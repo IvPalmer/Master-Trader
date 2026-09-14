@@ -1,0 +1,14 @@
+# Test dependencies for tests/, services/*/tests/, ft_userdata/ft_dashboard/tests/
+# and killers_bot/tests/. Not the runtime: Freqtrade runs in its own image.
+# Pinned to match ft_userdata/ft_dashboard/requirements.txt and
+# killers_bot/requirements.txt where they overlap, so installing both resolves.
+
+pytest==9.1.1
+requests==2.34.2
+pandas==3.0.5
+numpy==2.5.3
+fastapi==0.115.5
+httpx==0.27.2
+aiohttp==3.11.10
+jinja2==3.1.4
+pyyaml==6.0.2
