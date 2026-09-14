@@ -271,24 +271,6 @@ services:
   #         memory: 768M
   #   entrypoint: ["/bin/sh", "-c", "sleep 80 && exec freqtrade trade --logfile /freqtrade/user_data/logs/FundingShortV1.log --config /freqtrade/user_data/configs/FundingShortV1.json --strategy FundingShortV1"]
 
-  # ── Grafana Bridge (candle data proxy for dashboards) ──────────────
-
-  grafana-bridge:
-    build: ./grafana-bridge
-    restart: unless-stopped
-    container_name: ft-grafana-bridge
-    volumes:
-      - "./grafana/dashboards:/dashboards"
-      - "./grafana/overlays:/overlays:ro"
-    deploy:
-      resources:
-        limits:
-          memory: 192M
-    depends_on:
-      - keltnerbouncev1
-      - fundingfadev1
-      - cascadefaderv1
-
   # ── Monitoring Stack ───────────────────────────────────────────────
 
   metrics-exporter:
@@ -338,33 +320,7 @@ services:
     depends_on:
       - metrics-exporter
 
-  grafana:
-    image: grafana/grafana:latest
-    restart: unless-stopped
-    container_name: ft-grafana
-    volumes:
-      - "grafana_data:/var/lib/grafana"
-      - "./grafana/provisioning:/etc/grafana/provisioning:ro"
-      - "./grafana/dashboards:/var/lib/grafana/dashboards"
-    ports:
-      - "127.0.0.1:3030:3000"
-    deploy:
-      resources:
-        limits:
-          memory: 384M
-    environment:
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-      - GF_AUTH_DISABLE_LOGIN_FORM=true
-      - GF_USERS_DEFAULT_THEME=dark
-      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/freqtrade.json
-      - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
-    depends_on:
-      - prometheus
-      - grafana-bridge
-
 volumes:
   prometheus_data:
-  grafana_data:
   ft_exporter_state:
   ft_user_data:
