@@ -115,3 +115,13 @@ balance observer deadlines are at least 30 seconds, covering the gateway's
 12-second live queue plus 15-second transport bounds. Other dashboard read
 deadlines and failure visibility are unchanged. The added regression brings
 the dashboard suite to 69 passing tests.
+
+Final revision `368840d` completed the 00:13:48–00:18:54 UTC observation
+window: 11 samples over five minutes, zero gateway faults, no dashboard bot
+errors, complete account marks and no Killers restarts. The gateway queue
+cleared after the 00:15 candle refresh; maximum background request latency was
+60.736 seconds. The initial yellow dashboard sample reflected pre-restart
+telemetry; all subsequent samples were green. The four production integration
+checks passed again on this final runtime. All five charts continued updating
+without renderer errors or mobile overflow. Final test totals: 547 unit tests
+passed, 27 skipped, plus four production integration checks passed.
