@@ -108,7 +108,8 @@ exchange.fetch_swap_markets=lambda params: calls.append('swap') or []
 exchange.fetch_spot_markets=lambda params: calls.append('spot') or []
 exchange.fetch_hip3_markets=lambda params: calls.append('hip3') or []
 exchange.fetch_markets()
-exchange.markets={}
+exchange.set_markets([{'id':'BTC','symbol':'BTC/USDC:USDC','base':'BTC','quote':'USDC','settle':'USDC','type':'swap','spot':False,'swap':True,'future':False,'option':False,'contract':True,'linear':True,'inverse':False}])
+ccxt.hyperliquid().set_markets_from_exchange(exchange)
 exchange.fetch_tickers()
 print(json.dumps(calls==['swap','swap']))''')
     result['runtime_source_matches'] = {}
