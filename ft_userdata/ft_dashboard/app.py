@@ -507,8 +507,15 @@ def _api_auth(url: str) -> tuple[str, str]:
 
 
 async def _get(client: httpx.AsyncClient, url: str, path: str) -> tuple[Any, str | None]:
+    # Live RPC price/balance reads can wait 12s for gateway capacity plus 15s
+    # upstream. Keep their observer deadline outside that bounded request.
+    timeout = REQUEST_TIMEOUT
+    if path in {"profit", "status", "balance"} and any(
+        b["url"] == url and b.get("venue") == "hyperliquid" for b in BOTS
+    ):
+        timeout = max(timeout, 30.0)
     try:
-        r = await client.get(f"{url}/api/v1/{path}", auth=_api_auth(url), timeout=REQUEST_TIMEOUT)
+        r = await client.get(f"{url}/api/v1/{path}", auth=_api_auth(url), timeout=timeout)
         if r.status_code == 200:
             return r.json(), None
         return None, f"HTTP {r.status_code}"

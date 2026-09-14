@@ -96,3 +96,16 @@ controller.renderTradesCharts().then(() => {
 }).catch(error => { console.error(error); process.exitCode = 1; });
 '''
     subprocess.run(['node', '-e', script], check=True, capture_output=True)
+
+
+def test_live_rpc_observer_deadline_covers_gateway_wait_and_transport():
+    calls = []
+    class Client:
+        async def get(self, url, **kwargs):
+            calls.append(kwargs['timeout'])
+            return httpx.Response(200, json={})
+    bot = app._bot_meta('killers-ft')
+    for path in ['status', 'balance', 'show_config']:
+        result, error = asyncio.run(app._get(Client(), bot['url'], path))
+        assert error is None
+    assert calls == [max(30, app.REQUEST_TIMEOUT), max(30, app.REQUEST_TIMEOUT), app.REQUEST_TIMEOUT]

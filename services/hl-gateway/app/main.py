@@ -24,7 +24,7 @@ VARIABLE = {'recentTrades', 'historicalOrders', 'userFills', 'userFillsByTime',
             'userTwapSliceFills', 'userTwapSliceFillsByTime', 'delegatorHistory',
             'delegatorRewards', 'validatorStats'}
 # Only public market data is cached. Never conceal a new order/fill/account update.
-CACHE_TTL = {'allMids': 1, 'l2Book': .5, 'meta': 300, 'spotMeta': 300,
+CACHE_TTL = {'allMids': 1, 'l2Book': .5, 'meta': 300, 'spotMeta': 300, 'perpDexs': 300,
              'metaAndAssetCtxs': 10, 'spotMetaAndAssetCtxs': 10, 'candleSnapshot': 2}
 
 
@@ -68,7 +68,7 @@ def priority(client, path, body):
         return 0
     # CCXT fetch_ticker(s) uses asset contexts, not just allMids/l2Book.
     # Price reads used by live status and exits must not wait behind candles.
-    if client in {'killers', 'accounting'} and body.get('type') in LOW_COST | VARIABLE | {'openOrders', 'frontendOpenOrders', 'metaAndAssetCtxs', 'spotMetaAndAssetCtxs'}:
+    if client in {'killers', 'accounting'} and body.get('type') in LOW_COST | VARIABLE | {'openOrders', 'frontendOpenOrders', 'meta', 'spotMeta', 'perpDexs', 'metaAndAssetCtxs', 'spotMetaAndAssetCtxs'}:
         return 1
     return 2
 

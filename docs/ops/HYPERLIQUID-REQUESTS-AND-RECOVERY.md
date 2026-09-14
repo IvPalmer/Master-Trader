@@ -106,3 +106,12 @@ open-profit mark (~$5.32 at observation), retaining the historical comparison.
 Validation: 478 core/receiver/gateway tests passed (27 skipped), 68 dashboard
 tests passed, and all four opt-in read-only production checks passed. No local
 application or Docker runtime was started.
+
+At 00:09:36 a balance-only dashboard poll exceeded its old 10-second observer
+deadline while other Killers RPCs remained responsive; the next poll recovered.
+Public metadata prerequisites (`meta`, `spotMeta`, `perpDexs`) now share live
+read priority, with `perpDexs` cached for 300 seconds. Hyperliquid profit/status/
+balance observer deadlines are at least 30 seconds, covering the gateway's
+12-second live queue plus 15-second transport bounds. Other dashboard read
+deadlines and failure visibility are unchanged. The added regression brings
+the dashboard suite to 69 passing tests.

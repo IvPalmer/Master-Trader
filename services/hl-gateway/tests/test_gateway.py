@@ -127,7 +127,7 @@ def test_only_background_reads_wait_across_a_budget_window():
 
 
 def test_live_ticker_contexts_have_exit_priority():
-    for kind in ['metaAndAssetCtxs', 'spotMetaAndAssetCtxs', 'l2Book']:
+    for kind in ['meta', 'spotMeta', 'perpDexs', 'metaAndAssetCtxs', 'spotMetaAndAssetCtxs', 'l2Book']:
         assert g.priority('killers', 'info', {'type': kind}) == 1
     assert g.priority('killers', 'info', {'type': 'candleSnapshot'}) == 2
 
