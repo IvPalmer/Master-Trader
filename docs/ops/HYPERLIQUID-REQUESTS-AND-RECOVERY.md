@@ -82,3 +82,27 @@ currency, not the subscription whitelist. Neither copier reads indicators.
 Thus newly signaled tradable pairs remain admissible; their open-position feeds
 are added automatically. Keeping every possible signal pair subscribed caused
 100 concurrent candle requests every five minutes across two copiers with the full exchange history page. Autonomous strategy pairlists remain unchanged.
+
+### Final verification — 2026-09-14 00:09 UTC
+
+Runtime revision `68543b2` passed the read-only fleet verification: all six bots
+running (three live, three dry-run), complete current account observations,
+correct parsed gateway routing and matching deployed service source. All five
+Killers position quantities and the original ten native exit order IDs were
+preserved; the dashboard reported no position or execution faults/warnings.
+The gateway ran from 00:02:48 through this verification, crossing the 00:05
+candle refresh with zero faults and no bot restarts. Background history reached
+60.6 seconds of queue-plus-request latency within its configured deadline;
+this is a short completion soak, not evidence of day-long stability.
+
+The final browser check also exposed an independent ECharts/Alpine identity
+failure: storing chart instances in reactive state broke rendering after the
+first position. Instances now live in a private closure, and a failed card
+cannot prevent subsequent cards from rendering. All five charts rendered on
+the deployed dashboard; desktop and 390px mobile layout checks passed. Killers
+showed zero closed trades, a flat solid realized curve and a vertical current
+open-profit mark (~$5.32 at observation), retaining the historical comparison.
+
+Validation: 478 core/receiver/gateway tests passed (27 skipped), 68 dashboard
+tests passed, and all four opt-in read-only production checks passed. No local
+application or Docker runtime was started.
