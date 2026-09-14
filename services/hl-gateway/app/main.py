@@ -25,7 +25,7 @@ VARIABLE = {'recentTrades', 'historicalOrders', 'userFills', 'userFillsByTime',
             'delegatorRewards', 'validatorStats'}
 # Only public market data is cached. Never conceal a new order/fill/account update.
 CACHE_TTL = {'allMids': 1, 'l2Book': .5, 'meta': 300, 'spotMeta': 300,
-             'metaAndAssetCtxs': 5, 'spotMetaAndAssetCtxs': 5, 'candleSnapshot': 2}
+             'metaAndAssetCtxs': 10, 'spotMetaAndAssetCtxs': 10, 'candleSnapshot': 2}
 
 
 def cost(path, body):
@@ -138,6 +138,9 @@ class Gateway:
                             for c in sorted(CLIENTS)},
                 'max_latency_seconds': round(max([r[4] for r in recent] or [0]), 3),
                 'weight_last_minute': self.budget.total(),
+                'background_weight_last_minute': sum(r[1] for r in self.budget.used if r[2] == 2),
+                'requests_by_type': {kind: sum(r[2] == kind for r in recent)
+                                     for kind in sorted({r[2] for r in recent})},
                 'queued': sum(self.budget.waiting)}
 
     async def forward(self, client, path, body):

@@ -18,7 +18,7 @@ def fleet():
         pytest.skip('Opt in to read-only VPS checks with MT_VPS_INTEGRATION=1')
     script = (ROOT / 'deploy/vps/verify_fleet.py').read_text()
     result = subprocess.run(['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8',
-                             'main-instance', 'python3', '-'], input=script,
+                             'main-instance', 'sudo', '-n', 'python3', '-'], input=script,
                             capture_output=True, text=True, timeout=120)
     assert result.returncode == 0, result.stderr
     return json.loads(result.stdout)

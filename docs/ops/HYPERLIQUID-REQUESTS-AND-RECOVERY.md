@@ -66,7 +66,7 @@ exhaustion while slow price/history requests held RPC resources. Live CCXT asset
 context reads now receive exit-management priority. Background usage is capped
 at 600 independently of live usage (combined reads <=850, all requests <=900),
 so live traffic is not charged twice against the background allowance. Public
-asset contexts cache for five seconds. Expired cached responses are pruned on
+asset contexts cache for ten seconds (allMids remains one second). Expired cached responses are pruned on
 every request, with an 8 MiB response-byte cap and 128 entries.
 
 The attempted five-minute page-size override was removed after runtime source
