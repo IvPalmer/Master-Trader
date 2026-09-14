@@ -1,0 +1,21 @@
+name: Improvement or research
+description: Propose a scoped improvement with a measurable outcome
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or hypothesis
+      description: Search existing issues first; distinguish observed evidence from assumptions.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed scope and acceptance criteria
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies, validation and deployment implications

@@ -26,10 +26,14 @@ is disabled here. Never run:
 
 ## How to ship a code change
 
-1. Edit on Mac, commit, push to the branch this project's VPS clone tracks.
-2. Dokploy-managed apps redeploy via webhook automatically. Plain-compose
-   apps (in `/home/ubuntu/<slug>/`) need a manual `git pull && docker
-   compose up -d --build` on the VPS.
+1. Track the work in an issue, edit on an issue-linked branch, and open a PR.
+2. Review and test the PR, then merge to main when authorized. See CONTRIBUTING.md.
+3. When production rollout is authorized, open a release PR from main to the
+   project's deployment branch (`vps-deploy` here). Review the complete release
+   diff; merging may trigger Dokploy. Record the deployed commit and verify the
+   affected services. Do not push changes directly to a deployment branch.
+4. For services deployed manually, follow their runbook after the release PR.
+   A merge alone is not evidence that production is updated or healthy.
 
 ## Why this exists
 
