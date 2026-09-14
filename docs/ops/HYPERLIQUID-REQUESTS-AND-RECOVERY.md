@@ -69,10 +69,10 @@ so live traffic is not charged twice against the background allowance. Public
 asset contexts cache for ten seconds (allMids remains one second). Expired cached responses are pruned on
 every request, with an 8 MiB response-byte cap and 128 entries.
 
-The attempted five-minute page-size override was removed after runtime source
-inspection exposed a shared funding-mark history path: shortening pages made
-old open positions fan out into dozens of historical requests. The exchange's
-native history-page size is retained. Account membership failures retry on the
+The attempted five-minute page-size override was initially removed under an
+incorrect assumption that it also controlled funding-mark pagination. The
+2026-09-14 incident investigation below disproved that assumption against the
+pinned runtime: funding marks and rates use a separate one-hour timeframe. Account membership failures retry on the
 next exporter cycle instead of waiting an hour.
 
 The copier candle subscription list is BTC plus Freqtrade's automatically
@@ -125,3 +125,26 @@ telemetry; all subsequent samples were green. The four production integration
 checks passed again on this final runtime. All five charts continued updating
 without renderer errors or mobile overflow. Final test totals: 547 unit tests
 passed, 27 skipped, plus four production integration checks passed.
+
+
+### Hourly candle burst — 2026-09-14 01:05 UTC
+
+The next hourly overlap exposed two 70-second local gateway queue timeouts on
+Killers DOT/TRX five-minute OHLCV reads. There were no exchange 429s, transport
+failures or order submission failures in that window. The worker remained
+running and all five positions retained their original ten native exits.
+
+The pass-through copiers requested 5,000 five-minute candles per subscribed
+pair, even though their strategy requires ten startup candles and consumes no
+indicators. Six Killers feeds alone cost 624 reserved units, above the 600-unit
+background minute budget, before the hourly funding/observation overlap.
+Both copiers now request at most 100 candles on **5m only**, reducing those six
+requests to 132 reserved units. The timeframe and 30-second management cadence
+are unchanged; autonomous strategies and the request limiter are unchanged.
+
+Correction to the earlier pagination diagnosis: executable lookup against the
+pinned Freqtrade + CCXT runtime proves 5m futures pages become 100 while funding
+marks remain **1h / 5,000** and funding rates remain **1h / 500**. The production
+verifier now checks that contract rather than banning the 5m override. No
+funding approximation, entry/exit rule, position size, leverage or baseline
+qualification changes are introduced by this feed-only cap.

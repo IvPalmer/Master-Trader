@@ -58,7 +58,7 @@ print(json.dumps({'urls':c['exchange'].get('ccxt_config',{}).get('urls'), 'cance
         expected = 'http://hl-gateway:8080/' + client
         result['routing'][name] = effective['urls'] == {'api': {'public': expected, 'private': expected}} and effective['cancel_on_exit'] is False
         if client in {'killers', 'insiders'}:
-            result['routing'][name] = result['routing'][name] and '5m' not in effective['candle_limits'] and effective['subscriptions'] == ['BTC/USDC:USDC']
+            result['routing'][name] = result['routing'][name] and effective['candle_limits'] == {'5m': 100} and effective['subscriptions'] == ['BTC/USDC:USDC']
     # Exercise only validation/subscription functions against in-memory fakes.
     # Never invoke order submission, an exchange client, or a real RPC sender.
     result['copier_subscription_contract'] = exec_json('ft-killers-scalp', '''import json
@@ -76,6 +76,24 @@ rpc=RPC.__new__(RPC); rpc._freqtrade=bot
 rpc._force_entry_validations(pair,SignalDirection.LONG)
 active=FreqtradeBot._refresh_active_whitelist(bot,[NS(pair=pair)])
 print(json.dumps(pair in active and 'BTC/USDC:USDC' in active))''')
+    # Execute the pinned exchange's option lookup without initializing a live
+    # exchange. Funding history must retain its separate 1h page sizes.
+    result['copier_candle_contract'] = exec_json('ft-killers-scalp', '''import json,ccxt
+from types import SimpleNamespace as NS, MethodType
+from freqtrade.exchange import Exchange
+from freqtrade.exchange.hyperliquid import Hyperliquid
+from freqtrade.configuration.environment_vars import environment_vars_to_dict
+from freqtrade.enums import CandleType
+from freqtrade.misc import deep_merge_dicts
+c=environment_vars_to_dict()
+options=deep_merge_dicts(c['exchange'].get('_ft_has_params',{}),Hyperliquid.combine_ft_has(include_futures=True))
+fake=NS(_ft_has=options,_api_async=ccxt.hyperliquid())
+fake.features=MethodType(Exchange.features,fake)
+limit=lambda tf,typ: Exchange.ohlcv_candle_limit(fake,tf,typ)
+print(json.dumps(options['mark_ohlcv_timeframe']=='1h' and options['funding_fee_timeframe']=='1h'
+    and limit('5m',CandleType.FUTURES)==100
+    and limit('1h',CandleType.FUTURES)==5000
+    and limit('1h',CandleType.FUNDING_RATE)==500))''')
     result['runtime_source_matches'] = {}
     for name, deployed, source in [('killers-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),
             ('insiders-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),

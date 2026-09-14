@@ -212,6 +212,9 @@ services:
       # REST entry validation uses tradable markets, not this subscription list.
       # Freqtrade automatically adds every open position to active candle feeds.
       FREQTRADE__EXCHANGE__PAIR_WHITELIST: '["BTC/USDC:USDC"]'
+      # Pass-through strategy needs only 10 candles. Cap its 5m bootstrap feed;
+      # Hyperliquid funding marks/rates use 1h and retain their native limits.
+      FREQTRADE__EXCHANGE___FT_HAS_PARAMS__ohlcv_candle_limit_per_timeframe__5m: "100"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/killers"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/killers"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "90000"
@@ -269,6 +272,9 @@ services:
       # REST entry validation uses tradable markets, not this subscription list.
       # Freqtrade automatically adds every open position to active candle feeds.
       FREQTRADE__EXCHANGE__PAIR_WHITELIST: '["BTC/USDC:USDC"]'
+      # Pass-through strategy needs only 10 candles. Cap its 5m bootstrap feed;
+      # Hyperliquid funding marks/rates use 1h and retain their native limits.
+      FREQTRADE__EXCHANGE___FT_HAS_PARAMS__ohlcv_candle_limit_per_timeframe__5m: "100"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/insiders"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/insiders"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "90000"

@@ -83,3 +83,16 @@ def test_deployed_dashboard_assets_exist():
     assert 'ft-dashboard' in prod['services']
     for name in ['templates/index.html', 'static/dashboard.js', 'static/styles.css']:
         assert (FT_DIR / 'ft_dashboard' / name).is_file()
+
+
+def test_copier_candle_cap_is_scoped_away_from_funding_history():
+    prod = yaml.safe_load((FT_DIR / 'docker-compose.prod.yml').read_text())
+    key = 'FREQTRADE__EXCHANGE___FT_HAS_PARAMS__ohlcv_candle_limit_per_timeframe__5m'
+    for name, service in prod['services'].items():
+        env = service.get('environment', {})
+        if name in {'ft-killers-scalp', 'ft-insiders-scalp'}:
+            assert env[key] == '100'
+            assert env['FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS'] == '30'
+            assert not any('mark_ohlcv' in k or 'funding_fee' in k for k in env)
+        else:
+            assert key not in env
