@@ -67,6 +67,9 @@ OPTIMIZABLE = [
 DEFAULT_SPACES = "roi stoploss trailing"
 DEFAULT_EPOCHS = 200
 
+# Held back from training so validation is out-of-sample
+DEFAULT_VALIDATION_DAYS = 20
+
 # Minimum improvement thresholds to accept optimization results
 MIN_IMPROVEMENT = {
     "sharpe_delta": 0.1,        # Sharpe must improve by at least 0.1
@@ -85,13 +88,17 @@ def run_hyperopt(
     epochs: int = DEFAULT_EPOCHS,
     spaces: str = DEFAULT_SPACES,
     loss_function: str = "SharpeHyperOptLoss",
+    holdout_days: int = DEFAULT_VALIDATION_DAYS,
 ) -> Optional[dict]:
     """
     Run hyperopt optimization for a strategy on training window.
 
+    The most recent `holdout_days` are left out of the training window so that
+    validate_optimization has data hyperopt never saw.
+
     Returns dict with best parameters and metrics, or None on failure.
     """
-    end = datetime.now(timezone.utc)
+    end = datetime.now(timezone.utc) - timedelta(days=holdout_days)
     start = end - timedelta(days=train_days)
     timerange = f"{start.strftime('%Y%m%d')}-{end.strftime('%Y%m%d')}"
 
@@ -207,7 +214,7 @@ def _parse_hyperopt_output(output: str, strategy: str) -> Optional[dict]:
 def validate_optimization(
     strategy: str,
     optimized_params: dict,
-    validation_days: int = 20,
+    validation_days: int = DEFAULT_VALIDATION_DAYS,
 ) -> Optional[dict]:
     """
     Run out-of-sample backtest with optimized parameters to check for overfitting.
@@ -478,7 +485,7 @@ def main():
     parser.add_argument("--all", action="store_true", help="Optimize all eligible strategies")
     parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS, help=f"Hyperopt epochs (default: {DEFAULT_EPOCHS})")
     parser.add_argument("--train-days", type=int, default=60, help="Training window days (default: 60)")
-    parser.add_argument("--val-days", type=int, default=20, help="Validation window days (default: 20)")
+    parser.add_argument("--val-days", type=int, default=DEFAULT_VALIDATION_DAYS, help=f"Validation window days, held out of training (default: {DEFAULT_VALIDATION_DAYS})")
     parser.add_argument("--spaces", default=DEFAULT_SPACES, help=f"Hyperopt spaces (default: '{DEFAULT_SPACES}')")
     parser.add_argument("--loss", default="SharpeHyperOptLoss", help="Hyperopt loss function")
     parser.add_argument("--apply", action="store_true", help="Apply latest proposal if approved")
@@ -516,6 +523,7 @@ def main():
         # Step 1: Run hyperopt on training window
         hyperopt_result = run_hyperopt(
             strategy, args.train_days, args.epochs, args.spaces, args.loss,
+            holdout_days=args.val_days,
         )
 
         if hyperopt_result is None:
