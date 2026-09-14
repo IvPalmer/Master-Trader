@@ -85,6 +85,23 @@ def test_deployed_dashboard_assets_exist():
         assert (FT_DIR / 'ft_dashboard' / name).is_file()
 
 
+def test_build_contexts_exist():
+    """A service built from source is undeployable if its context isn't in the repo."""
+    for filename in ["docker-compose.yml", "docker-compose.prod.yml"]:
+        services = yaml.safe_load((FT_DIR / filename).read_text())["services"]
+        for service, spec in services.items():
+            build = spec.get("build")
+            if build is None:
+                continue
+            if isinstance(build, str):
+                context, dockerfile = build, "Dockerfile"
+            else:
+                context, dockerfile = build["context"], build.get("dockerfile", "Dockerfile")
+            assert (FT_DIR / context).is_dir(), f"{filename}: {service} builds missing {context}"
+            assert (FT_DIR / context / dockerfile).is_file(), \
+                f"{filename}: {service} missing {context}/{dockerfile}"
+
+
 def test_copier_candle_cap_is_scoped_away_from_funding_history():
     prod = yaml.safe_load((FT_DIR / 'docker-compose.prod.yml').read_text())
     key = 'FREQTRADE__EXCHANGE___FT_HAS_PARAMS__ohlcv_candle_limit_per_timeframe__5m'
