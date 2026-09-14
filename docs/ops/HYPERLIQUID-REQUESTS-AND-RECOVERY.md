@@ -148,3 +148,11 @@ marks remain **1h / 5,000** and funding rates remain **1h / 500**. The productio
 verifier now checks that contract rather than banning the 5m override. No
 funding approximation, entry/exit rule, position size, leverage or baseline
 qualification changes are introduced by this feed-only cap.
+
+A second contributor became visible during restart: the pinned CCXT defaults
+`fetchMarkets.types` to spot, swap and HIP-3. `fetch_tickers()` without an
+explicit type calls that same discovery path, fanning out across every HIP-3
+DEX even though Freqtrade admits none (`hip3_dexes` is unconfigured). All three
+managed Hyperliquid bots now set CCXT market types to `swap` only. Their native
+perp universe remains available. The production verifier checks both the parsed
+option and the pinned CCXT dispatch with network-free method stubs.

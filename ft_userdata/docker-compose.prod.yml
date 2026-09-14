@@ -218,6 +218,8 @@ services:
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/killers"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/killers"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "90000"
+      # These executors trade native perps only; avoid CCXT's all-HIP3 fan-out.
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__options__fetchMarkets__types: '["swap"]'
       FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
       # Preserve resting reduce-only exits through planned restarts.
       FREQTRADE__CANCEL_OPEN_ORDERS_ON_EXIT: "false"
@@ -278,6 +280,8 @@ services:
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/insiders"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/insiders"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "90000"
+      # These executors trade native perps only; avoid CCXT's all-HIP3 fan-out.
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__options__fetchMarkets__types: '["swap"]'
       FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
       # Preserve resting reduce-only exits through planned restarts.
       FREQTRADE__CANCEL_OPEN_ORDERS_ON_EXIT: "false"
@@ -381,6 +385,8 @@ services:
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/short"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/short"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "90000"
+      # These executors trade native perps only; avoid CCXT's all-HIP3 fan-out.
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__options__fetchMarkets__types: '["swap"]'
       FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
       # Preserve resting reduce-only exits through planned restarts.
       FREQTRADE__CANCEL_OPEN_ORDERS_ON_EXIT: "false"

@@ -96,3 +96,17 @@ def test_copier_candle_cap_is_scoped_away_from_funding_history():
             assert not any('mark_ohlcv' in k or 'funding_fee' in k for k in env)
         else:
             assert key not in env
+
+
+def test_hyperliquid_market_discovery_matches_native_perp_configs():
+    prod = yaml.safe_load((FT_DIR / 'docker-compose.prod.yml').read_text())
+    cases = {'ft-killers-scalp': 'KillersScalpV1.json',
+             'ft-insiders-scalp': 'InsidersScalpV2.json',
+             'ft-short-keltner-hl-live': 'ShortKeltnerV2HL-live.json'}
+    import json
+    for service, filename in cases.items():
+        env = prod['services'][service]['environment']
+        assert json.loads(env['FREQTRADE__EXCHANGE__CCXT_CONFIG__options__fetchMarkets__types']) == ['swap']
+        config = json.loads((FT_DIR / 'user_data/configs' / filename).read_text())
+        assert config['trading_mode'] == 'futures'
+        assert not config['exchange'].get('hip3_dexes')
