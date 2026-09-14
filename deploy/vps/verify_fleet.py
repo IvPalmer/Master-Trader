@@ -53,7 +53,11 @@ print(json.dumps({k:j.get(k) for k in ['status','poll_age_s','account_health']})
     for name, client in [('ft-killers-scalp', 'killers'), ('ft-insiders-scalp', 'insiders'), ('ft-short-keltner-hl-live', 'short')]:
         effective = exec_json(name, '''import json
 from freqtrade.configuration.environment_vars import environment_vars_to_dict
-c=environment_vars_to_dict()
+from freqtrade.misc import deep_merge_dicts
+files={'killers':'KillersScalpV1.json','insiders':'InsidersScalpV2.json','short':'ShortKeltnerV2HL-live.json'}
+env=environment_vars_to_dict()
+client=env['exchange']['ccxt_config']['urls']['api']['public'].rsplit('/',1)[-1]
+c=deep_merge_dicts(env,json.load(open('/freqtrade/user_data/configs/'+files[client])))
 print(json.dumps({'urls':c['exchange'].get('ccxt_config',{}).get('urls'), 'market_types':c['exchange'].get('ccxt_config',{}).get('options',{}).get('fetchMarkets',{}).get('types'), 'cancel_on_exit':c.get('cancel_open_orders_on_exit'), 'candle_limits':c['exchange'].get('_ft_has_params',{}).get('ohlcv_candle_limit_per_timeframe',{}), 'subscriptions':c['exchange'].get('pair_whitelist')}))''')
         expected = 'http://hl-gateway:8080/' + client
         result['routing'][name] = effective['urls'] == {'api': {'public': expected, 'private': expected}} and effective['cancel_on_exit'] is False and effective['market_types'] == ['swap']
@@ -96,14 +100,17 @@ print(json.dumps(options['mark_ohlcv_timeframe']=='1h' and options['funding_fee_
     and limit('1h',CandleType.FUNDING_RATE)==500))''')
     result['native_market_contract'] = exec_json('ft-killers-scalp', '''import json,ccxt
 from freqtrade.configuration.environment_vars import environment_vars_to_dict
-c=environment_vars_to_dict()
+from freqtrade.misc import deep_merge_dicts
+c=deep_merge_dicts(environment_vars_to_dict(),json.load(open('/freqtrade/user_data/configs/KillersScalpV1.json')))
 exchange=ccxt.hyperliquid(c['exchange']['ccxt_config'])
 calls=[]
 exchange.fetch_swap_markets=lambda params: calls.append('swap') or []
 exchange.fetch_spot_markets=lambda params: calls.append('spot') or []
 exchange.fetch_hip3_markets=lambda params: calls.append('hip3') or []
 exchange.fetch_markets()
-print(json.dumps(calls==['swap']))''')
+exchange.markets={}
+exchange.fetch_tickers()
+print(json.dumps(calls==['swap','swap']))''')
     result['runtime_source_matches'] = {}
     for name, deployed, source in [('killers-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),
             ('insiders-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),

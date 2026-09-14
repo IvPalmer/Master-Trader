@@ -156,3 +156,9 @@ DEX even though Freqtrade admits none (`hip3_dexes` is unconfigured). All three
 managed Hyperliquid bots now set CCXT market types to `swap` only. Their native
 perp universe remains available. The production verifier checks both the parsed
 option and the pinned CCXT dispatch with network-free method stubs.
+
+The camel-case `fetchMarkets` option lives in each bot's JSON config, not an
+environment leaf: the pinned Freqtrade parser lowercases intermediate keys and
+would silently turn that environment path into ineffective `fetchmarkets`.
+The verifier merges the mounted JSON with parsed environment values and also
+checks ticker dispatch; both paths must call native swap discovery only.

@@ -106,7 +106,7 @@ def test_hyperliquid_market_discovery_matches_native_perp_configs():
     import json
     for service, filename in cases.items():
         env = prod['services'][service]['environment']
-        assert json.loads(env['FREQTRADE__EXCHANGE__CCXT_CONFIG__options__fetchMarkets__types']) == ['swap']
         config = json.loads((FT_DIR / 'user_data/configs' / filename).read_text())
+        assert config['exchange']['ccxt_config']['options']['fetchMarkets']['types'] == ['swap']
         assert config['trading_mode'] == 'futures'
         assert not config['exchange'].get('hip3_dexes')

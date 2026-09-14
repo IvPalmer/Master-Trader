@@ -48,7 +48,7 @@
         "name": "hyperliquid",
         "walletAddress": "",
         "privateKey": "",
-        "ccxt_config": {},
+        "ccxt_config": {"options": {"fetchMarkets": {"types": ["swap"]}}},
         "ccxt_async_config": {},
         "pair_whitelist": [
             "BTC/USDC:USDC",
