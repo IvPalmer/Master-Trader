@@ -162,3 +162,25 @@ environment leaf: the pinned Freqtrade parser lowercases intermediate keys and
 would silently turn that environment path into ineffective `fetchmarkets`.
 The verifier merges the mounted JSON with parsed environment values and also
 checks ticker dispatch; both paths must call native swap discovery only.
+
+The native-only deployment exposed a CCXT 4.5.68 startup compatibility issue:
+`set_markets_from_exchange()` directly indexes optional helper maps normally
+populated by spot/HIP-3 discovery. Killers briefly failed startup with a
+`hip3TokensByName` KeyError. Initializing both `hip3TokensByName` and
+`cachedCurrenciesById` as empty option dictionaries restores the pinned
+async-to-sync market-copy path without querying those unused venues. The
+runtime contract now exercises that copy as well as discovery and tickers.
+All original ten exchange exit IDs were verified unchanged after recovery.
+The gateway was not restarted to clear its failure counters.
+
+Final runtime `6c39a74` passed all four production integration checks, including
+full native exit coverage and the executable candle/funding/CCXT contracts.
+The 01:24:56–01:30:01 UTC check collected eleven samples over five minutes:
+zero gateway faults or queued requests, all snapshots green, complete account
+marks and no restarted containers. The 01:25 candle refresh completed without
+the earlier minute-long stall; all five funding-history reads had also completed
+after startup. Maximum rolling request latency during the final check was
+9.051 seconds. The gateway process was left running throughout.
+Validation: 480 core/gateway/receiver tests and 69 dashboard tests passed
+(27 skipped), plus four read-only production checks. This is current runtime
+evidence and does not assert that every future hourly overlap has been observed.
