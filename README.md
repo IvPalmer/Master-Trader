@@ -79,20 +79,21 @@ instance from a fresh clone.
 git clone https://github.com/IvPalmer/Master-Trader.git
 cd Master-Trader
 python3 -m venv .venv
-.venv/bin/pip install pytest requests pandas numpy fastapi httpx aiohttp pyyaml jinja2
+.venv/bin/pip install -r requirements-dev.txt
 ```
 
 ```bash
 V=$PWD/.venv/bin/python
-$V -m pytest tests/ -q                                      # 265 passed, 27 skipped
-(cd services/killers-receiver  && $V -m pytest tests/ -q)   # 208 passed
-(cd services/insiders-receiver && $V -m pytest tests/ -q)   # 130 passed
-(cd ft_userdata/ft_dashboard   && $V -m pytest tests/ -q)   #  70 passed
-(cd services/hl-gateway        && $V -m pytest tests/ -q)   #  12 passed
-$V -m pytest killers_bot/tests/test_strict_open.py -q       #  22 passed
+$V -m pytest tests/ -q
+(cd services/killers-receiver  && $V -m pytest tests/ -q)
+(cd services/insiders-receiver && $V -m pytest tests/ -q)
+(cd ft_userdata/ft_dashboard   && $V -m pytest tests/ -q)
+(cd services/hl-gateway        && $V -m pytest tests/ -q)
+$V -m pytest killers_bot/tests/test_strict_open.py -q
 ```
 
-707 passed in total. No Docker is needed; the read-only VPS checks in
+These are the same six suites CI runs on every pull request, in the same order
+(`.github/workflows/tests.yml`). No Docker is needed; the read-only VPS checks in
 `tests/test_infrastructure.py` are opt-in behind `MT_VPS_INTEGRATION=1`. `freqtrade` is not required
 either, and the two funding-staleness tests skip without it.
 
@@ -120,17 +121,30 @@ Start from an existing config in `ft_userdata/user_data/configs/`, then set:
 - `exchange.key` and `exchange.secret` for live trading, left empty for dry-run
 - `dry_run_wallet` and `max_open_trades`
 
-### 4. Start the stack
+### 4. Running the stack
 
-```bash
-cd ft_userdata
-docker compose -f docker-compose.prod.yml up -d
-```
+Steps 1 to 3 are the whole contributor setup. The suites are network-free and need no containers, so
+nothing above requires Docker.
 
-Use `docker-compose.prod.yml`. The dev `docker-compose.yml` is a five-service subset: three bots plus
-`metrics-exporter` and `prometheus`.
+Running the bots is a different thing, and `ft_userdata/docker-compose.prod.yml` is the maintainer's
+deployment rather than a fresh-clone target. It expects four things this repository does not
+provision:
 
-Check the bots answer:
+- 36 operator environment variables, among them `FREQTRADE__EXCHANGE__KEY` and a user and password
+  per bot API
+- the external network `dokploy-network` (`:565`)
+- the external volume `claude-assistant_claude_auth` (`:574`)
+- host paths under `/home/ubuntu/` (`:535`, `:542`)
+
+`FREQTRADE__`-prefixed variables override the JSON, so a credential edited in step 3 is not
+necessarily the one a container runs with.
+
+The dev `ft_userdata/docker-compose.yml` is a five-service subset, three bots plus `metrics-exporter`
+and `prometheus`, with no external network or volume. It still needs exchange credentials and no test
+exercises it.
+
+[RUNTIME.md](RUNTIME.md) is the deployment path, and it is VPS-only by policy. Once a stack is up,
+this checks the bots answer:
 
 ```bash
 for port in 8095 8096 8102; do
@@ -141,6 +155,8 @@ done
 ```
 
 ### 5. Install automation
+
+From the repository root:
 
 ```bash
 bash ft_userdata/automation_scheduler.sh
