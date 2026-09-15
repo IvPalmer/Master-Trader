@@ -13,6 +13,7 @@ from pathlib import Path
 FT_DIR = Path(__file__).parent.parent / "ft_userdata"
 TRACKER = FT_DIR / "bot_evolution_tracker.py"
 BOTS_CONFIG = FT_DIR / "bots_config.json"
+CONFIG_DIR = FT_DIR / "user_data" / "configs"
 
 ACTIVE_BOTS = [
     name
@@ -207,3 +208,71 @@ def test_override_creates_missing_parent_dirs(tmp_path, monkeypatch):
     result = run_tracker("snapshot", "--note", "nested path check")
     assert result.returncode == 0, result.stderr
     assert target.exists()
+
+
+# Config capture: an absent config must be recorded, never a silent {}
+
+
+def probe_config_params(bot_name):
+    """Call extract_config_params out of process, as the data-dir probe above does."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import json, sys, bot_evolution_tracker as t\n"
+            "print('JSON:' + json.dumps(t.extract_config_params(sys.argv[1])))",
+            bot_name,
+        ],
+        capture_output=True,
+        text=True,
+        cwd=str(FT_DIR),
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = next(ln for ln in result.stdout.splitlines() if ln.startswith("JSON:"))
+    return json.loads(payload.removeprefix("JSON:")), result.stdout
+
+
+BOTS_WITH_CONFIG = [b for b in ACTIVE_BOTS if (CONFIG_DIR / f"{b}.json").exists()]
+BOTS_MISSING_CONFIG = [b for b in ACTIVE_BOTS if b not in BOTS_WITH_CONFIG]
+
+
+@pytest.mark.parametrize("bot", BOTS_MISSING_CONFIG)
+def test_missing_config_is_recorded(bot):
+    params, stdout = probe_config_params(bot)
+    assert params.get("_config_missing") == f"{bot}.json"
+    assert "WARNING" in stdout
+
+
+@pytest.mark.parametrize("bot", BOTS_WITH_CONFIG)
+def test_present_config_is_still_extracted(bot):
+    """Paired control: asserting only that absence is flagged would also pass on code
+    that flags everything."""
+    params, _ = probe_config_params(bot)
+    assert "_config_missing" not in params
+    assert set(params) == {
+        "dry_run",
+        "dry_run_wallet",
+        "max_open_trades",
+        "stake_amount",
+        "stoploss_on_exchange",
+        "trading_mode",
+    }
+
+
+def test_both_config_cases_are_covered():
+    """Neither parametrized test above may pass vacuously on an empty list."""
+    assert BOTS_MISSING_CONFIG, "no active bot lacks a config; absence untested"
+    assert BOTS_WITH_CONFIG, "no active bot has a config; control untested"
+
+
+def test_snapshot_never_records_an_empty_config(evolution_dir, snapshot_result):
+    """The defect at the artifact level: a snapshot whose config is {} cannot be told
+    apart from one whose config held no values, and a snapshot cannot be backfilled."""
+    for bot in ACTIVE_BOTS:
+        snapshots = sorted((evolution_dir / bot).glob("2*.json"))
+        assert snapshots, f"no snapshot written for {bot}"
+        with open(snapshots[-1]) as f:
+            data = json.load(f)
+        assert "config" in data, f"{bot} snapshot has no config key"
+        assert data["config"], f"{bot} snapshot recorded an empty config"
