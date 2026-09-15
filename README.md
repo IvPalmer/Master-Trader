@@ -22,151 +22,161 @@ review are recorded in
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                     Docker Compose Stack                          │
-│                                                                   │
-│  ┌────────────────┐ ┌────────────────┐                           │
-│  │ Supertrend     │ │ MasterTraderV1 │                           │
-│  │ Strategy :8084 │ │       :8086    │                           │
-│  │  1h trend      │ │    1h hybrid   │                           │
-│  └────────────────┘ └────────────────┘                           │
-│  ┌────────────────┐ ┌───────────────────────┐                    │
-│  │AlligatorTrendV1│ │ GaussianChannelV1     │                    │
-│  │     :8091      │ │        :8092          │                    │
-│  │   1d trend     │ │      1d trend         │                    │
-│  └────────────────┘ └───────────────────────┘                    │
-│                                                                   │
-│  ┌─────────────┐  ┌────────────┐  ┌───────────┐                  │
-│  │ Metrics     │→ │ Prometheus │→ │  Grafana  │                  │
-│  │ Exporter    │  │   :9091    │  │   :3000   │                  │
-│  │  :9090      │  │  90d ret.  │  │ Dashboard │                  │
-│  └─────────────┘  └────────────┘  └───────────┘                  │
-└──────────────────────────────────────────────────────────────────┘
+Production stack, `ft_userdata/docker-compose.prod.yml`, 13 services:
 
-┌──────────────────────────────────────────────────────────────────┐
-│                    Automation Layer (cron)                         │
-│                                                                   │
-│  Daily   22:00  bot_evolution_tracker.py   → Snapshots           │
-│  Daily   23:00  strategy_health_report.py  → Telegram            │
-│  Weekly  Sun    backtest_gate.py           → Telegram            │
-│  Weekly  Sun    tournament_manager.py      → Rebalance           │
-│  Weekly  Sun    hyperopt_optimizer.py      → Proposals           │
-│  Monthly 1st    walk_forward.py            → Validation          │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+---
+title: Signal to execution path
+---
+flowchart LR
+    tg(["Telegram"]) --> kbot["killers_bot observer"]
+    kbot -->|POST /event| rcv["signal copiers<br/>killers + insiders"]
+    rcv -->|places orders| hlb["Hyperliquid bots<br/>3 containers"]
+    rcv -->|price reads| gw["hl-gateway<br/>shared REST budget"]
+    hlb -->|CCXT| gw
+    gw --> hlapi(["api.hyperliquid.xyz"])
+    spb["Binance spot bots<br/>3 containers"] -->|CCXT| bnc(["Binance"])
+    mex["metrics-exporter<br/>circuit breaker"] -->|polls, can halt| hlb
+    mex -->|polls, can halt| spb
+    prm["prometheus"] -->|scrapes| mex
 ```
+
+Arrows show request initiation, not data flow. `metrics-exporter` and `prometheus` both poll, so on
+those edges the data travels the other way.
+
+The diagram covers the signal-to-execution path only. Left out for legibility: `funding-refresh`,
+which writes Binance funding rates into the shared `ft_user_data` volume that all six bots and the
+dashboard mount; `ft-dashboard`, which reads four read-only state volumes rather than Prometheus; and
+per-service ports. `ft_userdata/docker-compose.prod.yml` holds all 13 services, and every published
+port binds to `127.0.0.1`.
+
+`metrics-exporter` takes its bot list from `ft_userdata/bots_config.json`
+(`ft_userdata/metrics_exporter.py:36`), polls each bot's Freqtrade REST API on `:8080` (`:271`,
+`:477`), and halts entries when the portfolio circuit breaker trips by posting `/stopentry` (`:485`).
+That config file is the source of truth for which strategies are active and which wallet each one
+draws on, so check it rather than this diagram if the two ever disagree.
+
+`killers_bot` is not in this stack. It runs from `killers_bot/docker-compose.yml` and reaches the
+receivers over HTTP.
+
+Automation runs from cron, installed by `ft_userdata/automation_scheduler.sh`. Schedules and outputs
+are in the table below.
 
 ## Quick Start
 
+The maintainer runs this on a VPS; see [RUNTIME.md](RUNTIME.md). The steps below stand up your own
+instance from a fresh clone.
+
 ### Prerequisites
 
-- Docker & Docker Compose
-- Python 3.11+ with `requests`, `prometheus_client`, `numpy`
-- A Binance spot account and/or dedicated Hyperliquid accounts (keys optional for dry-run)
+- Python 3.13, which is what the suites are tested against
+- Docker and Docker Compose, for the stack
+- A Binance spot account and/or a Hyperliquid account. Keys are optional for dry-run.
 
-### 1. Set Up Freqtrade Directory
-
-```bash
-mkdir -p ~/ft_userdata/user_data/{strategies,configs,data,backtest_results,logs}
-mkdir -p ~/ft_userdata/grafana/{provisioning/datasources,provisioning/dashboards,dashboards}
-mkdir -p ~/ft_userdata/exporter
-```
-
-### 2. Copy Files from This Repo
+### 1. Clone and run the tests
 
 ```bash
-# Docker & infra
-cp deploy/docker-compose.yml ~/ft_userdata/
-cp deploy/Dockerfile.nfi ~/ft_userdata/
-cp deploy/monitoring/prometheus.yml ~/ft_userdata/
-cp deploy/monitoring/exporter/Dockerfile ~/ft_userdata/exporter/
-cp deploy/monitoring/grafana/provisioning/datasources/datasource.yml ~/ft_userdata/grafana/provisioning/datasources/
-cp deploy/monitoring/grafana/provisioning/dashboards/dashboard.yml ~/ft_userdata/grafana/provisioning/dashboards/
-cp deploy/monitoring/grafana/dashboards/freqtrade.json ~/ft_userdata/grafana/dashboards/
-
-# Automation scripts
-cp deploy/automation/*.py ~/ft_userdata/
-cp deploy/automation/automation_scheduler.sh ~/ft_userdata/
-
-# Backtest config
-cp deploy/configs/config-backtest.json ~/ft_userdata/user_data/
-
-# Strategy configs (customize from template)
-cp deploy/configs/strategy-template.json ~/ft_userdata/user_data/configs/MyStrategy.json
+git clone https://github.com/IvPalmer/Master-Trader.git
+cd Master-Trader
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
 ```
-
-### 3. Copy Strategies & Configs
 
 ```bash
-# All 9 strategies included — copy them all
-cp deploy/strategies/*.py ~/ft_userdata/user_data/strategies/
-
-# Copy all strategy configs (already sanitized — update credentials)
-cp deploy/configs/*.json ~/ft_userdata/user_data/configs/
+V=$PWD/.venv/bin/python
+$V -m pytest tests/ -q
+(cd services/killers-receiver  && $V -m pytest tests/ -q)
+(cd services/insiders-receiver && $V -m pytest tests/ -q)
+(cd ft_userdata/ft_dashboard   && $V -m pytest tests/ -q)
+(cd services/hl-gateway        && $V -m pytest tests/ -q)
+$V -m pytest killers_bot/tests/test_strict_open.py -q
 ```
 
-Then edit each config in `~/ft_userdata/user_data/configs/`:
-- Change `api_server.jwt_secret_key` and `password` (search for `CHANGE-ME`)
-- Set `exchange.key` and `exchange.secret` for live trading (leave empty for dry-run)
-- Adjust `dry_run_wallet`, `max_open_trades` as needed
+These are the same six suites CI runs on every pull request, in the same order
+(`.github/workflows/tests.yml`). No Docker is needed; the read-only VPS checks in
+`tests/test_infrastructure.py` are opt-in behind `MT_VPS_INTEGRATION=1`. `freqtrade` is not required
+either, and the two funding-staleness tests skip without it.
 
-### 5. Add a Bot to docker-compose.yml
+### 2. Where things live
 
-```yaml
-mybot:
-  image: freqtradeorg/freqtrade:stable
-  restart: unless-stopped
-  container_name: ft-mybot
-  volumes:
-    - "./user_data:/freqtrade/user_data"
-  ports:
-    - "127.0.0.1:8080:8080"  # Use unique host port per bot
-  command: >
-    trade
-    --logfile /freqtrade/user_data/logs/MyStrategy.log
-    --config /freqtrade/user_data/configs/MyStrategy.json
-    --strategy MyStrategy
-```
+Nothing needs copying. `ft_userdata/` is both the Freqtrade working directory and the Compose build
+context:
 
-### 6. Start Everything
+- `ft_userdata/user_data/strategies/` strategy files
+- `ft_userdata/user_data/configs/` per-strategy configs
+- `ft_userdata/user_data/config-backtest.json` backtesting config
+- `ft_userdata/bots_config.json` which strategies are active, and their wallets
+- `ft_userdata/prometheus.yml`, `ft_userdata/exporter/`, `ft_userdata/Dockerfile.nfi` monitoring and
+  image build inputs
+- `deploy/` holds only `vps/`, operational scripts for the maintainer's host
+
+Earlier revisions of this README copied files out of a top-level `deploy/` tree. That tree was
+consolidated into `ft_userdata/` in `c1885d7` and no longer exists.
+
+### 3. Configure a bot
+
+Start from an existing config in `ft_userdata/user_data/configs/`, then set:
+
+- `api_server.jwt_secret_key` and `api_server.password`
+- `exchange.key` and `exchange.secret` for live trading, left empty for dry-run
+- `dry_run_wallet` and `max_open_trades`
+
+### 4. Running the stack
+
+Steps 1 to 3 are the whole contributor setup. The suites are network-free and need no containers, so
+nothing above requires Docker.
+
+Running the bots is a different thing, and `ft_userdata/docker-compose.prod.yml` is the maintainer's
+deployment rather than a fresh-clone target. It expects four things this repository does not
+provision:
+
+- 36 operator environment variables, among them `FREQTRADE__EXCHANGE__KEY` and a user and password
+  per bot API
+- the external network `dokploy-network` (`:565`)
+- the external volume `claude-assistant_claude_auth` (`:574`)
+- host paths under `/home/ubuntu/` (`:535`, `:542`)
+
+`FREQTRADE__`-prefixed variables override the JSON, so a credential edited in step 3 is not
+necessarily the one a container runs with.
+
+The dev `ft_userdata/docker-compose.yml` is a five-service subset, three bots plus `metrics-exporter`
+and `prometheus`, with no external network or volume. It still needs exchange credentials and no test
+exercises it.
+
+[RUNTIME.md](RUNTIME.md) is the deployment path, and it is VPS-only by policy. Once a stack is up,
+this checks the bots answer:
 
 ```bash
-cd ~/ft_userdata
-docker compose up -d
-
-# Verify bots are healthy:
-for port in 8084 8086 8091 8092; do
-  echo -n "Port $port: "
-  curl -s -u freqtrader:yourpassword http://localhost:$port/api/v1/ping
+for port in 8095 8096 8102; do
+  echo -n "port $port: "
+  curl -s -u <api_user>:<api_password> http://127.0.0.1:$port/api/v1/ping
   echo
 done
 ```
 
-### 7. Install Automation
+### 5. Install automation
 
-Edit the scripts in `~/ft_userdata/` to match your bot configuration (ports, strategy names, credentials), then:
+From the repository root:
 
 ```bash
-# Update BOTS dict in each script to match your setup
-# Update API_USER/API_PASS, WEBHOOK_URL, INITIAL_CAPITAL
-
-# Install cron jobs
-bash ~/ft_userdata/automation_scheduler.sh
-
-# Test health report
-python3 ~/ft_userdata/strategy_health_report.py --stdout
+bash ft_userdata/automation_scheduler.sh
+python3 ft_userdata/strategy_health_report.py --stdout
 ```
+
+Each script reads bot ports, credentials and webhook targets from its own constants. Check those
+against your setup before installing the cron entries.
 
 ## Automation Scripts
 
-| Script | Schedule | Purpose |
-|--------|----------|---------|
-| `strategy_health_report.py` | Daily 23:00 UTC | Health scores (0-100), flags, recommendations |
-| `backtest_gate.py` | Weekly Sun 04:00 | Validate strategies via backtesting |
-| `hyperopt_optimizer.py` | Weekly Sun 06:00 | Parameter optimization with OOS validation |
-| `tournament_manager.py` | Weekly Sun 05:00 | Rank strategies, rebalance capital |
-| `walk_forward.py` | Monthly 1st 07:00 | Rolling train/test to prevent overfitting |
-| `metrics_exporter.py` | Always-on (Docker) | Prometheus metrics + portfolio circuit breaker |
+| Script | Schedule | Output | Purpose |
+|--------|----------|--------|---------|
+| `bot_evolution_tracker.py` | Daily 22:00 | Snapshots | Fleet snapshots and changelog |
+| `strategy_health_report.py` | Daily 23:00 UTC | Telegram | Health scores (0-100), flags, recommendations |
+| `backtest_gate.py` | Weekly Sun 04:00 | Telegram | Validate strategies via backtesting |
+| `tournament_manager.py` | Weekly Sun 05:00 | Rebalance | Rank strategies, rebalance capital |
+| `hyperopt_optimizer.py` | Weekly Sun 06:00 | Proposals | Parameter optimization with OOS validation |
+| `walk_forward.py` | Monthly 1st 07:00 | Validation | Rolling train/test to prevent overfitting |
+| `metrics_exporter.py` | Always-on (Docker) | Prometheus | Prometheus metrics + portfolio circuit breaker |
 
 All scripts can be run manually: `python3 script.py --help`
 
@@ -185,9 +195,11 @@ See `research/risk-implementation-plan.md` for the full implementation plan.
 
 ## Monitoring
 
-- **Grafana**: http://localhost:3000 — Master Dashboard with portfolio summary, per-bot P&L, charts
-- **FreqUI**: http://localhost:{port} per bot — native Freqtrade web UI
-- **Prometheus**: http://localhost:9091 — raw metrics (90-day retention)
+- **ft-dashboard**: the operator dashboard (`ft_userdata/ft_dashboard/`, FastAPI), portfolio summary
+  and per-bot analytics. Served behind Traefik in production rather than on a published port.
+- **FreqUI**: `http://127.0.0.1:<port>` per bot, the native Freqtrade web UI. Ports are listed under
+  Architecture.
+- **Prometheus**: `http://127.0.0.1:9091`, raw metrics.
 
 ## External Integrations (Optional)
 
@@ -212,32 +224,43 @@ To replicate: set up any webhook receiver that accepts the payload format above,
 Current operator-dashboard behavior, consolidated portfolio semantics, chart lifecycle safeguards, and the dashboard-only deployment procedure are documented in [docs/dashboard-portfolio-analytics-2026-08-23.md](docs/dashboard-portfolio-analytics-2026-08-23.md).
 
 ```
-research/                        # Strategy research & evidence
-  REPORT.md                      # Start here — synthesized findings
-  risk-implementation-plan.md    # Master risk management plan
-  automation-system.md           # Automation layer documentation
-  trade-data-analysis.md         # Actual MAE/trade data analysis
-  ...                            # 15+ research files
+ft_userdata/                     # Freqtrade working dir and Compose context
+  docker-compose.prod.yml        # production stack, 13 services
+  docker-compose.yml             # dev stack
+  bots_config.json               # which strategies are active, and their wallets
+  prometheus.yml                 # Prometheus scrape config
+  Dockerfile.nfi                 # bot image build
+  exporter/                      # metrics exporter image
+  ft_dashboard/                  # FastAPI operator dashboard
+  engine/                        # validation engine
+  user_data/
+    strategies/                  # strategy files
+    configs/                     # per-strategy configs
+    config-backtest.json         # backtesting config
+  strategy_health_report.py      # daily health scoring
+  backtest_gate.py               # backtesting validation gate
+  hyperopt_optimizer.py          # parameter optimization
+  tournament_manager.py          # capital rebalancing
+  walk_forward.py                # walk-forward validation
+  metrics_exporter.py            # Prometheus metrics + circuit breaker
+  bot_evolution_tracker.py       # snapshots
+  automation_scheduler.sh        # cron installer
 
-deploy/                          # Everything needed to deploy
-  docker-compose.yml             # Full stack: 6 bots + monitoring
-  configs/
-    strategy-template.json       # Template for new strategy configs
-    config-backtest.json         # Backtesting config (static pairlist)
-  automation/
-    strategy_health_report.py    # Daily health scoring
-    backtest_gate.py             # Backtesting validation gate
-    hyperopt_optimizer.py        # Parameter optimization loop
-    tournament_manager.py        # Capital rebalancing
-    walk_forward.py              # Walk-forward validation
-    metrics_exporter.py          # Prometheus metrics + circuit breaker
-    automation_scheduler.sh      # Cron job installer
-  monitoring/
-    prometheus.yml               # Prometheus scrape config
-    exporter/Dockerfile          # Metrics exporter Docker image
-    grafana/
-      dashboards/freqtrade.json  # Pre-built Grafana dashboard
-      provisioning/              # Grafana auto-provisioning configs
+services/
+  killers-receiver/              # Telegram signal copier
+  insiders-receiver/
+  hl-gateway/                    # shared Hyperliquid REST proxy
+  trade-webhook/
+
+research/                        # strategy research and evidence
+  REPORT.md                      # synthesized findings
+  risk-implementation-plan.md    # risk management plan
+  automation-system.md           # automation layer documentation
+
+docs/                            # audits, runbooks, session records
+deploy/vps/                      # VPS operational scripts
+killers_bot/                     # Telegram listener
+tests/                           # root test suite
 ```
 
 ## Key Principles
