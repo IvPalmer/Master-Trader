@@ -32,6 +32,10 @@ CONFIGS_DIR = Path.home() / "ft_userdata" / "user_data" / "configs"
 FT_DIR = Path.home() / "ft_userdata"
 LOGS_DIR = Path.home() / "ft_userdata" / "logs"
 PROPOSALS_DIR = Path.home() / "ft_userdata" / "optimization_proposals"
+BASE_BACKTEST_CONFIG = FT_DIR / "user_data" / "config-backtest.json"
+# Must sit under user_data/: that is the only path bind-mounted into the backtest
+# container, so a config written anywhere else is invisible to it.
+VALIDATION_CONFIG_DIR = FT_DIR / "user_data" / "hyperopt_results"
 WEBHOOK_URL = "http://localhost:8088/webhooks/freqtrade"
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -211,6 +215,60 @@ def _parse_hyperopt_output(output: str, strategy: str) -> Optional[dict]:
 # Out-of-Sample Validation
 # ---------------------------------------------------------------------------
 
+# Hyperopt keys a Freqtrade config can carry. Buy and sell hyperspace parameters
+# live in the strategy file, so no config can express them.
+# Source of truth is engine.walk_forward._extract_param_overrides: adding a key here
+# that it cannot map would drop that parameter silently, which is the failure this
+# whole check exists to prevent. Widen the extractor first, then this set.
+CONFIG_EXPRESSIBLE_PARAMS = frozenset({
+    "stoploss",
+    "roi",
+    "minimal_roi",
+    "trailing_stop",
+    "trailing_stop_positive",
+    "trailing_stop_positive_offset",
+    "trailing_only_offset_is_reached",
+})
+
+
+def _write_validation_config(strategy: str, optimized_params: dict) -> Optional[str]:
+    """
+    Write a backtest config carrying the optimized params.
+
+    Returns the container-internal path, or None if the parameters cannot be
+    expressed in a config, in which case the validation must not run at all.
+    """
+    unsupported = sorted(set(optimized_params) - CONFIG_EXPRESSIBLE_PARAMS)
+    if unsupported:
+        log.error(
+            "Cannot validate %s: hyperopt returned %s, which no config can carry. "
+            "Validating without them would measure a partly-tuned strategy.",
+            strategy, ", ".join(unsupported),
+        )
+        return None
+
+    if not BASE_BACKTEST_CONFIG.exists():
+        log.error("Base backtest config not found: %s", BASE_BACKTEST_CONFIG)
+        return None
+
+    try:
+        from engine.walk_forward import _extract_param_overrides
+    except ImportError as e:
+        log.error("Cannot validate %s: %s", strategy, e)
+        return None
+
+    with open(BASE_BACKTEST_CONFIG) as f:
+        config = json.load(f)
+    config.update(_extract_param_overrides(optimized_params))
+
+    VALIDATION_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = VALIDATION_CONFIG_DIR / f"validation-{strategy}.json"
+    with open(out_path, "w") as f:
+        json.dump(config, f, indent=2)
+
+    return f"/freqtrade/user_data/{VALIDATION_CONFIG_DIR.name}/{out_path.name}"
+
+
 def validate_optimization(
     strategy: str,
     optimized_params: dict,
@@ -230,15 +288,8 @@ def validate_optimization(
 
     log.info("Validating %s on %d-day out-of-sample window...", strategy, validation_days)
 
-    # We can't easily inject params into the strategy file for a Docker run,
-    # so we validate by running the backtest with current config (which should
-    # already have the base parameters). For a proper test, we'd need to create
-    # a temporary config with the optimized params.
-
-    # Create temporary config with optimized params
-    config_path = CONFIGS_DIR / f"{strategy}.json"
-    if not config_path.exists():
-        log.error("Config not found: %s", config_path)
+    config_path = _write_validation_config(strategy, optimized_params)
+    if config_path is None:
         return None
 
     cmd = [
@@ -247,7 +298,7 @@ def validate_optimization(
         image,
         "backtesting",
         "--strategy", strategy,
-        "--config", "/freqtrade/user_data/config-backtest.json",
+        "--config", config_path,
         "--timerange", timerange,
     ]
 
