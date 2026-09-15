@@ -179,6 +179,18 @@ def _is_stage_available(stage: str) -> bool:
     return mapping.get(stage) is not None
 
 
+def _viability_trades(via_data: dict) -> list[dict]:
+    """Read the viability backtest's trades back from the results file it recorded."""
+    metrics = via_data.get("metrics") or {}
+    result_file = metrics.get("_result_file")
+    bt_strategy = metrics.get("_bt_strategy")
+    if not result_file or not bt_strategy or not Path(result_file).is_file():
+        return []
+
+    from engine.calibration import _load_backtest_trades
+    return _load_backtest_trades(result_file, bt_strategy)
+
+
 def _print_registry_table() -> None:
     """Print a formatted table of all registered strategies."""
     header = f"{'Strategy':<25} {'TF':<5} {'Mode':<8} {'Port':<6} {'Stake':<7} {'Status':<8}"
@@ -652,7 +664,7 @@ def run_pipeline(
                     base_params = consensus.get("consensus_params", {})
                     # Collect trades from viability backtest for MC shuffle
                     via_data = results["strategies"][strat_name].get("viability", {})
-                    trades = via_data.get("_trades", [])
+                    trades = _viability_trades(via_data)
                     rob_result = run_robustness_stage(
                         strategy_name=strat_name,
                         trades=trades,
