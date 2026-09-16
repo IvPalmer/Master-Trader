@@ -560,6 +560,7 @@
     },
     {
       "id": "killers-retention-shadow-v1",
+      "amendments": [{"date": "2026-09-16", "reason": "Accounting implementation completed before any prospective completed pairs. Original epoch and +2R/1R policy unchanged. Settled exchange fills/funding and causal account taker fees now drive paired replay; fixed quoted, one-sample/half-depth/10bps, and two-sample/quarter-depth/25bps stresses, with date-clustered uncertainty and explicit exclusions. See research/profit_retention/ACCOUNTING.md. No live promotion authorized."}],
       "bot": "KillersScalpV1",
       "status": "open",
       "registered": "2026-09-16",

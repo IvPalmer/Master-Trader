@@ -1,7 +1,9 @@
 # Profit retention research — 2026-09-16
 
 Related to [#28](https://github.com/IvPalmer/Master-Trader/issues/28).
-Status: descriptive research and proposed forward experiment. No live exit,
+Original study status: descriptive research and proposed forward experiment.
+For the subsequently implemented forward collector and accounting, see
+[ACCOUNTING.md](ACCOUNTING.md). No live exit,
 allocation, runtime configuration or preregistration has changed. Shadow
 collection is **not running** as part of this work.
 

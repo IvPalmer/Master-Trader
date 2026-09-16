@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh settled trading cash flows and exit research every five minutes
+
+[Timer]
+OnBootSec=60s
+OnUnitInactiveSec=300s
+AccuracySec=1s
+Unit=master-trader-retention-accounting.service
+
+[Install]
+WantedBy=timers.target

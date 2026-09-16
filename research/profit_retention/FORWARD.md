@@ -4,7 +4,14 @@ Related to #28. Frozen hypothesis: full-position trailing stop arms at +2R and
 trails 1R, with risk based on actual fill and original posted stop. Baseline
 remains the live source policy. No live order submission or allocation change.
 
-## What is running versus still required
+## Implementation status
+
+Update 2026-09-16: paired event replay, settled fees/funding, execution stress and
+uncertainty reporting are now implemented in `accounting.py` and `ledger.py`. See
+[ACCOUNTING.md](ACCOUNTING.md) for the current system. The descriptions below
+record the original observation-only stage; its limitations motivated that work.
+
+## Original observation-only stage
 
 `collector.py` runs once per minute on the VPS, reading Freqtrade trade status
 and history plus Hyperliquid mark contexts and top-20 order-book levels. It uses
