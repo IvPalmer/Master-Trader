@@ -1,0 +1,17 @@
+[Unit]
+Description=Master Trader read-only profit-retention observations
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+UMask=0077
+ExecStart=/usr/bin/python3 /home/ubuntu/master-trader/research/profit-retention-tool-v1/collector.py --once --directory /home/ubuntu/master-trader/research/profit-retention-forward-v1
+TimeoutStartSec=110
+Nice=10
+MemoryMax=128M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/master-trader/research/profit-retention-forward-v1
