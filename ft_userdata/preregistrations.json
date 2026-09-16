@@ -557,6 +557,23 @@
         "Include a placebo/null comparison: a trigger that cannot beat a random mask of equal pass rate is not a trigger",
         "Exit design is OPEN and must be specified before validation — the current ROI ladder and 36h time-exit were built for a fade and are probably wrong for a continuation hold that is collecting funding"
       ]
+    },
+    {
+      "id": "killers-retention-shadow-v1",
+      "bot": "KillersScalpV1",
+      "status": "open",
+      "registered": "2026-09-16",
+      "review_by": "2026-12-15",
+      "min_closed_trades": 30,
+      "rules": [
+        "Read-only forward observation for +2R arm / 1R full-position trail versus unchanged actual source exits; details in research/profit_retention/FORWARD.md. No live orders or allocation changes.",
+        "Actual epoch start and collector hash are frozen in the private VPS manifest before the first observation. Existing positions are observational and excluded from fresh evidence.",
+        "Review floor: 30 completed pairs and 10 armed challengers; 90-day review may conclude insufficient evidence. No automatic promotion.",
+        "Matched fees/funding, partial fills and source-exit event replay, latency/nonfill stress and uncertainty/drawdown reporting must be validated before scoring net advantage. Minute-sampled marks are not exact exchange execution evidence.",
+        "No tuning on this cohort. Record all exclusions and amendments. Negative historical development results prohibit claiming robust benefit from the six-trade diagnostic."
+      ],
+      "triggers": [],
+      "resolution": null
     }
   ]
 }
