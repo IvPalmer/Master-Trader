@@ -281,6 +281,7 @@ def run_full_backtest(
         )
         if result_files:
             metrics["_result_file"] = str(result_files[0])
+            metrics["_bt_strategy"] = bt_strategy
 
         log.info("Backtest %s: %d trades, PF=%.2f, DD=%.1f%%",
                  strategy_name,
