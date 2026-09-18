@@ -10,13 +10,13 @@
 
 // Palette mirrors styles.css tokens so charts match the page.
 const COLORS = {
-  surface:  '#fffefb',
-  surface2: '#f7f5ed',
+  surface:  '#ffffff',
+  surface2: '#f6f8fa',
   text:     '#12171f',
   text2:    '#56606e',
-  text3:    '#9098a4',
-  border:   '#e7e3d6',
-  hairline: '#efece1',
+  text3:    '#61717f',
+  border:   '#dce3e9',
+  hairline: '#edf1f4',
   accent:   '#0e87a3',
   pos:      '#0a8f5b',
   neg:      '#d2473a',
@@ -66,6 +66,15 @@ function dash() {
     tradesView: 'open',
     tradesFilter: 'all',
     _tradeTfOverride: {},
+    _tradeScale: {},
+    expandedTrade: null,
+    expandTrade(trade) {
+      const id = this.tradeChartId(trade);
+      this.expandedTrade = this.expandedTrade === id ? null : id;
+      this.$nextTick(() => { this._scheduleChartResize(); document.getElementById(id)?.closest(".trade-card")?.scrollIntoView({block:"start"}); });
+    },
+    setTradeScale(trade, value) { this._tradeScale[this.tradeChartId(trade)] = value; this.renderTradeChart(trade); },
+    tradeScale(trade) { return this._tradeScale[this.tradeChartId(trade)] || "price"; },
     _chartObservers: {},
     _chartResizeTimers: [],
     _equityData: {},
@@ -977,13 +986,15 @@ function dash() {
           const ftStop = (typeof t.stop_loss_abs === 'number' && t.stop_loss_abs > 0) ? t.stop_loss_abs : null;
           const stopIsPosted = (typeof postedSL === 'number' && postedSL > 0);
           out.push({
-            bot_key: b.key, bot_name: b.name, pair: t.pair,
+            bot_key: b.key, bot_name: b.name, pair: t.pair, dry_run: b.dry_run,
             open_rate: t.open_rate, close_rate: t.current_rate,
             open_ts: t.open_timestamp, close_ts: now,
             profit_pct: t.profit_pct, profit_abs: t.profit_abs,
             is_win: (t.profit_abs || 0) > 0, is_open: true,
-            stop_rate: stopIsPosted ? postedSL : ftStop,
-            stop_is_posted: stopIsPosted,
+            stop_rate: ftStop,
+            is_short: t.is_short,
+            exit_levels: (t.exit_levels || []).filter(x => ["active","pending","unknown","placing","blocked","rejected"].includes(x.state)),
+            stop_is_posted: false,
             stoploss_pct: t.stop_loss_pct,
             duration_min: openMs ? Math.round((now - openMs) / 60000) : 0,
             booked_pct: t.booked_pct ?? null,
@@ -1146,120 +1157,12 @@ function dash() {
       }
       this._tradeChartState[chartId] = { loading: false, clipped: candles[0][0] > toMs(trade.open_ts) };
 
-      const span = toMs(trade.close_ts) - toMs(trade.open_ts);
-      const visiblePadMs = Math.max(span * 0.5, 30 * 60 * 1000);
-      const visibleStart = toMs(trade.open_ts) - visiblePadMs;
-      const visibleEnd = toMs(trade.close_ts) + visiblePadMs;
-
-      const allCandles = candles.filter(c => c && c.length >= 5);
-      if (!allCandles.length) return;
-
-      const chart = this._ensureChart(chartId);
-      if (!chart) return;
-
-      const dates = allCandles.map(c => typeof c[0] === 'number' ? toMs(c[0]) : new Date(c[0]).getTime());
-      const ohlc = allCandles.map(c => [c[1], c[2], c[3], c[4]]);
-
-      const winColor = trade.is_win ? COLORS.pos : COLORS.neg;
-      const entryTs = toMs(trade.open_ts);
-      const exitTs = toMs(trade.close_ts);
-
-      chart.setOption({
-        ...ECHART_COMMON,
-        animation: false,
-        grid: { left: 12, right: 56, top: 12, bottom: 54, containLabel: false },
-        xAxis: {
-          type: 'time',
-          axisLine: { lineStyle: { color: COLORS.border } },
-          axisLabel: { color: COLORS.text3, fontSize: 9, hideOverlap: true },
-          splitLine: { show: false },
-          axisPointer: { label: { show: false } },
-        },
-        yAxis: {
-          type: 'value', scale: true, position: 'right',
-          axisLine: { lineStyle: { color: COLORS.border } },
-          axisLabel: { color: COLORS.text3, fontSize: 9, formatter: v => v.toPrecision(4) },
-          splitLine: { lineStyle: { color: COLORS.border, opacity: 0.5 } },
-          axisPointer: { label: { show: false } },
-          min: ({ min, max }) => {
-            const lo = Math.min(min, trade.open_rate, trade.close_rate, trade.stop_rate || trade.open_rate);
-            const range = Math.max(max - min, 0.0001);
-            return lo - range * 0.05;
-          },
-          max: ({ min, max }) => {
-            const hi = Math.max(max, trade.open_rate, trade.close_rate, trade.stop_rate || trade.open_rate);
-            const range = Math.max(max - min, 0.0001);
-            return hi + range * 0.05;
-          },
-        },
-        dataZoom: [{
-          type: 'slider', xAxisIndex: 0,
-          startValue: visibleStart, endValue: visibleEnd,
-          height: 22, bottom: 12,
-          backgroundColor: COLORS.surface2, fillerColor: 'rgba(14, 135, 163, 0.12)',
-          borderColor: COLORS.border, handleSize: '120%',
-          handleStyle: { color: COLORS.accent, borderColor: COLORS.accent },
-          textStyle: { color: COLORS.text3, fontSize: 9 },
-          showDetail: false, filterMode: 'filter',
-        }],
-        series: [{
-          type: 'candlestick',
-          data: dates.map((d, i) => [d, ...ohlc[i]]),
-          itemStyle: {
-            color: COLORS.pos, color0: COLORS.neg,
-            borderColor: COLORS.pos, borderColor0: COLORS.neg, borderWidth: 1,
-          },
-          markLine: {
-            symbol: 'none', silent: true, animation: false, precision: 6,
-            data: [
-              { yAxis: trade.open_rate,
-                lineStyle: { color: COLORS.text2, type: 'solid', width: 1, opacity: 0.8 },
-                label: { show: true, formatter: 'entry ' + (trade.open_rate||0).toPrecision(5),
-                         position: 'insideStartTop', color: COLORS.text2, fontSize: 10, padding: [2, 4],
-                         backgroundColor: 'rgba(255,254,251,0.9)', borderRadius: 2, borderColor: COLORS.border, borderWidth: 1 } },
-              { yAxis: trade.close_rate,
-                lineStyle: { color: winColor, type: 'solid', width: 1, opacity: 0.8 },
-                label: { show: true, formatter: (trade.is_open ? 'now ' : (trade.is_win ? 'roi ' : 'sl ')) + (trade.close_rate||0).toPrecision(5),
-                         position: 'insideEndTop', color: winColor, fontSize: 10, padding: [2, 4],
-                         backgroundColor: 'rgba(255,254,251,0.9)', borderRadius: 2, borderColor: winColor, borderWidth: 1 } },
-              ...(trade.stop_rate ? [{
-                yAxis: trade.stop_rate,
-                lineStyle: { color: COLORS.neg, type: 'dashed', width: 1, opacity: 0.35 },
-                label: { show: true, formatter: (trade.is_open ? (trade.stop_is_posted ? 'SL ' : 'stop ') + (trade.stop_rate||0).toPrecision(5) : 'stop ' + (trade.stoploss_pct||0).toFixed(1) + '%'),
-                         position: 'insideStartBottom', color: COLORS.neg, fontSize: 9, padding: [2, 4],
-                         backgroundColor: 'rgba(255,254,251,0.9)', borderRadius: 2, opacity: 0.8 },
-              }] : []),
-            ],
-          },
-          markPoint: {
-            symbolSize: 12, animation: false, silent: true, label: { show: false },
-            data: [
-              { name: 'entry', value: trade.open_rate, xAxis: entryTs, yAxis: trade.open_rate,
-                symbol: 'circle', itemStyle: { color: COLORS.text, borderColor: COLORS.surface, borderWidth: 2 } },
-              { name: 'exit', value: trade.close_rate, xAxis: exitTs, yAxis: trade.close_rate,
-                symbol: 'circle', itemStyle: { color: winColor, borderColor: COLORS.surface, borderWidth: 2 } },
-            ],
-          },
-        }],
-        tooltip: {
-          trigger: 'axis', axisPointer: { type: 'cross' },
-          backgroundColor: COLORS.surface, borderColor: COLORS.border,
-          textStyle: { color: COLORS.text, fontSize: 10 },
-          formatter: params => {
-            const p = params.find(x => x.seriesType === 'candlestick');
-            if (!p) return '';
-            const [, o, c, l, h] = p.data;
-            const d = new Date(p.axisValue);
-            const ts = (d.getUTCMonth()+1) + '-' + String(d.getUTCDate()).padStart(2,'0') + ' ' +
-                       String(d.getUTCHours()).padStart(2,'0') + ':' + String(d.getUTCMinutes()).padStart(2,'0');
-            return `<b>${ts}</b><br/>O ${o.toPrecision(5)}<br/>H ${h.toPrecision(5)}<br/>L ${l.toPrecision(5)}<br/>C ${c.toPrecision(5)}`;
-          },
-        },
-      }, true);
-      // Re-fit to the container: if the card was initialised while its tab was
-      // hidden (display:none → 0×0), this picks up the real size once visible,
-      // preventing a blank chart after a tab switch.
-      chart.resize();
+      const el = document.getElementById(chartId);
+      if (!el || !window.TradingPriceChart) return;
+      if (charts[chartId] && charts[chartId].getDom() !== el) { charts[chartId].dispose(); delete charts[chartId]; }
+      if (!charts[chartId]) charts[chartId] = new window.TradingPriceChart(el);
+      charts[chartId].render(candles, trade, tf, this.tradeScale(trade));
+      charts[chartId].resize();
     },
 
     _resizeChart(id, chart = charts[id]) {

@@ -19,8 +19,10 @@
         src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"
         integrity="sha384-Mx5lkUEQPM1pOJCwFtUICyX45KNojXbkWdYhkKUKsbv391mavbfoAmONbzkgYPzR"
         crossorigin="anonymous"></script>
+<link rel="stylesheet" href="/static/workspace.css?v=41">
+<script defer src="/static/price-chart.js?v=41"></script>
 </head>
-<body x-data="dash()" x-init="boot()">
+<body x-data="dash()" x-init="boot()" @keydown.escape.window="expandedTrade=null; $nextTick(() => _scheduleChartResize())">
 
 <div class="shell">
 
@@ -78,7 +80,7 @@
 
     <header class="portfolio-head">
       <div>
-        <h1>live portfolio</h1>
+        <h1>Portfolio overview</h1>
         <p>
           <span x-text="liveBots.length">0</span> strategies ·
           <span x-text="liveAccountCount">0</span> funded accounts ·
@@ -154,52 +156,23 @@
     </div>
 
     <!-- ── B: Fleet vitals strip (compact, secondary when incidents exist) ── -->
-    <div class="vitals-strip" :class="attentionItems.length > 0 ? 'secondary' : ''">
-      <button class="vital-cell" @click="document.getElementById('chart-equity')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">account equity</span>
-        <span class="vital-val num" x-text="fmtUsd(hero.walletNow)">—</span>
-      </button>
-      <button class="vital-cell accent" @click="document.getElementById('chart-equity')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">marked p&l</span>
-        <span class="vital-val num" :class="hero.totalPnl >= 0 ? 'pos' : 'neg'"
-              x-text="fmtUsdSigned(hero.totalPnl) + ' (' + fmtPctSigned(hero.totalPct) + ')'">—</span>
-      </button>
-      <button class="vital-cell" @click="document.getElementById('chart-equity')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">closed p&l</span>
-        <span class="vital-val num" :class="hero.totalRealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalRealizedPnl)">—</span>
-      </button>
-      <button class="vital-cell" @click="openPositionsTab()">
-        <span class="vital-label">open p&l</span>
-        <span class="vital-val num" :class="hero.totalUnrealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)">—</span>
-      </button>
-      <button class="vital-cell" @click="document.getElementById('chart-candles')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">open positions</span>
-        <span class="vital-val num" x-text="hero.openCount">0</span>
-      </button>
-      <button class="vital-cell" @click="document.getElementById('chart-drawdown')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">capital at risk</span>
-        <span class="vital-val num" x-text="fmtUsd(hero.capitalAtRisk)">—</span>
-      </button>
-      <button class="vital-cell" @click="document.querySelector('.ledger')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">current drawdown</span>
-        <span class="vital-val num" x-text="fmtPct(hero.drawdownCurrentPct, 2)">—</span>
-      </button>
-      <button class="vital-cell" @click="document.querySelector('.ledger')?.scrollIntoView({behavior:'smooth'})">
-        <span class="vital-label">closed trades</span>
-        <span class="vital-val num" x-text="hero.closedTrades">0</span>
-      </button>
+    <div class="workspace-vitals">
+      <div><span>Account equity</span><strong x-text="fmtUsd(hero.walletNow)"></strong><small>Shared accounts counted once</small></div>
+      <div><span>Realized P&amp;L</span><strong :class="hero.totalRealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalRealizedPnl)"></strong><small x-text="hero.closedTrades+' closed trades · live epochs'"></small></div>
+      <div><span>Unrealized P&amp;L</span><strong :class="hero.totalUnrealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)"></strong><small x-text="hero.openCount+' open positions'"></small></div>
+      <div><span>Loss to bot stops</span><strong x-text="fmtUsd(hero.capitalAtRisk)"></strong><small>Estimate · gaps and fees can increase loss</small></div>
     </div>
 
     <!-- ── C: Every live bot, one operational scan ── -->
     <section class="fleet-board" aria-label="Live bot status">
       <div class="fleet-board-head">
         <div>
-          <h2 class="fleet-board-title">bot performance</h2>
+          <h2 class="fleet-board-title">Live strategies</h2>
           <p class="fleet-board-sub">
-            compare every live strategy · select a row to update the charts
+            Realized results, open exposure and current activity. Select a strategy to inspect.
           </p>
         </div>
-        <span class="fleet-board-poll">click a bot name for full analytics</span>
+        <span class="fleet-board-poll"></span>
       </div>
 
       <div class="bot-table-wrap">
@@ -211,11 +184,7 @@
               <th class="right">capital</th>
               <th class="right">closed p&amp;l</th>
               <th class="right">open p&amp;l</th>
-              <th class="right">marked p&amp;l</th>
-              <th class="right">return</th>
-              <th class="right">max dd</th>
               <th class="right">trades</th>
-              <th class="right">win rate</th>
               <th class="right">open</th>
               <th>activity</th>
               <th></th>
@@ -245,11 +214,7 @@
                 </td>
                 <td class="right num" :class="(bot.pnl?.closed || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.closed)">—</td>
                 <td class="right num" :class="(bot.pnl?.unrealized || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.unrealized)">—</td>
-                <td class="right num" :class="(bot.pnl?.all_coin || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.all_coin)">—</td>
-                <td class="right num" :class="(bot.pnl?.all_pct || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(bot.pnl?.all_pct)">—</td>
-                <td class="right num" x-text="fmtPct(-Math.abs((bot.stats?.max_drawdown || 0) * 100), 2)">—</td>
                 <td class="right num" x-text="bot.stats?.closed_trade_count || 0">0</td>
-                <td class="right num" x-text="(bot.stats?.closed_trade_count || 0) ? fmtPct((bot.stats?.winrate || 0) * 100, 1) : '—'">—</td>
                 <td class="right num" x-text="bot.open_trades?.length || 0">0</td>
                 <td>
                   <span class="readiness-line" :class="readinessTone(bot)">
@@ -262,13 +227,14 @@
               </tr>
             </template>
           </tbody>
-        </table>
+
+</table>
       </div>
     </section>
 
     <!-- ── D: Selectable performance workspace ── -->
     <div class="grid grid-12">
-      <div class="card col-9 performance-card">
+      <div class="card col-12 performance-card">
         <div class="card-head">
           <div>
             <div class="card-title">
@@ -293,47 +259,9 @@
         </div>
       </div>
 
-      <div class="card col-3 selection-summary">
-        <div class="card-head">
-          <div>
-            <div class="card-title" x-text="selectedEquityBot ? selectedEquityBot.label : 'portfolio snapshot'">portfolio snapshot</div>
-            <div class="card-sub" x-text="selectedEquityBot ? venueLabel(selectedEquityBot) + ' · ' + accountLabel(selectedEquityBot) : liveBots.length + ' strategies · ' + liveAccountCount + ' accounts'">fleet</div>
-          </div>
-        </div>
-        <div class="selection-status">
-          <span class="bot-state" :class="selectedEquityBot ? botStatus(selectedEquityBot).cls : (staleClass || 'running')">
-            <span class="bot-state-dot"></span>
-            <span x-text="selectedEquityBot ? botStatus(selectedEquityBot).label : statusLabel">live</span>
-          </span>
-          <span x-text="selectedEquityBot ? botActivity(selectedEquityBot) : (hero.openCount ? hero.openCount + ' open positions' : 'no open exposure')">no open exposure</span>
-        </div>
-        <div class="selection-kv">
-          <span>capital</span>
-          <strong class="num" x-text="fmtUsd(selectedEquityBot ? botCapital(selectedEquityBot) : hero.walletNow)">—</strong>
-          <span>closed p&amp;l</span>
-          <strong class="num" :class="selectedRealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(selectedRealizedPnl)">—</strong>
-          <span>open p&amp;l</span>
-          <strong class="num" :class="selectedUnrealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(selectedUnrealizedPnl)">—</strong>
-          <span>marked p&amp;l</span>
-          <strong class="num" :class="selectedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(selectedPnl)">—</strong>
-          <span>return</span>
-          <strong class="num" :class="selectedReturn >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(selectedReturn)">—</strong>
-          <span>max drawdown</span>
-          <strong class="num" x-text="fmtPct(-Math.abs(selectedMaxDrawdown), 2)">—</strong>
-          <span>closed trades</span>
-          <strong class="num" x-text="selectedClosedTrades">0</strong>
-          <span>win rate</span>
-          <strong class="num" x-text="selectedClosedTrades ? fmtPct(selectedWinRate * 100, 1) : '—'">—</strong>
-          <span>profit factor</span>
-          <strong class="num" x-text="fmtPF(selectedProfitFactor)">—</strong>
-        </div>
-        <div class="selection-action">
-          <button class="cmd-btn" x-show="selectedEquityBot" x-cloak @click="setTab('bot:'+selectedEquityBot.key)">open full analytics</button>
-          <button class="cmd-btn" x-show="!selectedEquityBot" @click="openPositionsTab()">review positions</button>
-        </div>
-      </div>
     </div>
 
+    <details class="workspace-research" @toggle="$nextTick(() => renderCharts())"><summary>Performance breakdown · drawdown, expectancy &amp; recent trades</summary>
     <!-- ── D: Bottom investigative row ── -->
     <div class="grid grid-12">
       <div class="card col-8">
@@ -440,6 +368,7 @@
         </div>
       </div>
     </div>
+    </details>
 
   </main>
 
@@ -988,6 +917,7 @@
   <!-- ══════════════ TRADES TAB ══════════════ -->
   <main class="tab-panel" x-show="tab === 'trades'" x-cloak>
 
+    <header class="portfolio-head"><div><h1 x-text="tradesView==='open'?'Positions':'Trade history'"></h1><p>Price, protection and exit plans in one place.</p></div></header>
     <!-- open / closed view toggle -->
     <div class="trades-view-toggle">
       <button class="filter-pill" :class="tradesView === 'open' ? 'on' : ''"
@@ -1022,7 +952,7 @@
 
     <div class="trades-grid">
       <template x-for="trade in filteredTrades" :key="trade.bot_key + '-' + trade.open_ts + '-' + trade.pair">
-        <div class="trade-card" :class="trade.is_win ? 'win' : 'loss'">
+        <div class="trade-card" :class="{win:trade.is_win,loss:!trade.is_win,expanded:expandedTrade===tradeChartId(trade)}">
           <div class="trade-card-head">
             <div class="trade-card-pair">
               <span class="bot-glyph" :data-bot="trade.bot_key" x-text="(trade.bot_name||'?').charAt(0).toUpperCase()">·</span>
@@ -1038,21 +968,7 @@
                     x-text="trade.is_open ? 'OPEN' : (trade.exit_reason || '—')">—</span>
             </div>
           </div>
-          <template x-if="trade.is_open">
-            <div class="splitbar" style="margin:0 12px 6px;">
-              <template x-if="trade.booked_pct > 0">
-                <span class="booked-seg" :style="'width:'+trade.booked_pct+'%'" x-text="'booked '+Math.round(trade.booked_pct)+'%'"></span>
-              </template>
-              <span class="ride-seg" :class="(trade.profit_pct||0)<0?'loss':''"
-                    x-text="trade.booked_pct ? 'riding '+Math.round(trade.riding_pct)+'%' : '100% open'"></span>
-            </div>
-          </template>
-          <template x-if="trade.is_open && trade.tps_total">
-            <div style="margin:0 12px 8px;">
-              <span class="pill tp-progress"
-                    x-text="trade.tps_hit+' / '+trade.tps_total+' targets filled'+(trade.next_tp ? ' · next @ '+fmtRate(trade.next_tp) : '')"></span>
-            </div>
-          </template>
+          <div class="position-context"><span x-text="trade.bot_name"></span><span x-show="trade.dry_run">Paper trading</span><span x-text="trade.is_short?'Short':'Long'"></span><span x-show="trade.tps_total" x-text="trade.tps_hit+' / '+trade.tps_total+' targets filled'"></span><span x-show="trade.booked_pct>0" x-text="Math.round(trade.booked_pct)+'% realized'"></span></div>
           <div class="trade-card-detail">
             <span>entry <strong x-text="(trade.open_rate||0).toPrecision(5)">—</strong></span>
             <span class="sep">→</span>
@@ -1068,6 +984,15 @@
                         x-text="tf">tf</button>
               </template>
             </div>
+          </div>
+          <div class="chart-controls">
+            <div class="scale-toggle" aria-label="Price scale"><button :aria-pressed="tradeScale(trade)==='price'" @click="setTradeScale(trade,'price')">Price action</button><button :aria-pressed="tradeScale(trade)==='exits'" @click="setTradeScale(trade,'exits')">All exits</button></div>
+            <button class="expand-chart" :aria-expanded="expandedTrade===tradeChartId(trade)" @click="expandTrade(trade)" x-text="expandedTrade===tradeChartId(trade)?'Restore grid':'Expand chart'"></button>
+          </div>
+          <div class="exit-levels" x-show="trade.is_open">
+            <span x-show="trade.stop_rate" class="exit-stop" x-text="'Bot stop '+fmtRate(trade.stop_rate)"></span>
+            <template x-for="(level,i) in (trade.exit_levels||[])" :key="i"><span :class="'exit-'+level.state" x-text="level.label+' '+fmtRate(level.price)+' · '+level.state"></span></template>
+            <span x-show="!(trade.exit_levels||[]).length">No TP order reported · strategy may exit dynamically</span>
           </div>
           <div class="trade-chart-source">
             <span x-text="venueLabel(raw.bots[trade.bot_key])"></span>
@@ -1137,7 +1062,7 @@
             <strong x-text="botActivity(bot)">scanning</strong>
           </span>
         </div>
-        <div class="bis-actions">
+        <div class="bis-actions"><button class="icon-btn" @click="tradesView='open'; tradesFilter=bot.key; setTab('trades')">Position charts</button>
           <button class="icon-btn" @click="setTab('live')">back to overview</button>
           <template x-if="bot.links?.freqtrade_ui">
             <a class="icon-btn" :href="bot.links.freqtrade_ui" target="_blank" rel="noopener">open freqtrade ui</a>
@@ -1190,34 +1115,11 @@
         </div>
       </section>
 
-      <!-- B: Current situation cluster (3 panels side by side) -->
+      <!-- Current exposure and performance -->
       <div class="grid grid-12" x-show="botHasHistory(bot)" x-cloak>
 
-        <!-- Last trade trace -->
-        <div class="card col-4">
-          <div class="card-head">
-            <div class="card-title">last trade trace</div>
-            <div class="card-sub">most recent closed · deviation from expected</div>
-          </div>
-          <template x-if="lastClosedTrade(bot)">
-            <div>
-              <div class="bot-detail-section">
-                <div class="last-trade-trace">
-                  <div class="ltt-row"><span class="ltt-k">pair</span><span class="ltt-v" x-text="lastClosedTrade(bot).pair">—</span></div>
-                  <div class="ltt-row"><span class="ltt-k">entry</span><span class="ltt-v" x-text="(lastClosedTrade(bot).open_rate||0).toPrecision(5)">—</span></div>
-                  <div class="ltt-row"><span class="ltt-k">exit</span><span class="ltt-v" x-text="(lastClosedTrade(bot).close_rate||0).toPrecision(5)">—</span></div>
-                  <div class="ltt-row"><span class="ltt-k">p&l</span><span class="ltt-v" :class="(lastClosedTrade(bot).profit_pct||0)>=0?'pos':'neg'" x-text="fmtPctSigned(lastClosedTrade(bot).profit_pct)+' · '+fmtUsdSigned(lastClosedTrade(bot).profit_abs)">—</span></div>
-                  <div class="ltt-row"><span class="ltt-k">exit reason</span><span class="ltt-v" x-text="lastClosedTrade(bot).exit_reason||'—'">—</span></div>
-                  <div class="ltt-row"><span class="ltt-k">duration</span><span class="ltt-v" x-text="fmtMin(lastClosedTrade(bot).trade_duration)">—</span></div>
-                </div>
-              </div>
-            </div>
-          </template>
-          <div class="empty" x-show="!lastClosedTrade(bot)"><div class="icon">—</div> no closed trades yet</div>
-        </div>
-
         <!-- Open trade status -->
-        <div class="card col-4">
+        <div class="card col-6">
           <div class="card-head">
             <div class="card-title">open trade status</div>
             <div class="card-sub" x-text="(bot.open_trades?.length ?? 0) + ' open · ' + fmtUsd(bot.capital_at_risk?.abs_loss || 0) + ' at risk'">0 open</div>
@@ -1247,7 +1149,7 @@
         </div>
 
         <!-- Live vs backtest deviation -->
-        <div class="card col-4">
+        <div class="card col-6">
           <div class="card-head">
             <div class="card-title" x-text="bot.baseline_comparable ? 'live vs backtest' : 'performance'">performance</div>
             <div class="card-sub" x-text="bot.baseline_status === 'stale-pre-v2' ? 'fresh v2 epoch · pre-v2 baseline is context only' : (!bot.baseline_comparable ? (bot.strategy_kind === 'copy-trader' ? 'copy-trader · fresh live epoch' : 'autonomous quant · forward live epoch') : 'deviation from expected · all-time')">forward live epoch</div>
@@ -1381,6 +1283,7 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=40"></script>
+<script src="/static/dashboard.js?v=41"></script>
+<div class="chart-attribution"><a href="https://www.tradingview.com/" target="_blank" rel="noopener">Charts by TradingView</a> · <a href="/static/CHART-NOTICE.txt">Notice</a> · <a href="/static/CHART-LICENSE.txt">License</a></div>
 </body>
 </html>
