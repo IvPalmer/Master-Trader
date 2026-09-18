@@ -172,3 +172,36 @@ def test_report_uses_settled_funding_even_when_executor_omits_it():
     assert report['executor_funding_discrepancies']==1
     assert report['exchange_reconciled_closed_trades']==1
     assert report['scenarios']['quoted']['baseline_mean_r']==pytest.approx(9.29/20)
+
+
+def test_newer_snapshot_waits_for_ledger_instead_of_false_missing_fill():
+    rows,protocol=analysis_input()
+    batch=raw_batch()
+    batch['end_ms']=4500
+    batch['fills']=[f for f in batch['fills'] if f['time']<=4500]
+    # The last covered snapshot predates the final stop fill.
+    for frame in rows[:-1]:
+        frame['trades'][0]['orders'][-1]['filled']=0
+    report=a.analyze(rows,protocol,[batch])
+    assert report['input_status']=='aligned'
+    assert report['observation_cutoff_ms']==4500
+    assert report['exclusions']=={'baseline_still_open':1}
+    assert report['scenarios']['quoted']['completed_pairs']==0
+
+
+def test_later_ledger_events_do_not_leak_into_older_position_snapshot():
+    rows,protocol=analysis_input()
+    rows=rows[:-1]
+    for frame in rows:
+        frame['trades'][0]['orders'][-1]['filled']=0
+    report=a.analyze(rows,protocol,[raw_batch()])
+    assert report['observation_cutoff_ms']==4500
+    assert report['exclusions']=={'baseline_still_open':1}
+
+
+def test_no_shared_coverage_is_explicit_not_a_clean_empty_result():
+    rows,protocol=analysis_input()
+    report=a.analyze(rows,protocol,[])
+    assert report['input_status']=='waiting_for_common_coverage'
+    assert report['observation_cutoff_ms'] is None
+    assert report['promotion_ready'] is False
