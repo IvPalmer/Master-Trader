@@ -240,9 +240,14 @@ def paired_summary(rows):
 
 
 def analyze(snapshots,protocol,batches):
-    source=snapshots if callable(snapshots) else lambda: iter(snapshots)
+    raw_source=snapshots if callable(snapshots) else lambda: iter(snapshots)
     ledger_source=batches if callable(batches) else lambda: iter(batches)
     fills,funding,coverage=merge_ledger(ledger_source())
+    ledger_end=max((hi for _,hi in coverage),default=None)
+    def source():
+        for frame in raw_source():
+            if ledger_end is not None and frame['ts']*1000<=ledger_end:
+                yield frame
     latest={}; first={}
     fee_observations=[b['fee_observation'] for b in ledger_source() if 'fee_observation' in b]
     previous=None
@@ -255,6 +260,15 @@ def analyze(snapshots,protocol,batches):
         for t in s['trades']:
             latest[str(t['trade_id'])]=t
             first.setdefault(str(t['trade_id']),s['ts'])
+    # Freeze repeated scans at the same snapshot boundary, even if the live
+    # collector appends more observations while this report is being built.
+    cutoff_ms=previous*1000 if previous is not None else None
+    def source():
+        for frame in raw_source():
+            if cutoff_ms is not None and frame['ts']*1000<=cutoff_ms:
+                yield frame
+    fills=[f for f in fills if cutoff_ms is not None and f['time']<=cutoff_ms]
+    funding=[f for f in funding if cutoff_ms is not None and f['time']<=cutoff_ms]
     rows={name:[] for name,*_ in SCENARIOS}; exclusions=Counter(); reconciled=0; funding_discrepancies=0
     scenario_flags={name:Counter() for name,*_ in SCENARIOS}; nonfills=Counter()
     for key,t in latest.items():
@@ -275,7 +289,7 @@ def analyze(snapshots,protocol,batches):
                     raise ValueError('Executor net PnL disagrees with settled exchange cash flows')
                 reconciled+=1
             entry_ms=min(e['ts'] for e in events if e['kind']=='entry')
-            end=t.get('close_timestamp') or int(previous*1000)
+            end=t.get('close_timestamp') if not t['is_open'] else int(previous*1000)
             if not any(lo<=entry_ms and hi>=end for lo,hi in coverage):
                 raise ValueError('Ledger coverage incomplete')
         except (ValueError,TypeError,KeyError) as exc:
@@ -306,7 +320,9 @@ def analyze(snapshots,protocol,batches):
             rows[name].append({'baseline_r':cash/risk,'candidate_r':result['net_usd']/risk,
                 'delta_r':(result['net_usd']-cash)/risk,'closed_ms':end,'armed':result['armed'],
                 'date':datetime.fromtimestamp(entry_ms/1000,timezone.utc).date().isoformat()})
-    return {'executor_funding_discrepancies':funding_discrepancies,'exchange_reconciled_closed_trades':reconciled,'observed_trade_count':len(latest),
+    return {'ledger_end_ms':ledger_end,'observation_cutoff_ms':cutoff_ms,
+        'input_status':'aligned' if cutoff_ms is not None else 'waiting_for_common_coverage',
+        'executor_funding_discrepancies':funding_discrepancies,'exchange_reconciled_closed_trades':reconciled,'observed_trade_count':len(latest),
         'exclusions':dict(exclusions),'scenarios':{name:dict(paired_summary(rows[name]),
             flagged=dict(scenario_flags[name]),nonfill_observations=nonfills[name]) for name,*_ in SCENARIOS},
         'promotion_ready':False,'interpretation':'Executable research accounting, not proof of profitable live execution. Fresh sample and deployment validation still required.'}

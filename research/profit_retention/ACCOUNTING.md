@@ -107,3 +107,13 @@ experiment entry.
 
 Rollback disables only the accounting timer/service and retains its private
 ledger. The original observation timer and all live trading services are separate.
+
+### Shared report cutoff (2026-09-18)
+
+Each report selects the latest observation at or before the completed ledger
+cutoff, then excludes later fills and funding from that same report. Repeated
+observation scans use the frozen selected cutoff, so a concurrently appended
+snapshot cannot create false missing-coverage/missing-fill flags. Both timestamps
+and an explicit waiting status are reported; real historical coverage gaps still
+fail validation. Raw observations, ledger batches and the research epoch are
+unchanged.
