@@ -5,7 +5,7 @@ class PriceChart {
   private chart; private series; private lines:IPriceLine[]=[]; private timeframe=''; private dead=false;
   private exits:Level[]=[]; private mode='price';
   constructor(private el:HTMLElement) {
-    this.chart=createChart(el,{autoSize:true,layout:{background:{type:ColorType.Solid,color:'#ffffff'},textColor:'#526170',fontSize:12,attributionLogo:true},grid:{vertLines:{visible:false},horzLines:{color:'#edf0f2'}},rightPriceScale:{borderVisible:false,scaleMargins:{top:.12,bottom:.12}},timeScale:{borderVisible:false,timeVisible:true,secondsVisible:false,rightOffset:4},crosshair:{mode:0}});
+    this.chart=createChart(el,{autoSize:true,localization:{locale:"en-US"},layout:{background:{type:ColorType.Solid,color:'#ffffff'},textColor:'#526170',fontSize:12,attributionLogo:true},grid:{vertLines:{visible:false},horzLines:{color:'#edf0f2'}},rightPriceScale:{borderVisible:false,scaleMargins:{top:.12,bottom:.12}},timeScale:{borderVisible:false,timeVisible:true,secondsVisible:false,rightOffset:4},crosshair:{mode:0}});
     this.series=this.chart.addSeries(CandlestickSeries,{upColor:'#16714b',downColor:'#c23b35',borderVisible:false,wickUpColor:'#16714b',wickDownColor:'#c23b35',lastValueVisible:false,priceLineVisible:false,autoscaleInfoProvider:((original)=>{const info=original();if(!info?.priceRange || this.mode!=='exits')return info;for(const x of this.exits){info.priceRange.minValue=Math.min(info.priceRange.minValue,x.price);info.priceRange.maxValue=Math.max(info.priceRange.maxValue,x.price);}return info;}) as AutoscaleInfoProvider});
   }
   render(rows:number[][],trade:Trade,tf:string,mode:string) {

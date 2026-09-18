@@ -6205,7 +6205,7 @@
       __publicField(this, "dead", false);
       __publicField(this, "exits", []);
       __publicField(this, "mode", "price");
-      this.chart = Wn(el, { autoSize: true, layout: { background: { type: Li.Solid, color: "#ffffff" }, textColor: "#526170", fontSize: 12, attributionLogo: true }, grid: { vertLines: { visible: false }, horzLines: { color: "#edf0f2" } }, rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.12 } }, timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: 4 }, crosshair: { mode: 0 } });
+      this.chart = Wn(el, { autoSize: true, localization: { locale: "en-US" }, layout: { background: { type: Li.Solid, color: "#ffffff" }, textColor: "#526170", fontSize: 12, attributionLogo: true }, grid: { vertLines: { visible: false }, horzLines: { color: "#edf0f2" } }, rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.12 } }, timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: 4 }, crosshair: { mode: 0 } });
       this.series = this.chart.addSeries(Pe, { upColor: "#16714b", downColor: "#c23b35", borderVisible: false, wickUpColor: "#16714b", wickDownColor: "#c23b35", lastValueVisible: false, priceLineVisible: false, autoscaleInfoProvider: ((original) => {
         const info = original();
         if (!info?.priceRange || this.mode !== "exits") return info;
