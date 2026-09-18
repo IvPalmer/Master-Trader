@@ -17,7 +17,7 @@ const assert=require('node:assert/strict');
   const price=c.series.options().autoscaleInfoProvider(()=>({priceRange:{minValue:99,maxValue:102}}));
   c.render(bars,trade,'1h','exits');const exits=c.series.options().autoscaleInfoProvider(()=>({priceRange:{minValue:99,maxValue:102}}));
   const labels=c.lines.map(x=>x.options().title);
-  el.style.width='1100px';el.style.height='600px';c.resize();await frame();const width=el.querySelector('canvas').width;
+  el.style.width='1100px';el.style.height='600px';c.resize();await frame();const width=Math.max(...Array.from(el.querySelectorAll('canvas'),x=>x.getBoundingClientRect().width));
   c.render(bars,trade,'4h','price');await frame();const reset=c.chart.timeScale().getVisibleLogicalRange();c.dispose();
   return {viewport,price,exits,labels,width,reset,disposed:c.isDisposed()};
  });
