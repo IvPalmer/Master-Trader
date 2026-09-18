@@ -1,4 +1,4 @@
-/* dashboard.js — Alpine controller + ECharts panels for master-trader.
+/* dashboard.js — Alpine controller + TradingView charts for master-trader.
  *
  * Charts:
  *  - chart-equity     equity curve (live + scaled backtest expected)
@@ -24,13 +24,6 @@ const COLORS = {
   info:     '#0e87a3',
 };
 
-const ECHART_COMMON = {
-  textStyle: { fontFamily: '"Inter", system-ui, sans-serif', fontSize: 11, color: COLORS.text3 },
-  backgroundColor: 'transparent',
-  grid: { left: 50, right: 18, top: 28, bottom: 30, containLabel: false },
-  axisPointer: { lineStyle: { color: COLORS.border, width: 1 } },
-};
-
 // Bug fix B3: coerce timestamps — Freqtrade returns ms but guard against seconds
 function toMs(ts) {
   if (!ts) return 0;
@@ -38,7 +31,7 @@ function toMs(ts) {
 }
 
 // Closed P&L persists between fills. Extend only to the latest observation;
-// the vertical dashed tip is a snapshot, never invented unrealized history.
+// the current open mark is a separate snapshot, never invented unrealized history.
 function closedEquityThroughMark(realized, marked) {
   const points = realized.map(p => [new Date(p[0]), p[1]]);
   const last = points[points.length - 1];
@@ -50,7 +43,7 @@ function closedEquityThroughMark(realized, marked) {
 }
 
 function dash() {
-  // ECharts keeps identity-sensitive internals. Keep instances outside Alpine
+  // Chart libraries keep identity-sensitive internals. Keep instances outside Alpine
   // reactive state so methods always receive the original instance as `this`.
   const charts = {};
   return {
@@ -439,7 +432,6 @@ function dash() {
     openPosKey: null,
     setOpenPos(p) {
       this.openPosKey = p._bot + ':' + p.pair;
-      this.$nextTick(() => this.renderCandles());
     },
     get openPos() {
       const list = this.openPositions;
@@ -525,12 +517,12 @@ function dash() {
     stopTone(bot) {
       if (bot?.native_stop?.status === 'missing') return 'bad';
       if (['awaiting-first-fill', 'awaiting-fill', 'awaiting-stop', 'no-open-position'].includes(bot?.native_stop?.status)) return 'pending';
-      return 'good';
+      return bot?.native_stop?.status === 'verified' ? 'good' : 'pending';
     },
     fmtEpoch(bot) {
       const ts = bot?.epoch?.start_ts_ms;
       if (!ts) return bot?.epoch?.label || 'current epoch';
-      return `${bot.epoch.label} · since ${new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' })}`;
+      return `${bot.epoch.label || 'Epoch label unavailable'} · since ${new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' })}`;
     },
     venueLabel(bot) {
       return bot?.venue === 'hyperliquid' ? 'Hyperliquid perps' : 'Binance spot';
@@ -559,18 +551,18 @@ function dash() {
       return bot.wallet?.bot_owned;
     },
     get equityTitle() {
-      return this.selectedEquityBot ? `${this.selectedEquityBot.label} equity curve` : 'portfolio equity curve';
+      return this.selectedEquityBot ? `${this.selectedEquityBot.label} equity` : 'Portfolio equity';
     },
     get equitySubtitle() {
       const bot = this.selectedEquityBot;
-      if (!bot) return 'solid line = closed trades · dashed tip = current mark on open positions';
+      if (!bot) return 'Realized equity over time · current equity shown separately';
       if (bot.lineage) return this.equityExplanation(bot);
-      if (bot.baseline?.annual_return_pct) return 'closed live equity vs expectation · dashed tip includes open P&L';
-      return 'closed live equity · dashed tip includes current open P&L';
+      if (bot.baseline?.annual_return_pct) return 'Realized live equity · current equity shown separately';
+      return 'Realized live equity · current equity shown separately';
     },
     equityExplanation(bot) {
       const closed = bot?.stats?.closed_trade_count || 0;
-      return `Historical dry-run + rebased live returns · comparison scale, not account balance. ${closed ? closed + ' closed live trades' : 'No closed live trades: solid line stays flat'}; dashed tip = current open P&L.`;
+      return `Historical dry-run + rebased live returns · comparison scale, not account balance. ${closed ? closed + ' closed live trades' : 'No closed live trades: solid line stays flat'}; current equity snapshot includes open P&L.`;
     },
     get equityHasHistory() {
       return this.selectedEquityBot
@@ -938,13 +930,13 @@ function dash() {
 
     // ─── chart rendering ───
     renderCharts() {
-      if (!window.echarts) { setTimeout(() => this.renderCharts(), 100); return; }
+      if (!window.TradingAnalytics) { setTimeout(() => this.renderCharts(), 100); return; }
       const t = this.tab;
       if (t === 'live') {
         this.renderEquity();
         this.renderDrawdown();
         this.renderPerPair();
-        this.renderCandles();
+
       } else if (t === 'portfolio') {
         this.renderPortfolioCharts();
       } else if (t === 'dryrun') {
@@ -1189,7 +1181,7 @@ function dash() {
 
     _renderTabFresh() {
       this.$nextTick(() => requestAnimationFrame(() => {
-        // x-show must finish applying before ECharts reads the destination
+        // x-show must finish applying before the chart reads the destination
         // panel. Recreating here prevents a hidden tab's 0px coordinate grid
         // from surviving after its canvas expands.
         this._disposeCharts();
@@ -1218,7 +1210,7 @@ function dash() {
         delete charts[id];
       }
       if (!charts[id] || charts[id].isDisposed()) {
-        const chart = echarts.init(el, null, { renderer: 'canvas' });
+        const chart = new window.TradingAnalytics(el);
         if (typeof ResizeObserver !== 'undefined') {
           const ro = new ResizeObserver(entries => {
             const box = entries[0]?.contentRect;
@@ -1246,651 +1238,73 @@ function dash() {
       } catch { return null; }
     },
 
+    _equityView(id, data, bot = null, hasOpen = false) {
+      const lineage = data?.lineage;
+      const marked = lineage?.live || data?.live || [];
+      const closed = closedEquityThroughMark(lineage?.realized || data?.realized || [], marked);
+      const series = [];
+      if (lineage?.legacy?.length) series.push({label: lineage.legacy_label || 'Historical paper', data: lineage.legacy, color: COLORS.text3});
+      series.push({label: lineage ? `${lineage.live_label || 'Live'} · realized` : 'Realized equity', data: closed, color: COLORS.accent, step: true});
+      const snapshot = hasOpen && marked.length ? {label:lineage?'Current rebased value · includes open P&L':'Current equity · includes open P&L', value:marked[marked.length-1][1]} : null;
+      this._ensureChart(id)?.lines(series, {snapshot, note: lineage?.transition?.label || bot?.epoch?.label || '', empty:'Equity history not available yet'});
+    },
+
     async renderEquity() {
       const key = this.equityBot || 'fleet';
-      const isFleet = key === 'fleet';
-      const fleetData = isFleet ? this.fleetPerformanceData : null;
-      const data = isFleet ? fleetData : await this._fetchEquity(key);
-      const chart = this._ensureChart('chart-equity');
-      if (!chart) return;
-      const bot = isFleet ? null : this.raw.bots[key];
-      const lineage = !isFleet ? data?.lineage : null;
-      const transitionTs = lineage?.transition?.ts || bot?.epoch?.start_ts_ms || data?.bot_start_ts_ms;
-      const transitionLabel = lineage?.transition?.label || bot?.epoch?.label || 'live epoch';
-      const legacyName = lineage?.legacy_label || 'dry-run';
-      const liveName = lineage ? `${lineage.live_label} · closed` : 'closed equity';
-      const legacy = (lineage?.legacy || []).map(p => [new Date(p[0]), p[1]]);
-      const marked = (lineage?.live || data?.live || []).map(p => [new Date(p[0]), p[1]]);
-      const live = closedEquityThroughMark(lineage?.realized || data?.realized || data?.live || [], marked);
-      const hasOpenMark = isFleet ? this.hero.openCount > 0 : (bot?.open_trades?.length || 0) > 0;
-      const markToMarket = hasOpenMark && live.length && marked.length
-        ? [live[live.length - 1], marked[marked.length - 1]]
-        : [];
-      const startTs = data?.bot_start_ts_ms || (live[0]?.[0]?.getTime() ?? Date.now());
-      const startCap = isFleet
-        ? (this.hero.walletStart || this.hero.walletNow || 0)
-        : (data?.starting_capital ?? bot?.wallet?.starting_capital ?? 0);
-      const annual = bot?.baseline?.annual_return_pct ?? 0;
-      const lastLiveTs = marked.length ? marked[marked.length - 1][0].getTime() : Date.now();
-      const horizon = Math.max(lastLiveTs, Date.now()) + 12 * 3600 * 1000;
-      const expected = [];
-      if (!isFleet && annual && !lineage) {
-        for (let i = 0; i <= 80; i++) {
-          const ts = startTs + (horizon - startTs) * i / 80;
-          const days = (ts - startTs) / 86400000;
-          const eq = startCap * Math.pow(1 + annual / 100, days / 365);
-          expected.push([new Date(ts), Number(eq.toFixed(4))]);
-        }
-      }
-      const liveByTs = new Map(live.map(([d, v]) => [d.getTime(), v]));
-      const winMarks = [];
-      const lossMarks = [];
-      // toMs() normalises s vs ms — marks otherwise land off-curve when
-      // close_timestamp is seconds but equity x-axis is ms.
-      const sortedClosed = (isFleet ? (fleetData?.trades || []) : (bot?.recent_trades || []))
-        .filter(t => !t.is_open && t.close_timestamp)
-        .sort((a, b) => toMs(a.close_timestamp) - toMs(b.close_timestamp));
-      const liveActualStart = Number(data?.starting_capital || 0);
-      const lineageScale = lineage && liveActualStart > 0
-        ? Number(lineage.legacy_ending_equity || 0) / liveActualStart : 1;
-      let runningEquity = lineage ? Number(lineage.legacy_ending_equity || 0) : startCap;
-      for (const t of sortedClosed) {
-        runningEquity += Number(t.profit_abs || 0) * lineageScale;
-        const tsMs = toMs(t.close_timestamp);
-        const y = liveByTs.get(tsMs) ?? runningEquity;
-        const m = { coord: [tsMs, y], pair: t.pair, pct: t.profit_pct };
-        if ((t.profit_abs || 0) >= 0) winMarks.push(m);
-        else lossMarks.push(m);
-      }
-      chart.setOption({
-        ...ECHART_COMMON, animation: false,
-        tooltip: {
-          trigger: 'axis',
-          backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1,
-          textStyle: { color: COLORS.text, fontSize: 11 },
-          valueFormatter: v => v != null ? '$' + Number(v).toFixed(2) : '—',
-        },
-        legend: {
-          data: [
-            ...(lineage ? [legacyName] : []),
-            liveName,
-            ...(markToMarket.length ? ['current mark'] : []),
-            ...(expected.length ? ['backtest expected'] : []),
-          ],
-          top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 11 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3,
-        },
-        graphic: (legacy.length + live.length + markToMarket.length) > 1 ? [] : [{
-          type: 'text', left: 'center', top: 'middle', silent: true,
-          style: { text: 'Collecting live trades', fill: COLORS.text3, font: '500 12px Inter' },
-        }],
-        grid: { left: 60, right: 18, top: 32, bottom: 30 },
-        xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { show: false } },
-        yAxis: {
-          type: 'value', scale: true,
-          axisLine: { show: false }, axisTick: { show: false },
-          axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' },
-          splitLine: { lineStyle: { color: COLORS.hairline, type: 'dashed' } },
-        },
-        series: [
-          ...(lineage ? [{ name: legacyName, type: 'line', data: legacy, showSymbol: false,
-            lineStyle: { color: COLORS.text3, width: 1.7 }, itemStyle: { color: COLORS.text3 }, z: 1 }] : []),
-          ...(expected.length ? [{ name: 'backtest expected', type: 'line', data: expected, showSymbol: false,
-            lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.4, opacity: 0.7 }, itemStyle: { color: COLORS.text3 }, z: 1 }] : []),
-          { name: liveName, type: 'line', data: live, step: 'end', smooth: false, showSymbol: false,
-            lineStyle: { color: COLORS.accent, width: 2 },
-            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(14, 135, 163, 0.18)' }, { offset: 1, color: 'rgba(14, 135, 163, 0.0)' },
-            ]) },
-            itemStyle: { color: COLORS.accent },
-            markPoint: {
-              symbol: 'circle', symbolSize: 7,
-              data: [
-                ...winMarks.map(m => ({ coord: m.coord, itemStyle: { color: COLORS.pos, borderColor: COLORS.surface, borderWidth: 1.5 }, label: { show: false }, tooltip: { formatter: () => `${m.pair} · +${m.pct?.toFixed(2)}%` } })),
-                ...lossMarks.map(m => ({ coord: m.coord, itemStyle: { color: COLORS.neg, borderColor: COLORS.surface, borderWidth: 1.5 }, label: { show: false }, tooltip: { formatter: () => `${m.pair} · ${m.pct?.toFixed(2)}%` } })),
-              ],
-            },
-            markLine: transitionTs ? {
-              silent: true, symbol: 'none',
-              data: [{ xAxis: transitionTs,
-                lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.4 },
-                label: { show: true, position: 'insideEndTop', formatter: transitionLabel,
-                  color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)',
-                  padding: [3, 5], borderRadius: 3 } }],
-            } : undefined,
-            z: 2 },
-          ...(markToMarket.length ? [{
-            name: 'current mark', type: 'line', data: markToMarket, smooth: false,
-            showSymbol: true, symbol: 'circle', symbolSize: 7,
-            lineStyle: { color: this.selectedUnrealizedPnl >= 0 ? COLORS.pos : COLORS.neg, width: 2, type: 'dashed' },
-            itemStyle: { color: this.selectedUnrealizedPnl >= 0 ? COLORS.pos : COLORS.neg, borderColor: COLORS.surface, borderWidth: 1.5 },
-            tooltip: { valueFormatter: value => `${this.fmtUsd(Number(value))} · includes ${this.fmtUsdSigned(this.selectedUnrealizedPnl)} open P&L` },
-            z: 4,
-          }] : []),
-        ],
-      }, true);
+      const bot = key === 'fleet' ? null : this.raw.bots[key];
+      const data = key === 'fleet' ? this.fleetPerformanceData : await this._fetchEquity(key);
+      this._equityView('chart-equity', data, bot, bot ? !!bot.open_trades?.length : this.hero.openCount > 0);
     },
 
     async renderDrawdown() {
       const key = this.equityBot || 'fleet';
-      const isFleet = key === 'fleet';
-      let data = isFleet ? this.fleetPerformanceData : this._equityData[key];
-      if (!isFleet && !data) data = await this._fetchEquity(key);
-      const chart = this._ensureChart('chart-drawdown');
-      if (!chart) return;
-      const bot = isFleet ? null : this.raw.bots[key];
-      const lineage = !isFleet ? data?.lineage : null;
-      const transitionTs = lineage?.transition?.ts || bot?.epoch?.start_ts_ms || data?.bot_start_ts_ms;
-      const transitionLabel = lineage?.transition?.label || bot?.epoch?.label || 'live epoch';
-      const dd = (lineage?.drawdown || data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
-      const baselineDd = isFleet ? this.hero.drawdownBacktest : (bot?.baseline?.max_dd_pct || 0);
-      const ddCap = baselineDd ? -baselineDd * 1.5 : Math.min(-5, Math.floor((this.selectedMaxDrawdown || 0) * -1.5));
-      chart.setOption({
-        ...ECHART_COMMON, animation: false,
-        tooltip: {
-          trigger: 'axis',
-          backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1,
-          textStyle: { color: COLORS.text, fontSize: 11 },
-          valueFormatter: v => v != null ? Number(v).toFixed(2) + '%' : '—',
-        },
-        grid: { left: 50, right: 18, top: 22, bottom: 30 },
-        xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 } },
-        yAxis: {
-          type: 'value', max: 0, min: Math.floor(ddCap),
-          axisLine: { show: false }, axisTick: { show: false },
-          axisLabel: { color: COLORS.text3, fontSize: 10, formatter: v => Math.round(v) + '%' },
-          splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.5 } },
-        },
-        series: [{
-          type: 'line', data: dd, showSymbol: false,
-          lineStyle: { color: COLORS.neg, width: 1.5 },
-          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(210, 71, 58, 0.0)' }, { offset: 1, color: 'rgba(210, 71, 58, 0.22)' },
-          ]) },
-          markLine: {
-            silent: true, symbol: 'none',
-            data: [
-              ...(transitionTs ? [{ xAxis: transitionTs,
-                lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.2 },
-                label: { show: true, position: 'insideEndTop', formatter: transitionLabel,
-                  color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)', padding: [2,4], borderRadius: 2 } }] : []),
-              ...(baselineDd ? [
-              { yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 },
-                label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%',
-                         color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2,4], borderRadius: 2 } },
-              { yAxis: -baselineDd,
-                lineStyle: { color: COLORS.text3, type: 'dotted', width: 1, opacity: 0.6 },
-                label: { show: true, position: 'insideEndBottom', formatter: 'reference ' + (-baselineDd).toFixed(1) + '%',
-                         color: COLORS.text3, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2,4], borderRadius: 2 } },
-              ] : []),
-            ],
-          },
-        }],
-      }, true);
+      const data = key === 'fleet' ? this.fleetPerformanceData : this._equityData[key] || await this._fetchEquity(key);
+      this._drawdownView('chart-drawdown', data, key === 'fleet' ? this.hero.drawdownBacktest : this.raw.bots[key]?.baseline?.max_dd_pct);
+    },
+
+    _drawdownView(id, data, reference) {
+      this._ensureChart(id)?.lines([{label:'Drawdown',data:data?.lineage?.drawdown || data?.drawdown || [],color:COLORS.neg,step:true}], {percent:true, note:reference ? `Historical reference: −${Math.abs(reference).toFixed(2)}% · limit: −${(Math.abs(reference)*1.5).toFixed(2)}%` : '', empty:'Drawdown history not available yet'});
+    },
+
+    _pairRows(bots) {
+      const pairs = new Map();
+      for (const bot of bots) {
+        for (const row of bot.per_pair || []) {
+          const item = pairs.get(row.pair) || {label:row.pair, realized:0, unrealized:0};
+          item.realized += Number(row.pnl || 0); pairs.set(row.pair,item);
+        }
+        for (const row of bot.open_trades || []) {
+          const item = pairs.get(row.pair) || {label:row.pair, realized:0, unrealized:0};
+          item.unrealized += Number(row.profit_abs || 0); pairs.set(row.pair,item);
+        }
+      }
+      return [...pairs.values()].sort((a,b)=>Math.abs(b.realized+b.unrealized)-Math.abs(a.realized+a.unrealized)).slice(0,10);
     },
 
     renderPerPair() {
-      const chart = this._ensureChart('chart-perpair');
-      if (!chart) return;
-      const pairMap = {};
-      const scope = this.selectedEquityBot ? [this.selectedEquityBot] : this.liveBots;
-      for (const b of scope) {
-        for (const pp of (b.per_pair || [])) {
-          if (!pairMap[pp.pair]) pairMap[pp.pair] = { realized: 0, unrealized: 0 };
-          pairMap[pp.pair].realized += Number(pp.pnl || 0);
-        }
-        for (const trade of (b.open_trades || [])) {
-          if (!pairMap[trade.pair]) pairMap[trade.pair] = { realized: 0, unrealized: 0 };
-          pairMap[trade.pair].unrealized += Number(trade.profit_abs || 0);
-        }
-      }
-      const rows = Object.entries(pairMap)
-        .map(([pair, values]) => ({ pair, ...values, total: values.realized + values.unrealized }))
-        .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
-        .slice(0, 10);
-      if (!rows.length) {
-        chart.setOption({
-          ...ECHART_COMMON,
-          graphic: [{ type: 'text', left: 'center', top: 'middle', silent: true,
-            style: { text: 'No closed or open trades yet', fill: COLORS.text3, font: '500 12px Inter' } }],
-          series: [], xAxis: { type: 'value', show: false }, yAxis: { type: 'category', data: [], show: false },
-        }, true);
-        return;
-      }
-      const visible = [...rows].reverse();
-      chart.setOption({
-        ...ECHART_COMMON, animation: false,
-        graphic: [],
-        tooltip: {
-          trigger: 'axis', axisPointer: { type: 'shadow' },
-          backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1,
-          textStyle: { color: COLORS.text, fontSize: 11 },
-          formatter: params => {
-            const row = visible[params?.[0]?.dataIndex];
-            if (!row) return '';
-            return `<b>${row.pair}</b><br/>closed ${this.fmtUsdSigned(row.realized)}<br/>open ${this.fmtUsdSigned(row.unrealized)}<br/><b>marked ${this.fmtUsdSigned(row.total)}</b>`;
-          },
-        },
-        legend: { data: ['closed', 'open mark'], top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 10 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
-        grid: { left: 70, right: 64, top: 28, bottom: 24 },
-        xAxis: { type: 'value', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.5 } } },
-        yAxis: { type: 'category', data: visible.map(row => row.pair), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text2, fontSize: 11, formatter: v => String(v).split('/')[0] } },
-        series: [
-          { name: 'closed', type: 'bar', stack: 'pnl', data: visible.map(row => row.realized), barWidth: 14,
-            itemStyle: { color: COLORS.accent, borderRadius: [0, 3, 3, 0] } },
-          { name: 'open mark', type: 'bar', stack: 'pnl', data: visible.map(row => row.unrealized), barWidth: 14,
-            itemStyle: { color: point => Number(point.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] },
-            label: { show: true, position: 'right', formatter: point => this.fmtUsdSigned(visible[point.dataIndex]?.total || 0), color: COLORS.text2, fontSize: 10, fontFamily: '"Inter", system-ui, sans-serif' } },
-        ],
-      }, true);
+      this._ensureChart('chart-perpair')?.comparison(this._pairRows(this.selectedEquityBot ? [this.selectedEquityBot] : this.liveBots));
     },
 
     renderPortfolioCharts() {
-      const performance = this.fleetPerformanceData;
-      const live = (performance.live || []).map(point => [new Date(point[0]), point[1]]);
-      const realized = (performance.realized || performance.live || []).map(point => [new Date(point[0]), point[1]]);
-      const markToMarket = performance.hasOpenMark && realized.length && live.length
-        ? [realized[realized.length - 1], live[live.length - 1]]
-        : [];
-      const drawdown = (performance.drawdown || []).map(point => [new Date(point[0]), point[1]]);
-      const chartIds = [
-        'chart-portfolio-equity',
-        'chart-portfolio-dd',
-        'chart-portfolio-strategy',
-        'chart-portfolio-venue',
-        'chart-portfolio-pair',
-      ];
-
-      const equityChart = this._ensureChart(chartIds[0]);
-      if (equityChart) equityChart.setOption({
-        ...ECHART_COMMON, animation: false,
-        graphic: live.length > 1 ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
-          style: { text: 'Collecting portfolio trades', fill: COLORS.text3, font: '500 12px Inter' } }],
-        tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1,
-          textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: value => '$' + Number(value).toFixed(2) },
-        grid: { left: 60, right: 18, top: 24, bottom: 30 },
-        xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { show: false } },
-        yAxis: { type: 'value', scale: true, axisLine: { show: false }, axisTick: { show: false },
-          axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.hairline, type: 'dashed' } } },
-        legend: { data: ['closed equity', ...(markToMarket.length ? ['current mark'] : [])], top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 10 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
-        series: [{ name: 'closed equity', type: 'line', data: realized, showSymbol: false,
-          lineStyle: { color: COLORS.accent, width: 2.2 }, itemStyle: { color: COLORS.accent },
-          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(14,135,163,.20)' }, { offset: 1, color: 'rgba(14,135,163,0)' },
-          ]) } },
-          ...(markToMarket.length ? [{ name: 'current mark', type: 'line', data: markToMarket, showSymbol: true,
-            symbol: 'circle', symbolSize: 7,
-            lineStyle: { color: this.hero.totalUnrealizedPnl >= 0 ? COLORS.pos : COLORS.neg, width: 2, type: 'dashed' },
-            itemStyle: { color: this.hero.totalUnrealizedPnl >= 0 ? COLORS.pos : COLORS.neg, borderColor: COLORS.surface, borderWidth: 1.5 } }] : []),
-        ],
-      }, true);
-
-      const ddChart = this._ensureChart(chartIds[1]);
-      if (ddChart) {
-        const floor = Math.min(-5, Math.floor(Math.min(...drawdown.map(point => point[1]), 0) * 1.25));
-        ddChart.setOption({
-          ...ECHART_COMMON, animation: false,
-          graphic: drawdown.length > 1 ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
-            style: { text: 'No portfolio drawdown yet', fill: COLORS.text3, font: '500 12px Inter' } }],
-          tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1,
-            textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: value => Number(value).toFixed(2) + '%' },
-          grid: { left: 50, right: 18, top: 18, bottom: 30 },
-          xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 } },
-          yAxis: { type: 'value', min: floor, max: 0, axisLine: { show: false }, axisTick: { show: false },
-            axisLabel: { color: COLORS.text3, fontSize: 10, formatter: value => Math.round(value) + '%' },
-            splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: .55 } } },
-          series: [{ type: 'line', data: drawdown, showSymbol: false, lineStyle: { color: COLORS.neg, width: 1.6 },
-            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(210,71,58,0)' }, { offset: 1, color: 'rgba(210,71,58,.22)' },
-            ]) } }],
-        }, true);
-      }
-
-      const strategyChart = this._ensureChart(chartIds[2]);
-      if (strategyChart) {
-        const rows = [...this.portfolioStrategyRows].reverse();
-        strategyChart.setOption({
-          ...ECHART_COMMON, animation: false,
-          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface,
-            borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 },
-            formatter: params => {
-              const row = rows[params?.[0]?.dataIndex];
-              if (!row) return '';
-              return `<b>${row.label}</b><br/>closed ${this.fmtUsdSigned(row.realized)}<br/>open ${this.fmtUsdSigned(row.unrealized)}<br/><b>marked ${this.fmtUsdSigned(row.pnl)}</b>`;
-            } },
-          legend: { data: ['closed', 'open mark'], top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 10 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
-          grid: { left: 118, right: 64, top: 28, bottom: 26 },
-          xAxis: { type: 'value', axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' },
-            splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: .5 } } },
-          yAxis: { type: 'category', data: rows.map(row => row.label), axisLine: { show: false }, axisTick: { show: false },
-            axisLabel: { color: COLORS.text2, fontSize: 10 } },
-          series: [
-            { name: 'closed', type: 'bar', stack: 'pnl', data: rows.map(row => row.realized), barMaxWidth: 16,
-              itemStyle: { color: COLORS.accent, borderRadius: [0, 3, 3, 0] } },
-            { name: 'open mark', type: 'bar', stack: 'pnl', data: rows.map(row => row.unrealized), barMaxWidth: 16,
-              itemStyle: { color: point => Number(point.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] },
-              label: { show: true, position: 'right', color: COLORS.text2, fontSize: 10,
-                formatter: point => this.fmtUsdSigned(rows[point.dataIndex]?.pnl || 0) } },
-          ],
-        }, true);
-      }
-
-      const venueChart = this._ensureChart(chartIds[3]);
-      if (venueChart) {
-        const rows = this.portfolioVenues;
-        venueChart.setOption({
-          ...ECHART_COMMON, animation: false,
-          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface,
-            borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 },
-            valueFormatter: value => this.fmtUsd(Number(value)) },
-          grid: { left: 118, right: 58, top: 16, bottom: 28 },
-          xAxis: { type: 'value', axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' },
-            splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: .5 } } },
-          yAxis: { type: 'category', data: rows.map(row => row.label), axisLine: { show: false }, axisTick: { show: false },
-            axisLabel: { color: COLORS.text2, fontSize: 10 } },
-          series: [{ type: 'bar', data: rows.map(row => row.capital), barMaxWidth: 22,
-            itemStyle: { color: COLORS.accent, borderRadius: [0, 3, 3, 0] },
-            label: { show: true, position: 'right', color: COLORS.text2, fontSize: 10,
-              formatter: point => this.fmtUsd(Number(point.value)) } }],
-        }, true);
-      }
-
-      const pairChart = this._ensureChart(chartIds[4]);
-      if (pairChart) {
-        const rows = this.portfolioPairRows.slice(0, 10).reverse();
-        pairChart.setOption({
-          ...ECHART_COMMON, animation: false,
-          graphic: rows.length ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
-            style: { text: 'No pair performance yet', fill: COLORS.text3, font: '500 12px Inter' } }],
-          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface,
-            borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 },
-            formatter: params => {
-              const row = rows[params?.[0]?.dataIndex];
-              if (!row) return '';
-              return `<b>${row.pair}</b><br/>closed ${this.fmtUsdSigned(row.realized)}<br/>open ${this.fmtUsdSigned(row.unrealized)}<br/><b>marked ${this.fmtUsdSigned(row.pnl)}</b>`;
-            } },
-          legend: { data: ['closed', 'open mark'], top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 10 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
-          grid: { left: 72, right: 64, top: 28, bottom: 26 },
-          xAxis: { type: 'value', axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' },
-            splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: .5 } } },
-          yAxis: { type: 'category', data: rows.map(row => row.pair.split('/')[0]), axisLine: { show: false }, axisTick: { show: false },
-            axisLabel: { color: COLORS.text2, fontSize: 10 } },
-          series: [
-            { name: 'closed', type: 'bar', stack: 'pnl', data: rows.map(row => row.realized), barMaxWidth: 14,
-              itemStyle: { color: COLORS.accent, borderRadius: [0, 3, 3, 0] } },
-            { name: 'open mark', type: 'bar', stack: 'pnl', data: rows.map(row => row.unrealized), barMaxWidth: 14,
-              itemStyle: { color: point => Number(point.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] },
-              label: { show: true, position: 'right', color: COLORS.text2, fontSize: 10,
-                formatter: point => this.fmtUsdSigned(rows[point.dataIndex]?.pnl || 0) } },
-          ],
-        }, true);
-      }
-
-      this._scheduleChartResize(chartIds);
-    },
-
-    async renderCandles() {
-      const pos = this.openPos;
-      const chart = this._ensureChart('chart-candles');
-      if (!chart || !pos) return;
-      try {
-        const r = await fetch(`/api/candles/${pos._bot}?pair=${encodeURIComponent(pos.pair)}&timeframe=1h&limit=120`, { cache: 'no-store' });
-        if (!r.ok) return;
-        const data = await r.json();
-        const candles = (data.candles || []).map(c => [c[0], c[1], c[2], c[3], c[4]]);
-        if (!candles.length) return;
-        const dates = candles.map(c => c[0]);
-        const ohlc = candles.map(c => [c[1], c[2], c[3], c[4]]);
-
-        const decimals = (() => {
-          const rng = Math.max(...ohlc.flat());
-          if (rng >= 100) return 2;
-          if (rng >= 1) return 4;
-          return 5;
-        })();
-        const fmt = v => Number(v).toFixed(decimals);
-        const pct = (a, b) => ((a - b) / b * 100);
-
-        const stop = pos.stop_loss_abs;
-        const entry = pos.open_rate;
-        const now = pos.current_rate;
-
-        const lows = ohlc.map(c => c[2]);
-        const highs = ohlc.map(c => c[3]);
-        const candleMin = Math.min(...lows, stop ?? Infinity, entry ?? Infinity);
-        const candleMax = Math.max(...highs, entry ?? -Infinity);
-        const padY = (candleMax - candleMin) * 0.10;
-        const yMin = candleMin - padY;
-        const yMax = candleMax + padY;
-
-        const areas = [];
-        if (entry != null && stop != null) {
-          areas.push([{ yAxis: stop, itemStyle: { color: 'rgba(210, 71, 58, 0.08)' } }, { yAxis: entry }]);
-        }
-        if (entry != null && entry < yMax) {
-          areas.push([{ yAxis: entry, itemStyle: { color: 'rgba(10, 143, 91, 0.07)' } }, { yAxis: yMax }]);
-        }
-
-        // Bug fix B5: use actual stoploss from bot baseline
-        const botData = this.raw.bots[pos._bot];
-        const slPct = Math.abs(botData?.baseline?.stoploss ?? 5);
-
-        const lines = [];
-        const baseLabel = {
-          show: true, fontSize: 10, fontFamily: '"Inter", system-ui, sans-serif',
-          backgroundColor: 'rgba(255, 254, 251, 0.92)',
-          padding: [3, 6], borderRadius: 2, borderWidth: 1,
-        };
-        if (entry != null) {
-          lines.push({ yAxis: entry, lineStyle: { color: COLORS.accent, type: 'solid', width: 1.6 },
-            label: { ...baseLabel, position: 'insideStartTop', distance: 3, formatter: '▶ entry ' + fmt(entry), color: COLORS.accent, borderColor: COLORS.accent } });
-        }
-        if (stop != null) {
-          lines.push({ yAxis: stop, lineStyle: { color: COLORS.neg, type: 'dashed', width: 1.6 },
-            label: { ...baseLabel, position: 'insideStartBottom', distance: 3,
-                     // Bug fix B5: show actual stoploss %, not hardcoded -5%
-                     formatter: '▼ stop −' + slPct.toFixed(1) + '% · ' + fmt(stop),
-                     color: COLORS.neg, borderColor: COLORS.neg } });
-        }
-        if (now != null && entry != null) {
-          const pnlPct = pct(now, entry);
-          const farFromEntry = Math.abs(pnlPct) > 0.5;
-          lines.push({ yAxis: now, lineStyle: { color: pnlPct >= 0 ? COLORS.pos : COLORS.neg, type: 'dotted', width: 1.2 },
-            label: { ...baseLabel, position: farFromEntry ? 'insideEndTop' : 'insideMiddleTop', distance: 3,
-                     formatter: 'now ' + fmt(now) + ' · ' + (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%',
-                     color: pnlPct >= 0 ? COLORS.pos : COLORS.neg, borderColor: pnlPct >= 0 ? COLORS.pos : COLORS.neg } });
-        }
-
-        chart.setOption({
-          ...ECHART_COMMON, animation: false,
-          tooltip: {
-            trigger: 'axis', axisPointer: { type: 'cross', lineStyle: { color: COLORS.border } },
-            backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1,
-            textStyle: { color: COLORS.text, fontSize: 11 },
-          },
-          grid: { left: 60, right: 12, top: 14, bottom: 30 },
-          xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 9, formatter: v => v.slice(5, 16).replace('T', ' ') } },
-          yAxis: { scale: true, min: yMin - padY, max: yMax + padY, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: v => fmt(v) }, splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.5 } } },
-          series: [{
-            type: 'candlestick', data: ohlc,
-            itemStyle: { color: COLORS.pos, color0: COLORS.neg, borderColor: COLORS.pos, borderColor0: COLORS.neg, borderWidth: 1 },
-            markArea: { silent: true, data: areas },
-            markLine: { silent: true, symbol: 'none', data: lines },
-          }],
-        }, true);
-      } catch (e) { console.warn('candles', e); }
+      const data = this.fleetPerformanceData;
+      this._equityView('chart-portfolio-equity',data,null,this.hero.openCount>0);
+      this._drawdownView('chart-portfolio-dd',data);
+      this._ensureChart('chart-portfolio-strategy')?.comparison(this.portfolioStrategyRows);
+      this._ensureChart('chart-portfolio-pair')?.comparison(this.portfolioPairRows.map(row=>({...row,label:row.pair})));
+      this._scheduleChartResize();
     },
 
     async renderBotEquity(key) {
       const data = await this._fetchEquity(key);
-      const chart = this._ensureChart('chart-equity-' + key);
-      if (!chart) return;
-      const bot = this.raw.bots[key];
-      const startTs = data?.bot_start_ts_ms || 0;
-      const transitionTs = data?.lineage?.transition?.ts || bot?.epoch?.start_ts_ms || startTs;
-      const transitionLabel = data?.lineage?.transition?.label || bot?.epoch?.label || 'live epoch';
-      const expected = (data?.expected || []).filter(p => p[0] >= startTs).map(p => [new Date(p[0]), p[1]]);
-      const marked = (data?.live || []).map(p => [new Date(p[0]), p[1]]);
-      const live = (data?.realized || data?.live || []).map(p => [new Date(p[0]), p[1]]);
-      const markToMarket = (bot?.open_trades?.length || 0) && live.length && marked.length
-        ? [live[live.length - 1], marked[marked.length - 1]] : [];
-      chart.setOption({
-        ...ECHART_COMMON, animation: false,
-        tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: v => v != null ? '$' + Number(v).toFixed(2) : '—' },
-        legend: { data: ['closed equity', ...(markToMarket.length ? ['current mark'] : []), 'backtest expected'], top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 11 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
-        grid: { left: 60, right: 18, top: 32, bottom: 30 },
-        xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { show: false } },
-        yAxis: { type: 'value', scale: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.hairline, type: 'dashed' } } },
-        series: [
-          { name: 'backtest expected', type: 'line', data: expected, showSymbol: false, lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.2 } },
-          { name: 'closed equity', type: 'line', data: live, showSymbol: false,
-            lineStyle: { color: COLORS.info, width: 2 },
-            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14, 135, 163, 0.18)' }, { offset: 1, color: 'rgba(14, 135, 163, 0.0)' }]) },
-            markLine: transitionTs ? { silent:true, symbol:'none', data:[{ xAxis:transitionTs,
-              lineStyle:{ color:COLORS.warn, type:'dashed', width:1.2 },
-              label:{ show:true, position:'insideEndTop', formatter:transitionLabel, color:COLORS.warn, fontSize:10,
-                backgroundColor:'rgba(255,254,251,.94)', padding:[2,4], borderRadius:2 } }] } : undefined },
-          ...(markToMarket.length ? [{ name: 'current mark', type: 'line', data: markToMarket, showSymbol: true,
-            symbol: 'circle', symbolSize: 7,
-            lineStyle: { color: (bot.pnl?.unrealized || 0) >= 0 ? COLORS.pos : COLORS.neg, width: 2, type: 'dashed' },
-            itemStyle: { color: (bot.pnl?.unrealized || 0) >= 0 ? COLORS.pos : COLORS.neg, borderColor: COLORS.surface, borderWidth: 1.5 } }] : []),
-        ],
-      }, true);
+      this._equityView('chart-equity-'+key,data,this.raw.bots[key],!!this.raw.bots[key]?.open_trades?.length);
     },
 
-    // ─── per-bot detail tab charts ───
     async renderDetailCharts(key) {
-      const bot = this.raw.bots[key];
-      if (!bot) return;
+      const bot = this.raw.bots[key]; if (!bot) return;
       const data = await this._fetchEquity(key);
-
-      const equityChart = this._ensureChart('chart-detail-equity-' + key);
-      if (equityChart) {
-        const startTs  = data?.bot_start_ts_ms || 0;
-        // Bug fix B2: defensive wallet access
-        const startCap = data?.starting_capital ?? bot.wallet?.starting_capital ?? 200;
-        const annual   = bot.baseline?.annual_return_pct ?? 0;
-        const lineage  = data?.lineage;
-        const transitionTs = lineage?.transition?.ts || bot?.epoch?.start_ts_ms || startTs;
-        const transitionLabel = lineage?.transition?.label || bot?.epoch?.label || 'live epoch';
-        const legacyName = lineage?.legacy_label || 'dry-run';
-        const liveName = lineage ? `${lineage.live_label} · closed` : 'closed equity';
-        const legacy   = (lineage?.legacy || []).map(p => [new Date(p[0]), p[1]]);
-        const marked   = (lineage?.live || data?.live || []).map(p => [new Date(p[0]), p[1]]);
-        const live     = closedEquityThroughMark(lineage?.realized || data?.realized || data?.live || [], marked);
-        const markToMarket = (bot.open_trades?.length || 0) && live.length && marked.length
-          ? [live[live.length - 1], marked[marked.length - 1]] : [];
-        const lastLiveTs = marked.length ? marked[marked.length-1][0].getTime() : Date.now();
-        const horizon  = Math.max(lastLiveTs, Date.now()) + 12*3600*1000;
-        const expected = [];
-        if (annual && !lineage) {
-          for (let i = 0; i <= 80; i++) {
-            const ts   = startTs + (horizon - startTs) * i / 80;
-            const days = (ts - startTs) / 86400000;
-            expected.push([new Date(ts), startCap * Math.pow(1 + annual/100, days/365)]);
-          }
-        }
-        equityChart.setOption({
-          ...ECHART_COMMON, animation: false,
-          tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: v => v != null ? '$' + Number(v).toFixed(2) : '—' },
-          legend: { data: [...(lineage ? [legacyName] : []), liveName, ...(markToMarket.length ? ['current mark'] : []), ...(expected.length ? ['backtest expected'] : [])], top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 11 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
-          graphic: (legacy.length + live.length + markToMarket.length) > 1 ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
-            style: { text: 'Collecting live trades', fill: COLORS.text3, font: '500 12px Inter' } }],
-          grid: { left: 60, right: 18, top: 32, bottom: 30 },
-          xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 }, splitLine: { show: false } },
-          yAxis: { type: 'value', scale: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.hairline, type: 'dashed' } } },
-          series: [
-            ...(lineage ? [{ name: legacyName, type: 'line', data: legacy, showSymbol: false,
-              lineStyle: { color: COLORS.text3, width: 1.7 } }] : []),
-            ...(expected.length ? [{ name: 'backtest expected', type: 'line', data: expected, showSymbol: false, lineStyle: { color: COLORS.text3, type: 'dashed', width: 1.2 } }] : []),
-            { name: liveName, type: 'line', data: live, step: 'end', showSymbol: false,
-              lineStyle: { color: COLORS.info, width: 2 },
-              areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14,135,163,0.18)' }, { offset: 1, color: 'rgba(14,135,163,0)' }]) },
-              markLine: transitionTs ? { silent: true, symbol: 'none', data: [{ xAxis: transitionTs,
-                lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.4 },
-                label: { show: true, position: 'insideEndTop', formatter: transitionLabel,
-                  color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)', padding: [3,5], borderRadius: 3 } }] } : undefined },
-            ...(markToMarket.length ? [{ name: 'current mark', type: 'line', data: markToMarket, showSymbol: true,
-              symbol: 'circle', symbolSize: 7,
-              lineStyle: { color: (bot.pnl?.unrealized || 0) >= 0 ? COLORS.pos : COLORS.neg, width: 2, type: 'dashed' },
-              itemStyle: { color: (bot.pnl?.unrealized || 0) >= 0 ? COLORS.pos : COLORS.neg, borderColor: COLORS.surface, borderWidth: 1.5 } }] : []),
-          ],
-        }, true);
-      }
-
-      const ddChart = this._ensureChart('chart-detail-dd-' + key);
-      if (ddChart) {
-        const lineage = data?.lineage;
-        const transitionTs = lineage?.transition?.ts || bot?.epoch?.start_ts_ms || data?.bot_start_ts_ms;
-        const transitionLabel = lineage?.transition?.label || bot?.epoch?.label || 'live epoch';
-        const dd    = (lineage?.drawdown || data?.drawdown || []).map(p => [new Date(p[0]), p[1]]);
-        const baselineDd = bot.baseline?.max_dd_pct || 0;
-        const ddCap = baselineDd ? -baselineDd * 1.5 : -5;
-        ddChart.setOption({
-          ...ECHART_COMMON, animation: false,
-          graphic: dd.length > 1 ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
-            style: { text: 'No drawdown yet', fill: COLORS.text3, font: '500 12px Inter' } }],
-          tooltip: { trigger: 'axis', backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 }, valueFormatter: v => v != null ? Number(v).toFixed(2) + '%' : '—' },
-          grid: { left: 50, right: 18, top: 22, bottom: 30 },
-          xAxis: { type: 'time', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10 } },
-          yAxis: { type: 'value', max: 0, min: Math.floor(ddCap), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: v => Math.round(v) + '%' }, splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.5 } } },
-          series: [{
-            type: 'line', data: dd, showSymbol: false,
-            lineStyle: { color: COLORS.neg, width: 1.5 },
-            areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(210,71,58,0)' }, { offset: 1, color: 'rgba(210,71,58,0.22)' }]) },
-            markLine: { silent: true, symbol: 'none', data: [
-              ...(transitionTs ? [{ xAxis: transitionTs, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1.2 }, label: { show: true, position: 'insideEndTop', formatter: transitionLabel, color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.94)', padding: [2,4], borderRadius: 2 } }] : []),
-              ...(baselineDd ? [{ yAxis: ddCap, lineStyle: { color: COLORS.warn, type: 'dashed', width: 1 }, label: { show: true, position: 'insideEndTop', formatter: 'cap ' + ddCap.toFixed(1) + '%', color: COLORS.warn, fontSize: 10, backgroundColor: 'rgba(255,254,251,0.9)', padding: [2, 4], borderRadius: 2 } }] : []),
-            ] },
-          }],
-        }, true);
-      }
-
-      const pairChart = this._ensureChart('chart-detail-pair-' + key);
-      if (pairChart) {
-        const pairMap = {};
-        for (const row of bot.per_pair || []) {
-          pairMap[row.pair] = { pair: row.pair, realized: Number(row.pnl || 0), unrealized: 0 };
-        }
-        for (const trade of bot.open_trades || []) {
-          if (!pairMap[trade.pair]) pairMap[trade.pair] = { pair: trade.pair, realized: 0, unrealized: 0 };
-          pairMap[trade.pair].unrealized += Number(trade.profit_abs || 0);
-        }
-        const rows = Object.values(pairMap)
-          .map(row => ({ ...row, total: row.realized + row.unrealized }))
-          .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
-          .slice(0, 10)
-          .reverse();
-        pairChart.setOption({
-          ...ECHART_COMMON, animation: false,
-          graphic: rows.length ? [] : [{ type: 'text', left: 'center', top: 'middle', silent: true,
-            style: { text: 'No pair performance yet', fill: COLORS.text3, font: '500 12px Inter' } }],
-          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1, textStyle: { color: COLORS.text, fontSize: 11 },
-            formatter: params => {
-              const row = rows[params?.[0]?.dataIndex];
-              if (!row) return '';
-              return `<b>${row.pair}</b><br/>closed ${this.fmtUsdSigned(row.realized)}<br/>open ${this.fmtUsdSigned(row.unrealized)}<br/><b>marked ${this.fmtUsdSigned(row.total)}</b>`;
-            } },
-          legend: { data: ['closed', 'open mark'], top: 0, right: 8, textStyle: { color: COLORS.text3, fontSize: 10 }, icon: 'roundRect', itemWidth: 10, itemHeight: 3 },
-          grid: { left: 70, right: 64, top: 28, bottom: 24 },
-          xAxis: { type: 'value', axisLine: { lineStyle: { color: COLORS.border } }, axisLabel: { color: COLORS.text3, fontSize: 10, formatter: '${value}' }, splitLine: { lineStyle: { color: COLORS.border, type: 'dashed', opacity: 0.5 } } },
-          yAxis: { type: 'category', data: rows.map(row => row.pair), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: COLORS.text2, fontSize: 11, formatter: v => String(v).split('/')[0] } },
-          series: [
-            { name: 'closed', type: 'bar', stack: 'pnl', data: rows.map(row => row.realized), barWidth: 12,
-              itemStyle: { color: COLORS.accent, borderRadius: [0, 3, 3, 0] } },
-            { name: 'open mark', type: 'bar', stack: 'pnl', data: rows.map(row => row.unrealized), barWidth: 12,
-              itemStyle: { color: point => Number(point.value) >= 0 ? COLORS.pos : COLORS.neg, borderRadius: [0, 3, 3, 0] },
-              label: { show: true, position: 'right', formatter: point => this.fmtUsdSigned(rows[point.dataIndex]?.total || 0), color: COLORS.text2, fontSize: 10, fontFamily: '"Inter", system-ui, sans-serif' } },
-          ],
-        }, true);
-      }
-    },
-
-    _renderEmptyChart(chart, msg) {
-      chart.setOption({
-        ...ECHART_COMMON,
-        graphic: [{ type: 'text', left: 'center', top: 'middle', style: { text: msg, fill: COLORS.text3, fontSize: 12 } }],
-        xAxis: { show: false }, yAxis: { show: false }, series: [],
-      }, true);
+      this._equityView('chart-detail-equity-'+key,data,bot,!!bot.open_trades?.length);
+      this._drawdownView('chart-detail-dd-'+key,data,bot.baseline?.max_dd_pct);
+      this._ensureChart('chart-detail-pair-'+key)?.comparison(this._pairRows([bot]));
     },
   };
 }
