@@ -187,6 +187,8 @@ services:
       # and removes liquidations. This bounded live evolution explicitly
       # supersedes the historical dry-only verdict; set "false" to revert.
       KILLERS_POSTED_SL: "true"
+      # Empty preserves existing policy until a reviewed prospective activation.
+      KILLERS_TP_ALLOCATIONS: ${KILLERS_TP_ALLOCATIONS:-}
       KILLERS_EXECUTION_VENUE: hyperliquid
     volumes:
       - killers_receiver_state:/var/lib/killers
