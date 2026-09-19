@@ -189,6 +189,7 @@ services:
       KILLERS_POSTED_SL: "true"
       # Empty preserves existing policy until a reviewed prospective activation.
       KILLERS_TP_ALLOCATIONS: ${KILLERS_TP_ALLOCATIONS:-}
+      KILLERS_TP_MODE: ${KILLERS_TP_MODE:-legacy}
       KILLERS_EXECUTION_VENUE: hyperliquid
     volumes:
       - killers_receiver_state:/var/lib/killers
