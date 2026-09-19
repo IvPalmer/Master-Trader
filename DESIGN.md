@@ -171,3 +171,13 @@ pill shapes.
   “No TP order reported” does not rule out a dynamic strategy exit.
 - **Don't** remove the multiple-chart comparison view to accommodate expansion,
   or reset a user's viewport during a same-timeframe refresh.
+
+## Position close controls
+
+Each open chart has a text-labelled Close position control. A native modal dialog
+provides protected confirmation focus, bot/market/side/quantity context and bot
+API authentication. Passwords are cleared after submission/dismissal and never
+stored in browser storage. Submission is disabled during and after accepted or
+uncertain requests. Copy distinguishes acceptance from execution; filled status
+continues to come from the bot. The backend persists duplicate protection across
+restarts, validates current position identity and rejects cross-origin actions.

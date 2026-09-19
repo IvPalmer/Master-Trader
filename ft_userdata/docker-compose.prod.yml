@@ -531,6 +531,7 @@ services:
       KILLERS_RECEIVER_DB: /var/lib/killers-receiver/receiver-hyperliquid.sqlite
       LINEAGE_DB_DIR: /var/lib/freqtrade-history
     volumes:
+      - dashboard_actions:/var/lib/dashboard-actions
       - ft_exporter_state:/var/lib/account-health:ro
       - ./overlays:/overlays:ro
       # killers_bot SQLite (read-only) so the dashboard can render the
@@ -568,6 +569,7 @@ networks:
   dokploy-network:
     external: true
 volumes:
+  dashboard_actions:
   prometheus_data: null
   ft_user_data: null
   ft_exporter_state: null

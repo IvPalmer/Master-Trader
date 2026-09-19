@@ -61,6 +61,35 @@ function dash() {
     _tradeTfOverride: {},
     _tradeScale: {},
     expandedTrade: null,
+    closeTrade: null, closeBusy: false, closeMessage: '', closeUser: '', closePassword: '', closeRequestId: null,
+    showClose(trade) {
+      this.closeTrade = {...trade}; this.closeMessage = ''; this.closePassword = '';
+      this.closeRequestId = crypto.randomUUID();
+      this.$refs.closeDialog.showModal();
+    },
+    dismissClose() { if (!this.closeBusy) { this.$refs.closeDialog.close(); this.closePassword = ''; } },
+    async submitClose() {
+      if (this.closeBusy || !this.closeTrade) return;
+      const t = this.closeTrade; this.closeBusy = true; this.closeMessage = 'Submitting exit request…';
+      try {
+        const credential = btoa(String.fromCharCode(...new TextEncoder().encode(this.closeUser+':'+this.closePassword)));
+        const r = await fetch(`/api/trades/${encodeURIComponent(t.bot_key)}/${t.trade_id}/close`, {
+          method:'POST', headers:{'Content-Type':'application/json','X-Trade-Action':'close','Authorization':'Basic '+credential},
+          body:JSON.stringify({request_id:this.closeRequestId,pair:t.pair,amount:t.amount,open_timestamp:t.open_ts,is_short:!!t.is_short})
+        });
+        const result = await r.json();
+        if (!r.ok) {
+          this.closeMessage = typeof result.detail==='string' ? result.detail : 'Request rejected. Refresh the position before trying again.';
+          if ([401,403,409,422,503].includes(r.status)) this.closeBusy = false;
+          return;
+        }
+        this.closeMessage = result.state==='already_closed' ? 'This position is already closed.' : result.state==='accepted' ? 'Exit request accepted. Waiting for the bot to report the fill.' : 'Exit status is uncertain. Check the bot’s orders before taking further action.';
+        // Keep submission disabled after accepted/uncertain responses. Refresh does not mean filled.
+        await this.refresh();
+      } catch (_) {
+        this.closeMessage = 'Connection interrupted. The exit may have been submitted. Check the bot’s orders before trying again.';
+      } finally { this.closePassword = ''; }
+    },
     expandTrade(trade) {
       const id = this.tradeChartId(trade);
       this.expandedTrade = this.expandedTrade === id ? null : id;
@@ -978,7 +1007,7 @@ function dash() {
           const ftStop = (typeof t.stop_loss_abs === 'number' && t.stop_loss_abs > 0) ? t.stop_loss_abs : null;
           const stopIsPosted = (typeof postedSL === 'number' && postedSL > 0);
           out.push({
-            bot_key: b.key, bot_name: b.name, pair: t.pair, dry_run: b.dry_run,
+            bot_key: b.key, bot_name: b.name, pair: t.pair, dry_run: b.dry_run, trade_id: t.trade_id, amount: t.amount,
             open_rate: t.open_rate, close_rate: t.current_rate,
             open_ts: t.open_timestamp, close_ts: now,
             profit_pct: t.profit_pct, profit_abs: t.profit_abs,

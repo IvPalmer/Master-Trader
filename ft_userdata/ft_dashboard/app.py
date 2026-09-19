@@ -1690,6 +1690,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, title="master-trader")
+from trade_controls import install as install_trade_controls
+install_trade_controls(app, BOTS, _api_auth)
 
 
 @app.middleware("http")
