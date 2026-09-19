@@ -3,28 +3,35 @@ name: Master Trader
 description: A neutral trading workspace for fleet comparison and position inspection.
 colors:
   primary: "#176c84"
-  background: "#f3f5f7"
+  background: "#f4f6f8"
   surface: "#ffffff"
   surface-muted: "#f6f8fa"
   border: "#dce3e9"
   text: "#17232f"
   text-secondary: "#465766"
   text-muted: "#61717f"
-  chart-positive: "#16714b"
+  positive: "#16714b"
+  negative: "#ba3a35"
   chart-negative: "#c23b35"
   chart-pending: "#9a690a"
 typography:
   headline:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "28px"
     fontWeight: 650
+    lineHeight: 1.2
     letterSpacing: "-.025em"
+  title:
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: "16px"
+    fontWeight: 650
+    lineHeight: 1.5
   body:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "14px"
     lineHeight: 1.5
   label:
-    fontFamily: "Inter, system-ui, sans-serif"
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "12px"
 rounded:
   surface: "12px"
@@ -49,38 +56,54 @@ view. It does not introduce a new brand or decorative visual theme.
 
 This document records the implemented workspace overrides in
 `ft_userdata/ft_dashboard/static/workspace.css`, layered after `styles.css`, and
-the template and `frontend/src/price-chart.ts` behavior.
+the template, `frontend/src/analytics.ts` and `frontend/src/price-chart.ts`.
 
 ## Colors
 
 The teal primary color marks selection and actions. Cool gray backgrounds, white
 surfaces and subdued borders separate information without competing with it.
 Positive, negative and pending chart colors communicate direction or order state;
-text labels carry the same meaning. Existing metric colors remain inherited from
-the base stylesheet, so charts and P&L text use distinct semantic shades.
+text labels carry the same meaning. Positive and negative metric text use the
+workspace semantic colors; candle losses retain the chart-negative shade.
+Position exit-state labels retain their own muted foreground/background pairs.
 
 ## Typography
 
-Inter is the interface family; JetBrains Mono with system monospace fallbacks
-remains available for numeric tables and technical values. Use tabular figures
-for values that users compare.
+The interface and comparable numeric values use Inter with the native fallbacks
+in frontmatter. Weights 400, 500, 600 and 700 are self-hosted as WOFF2 files under
+`static/fonts`, with `font-display: swap`. Numeric tables and P&L use tabular figures. The base stylesheet
+retains JetBrains Mono for explicit technical/mono treatments; it is not the
+default numeric table face.
 
-The overview heading and primary values are 28px; values use weight 600. Card
-headings are 15px at weight 650, pair names 16px, table values 13px and supporting
-labels 12px. Bot identity headings are 26px. At widths up to 600px, overview
-headings and primary values become 24px. Prefer short, explicit labels over
-additional typographic emphasis.
+The overview heading is 28px at weight 650; primary values are 30px at weight 600.
+Card headings are 16px at weight 650, table values 13px and supporting labels
+12px. Bot identity headings are 26px. At widths up to 600px, the overview heading
+becomes 24px and primary values 26px. Prefer short, explicit labels.
 
 ## Layout
 
-The centered shell is at most 1800px wide, with 28px horizontal padding, reduced
-to 18px at widths up to 1000px and 12px at widths up to 600px. Main sections use
-20–24px spacing. Four overview measurements become two columns at 1000px.
+The centered shell is at most 1600px wide, with 32px horizontal padding, reduced
+to 24px at widths up to 1100px and 16px at widths up to 600px. Sections and grids
+use 24px gaps; the mobile tab-panel gap becomes 20px at 600px. The 12-column
+analytics grid stacks at 1100px. Four overview measurements become two columns
+at 800px. Six performance-quality columns become three at 1100px and two at
+600px. Mobile navigation wraps into rows at 600px, with 20px horizontal gaps
+and 12px vertical tab padding; the current navigation occupies two rows.
 
-Position charts use two columns by default, three from 1650px and one at widths
-up to 1000px, with 20px gaps. Cards have 20px padding, reduced to 16px at 1000px.
-Charts are 340px tall, or 300px at widths up to 600px. An expanded card occupies
-the full grid width and first row; its chart uses up to 65vh/700px with a 380px
+Bot-detail exposure and performance panels each span the full grid width.
+Performance facts use three columns with 20px row and 32px column gaps,
+becoming two columns with 16px column gaps at 600px.
+
+Panel headers use 20px top, 24px horizontal and 16px bottom padding. Analytics
+charts use 20px horizontal/bottom padding; comparison tables use 24px horizontal
+padding. Charts are 300px tall by default, 360px for tall and 220px for short;
+tall charts become 320px at 600px. Empty analytics and comparison tables use
+content-driven height.
+
+Position charts use two columns by default, three from 1900px and one at widths
+up to 800px, with 24px gaps. Cards have 20px padding, reduced to 16px at 600px.
+Position charts are 340px tall, or 300px at 600px. An expanded card occupies the
+full grid width and first row; its chart uses `min(65vh, 700px)` with a 380px
 minimum. On small screens its height is 65vh, retaining that minimum.
 
 ## Elevation & Depth
@@ -103,6 +126,16 @@ pill shapes.
   and estimated loss to bot stops. Shared accounts count once. The realized
   series represents closed results in live epochs; current unrealized P&L is a
   separate measurement. Secondary research stays behind disclosure controls.
+- **Analytics:** D3 scales and shapes render responsive SVG equity and drawdown
+  plots on a continuous calendar-time domain. Sparse observations keep their
+  elapsed-time spacing. Realized equity and drawdown use step-after curves,
+  2px strokes, horizontal grid lines, right-aligned value axes and separate text
+  legends. Hover shows the nearest prior observation per series with a date
+  and dashed vertical guide. Current equity remains a separate labeled snapshot
+  above the plot. Empty histories and all-zero drawdown show explicit messages;
+  a single observation uses a point. Small contribution comparisons use semantic
+  tables with Name, Realized, Open P&L and Total columns; numeric columns align
+  right. Lightweight Charts is reserved for position candles; ECharts is absent.
 - **Bot detail:** show strategy, venue, account, operating state and measurement
   scope together. Keep the selected bot's performance, positions, history and
   native-stop evidence scoped to that bot. Paper and historical observations
@@ -120,7 +153,7 @@ pill shapes.
   the timeframe is unchanged; a new timeframe starts near the latest 90 bars.
 - **Expand chart:** expand one card within the grid; Restore grid or Escape
   returns to the comparison layout. This is an inline expansion, not a modal.
-- **Controls:** compact controls have a 32px minimum height and 6px/12px padding.
+- **Controls:** compact controls have a 36px minimum height and 8px/12px padding.
   Focus uses a 2px teal outline with 3px offset; hover reduces brightness.
   Scale selection exposes `aria-pressed`, expansion exposes `aria-expanded`
   and chart loading exposes `aria-busy`. Reduced-motion preferences disable
