@@ -561,6 +561,8 @@ def init_db(path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(path, isolation_level=None)
     conn.row_factory = sqlite3.Row
     conn.executescript(POSITION_SCHEMA)
+    from .tp_migration import SCHEMA as MIGRATION_SCHEMA
+    conn.executescript(MIGRATION_SCHEMA)
     target_columns = {r[1] for r in conn.execute("PRAGMA table_info(target_orders)")}
     for column in ("submitted_at", "prior_order_ids"):
         if column not in target_columns:
@@ -1199,6 +1201,22 @@ async def _adopt_or_post_next_tp(
                 return mark("blocked", "allocation below Hyperliquid minimum notional")
         except (ValueError, TypeError):
             return mark("blocked", "invalid remaining position amount")
+
+    # A migrated first exit may have waited across a crash/restart. Never
+    # turn its approved resting limit into an already-crossed immediate exit.
+    position = conn.execute("SELECT tp_policy FROM positions WHERE pos_id=?", (pos_id,)).fetchone()
+    policy = json.loads(position["tp_policy"]) if position and position["tp_policy"] else None
+    if policy and policy.get("migration_id") and idx == policy["targets"][0]["idx"]:
+        from decimal import Decimal
+        try:
+            mark_price = Decimal(str(trade["current_rate"]))
+            if not mark_price.is_finite() or mark_price <= 0:
+                raise ValueError()
+            crossed = tp_price >= float(mark_price) if trade.get("is_short") else tp_price <= float(mark_price)
+            if crossed:
+                return mark("blocked", "migrated first target crossed before submission; operator review required")
+        except (KeyError, ValueError, ArithmeticError):
+            return mark("blocked", "fresh mark missing for migrated first target")
 
     # ── Step B: POST a new limit exit ────────────────────────────────
     # Commit intent BEFORE awaiting. A crash/timeout must never become a
@@ -1957,6 +1975,10 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+
+
+from .tp_migration import install_routes as install_tp_migration_routes
+install_tp_migration_routes(app, ft_get_trade, ft_cancel_open_order, _adopt_or_post_next_tp)
 
 
 @app.get("/healthz")
