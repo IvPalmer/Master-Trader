@@ -154,8 +154,8 @@ exposed through the public dashboard.
 Rebuild/recreate **killers-receiver** from the release checkout, preserving its
 current environment and volume. Verify healthy startup and use preview only to
 validate compatibility before the operator applies a trade. A successful build
-or preview does not mean an existing trade was migrated. Keep issue #45 open
-until separately verified live results are recorded.
+or preview does not mean an existing trade was migrated. Record actual order
+verification separately; see the dated rollout record below.
 
 The schema addition is additive. Before any apply, reverting this release does
 not require deleting its journal. After an apply, retain code that understands
@@ -176,3 +176,58 @@ behalf, and does not require copying UUIDs between commands. The same five-minut
 expiry, stale-state checks, shared lock and idempotency still apply. A legacy
 cancellation hold with no remaining open TP can be reviewed this way; it posts
 the approved replacement without trying to cancel an absent order again.
+
+## Verified rollout record — 2026-09-19
+
+Issue [#45](https://github.com/IvPalmer/Master-Trader/issues/45) tracks the
+implementation and operational verification. This is a dated release record,
+not a live position report.
+
+| Stage | Source / release | Verified outcome |
+|---|---|---|
+| Size-aware source policy | [#48](https://github.com/IvPalmer/Master-Trader/pull/48) | Nearest eligible source candidates, feasible split or full exit at the first candidate; deploying the code did not activate the receiver. |
+| Operator activation | Existing reviewed release | Operator rebuilt/recreated the receiver with `nearest_source`; active TP limits confirmed. Existing legacy positions remained unchanged. |
+| Existing-position migration | [#51](https://github.com/IvPalmer/Master-Trader/pull/51), release [#52](https://github.com/IvPalmer/Master-Trader/pull/52) | Preview/apply workflow and private journal deployed. Initial cancellation verification was incompatible with Freqtrade's omitted zero-fill cancelled orders. |
+| Cancellation compatibility and interactive recovery | [#55](https://github.com/IvPalmer/Master-Trader/pull/55), release [#56](https://github.com/IvPalmer/Master-Trader/pull/56) | Corrected serializer handling; interactive operator confirmation added; receiver rebuilt and health verified. |
+| Operator application and verification | [Verification record](https://github.com/IvPalmer/Master-Trader/issues/45#issuecomment-5745161492) | Both legacy migrations recorded `active`. Receiver and executor matched; a separate Hyperliquid open-order read confirmed the replacement first TPs were resting reduce-only orders with native stop-limit orders present. A new position also used `nearest_source` and had its first TP and stop verified. |
+
+Final execution release: `e791a0c018d227e9f0e66cfb762f8204e7f43bac` on
+`vps-deploy`, containing main source `60fd38c`. Receiver image:
+`sha256:99b89a88b5b5fa6d2a1345fb0611239eab43b36d5cded1d99dda939a0a0d4423`.
+The operator submitted the migration applications; agent verification was
+read-only. No account identifiers, order IDs, approval UUIDs or raw production
+tapes belong in this record. Private backups and the migration journal remain
+on the VPS.
+
+Validation for #55/#56: **277 receiver tests passed**, including omitted
+cancelled-order records, changed exit accounting, crash/timeout handling,
+interactive confirmation versus skip, and simulated second-leg cascade. Both
+PR and release CI passed all checks. Live preview compatibility and service
+health were checked after deployment; live replacement orders were verified
+separately after operator application.
+
+### Failures and recovery recorded
+
+- An initial apply arrived 1,368 seconds after preview creation and correctly
+  failed the 300-second validity check without changing orders.
+- Later applies cancelled the old TPs but stopped because the tool required
+  cancelled zero-fill records that Freqtrade intentionally omits. Native stops
+  remained present; no replacement TP was submitted until operator recovery.
+- The fix accepts omission only after acknowledged cancellation, no normal open
+  exit, unchanged inventory/stop and unchanged exit accounting. If the old order
+  is present, it must prove cancellation with zero fill. Ambiguous responses
+  still block rather than retry blindly.
+- `review` requires the literal `APPLY`; Enter or any other text skips the
+  position. Preview generation is not order placement.
+
+### What remains market evidence
+
+The second target of a split is pending until the first fills; it is **not** a
+second resting exchange order. Its future live fill/cascade was not observed
+in this verification, although cascade behavior passed automated tests.
+Profitability, net profit retention, execution costs and missed winners remain
+research questions under [#28](https://github.com/IvPalmer/Master-Trader/issues/28).
+Migration does not convert older entries into fresh forward pairs. Preserve
+original entry epochs, record the policy transition separately, and do not
+rewrite existing preregistrations or tapes. No monitoring automation was enabled
+by this rollout.
