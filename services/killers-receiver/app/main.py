@@ -55,6 +55,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from .tp_plan import executable_targets
+from .tp_policy import parse_policy, snapshot_policy, preflight, executable_source_targets, snapshot_nearby, nearby_allocations
 
 logging.basicConfig(
     level=logging.INFO,
@@ -189,6 +190,14 @@ class Config:
         self.active_tp_limits = (os.environ.get(
             "KILLERS_ACTIVE_TP_LIMITS", "true",
         ).lower() in ("true", "1", "yes"))
+        self.tp_allocations = parse_policy(os.environ.get("KILLERS_TP_ALLOCATIONS", ""))
+        self.tp_mode = os.environ.get("KILLERS_TP_MODE", "legacy")
+        if self.tp_mode not in ("legacy", "nearest_source"):
+            raise ValueError("KILLERS_TP_MODE must be legacy or nearest_source")
+        if self.tp_mode == "nearest_source" and self.tp_allocations:
+            raise ValueError("nearest_source cannot be combined with explicit TP allocations")
+        if (self.tp_allocations or self.tp_mode == "nearest_source") and (not self.active_tp_limits or execution_venue() != "hyperliquid"):
+            raise ValueError("KILLERS_TP_ALLOCATIONS requires active Hyperliquid TP limits")
         # Reconciler tick interval for target_orders state transitions.
         self.target_reconcile_sec = int(os.environ.get(
             "KILLERS_TARGET_RECONCILE_SEC", "20",
@@ -569,6 +578,9 @@ def init_db(path: str) -> sqlite3.Connection:
         conn.execute("ALTER TABLE positions ADD COLUMN targets_remaining TEXT")
     except sqlite3.OperationalError:
         pass
+    position_columns = {r[1] for r in conn.execute("PRAGMA table_info(positions)")}
+    if "tp_policy" not in position_columns:
+        conn.execute("ALTER TABLE positions ADD COLUMN tp_policy TEXT")
     # Migration: absolute posted SL price per position, for the KILLERS_POSTED_SL
     # hard-stop mode. NULL on legacy rows → those positions are never SL-exited
     # (mode only acts on positions opened with a parsed posted SL).
@@ -1029,15 +1041,26 @@ async def _place_target_limits_inner(
     plan = [(idx, float(price), round(float(slice_amount), 8))
             for idx, price in enumerate(targets)]
     planning_error = None
+    frozen_policy = None
     if execution_venue() == "hyperliquid":
         trade_snapshot = await ft_get_trade(cfg, ft_trade_id, session=session)
         if trade_snapshot is None:
             return []  # delayed-fill reconciliation will retry the read
         try:
-            plan = executable_targets(trade_snapshot, targets, min_notional=10)
+            position = conn.execute("SELECT tp_policy FROM positions WHERE pos_id=?", (pos_id,)).fetchone()
+            frozen_policy = json.loads(position["tp_policy"]) if position and position["tp_policy"] else None
+            if frozen_policy:
+                plan = (nearby_allocations(trade_snapshot, frozen_policy)
+                        if frozen_policy.get("mode") == "nearest_source"
+                        else executable_source_targets(trade_snapshot, frozen_policy))
+            else:
+                plan = executable_targets(trade_snapshot, targets, min_notional=10)
         except (ValueError, ArithmeticError, TypeError) as exc:
             planning_error = str(exc)
-            plan = [(idx, float(price), 0.0) for idx, price in enumerate(targets)]
+            if frozen_policy:
+                plan = [(row["idx"], float(row["price"]), 0.0) for row in frozen_policy["targets"]]
+            else:
+                plan = [(idx, float(price), 0.0) for idx, price in enumerate(targets)]
         if not plan:
             return []  # entry is not filled yet; never allocate requested size
     # Step 1: persist every target as 'pending'. UNIQUE not enforced at
@@ -1048,7 +1071,7 @@ async def _place_target_limits_inner(
             "INSERT INTO target_orders (pos_id, idx, price, amount, state, notes) "
             "VALUES (?, ?, ?, ?, ?, ?)",
             (pos_id, idx, float(tp_price), planned_amount, state,
-             planning_error or "executable target allocation"),
+             planning_error or ("frozen source allocation v1" if frozen_policy else "legacy late-target consolidation")),
         )
         placed.append({
             "target_id": cur.lastrowid, "idx": idx, "price": float(tp_price),
@@ -2762,6 +2785,24 @@ async def _process_event_inner(payload: EventPayload, phase2_locked=False):
                 symbol, msg_id,
             )
 
+        frozen_policy = None
+        if getattr(cfg, "tp_mode", "legacy") == "nearest_source":
+            try:
+                frozen_policy = snapshot_nearby(signal_targets, target_ref, direction == "short")
+                # Entry sizing remains unchanged. Actual quantum/residual checks follow the fill.
+                from decimal import Decimal
+                value = Decimal(str(stake)) * Decimal(str(leverage)) / Decimal(str(target_ref)) * Decimal(frozen_policy["targets"][0]["price"])
+                if value < 10:
+                    raise ValueError("whole position below minimum at first target")
+            except (ValueError, ArithmeticError, TypeError) as exc:
+                return {"action": "skipped", "reason": "tp_policy_infeasible", "detail": str(exc)}
+        elif getattr(cfg, "tp_allocations", None):
+            try:
+                frozen_policy = snapshot_policy(cfg.tp_allocations, signal_targets, target_ref, direction == "short")
+                preflight(frozen_policy, stake * leverage, target_ref)
+            except (ValueError, ArithmeticError, TypeError) as exc:
+                return {"action": "skipped", "reason": "tp_policy_infeasible", "detail": str(exc)}
+
         # Insert tentative position record BEFORE the REST call so we have audit
         # spine even if the call fails. UNIQUE constraint on open_msg_id makes
         # this idempotent — duplicate event delivery returns the existing row.
@@ -2770,11 +2811,11 @@ async def _process_event_inner(payload: EventPayload, phase2_locked=False):
             cur = conn.execute(
                 "INSERT INTO positions (signal_id, symbol, pair, direction, state, "
                 " open_msg_id, open_date, stake_usd, leverage, sl_distance_pct, sl_abs, "
-                " last_event_at, targets_remaining) "
-                "VALUES (?, ?, ?, ?, 'requested', ?, ?, ?, ?, ?, ?, ?, ?)",
+                " last_event_at, targets_remaining, tp_policy) "
+                "VALUES (?, ?, ?, ?, 'requested', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (signal_id, symbol, pair, direction, msg_id, str(msg.get("date")),
                  stake, leverage, sl_dist, sl_abs, datetime.now(timezone.utc).isoformat(),
-                 targets_json),
+                 targets_json, json.dumps(frozen_policy) if frozen_policy else None),
             )
             pos_id = cur.lastrowid
         except sqlite3.IntegrityError:
