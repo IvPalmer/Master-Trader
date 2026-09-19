@@ -57,7 +57,8 @@ def order_basis(order):
 def inventory(trade):
     return {k: trade.get(k) for k in (
         'trade_id', 'pair', 'is_open', 'is_short', 'open_timestamp',
-        'amount', 'open_rate', 'nr_of_successful_entries', 'stop_loss_abs',
+        'amount', 'open_rate', 'nr_of_successful_entries', 'nr_of_successful_exits',
+        'realized_profit', 'stop_loss_abs',
         'stop_loss_ratio', 'amount_precision', 'precision_mode',
         'price_precision', 'precision_mode_price', 'contract_size')}
 
@@ -193,7 +194,11 @@ class Migration:
         if opened:
             matches = [o for o in after.get('orders', [])
                        if str(o.get('order_id')) == str(opened[0]['order_id'])]
-            if (len(matches) != 1 or matches[0].get('is_open') is not False
+            # Freqtrade Trade.to_json intentionally omits cancelled zero-fill
+            # orders (select_filled_or_open_orders). After acknowledged cancel,
+            # absence + unchanged inventory/exit accounting + no open order is
+            # the expected successful result, not an uncertain cancellation.
+            if matches and (len(matches) != 1 or matches[0].get('is_open') is not False
                     or matches[0].get('status') not in ('canceled', 'cancelled', 'expired')
                     or Decimal(str(matches[0].get('filled') or 0)) != 0):
                 return self.finish(request_id, 'needs_review', 'Old exit cancellation not proven unfilled; no replacement sent')
