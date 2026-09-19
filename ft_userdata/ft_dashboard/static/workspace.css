@@ -131,3 +131,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid v
 .dialog-actions { display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-end; margin-top:24px; }
 .dialog-actions button { padding:10px 14px; font:inherit; }
 .close-result { color:#465766; overflow-wrap:anywhere; }
+.close-dialog { margin:auto; inset:0; max-height:calc(100dvh - 32px); overflow:auto; }
+.dialog-actions button { border:1px solid #61717f; border-radius:6px; background:#fff; cursor:pointer; }
+.dialog-actions .close-position { border-color:#c86c68; }
