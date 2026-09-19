@@ -1126,6 +1126,8 @@ function dash() {
         }
       } finally { this._tradeChartsBusy = false; }
     },
+    focusTradeEntry(trade) { charts[this.tradeChartId(trade)]?.focusEntry(); },
+
     tradeChartStatus(trade) { return this._tradeChartState[this.tradeChartId(trade)] || { loading: true }; },
     retryTradeChart(trade) {
       const prefix = trade.bot_key + ':' + trade.pair + ':';

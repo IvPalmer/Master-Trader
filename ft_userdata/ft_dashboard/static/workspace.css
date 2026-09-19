@@ -134,3 +134,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid v
 .close-dialog { margin:auto; inset:0; max-height:calc(100dvh - 32px); overflow:auto; }
 .dialog-actions button { border:1px solid #61717f; border-radius:6px; background:#fff; cursor:pointer; }
 .dialog-actions .close-position { border-color:#c86c68; }
+
+.trade-entry-price { color:var(--accent); display:inline-flex; align-items:center; gap:8px; font-weight:600; }
+.trade-entry-price::before { content:""; width:18px; border-top:2px solid currentColor; flex-shrink:0; }
