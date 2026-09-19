@@ -18,6 +18,20 @@
 </head>
 <body x-data="dash()" x-init="boot()" @keydown.escape.window="expandedTrade=null; $nextTick(() => _scheduleChartResize())">
 
+<dialog class="close-dialog" x-ref="closeDialog" aria-labelledby="close-title" @cancel="closePassword=''">
+  <form @submit.prevent="submitClose()">
+    <h2 id="close-title">Close position at market?</h2>
+    <p><strong x-text="closeTrade?.pair"></strong> · <span x-text="closeTrade?.bot_name"></span></p>
+    <p x-text="closeTrade?.dry_run ? 'Paper trading' : 'Live trading'"></p>
+    <p><span x-text="closeTrade?.is_short?'Short':'Long'"></span> · Full remaining quantity: <strong x-text="closeTrade?.amount"></strong></p>
+    <p>The fill price and final P&amp;L can change before execution. This closes the entire position.</p>
+    <label>Bot API username<input autocomplete="username" x-model="closeUser" required :disabled="closeBusy"></label>
+    <label>Bot API password<input type="password" autocomplete="current-password" x-model="closePassword" required :disabled="closeBusy"></label>
+    <p class="close-result" role="status" x-text="closeMessage"></p>
+    <div class="dialog-actions"><button type="button" @click="$refs.closeDialog.close(); closePassword=''">Dismiss</button><button type="submit" class="close-position" :disabled="closeBusy">Confirm market close</button></div>
+  </form>
+</dialog>
+
 <div class="shell">
 
   <!-- ── topbar ───────────────────────────────── -->
@@ -833,6 +847,9 @@
           <div class="chart-controls">
             <div class="scale-toggle" aria-label="Price scale"><button :aria-pressed="tradeScale(trade)==='price'" @click="setTradeScale(trade,'price')">Price action</button><button :aria-pressed="tradeScale(trade)==='exits'" @click="setTradeScale(trade,'exits')">All exits</button></div>
             <button class="expand-chart" :aria-expanded="expandedTrade===tradeChartId(trade)" @click="expandTrade(trade)" x-text="expandedTrade===tradeChartId(trade)?'Restore grid':'Expand chart'"></button>
+          </div>
+          <div class="position-actions" x-show="trade.is_open">
+            <button class="close-position" :disabled="!trade.trade_id || !trade.amount" @click="showClose(trade)">Close position…</button>
           </div>
           <div class="exit-levels" x-show="trade.is_open">
             <span x-show="trade.stop_rate" class="exit-stop" x-text="'Bot stop '+fmtRate(trade.stop_rate)"></span>

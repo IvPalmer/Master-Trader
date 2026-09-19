@@ -116,3 +116,18 @@ button:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid v
 @media(max-width:600px){.bot-performance-facts{grid-template-columns:repeat(2,minmax(0,1fr));padding:0 16px 20px;gap:20px 16px;}}
 .card-head:has(>.card-sub) { flex-direction:column; gap:4px; }
 @media(max-width:600px){.portfolio-head{align-items:flex-start;}}
+
+.position-actions { display:flex; justify-content:flex-end; margin-block:12px; }
+.close-position { color:#a52b27; border:1px solid #c86c68; background:#fff; border-radius:6px; padding:10px 14px; font:inherit; cursor:pointer; }
+.close-position:hover:not(:disabled) { background:#fff1f0; }
+.close-position:disabled { opacity:.55; cursor:not-allowed; }
+.close-position:focus-visible, .close-dialog button:focus-visible { outline:2px solid #176c84; outline-offset:3px; }
+.close-dialog { width:min(480px,calc(100vw - 32px)); box-sizing:border-box; border:1px solid #dce3e9; border-radius:12px; padding:24px; color:#17232f; background:#fff; }
+.close-dialog::backdrop { background:rgb(23 35 47 / .48); }
+.close-dialog h2 { margin:0 0 16px; font-size:22px; }
+.close-dialog p { line-height:1.5; margin:12px 0; }
+.close-dialog label { display:block; margin-block:16px; }
+.close-dialog input { display:block; box-sizing:border-box; width:100%; margin-top:8px; padding:10px; font-size:16px; border:1px solid #61717f; border-radius:6px; }
+.dialog-actions { display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-end; margin-top:24px; }
+.dialog-actions button { padding:10px 14px; font:inherit; }
+.close-result { color:#465766; overflow-wrap:anywhere; }
