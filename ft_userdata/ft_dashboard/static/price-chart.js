@@ -2059,6 +2059,10 @@
   function Qt(t, i, s) {
     return i - t <= s;
   }
+  function ti(t) {
+    const i = Math.ceil(t);
+    return i % 2 == 0 ? i - 1 : i;
+  }
   var ii = class extends R {
     constructor() {
       super(...arguments), this.Yt = null;
@@ -6192,6 +6196,324 @@
     }
   };
   var Pe = { type: "Candlestick", isBuiltIn: true, defaultOptions: { upColor: "#26a69a", downColor: "#ef5350", wickVisible: true, borderVisible: true, borderColor: "#378658", borderUpColor: "#26a69a", borderDownColor: "#ef5350", wickColor: "#737375", wickUpColor: "#26a69a", wickDownColor: "#ef5350" }, $g: (t, i) => new Ce(t, i) };
+  var je = class {
+    constructor(t, i) {
+      this.Jn = t, this.ah = i, this.WM();
+    }
+    detach() {
+      this.Jn.detachPrimitive(this.ah);
+    }
+    getSeries() {
+      return this.Jn;
+    }
+    applyOptions(t) {
+      this.ah && this.ah.hr && this.ah.hr(t);
+    }
+    WM() {
+      this.Jn.attachPrimitive(this.ah);
+    }
+  };
+  var Ke = { autoScale: true, zOrder: "normal" };
+  function Xe(t, i) {
+    return ti(Math.min(Math.max(t, 12), 30) * i);
+  }
+  function Ze(t, i) {
+    switch (t) {
+      case "arrowDown":
+      case "arrowUp":
+        return Xe(i, 1);
+      case "circle":
+        return Xe(i, 0.8);
+      case "square":
+        return Xe(i, 0.7);
+    }
+  }
+  function Ge(t) {
+    return (function(t2) {
+      const i = Math.ceil(t2);
+      return i % 2 != 0 ? i - 1 : i;
+    })(Xe(t, 1));
+  }
+  function Je(t) {
+    return Math.max(Xe(t, 0.1), 3);
+  }
+  function Qe(t, i, s) {
+    return i ? t : s ? Math.ceil(t / 2) : 0;
+  }
+  function tr(t, i, s, n) {
+    const e3 = (Ze("arrowUp", n) - 1) / 2 * s._b, r2 = (ti(n / 2) - 1) / 2 * s._b;
+    i.beginPath(), t ? (i.moveTo(s._t - e3, s.ut), i.lineTo(s._t, s.ut - e3), i.lineTo(s._t + e3, s.ut), i.lineTo(s._t + r2, s.ut), i.lineTo(s._t + r2, s.ut + e3), i.lineTo(s._t - r2, s.ut + e3), i.lineTo(s._t - r2, s.ut)) : (i.moveTo(s._t - e3, s.ut), i.lineTo(s._t, s.ut + e3), i.lineTo(s._t + e3, s.ut), i.lineTo(s._t + r2, s.ut), i.lineTo(s._t + r2, s.ut - e3), i.lineTo(s._t - r2, s.ut - e3), i.lineTo(s._t - r2, s.ut)), i.fill();
+  }
+  function ir(t, i, s, n, e3, r2) {
+    const h2 = (Ze("arrowUp", n) - 1) / 2, a2 = (ti(n / 2) - 1) / 2;
+    if (e3 >= i - a2 - 2 && e3 <= i + a2 + 2 && r2 >= (t ? s : s - h2) - 2 && r2 <= (t ? s + h2 : s) + 2) return true;
+    return (() => {
+      if (e3 < i - h2 - 3 || e3 > i + h2 + 3 || r2 < (t ? s - h2 - 3 : s) || r2 > (t ? s : s + h2 + 3)) return false;
+      const n2 = Math.abs(e3 - i);
+      return Math.abs(r2 - s) + 3 >= n2 / 2;
+    })();
+  }
+  var sr = class {
+    constructor() {
+      this.Yt = null, this.On = new rt(), this.F = -1, this.W = "", this.Wp = "", this.ub = "normal";
+    }
+    ht(t) {
+      this.Yt = t;
+    }
+    Nn(t, i, s) {
+      this.F === t && this.W === i || (this.F = t, this.W = i, this.Wp = x(t, i), this.On.Bn()), this.ub = s;
+    }
+    jn(t, i) {
+      if (null === this.Yt || null === this.Yt.lt) return null;
+      for (let s = this.Yt.lt.from; s < this.Yt.lt.to; s++) {
+        const n = this.Yt.ot[s];
+        if (n && er(n, t, i)) return { zOrder: "normal", externalId: n.Kn ?? "" };
+      }
+      return null;
+    }
+    draw(t) {
+      "aboveSeries" !== this.ub && t.useBitmapCoordinateSpace(((t2) => {
+        this.et(t2);
+      }));
+    }
+    drawBackground(t) {
+      "aboveSeries" === this.ub && t.useBitmapCoordinateSpace(((t2) => {
+        this.et(t2);
+      }));
+    }
+    et({ context: t, horizontalPixelRatio: i, verticalPixelRatio: s }) {
+      if (null !== this.Yt && null !== this.Yt.lt) {
+        t.textBaseline = "middle", t.font = this.Wp;
+        for (let n = this.Yt.lt.from; n < this.Yt.lt.to; n++) {
+          const e3 = this.Yt.ot[n];
+          void 0 !== e3.ri && (e3.ri.Qi = this.On.Vi(t, e3.ri.cb), e3.ri.$t = this.F, e3.ri._t = e3._t - e3.ri.Qi / 2), nr(e3, t, i, s);
+        }
+      }
+    }
+  };
+  function nr(t, i, s, n) {
+    i.fillStyle = t.R, void 0 !== t.ri && (function(t2, i2, s2, n2, e3, r2) {
+      t2.save(), t2.scale(e3, r2), t2.fillText(i2, s2, n2), t2.restore();
+    })(i, t.ri.cb, t.ri._t, t.ri.ut, s, n), (function(t2, i2, s2) {
+      if (0 === t2.zr) return;
+      switch (t2.fb) {
+        case "arrowDown":
+          return void tr(false, i2, s2, t2.zr);
+        case "arrowUp":
+          return void tr(true, i2, s2, t2.zr);
+        case "circle":
+          return void (function(t3, i3, s3) {
+            const n2 = (Ze("circle", s3) - 1) / 2;
+            t3.beginPath(), t3.arc(i3._t, i3.ut, n2 * i3._b, 0, 2 * Math.PI, false), t3.fill();
+          })(i2, s2, t2.zr);
+        case "square":
+          return void (function(t3, i3, s3) {
+            const n2 = Ze("square", s3), e3 = (n2 - 1) * i3._b / 2, r2 = i3._t - e3, h2 = i3.ut - e3;
+            t3.fillRect(r2, h2, n2 * i3._b, n2 * i3._b);
+          })(i2, s2, t2.zr);
+      }
+      t2.fb;
+    })(t, i, (function(t2, i2, s2) {
+      const n2 = Math.max(1, Math.floor(i2)) % 2 / 2;
+      return { _t: Math.round(t2._t * i2) + n2, ut: t2.ut * s2, _b: i2 };
+    })(t, s, n));
+  }
+  function er(t, i, s) {
+    return !(void 0 === t.ri || !(function(t2, i2, s2, n, e3, r2) {
+      const h2 = n / 2;
+      return e3 >= t2 && e3 <= t2 + s2 && r2 >= i2 - h2 && r2 <= i2 + h2;
+    })(t.ri._t, t.ri.ut, t.ri.Qi, t.ri.$t, i, s)) || (function(t2, i2, s2) {
+      if (0 === t2.zr) return false;
+      switch (t2.fb) {
+        case "arrowDown":
+          return ir(true, t2._t, t2.ut, t2.zr, i2, s2);
+        case "arrowUp":
+          return ir(false, t2._t, t2.ut, t2.zr, i2, s2);
+        case "circle":
+          return (function(t3, i3, s3, n, e3) {
+            const r2 = 2 + Ze("circle", s3) / 2, h2 = t3 - n, a2 = i3 - e3;
+            return Math.sqrt(h2 * h2 + a2 * a2) <= r2;
+          })(t2._t, t2.ut, t2.zr, i2, s2);
+        case "square":
+          return (function(t3, i3, s3, n, e3) {
+            const r2 = Ze("square", s3), h2 = (r2 - 1) / 2, a2 = t3 - h2, l2 = i3 - h2;
+            return n >= a2 && n <= a2 + r2 && e3 >= l2 && e3 <= l2 + r2;
+          })(t2._t, t2.ut, t2.zr, i2, s2);
+      }
+    })(t, i, s);
+  }
+  function rr(t) {
+    return "atPriceTop" === t || "atPriceBottom" === t || "atPriceMiddle" === t;
+  }
+  function hr(t, i, s, n, e3, r2, h2, a2) {
+    const l2 = (function(t2, i2, s2) {
+      if (rr(i2.position) && void 0 !== i2.price) return i2.price;
+      if ("value" in (n2 = t2) && "number" == typeof n2.value) return t2.value;
+      var n2;
+      if ((function(t3) {
+        return "open" in t3 && "high" in t3 && "low" in t3 && "close" in t3;
+      })(t2)) {
+        if ("inBar" === i2.position) return t2.close;
+        if ("aboveBar" === i2.position) return s2 ? t2.low : t2.high;
+        if ("belowBar" === i2.position) return s2 ? t2.high : t2.low;
+      }
+    })(s, i, h2.priceScale().options().invertScale);
+    if (void 0 === l2) return;
+    const o2 = rr(i.position), _2 = a2.timeScale(), c2 = p(i.size) ? Math.max(i.size, 0) : 1, d2 = Ge(_2.options().barSpacing) * c2, f2 = d2 / 2;
+    t.zr = d2;
+    switch (i.position) {
+      case "inBar":
+      case "atPriceMiddle":
+        return t.ut = u(h2.priceToCoordinate(l2)), void (void 0 !== t.ri && (t.ri.ut = t.ut + f2 + r2 + 0.6 * e3));
+      case "aboveBar":
+      case "atPriceTop": {
+        const i2 = o2 ? 0 : n.pb;
+        return t.ut = u(h2.priceToCoordinate(l2)) - f2 - i2, void 0 !== t.ri && (t.ri.ut = t.ut - f2 - 0.6 * e3, n.pb += 1.2 * e3), void (o2 || (n.pb += d2 + r2));
+      }
+      case "belowBar":
+      case "atPriceBottom": {
+        const i2 = o2 ? 0 : n.mb;
+        return t.ut = u(h2.priceToCoordinate(l2)) + f2 + i2, void 0 !== t.ri && (t.ri.ut = t.ut + f2 + r2 + 0.6 * e3, n.mb += 1.2 * e3), void (o2 || (n.mb += d2 + r2));
+      }
+    }
+  }
+  var ar = class {
+    constructor(t, i, s) {
+      this.wb = [], this.xt = true, this.gb = true, this.Gt = new sr(), this.ge = t, this.Vp = i, this.Yt = { ot: [], lt: null }, this.Ps = s;
+    }
+    renderer() {
+      if (!this.ge.options().visible) return null;
+      this.xt && this.Mb();
+      const t = this.Vp.options().layout;
+      return this.Gt.Nn(t.fontSize, t.fontFamily, this.Ps.zOrder), this.Gt.ht(this.Yt), this.Gt;
+    }
+    bb(t) {
+      this.wb = t, this.yt("data");
+    }
+    yt(t) {
+      this.xt = true, "data" === t && (this.gb = true);
+    }
+    Sb(t) {
+      this.xt = true, this.Ps = t;
+    }
+    zOrder() {
+      return "aboveSeries" === this.Ps.zOrder ? "top" : this.Ps.zOrder;
+    }
+    Mb() {
+      const t = this.Vp.timeScale(), i = this.wb;
+      this.gb && (this.Yt.ot = i.map(((t2) => ({ wt: t2.time, _t: 0, ut: 0, zr: 0, fb: t2.shape, R: t2.color, Kn: t2.id, xb: t2.xb, ri: void 0 }))), this.gb = false);
+      const s = this.Vp.options().layout;
+      this.Yt.lt = null;
+      const n = t.getVisibleLogicalRange();
+      if (null === n) return;
+      const e3 = new Ti(Math.floor(n.from), Math.ceil(n.to));
+      if (null === this.ge.data()[0]) return;
+      if (0 === this.Yt.ot.length) return;
+      let r2 = NaN;
+      const h2 = Je(t.options().barSpacing), a2 = { pb: h2, mb: h2 };
+      this.Yt.lt = on(this.Yt.ot, e3, true);
+      for (let n2 = this.Yt.lt.from; n2 < this.Yt.lt.to; n2++) {
+        const e4 = i[n2];
+        e4.time !== r2 && (a2.pb = h2, a2.mb = h2, r2 = e4.time);
+        const l2 = this.Yt.ot[n2];
+        l2._t = u(t.logicalToCoordinate(e4.time)), void 0 !== e4.text && e4.text.length > 0 && (l2.ri = { cb: e4.text, _t: 0, ut: 0, Qi: 0, $t: 0 });
+        const o2 = this.ge.dataByIndex(e4.time, 0);
+        null !== o2 && hr(l2, e4, o2, a2, s.fontSize, h2, this.ge, this.Vp);
+      }
+      this.xt = false;
+    }
+  };
+  function lr(t) {
+    return { ...Ke, ...t };
+  }
+  var or = class {
+    constructor(t) {
+      this.sh = null, this.wb = [], this.Cb = [], this.Pb = null, this.ge = null, this.Vp = null, this.yb = true, this.kb = null, this.Tb = null, this.Rb = null, this.Db = true, this.Ps = lr(t);
+    }
+    attached(t) {
+      this.Vb(), this.Vp = t.chart, this.ge = t.series, this.sh = new ar(this.ge, u(this.Vp), this.Ps), this.lb = t.requestUpdate, this.ge.subscribeDataChanged(((t2) => this.Tg(t2))), this.Db = true, this.jM();
+    }
+    jM() {
+      this.lb && this.lb();
+    }
+    detached() {
+      this.ge && this.Pb && this.ge.unsubscribeDataChanged(this.Pb), this.Vp = null, this.ge = null, this.sh = null, this.Pb = null;
+    }
+    bb(t) {
+      this.Db = true, this.wb = t, this.Vb(), this.yb = true, this.Tb = null, this.jM();
+    }
+    Bb() {
+      return this.wb;
+    }
+    paneViews() {
+      return this.sh ? [this.sh] : [];
+    }
+    updateAllViews() {
+      this.Ib();
+    }
+    hitTest(t, i) {
+      return this.sh ? this.sh.renderer()?.jn(t, i) ?? null : null;
+    }
+    autoscaleInfo(t, i) {
+      if (this.Ps.autoScale && this.sh) {
+        const t2 = this.Eb();
+        if (t2) return { priceRange: null, margins: t2 };
+      }
+      return null;
+    }
+    hr(t) {
+      this.Ps = lr({ ...this.Ps, ...t }), this.jM && this.jM();
+    }
+    Eb() {
+      const t = u(this.Vp).timeScale().options().barSpacing;
+      if (this.yb || t !== this.Rb) {
+        if (this.Rb = t, this.wb.length > 0) {
+          const i = Je(t), s = 1.5 * Ge(t) + 2 * i, n = this.Ab();
+          this.kb = { above: Qe(s, n.aboveBar, n.inBar), below: Qe(s, n.belowBar, n.inBar) };
+        } else this.kb = null;
+        this.yb = false;
+      }
+      return this.kb;
+    }
+    Ab() {
+      return null === this.Tb && (this.Tb = this.wb.reduce(((t, i) => (t[i.position] || (t[i.position] = true), t)), { inBar: false, aboveBar: false, belowBar: false, atPriceTop: false, atPriceBottom: false, atPriceMiddle: false })), this.Tb;
+    }
+    Vb() {
+      if (!this.Db || !this.Vp || !this.ge) return;
+      const t = this.Vp.timeScale(), i = this.ge?.data();
+      if (null == t.getVisibleLogicalRange() || !this.ge || 0 === i.length) return void (this.Cb = []);
+      const s = t.timeToIndex(u(i[0].time), true);
+      this.Cb = this.wb.map(((i2, n) => {
+        const e3 = t.timeToIndex(i2.time, true), r2 = e3 < s ? 1 : -1, h2 = u(this.ge).dataByIndex(e3, r2), a2 = { time: t.timeToIndex(u(h2).time, false), position: i2.position, shape: i2.shape, color: i2.color, id: i2.id, xb: n, text: i2.text, size: i2.size, price: i2.price, yw: i2.time };
+        if ("atPriceTop" === i2.position || "atPriceBottom" === i2.position || "atPriceMiddle" === i2.position) {
+          if (void 0 === i2.price) throw new Error(`Price is required for position ${i2.position}`);
+          return { ...a2, position: i2.position, price: i2.price };
+        }
+        return { ...a2, position: i2.position, price: i2.price };
+      })), this.Db = false;
+    }
+    Ib(t) {
+      this.sh && (this.Vb(), this.sh.bb(this.Cb), this.sh.Sb(this.Ps), this.sh.yt(t));
+    }
+    Tg(t) {
+      this.Db = true, this.jM();
+    }
+  };
+  var _r = class extends je {
+    constructor(t, i, s) {
+      super(t, i), s && this.setMarkers(s);
+    }
+    setMarkers(t) {
+      this.ah.bb(t);
+    }
+    markers() {
+      return this.ah.Bb();
+    }
+  };
+  function ur(t, i, s) {
+    const n = new _r(t, new or(s ?? {}));
+    return i && n.setMarkers(i), n;
+  }
   var br = { ...e, color: "#2196f3" };
 
   // node_modules/d3-array/src/ascending.js
@@ -8626,16 +8948,16 @@
       }
       const table = node("table", "", "contribution-table");
       const head = node("thead");
-      const tr = node("tr");
-      for (const title of ["Name", "Realized", "Open P&L", "Total"]) tr.append(node("th", title));
-      head.append(tr);
+      const tr2 = node("tr");
+      for (const title of ["Name", "Realized", "Open P&L", "Total"]) tr2.append(node("th", title));
+      head.append(tr2);
       table.append(head);
       const body = node("tbody");
       for (const row of rows) {
-        const tr2 = node("tr");
-        tr2.append(node("th", row.label));
-        for (const value of [row.realized, row.unrealized, row.realized + row.unrealized]) tr2.append(node("td", money(value), value < 0 ? "neg" : value > 0 ? "pos" : ""));
-        body.append(tr2);
+        const tr3 = node("tr");
+        tr3.append(node("th", row.label));
+        for (const value of [row.realized, row.unrealized, row.realized + row.unrealized]) tr3.append(node("td", money(value), value < 0 ? "neg" : value > 0 ? "pos" : ""));
+        body.append(tr3);
       }
       table.append(body);
       this.el.append(table);
@@ -8667,6 +8989,8 @@
       __publicField(this, "dead", false);
       __publicField(this, "exits", []);
       __publicField(this, "mode", "price");
+      __publicField(this, "markers");
+      __publicField(this, "entryIndex", -1);
       this.chart = Wn(el, { autoSize: true, localization: { locale: "en-US" }, layout: { background: { type: Li.Solid, color: "#ffffff" }, textColor: "#526170", fontSize: 12, attributionLogo: true }, grid: { vertLines: { visible: false }, horzLines: { color: "#edf0f2" } }, rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.12 } }, timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: 4 }, crosshair: { mode: 0 } });
       this.series = this.chart.addSeries(Pe, { upColor: "#16714b", downColor: "#c23b35", borderVisible: false, wickUpColor: "#16714b", wickDownColor: "#c23b35", lastValueVisible: false, priceLineVisible: false, autoscaleInfoProvider: ((original) => {
         const info = original();
@@ -8677,22 +9001,36 @@
         }
         return info;
       }) });
+      this.markers = ur(this.series, []);
     }
     render(rows, trade, tf, mode) {
       const data = rows.filter((r2) => r2.length >= 5 && r2.every(Number.isFinite)).map((r2) => ({ time: Math.floor(r2[0] / 1e3), open: r2[1], close: r2[2], low: r2[3], high: r2[4] })).sort((a2, b2) => a2.time - b2.time).filter((r2, i, a2) => !i || r2.time !== a2[i - 1].time);
       if (!data.length) return;
       const previous = this.chart.timeScale().getVisibleLogicalRange();
       this.mode = mode;
-      this.exits = [{ price: trade.open_rate, label: "Entry" }, { price: trade.close_rate, label: trade.is_open ? "Current" : "Exit" }, ...trade.is_open && trade.stop_rate ? [{ price: trade.stop_rate, label: trade.is_open ? "Bot stop" : "Recorded stop", state: "stop" }] : [], ...trade.exit_levels || []].filter((x3) => Number.isFinite(x3.price) && x3.price > 0);
+      this.exits = [{ price: trade.open_rate, label: "Entry price", state: "entry" }, { price: trade.close_rate, label: trade.is_open ? "Current" : "Exit" }, ...trade.is_open && trade.stop_rate ? [{ price: trade.stop_rate, label: trade.is_open ? "Bot stop" : "Recorded stop", state: "stop" }] : [], ...trade.exit_levels || []].filter((x3) => Number.isFinite(x3.price) && x3.price > 0);
       const reference = data[data.length - 1].close;
       const precision = Math.min(10, Math.max(2, 4 - Math.floor(Math.log10(reference))));
       this.series.applyOptions({ priceFormat: { type: "price", precision, minMove: 10 ** -precision } });
       this.series.setData(data);
       this.lines.forEach((line) => this.series.removePriceLine(line));
-      this.lines = this.exits.map((x3) => this.series.createPriceLine({ price: x3.price, title: x3.label, axisLabelVisible: true, color: x3.state === "stop" ? "#c23b35" : x3.state === "active" ? "#16714b" : x3.state === "pending" ? "#9a690a" : "#657482", lineStyle: x3.state === "active" ? h.Solid : h.Dashed, lineWidth: 1 }));
+      this.lines = this.exits.map((x3) => this.series.createPriceLine({ price: x3.price, title: x3.label, axisLabelVisible: true, color: x3.state === "entry" ? "#176c84" : x3.state === "stop" ? "#c23b35" : x3.state === "active" ? "#16714b" : x3.state === "pending" ? "#9a690a" : "#657482", lineStyle: x3.state === "entry" || x3.state === "active" ? h.Solid : h.Dotted, lineWidth: x3.state === "entry" ? 2 : 1 }));
+      const raw = trade.open_ts;
+      const numeric = Number(raw);
+      const opened = raw == null ? NaN : Number.isFinite(numeric) ? numeric < 1e12 ? numeric * 1e3 : numeric : Date.parse(String(raw));
+      const seconds2 = opened / 1e3;
+      const duration = { "5m": 300, "15m": 900, "1h": 3600, "4h": 14400 }[tf];
+      const candle = duration && Number.isFinite(seconds2) ? data.find((r2) => r2.time <= seconds2 && seconds2 < r2.time + duration) : void 0;
+      this.entryIndex = candle ? data.indexOf(candle) : -1;
+      this.markers.setMarkers(candle ? [{ time: candle.time, position: trade.is_short ? "aboveBar" : "belowBar", shape: trade.is_short ? "arrowDown" : "arrowUp", color: "#176c84", text: "Entry", size: 1.5 }] : []);
       if (previous && this.timeframe === tf) this.chart.timeScale().setVisibleLogicalRange(previous);
       else this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, data.length - 90), to: data.length + 3 });
       this.timeframe = tf;
+    }
+    focusEntry() {
+      if (this.entryIndex < 0) return false;
+      this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, this.entryIndex - 12), to: this.entryIndex + 12 });
+      return true;
     }
     getDom() {
       return this.el;

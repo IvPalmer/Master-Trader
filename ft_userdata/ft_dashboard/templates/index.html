@@ -829,7 +829,7 @@
           </div>
           <div class="position-context"><span x-text="trade.bot_name"></span><span x-show="trade.dry_run">Paper trading</span><span x-text="trade.is_short?'Short':'Long'"></span><span x-show="trade.tps_total" x-text="trade.tps_hit+' / '+trade.tps_total+' targets filled'"></span><span x-show="trade.booked_pct>0" x-text="Math.round(trade.booked_pct)+'% realized'"></span></div>
           <div class="trade-card-detail">
-            <span>entry <strong x-text="(trade.open_rate||0).toPrecision(5)">—</strong></span>
+            <span class="trade-entry-price" title="Average filled entry price · solid blue line on chart">Entry price <strong x-text="(trade.open_rate||0).toPrecision(5)">—</strong></span>
             <span class="sep">→</span>
             <span><span x-text="trade.is_open ? 'now' : 'exit'">exit</span> <strong x-text="(trade.close_rate||0).toPrecision(5)">—</strong></span>
             <span class="sep">·</span>
@@ -846,6 +846,7 @@
           </div>
           <div class="chart-controls">
             <div class="scale-toggle" aria-label="Price scale"><button :aria-pressed="tradeScale(trade)==='price'" @click="setTradeScale(trade,'price')">Price action</button><button :aria-pressed="tradeScale(trade)==='exits'" @click="setTradeScale(trade,'exits')">All exits</button></div>
+            <button class="expand-chart" x-show="!tradeChartStatus(trade).clipped" :disabled="!!tradeChartStatus(trade).loading" @click="focusTradeEntry(trade)">Show entry</button>
             <button class="expand-chart" :aria-expanded="expandedTrade===tradeChartId(trade)" @click="expandTrade(trade)" x-text="expandedTrade===tradeChartId(trade)?'Restore grid':'Expand chart'"></button>
           </div>
           <div class="position-actions" x-show="trade.is_open">
