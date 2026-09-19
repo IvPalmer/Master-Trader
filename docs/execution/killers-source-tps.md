@@ -95,7 +95,7 @@ docker exec killers-receiver python -m app.tp_migrate preview --trade-id TRADE_I
 
 Each preview prints the market, current mark, original source target numbers,
 prices, quantities and an **individual apply command** with a request UUID. Read
-that proposal and run its printed command within five minutes. No bulk apply is
+that proposal and run its printed SSH command from your Mac within five minutes. No bulk apply is
 provided. Credentials stay inside the receiver container; do not paste them into
 commands. Preview stores a private approval record but makes no exchange writes.
 

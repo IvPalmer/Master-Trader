@@ -17,8 +17,9 @@ def call(cfg, path, body=None):
 def show(result):
     print(json.dumps(result, indent=2))
     if result.get('state') == 'preview':
-        print('\nTo apply this preview within five minutes:\n'
-              'docker exec killers-receiver python -m app.tp_migrate apply --request-id '+result['request_id'])
+        print('\nFrom your Mac, apply this preview within five minutes:\n'
+              "ssh main-instance 'docker exec killers-receiver python -m app.tp_migrate apply --request-id "
+              +result['request_id']+"'")
 
 
 def main():
