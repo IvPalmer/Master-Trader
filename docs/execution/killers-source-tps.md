@@ -60,3 +60,21 @@ submission. This change deliberately does not bulk-rearm current positions.
 Rollback of the environment affects future entries only; retain the new code to
 honor already frozen policies. Rolling back to old code with new-policy positions
 still pending arming is unsafe because old code would ignore their snapshots.
+
+## Nearest-source fallback
+
+`KILLERS_TP_MODE=nearest_source` (with empty `KILLERS_TP_ALLOCATIONS`) opts new
+positions into the size-aware fallback. It freezes the nearest two eligible
+original source targets at entry. Once entry fills, the planner finds the
+executable quantity interval at the first target and chooses the valid split
+closest to half. Both exits must clear the minimum, and the first must leave
+Freqtrade's required residual. If no split works, **100% exits at the first
+candidate**, never at a farther target. Prices are unchanged source prices.
+
+A missing/crossed first candidate at arming blocks the plan for review instead
+of posting an immediately marketable exit or moving to a later price. A
+whole position too small at the first target is rejected rather than increased.
+This is not a proven optimal TP strategy. The mode defaults to `legacy`; no
+existing position is migrated, no research epoch is edited, and implementation
+or deployment alone does not activate this policy. Prospective activation is
+an operator decision, with a new measurement epoch.

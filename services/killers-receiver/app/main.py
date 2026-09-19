@@ -55,7 +55,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from .tp_plan import executable_targets
-from .tp_policy import parse_policy, snapshot_policy, preflight, executable_source_targets
+from .tp_policy import parse_policy, snapshot_policy, preflight, executable_source_targets, snapshot_nearby, nearby_allocations
 
 logging.basicConfig(
     level=logging.INFO,
@@ -191,7 +191,12 @@ class Config:
             "KILLERS_ACTIVE_TP_LIMITS", "true",
         ).lower() in ("true", "1", "yes"))
         self.tp_allocations = parse_policy(os.environ.get("KILLERS_TP_ALLOCATIONS", ""))
-        if self.tp_allocations and (not self.active_tp_limits or execution_venue() != "hyperliquid"):
+        self.tp_mode = os.environ.get("KILLERS_TP_MODE", "legacy")
+        if self.tp_mode not in ("legacy", "nearest_source"):
+            raise ValueError("KILLERS_TP_MODE must be legacy or nearest_source")
+        if self.tp_mode == "nearest_source" and self.tp_allocations:
+            raise ValueError("nearest_source cannot be combined with explicit TP allocations")
+        if (self.tp_allocations or self.tp_mode == "nearest_source") and (not self.active_tp_limits or execution_venue() != "hyperliquid"):
             raise ValueError("KILLERS_TP_ALLOCATIONS requires active Hyperliquid TP limits")
         # Reconciler tick interval for target_orders state transitions.
         self.target_reconcile_sec = int(os.environ.get(
@@ -1045,7 +1050,9 @@ async def _place_target_limits_inner(
             position = conn.execute("SELECT tp_policy FROM positions WHERE pos_id=?", (pos_id,)).fetchone()
             frozen_policy = json.loads(position["tp_policy"]) if position and position["tp_policy"] else None
             if frozen_policy:
-                plan = executable_source_targets(trade_snapshot, frozen_policy)
+                plan = (nearby_allocations(trade_snapshot, frozen_policy)
+                        if frozen_policy.get("mode") == "nearest_source"
+                        else executable_source_targets(trade_snapshot, frozen_policy))
             else:
                 plan = executable_targets(trade_snapshot, targets, min_notional=10)
         except (ValueError, ArithmeticError, TypeError) as exc:
@@ -2779,7 +2786,17 @@ async def _process_event_inner(payload: EventPayload, phase2_locked=False):
             )
 
         frozen_policy = None
-        if getattr(cfg, "tp_allocations", None):
+        if getattr(cfg, "tp_mode", "legacy") == "nearest_source":
+            try:
+                frozen_policy = snapshot_nearby(signal_targets, target_ref, direction == "short")
+                # Entry sizing remains unchanged. Actual quantum/residual checks follow the fill.
+                from decimal import Decimal
+                value = Decimal(str(stake)) * Decimal(str(leverage)) / Decimal(str(target_ref)) * Decimal(frozen_policy["targets"][0]["price"])
+                if value < 10:
+                    raise ValueError("whole position below minimum at first target")
+            except (ValueError, ArithmeticError, TypeError) as exc:
+                return {"action": "skipped", "reason": "tp_policy_infeasible", "detail": str(exc)}
+        elif getattr(cfg, "tp_allocations", None):
             try:
                 frozen_policy = snapshot_policy(cfg.tp_allocations, signal_targets, target_ref, direction == "short")
                 preflight(frozen_policy, stake * leverage, target_ref)
