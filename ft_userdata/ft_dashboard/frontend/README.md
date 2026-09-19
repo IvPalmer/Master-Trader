@@ -1,7 +1,8 @@
-# Position chart component
+# Dashboard chart components
 
 TypeScript + pinned TradingView Lightweight Charts. The Python dashboard and its
-existing Alpine state remain; portfolio analysis continues to use ECharts.
+existing Alpine state remain. Candle charts use bundled Lightweight Charts; accounting histories use D3 calendar-time SVG plots;
+account and contribution comparisons use semantic HTML tables. ECharts is removed.
 
 ```
 npm ci
@@ -25,3 +26,17 @@ resizing/expanding retains the same chart instance.
 
 The committed bundle allows the existing Python image to deploy without Node.
 Keep CHART-NOTICE.txt, CHART-LICENSE.txt, attribution links and the chart logo.
+
+Equity history contains realized values and optional labeled historical paper
+lineage. Current equity is a separately labeled snapshot, not an interpolated
+unrealized return path. Drawdown scales to the observations; historical reference
+limits remain textual so they cannot compress small live movements.
+
+Generate a self-contained synthetic preview without a local server:
+
+```
+node scripts/preview.cjs /tmp/master-trader-preview.html
+```
+
+The preview and browser suite share `tests/fixture.cjs`. No production API or
+account data is used. The preview intercepts fetch and bundles all scripts/styles.

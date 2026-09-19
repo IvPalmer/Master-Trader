@@ -7,20 +7,14 @@
 <meta name="description" content="Live trading fleet · operational + pre-flight dashboard">
 <meta name="theme-color" content="#fafaf7">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230891b2'/><path d='M8 22 L13 14 L17 18 L24 8' stroke='%23ffffff' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/styles.css?v=25">
 <script defer
         src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
         integrity="sha384-iZD2X8o1Zdq0HR5H/7oa8W30WS4No+zWCKUPD7fHRay9I1Gf+C4F8sVmw7zec1wW"
         crossorigin="anonymous"></script>
-<script defer
-        src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"
-        integrity="sha384-Mx5lkUEQPM1pOJCwFtUICyX45KNojXbkWdYhkKUKsbv391mavbfoAmONbzkgYPzR"
-        crossorigin="anonymous"></script>
-<link rel="stylesheet" href="/static/workspace.css?v=41">
-<script defer src="/static/price-chart.js?v=41"></script>
+
+<link rel="stylesheet" href="/static/workspace.css?v=44">
+<script defer src="/static/price-chart.js?v=44"></script>
 </head>
 <body x-data="dash()" x-init="boot()" @keydown.escape.window="expandedTrade=null; $nextTick(() => _scheduleChartResize())">
 
@@ -267,7 +261,7 @@
       <div class="card col-8">
         <div class="card-head">
           <div>
-            <div class="card-title">drawdown · <span x-text="equitySelectionLabel">fleet</span></div>
+            <div class="card-title">Drawdown · <span x-text="equitySelectionLabel">fleet</span></div>
             <div class="card-sub">closed equity plus the current mark on open positions · risk below peak</div>
           </div>
         </div>
@@ -303,7 +297,7 @@
 
         <div class="card">
           <div class="card-head">
-            <div class="card-title">expectancy · <span x-text="equitySelectionLabel">fleet</span></div>
+            <div class="card-title">Expectancy · <span x-text="equitySelectionLabel">fleet</span></div>
             <div class="card-sub" x-text="selectedExpectancy.sample + ' trade sample'">—</div>
           </div>
           <div class="kv">
@@ -326,7 +320,7 @@
       <div class="card col-5">
         <div class="card-head">
           <div>
-            <div class="card-title">p&l by pair · <span x-text="equitySelectionLabel">fleet</span></div>
+            <div class="card-title">P&l by pair · <span x-text="equitySelectionLabel">fleet</span></div>
             <div class="card-sub">closed trades for the selected performance view</div>
           </div>
         </div>
@@ -336,7 +330,7 @@
       <div class="card col-7 card-body flush">
         <div class="card-head">
           <div>
-            <div class="card-title">recent trades · live bots</div>
+            <div class="card-title">Recent trades · live bots</div>
             <div class="card-sub">last 30 closed across all live bots</div>
           </div>
         </div>
@@ -375,198 +369,49 @@
   <!-- ══════════════ CONSOLIDATED PORTFOLIO ══════════════ -->
   <main class="tab-panel portfolio-analysis" x-show="tab === 'portfolio'" x-cloak>
     <header class="portfolio-head">
-      <div>
-        <h1>portfolio analysis</h1>
-        <p>consolidated capital, performance and risk across every funded account</p>
-      </div>
-      <div class="portfolio-health" :class="staleClass">
-        <span class="bot-state-dot"></span>
-        <div>
-          <strong x-text="liveAccountCount + ' accounts · ' + liveVenueCount + ' venues'">portfolio scope</strong>
-          <span>updated <span x-text="lastPollLabel">never</span></span>
-        </div>
-      </div>
+      <div><h1>Performance</h1><p>Realized results and current exposure across your funded accounts.</p></div>
+      <div class="portfolio-health" :class="staleClass"><span class="bot-state-dot"></span><div><strong x-text="liveAccountCount + ' accounts · ' + liveVenueCount + ' venues'"></strong><span>Updated <span x-text="lastPollLabel"></span></span></div></div>
     </header>
-
-    <section class="portfolio-metrics" aria-label="Consolidated portfolio metrics">
-      <div class="portfolio-metric">
-        <span>capital</span><strong class="num" x-text="fmtUsd(hero.walletNow)">—</strong>
-      </div>
-      <div class="portfolio-metric">
-        <span>marked p&amp;l</span><strong class="num" :class="hero.totalPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalPnl)">—</strong>
-      </div>
-      <div class="portfolio-metric">
-        <span>closed p&amp;l</span><strong class="num" :class="hero.totalRealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalRealizedPnl)">—</strong>
-      </div>
-      <div class="portfolio-metric">
-        <span>open p&amp;l</span><strong class="num" :class="hero.totalUnrealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)">—</strong>
-      </div>
-      <div class="portfolio-metric">
-        <span>return</span><strong class="num" :class="hero.totalPct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(hero.totalPct)">—</strong>
-      </div>
-      <div class="portfolio-metric">
-        <span>max drawdown</span><strong class="num" x-text="fmtPct(-portfolioDrawdownMax, 2)">—</strong>
-      </div>
-      <div class="portfolio-metric">
-        <span>profit factor</span><strong class="num" x-text="fmtPF(hero.profitFactor)">—</strong>
-      </div>
-      <div class="portfolio-metric">
-        <span>expectancy</span><strong class="num" :class="(hero.expectancyPerTrade || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.expectancyPerTrade)">—</strong>
-      </div>
-      <div class="portfolio-metric">
-        <span>closed trades</span><strong class="num" x-text="hero.closedTrades">0</strong>
-      </div>
-      <div class="portfolio-metric">
-        <span>win rate</span><strong class="num" x-text="hero.closedTrades ? fmtPct(hero.winRate * 100, 1) : '—'">—</strong>
-      </div>
+    <section class="workspace-vitals" aria-label="Portfolio performance">
+      <div><span>Account equity</span><strong x-text="fmtUsd(hero.walletNow)"></strong><small>Shared accounts counted once</small></div>
+      <div><span>Realized P&amp;L</span><strong :class="hero.totalRealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalRealizedPnl)"></strong><small x-text="hero.closedTrades+' closed trades'"></small></div>
+      <div><span>Unrealized P&amp;L</span><strong :class="hero.totalUnrealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)"></strong><small x-text="hero.openCount+' open positions'"></small></div>
+      <div><span>Max drawdown</span><strong x-text="fmtPct(-portfolioDrawdownMax,2)"></strong><small>Includes the current open mark</small></div>
     </section>
-
-    <div class="grid grid-12">
-      <section class="card col-8">
-        <div class="card-head">
-          <div>
-            <div class="card-title">consolidated equity</div>
-            <div class="card-sub">closed equity with a dashed current mark for all open positions</div>
-          </div>
-          <span class="tag live">live</span>
-        </div>
-        <div class="chart tall" id="chart-portfolio-equity"></div>
-      </section>
-
-      <section class="card col-4 portfolio-risk-summary">
-        <div class="card-head">
-          <div>
-            <div class="card-title">portfolio state</div>
-            <div class="card-sub">current exposure and payoff quality</div>
-          </div>
-        </div>
-        <div class="portfolio-state-row">
-          <span>open positions</span><strong class="num" x-text="hero.openCount">0</strong>
-        </div>
-        <div class="portfolio-state-row">
-          <span>open p&amp;l</span><strong class="num" :class="hero.totalUnrealizedPnl >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)">—</strong>
-        </div>
-        <div class="portfolio-state-row">
-          <span>open notional</span><strong class="num" x-text="fmtUsd(hero.openNotional)">—</strong>
-        </div>
-        <div class="portfolio-state-row">
-          <span>capital at risk</span><strong class="num" x-text="fmtUsd(hero.capitalAtRisk)">—</strong>
-        </div>
-        <div class="portfolio-state-row">
-          <span>risk / starting capital</span><strong class="num" x-text="fmtPct(hero.capitalAtRiskPct, 2)">—</strong>
-        </div>
-        <div class="portfolio-state-row">
-          <span>current drawdown</span><strong class="num" x-text="fmtPct(portfolioCurrentDrawdown, 2)">—</strong>
-        </div>
-        <div class="portfolio-state-row">
-          <span>average win</span><strong class="num pos" x-text="fmtUsdSigned(hero.avgWin)">—</strong>
-        </div>
-        <div class="portfolio-state-row">
-          <span>average loss</span><strong class="num neg" x-text="fmtUsdSigned(hero.avgLoss)">—</strong>
-        </div>
-        <div class="portfolio-state-row">
-          <span>payoff ratio</span><strong class="num" x-text="hero.payoff != null ? hero.payoff.toFixed(2) : '—'">—</strong>
-        </div>
+    <div class="grid grid-12 performance-primary">
+      <section class="card col-8"><div class="card-head"><div><h2 class="card-title">Equity history</h2><p class="card-sub">Realized equity over time. The current mark is a separate snapshot.</p></div></div><div class="chart tall" id="chart-portfolio-equity"></div></section>
+      <section class="card col-4"><div class="card-head"><div><h2 class="card-title">Exposure &amp; risk</h2><p class="card-sub">Current open positions</p></div></div>
+        <dl class="fact-list">
+          <div><dt>Open notional</dt><dd x-text="fmtUsd(hero.openNotional)"></dd></div>
+          <div><dt>Loss to bot stops</dt><dd x-text="fmtUsd(hero.capitalAtRisk)"></dd></div>
+          <div><dt>Risk / starting capital</dt><dd x-text="fmtPct(hero.capitalAtRiskPct,2)"></dd></div>
+          <div><dt>Current drawdown</dt><dd x-text="fmtPct(portfolioCurrentDrawdown,2)"></dd></div>
+        </dl>
+        <p class="panel-note">Stop risk is an estimate. Gaps and fees can increase loss.</p>
+        <button class="panel-action" @click="tradesView='open';tradesFilter='all';setTab('trades')">Review open positions →</button>
       </section>
     </div>
-
+    <section class="performance-quality" aria-label="Closed trade statistics">
+      <div><span>Win rate</span><strong x-text="hero.closedTrades?fmtPct(hero.winRate*100,1):'—'"></strong></div>
+      <div><span>Profit factor</span><strong x-text="fmtPF(hero.profitFactor)"></strong></div>
+      <div><span>Expectancy / trade</span><strong x-text="fmtUsdSigned(hero.expectancyPerTrade)"></strong></div>
+      <div><span>Average win</span><strong x-text="fmtUsdSigned(hero.avgWin)"></strong></div>
+      <div><span>Average loss</span><strong x-text="fmtUsdSigned(hero.avgLoss)"></strong></div>
+      <div><span>Payoff ratio</span><strong x-text="hero.payoff!=null?hero.payoff.toFixed(2):'—'"></strong></div>
+    </section>
     <div class="grid grid-12">
-      <section class="card col-7">
-        <div class="card-head">
-          <div>
-            <div class="card-title">portfolio drawdown</div>
-            <div class="card-sub">underwater curve including the current mark on open positions</div>
-          </div>
-        </div>
-        <div class="chart short" id="chart-portfolio-dd"></div>
-      </section>
-
-      <section class="card col-5">
-        <div class="card-head">
-          <div>
-            <div class="card-title">equity by account</div>
-            <div class="card-sub">shared balances counted once</div>
-          </div>
-        </div>
-        <div class="account-allocation">
-          <template x-for="account in portfolioAccounts" :key="account.key">
-            <div class="account-allocation-row">
-              <div>
-                <strong x-text="account.label">account</strong>
-                <span x-show="account.free != null" x-text="'free '+fmtUsd(account.free)+(account.margin != null ? ' · margin '+fmtUsd(account.margin) : '')"></span>
-                <span x-text="account.bots.length + ' strateg' + (account.bots.length === 1 ? 'y' : 'ies')">—</span>
-              </div>
-              <div class="allocation-bar" aria-hidden="true"><span :style="'width:' + account.weight.toFixed(2) + '%' "></span></div>
-              <strong class="num" x-text="fmtUsd(account.capital)">—</strong>
-              <span class="num allocation-weight" x-text="fmtPct(account.weight, 1)">—</span>
-            </div>
-          </template>
-        </div>
-      </section>
+      <section class="card col-7"><div class="card-head"><div><h2 class="card-title">Drawdown</h2><p class="card-sub">Distance below peak equity</p></div></div><div class="chart short" id="chart-portfolio-dd"></div></section>
+      <section class="card col-5"><div class="card-head"><div><h2 class="card-title">Funded accounts</h2><p class="card-sub">Shared balances counted once</p></div></div><div class="account-allocation">
+        <template x-for="account in portfolioAccounts" :key="account.key"><div class="account-allocation-row"><div><strong x-text="account.label"></strong><span x-text="account.bots.length+' strategies · '+(account.venue==='hyperliquid'?'Hyperliquid':'Binance')"></span></div><strong class="num" x-text="fmtUsd(account.capital)"></strong></div></template>
+      </div></section>
     </div>
-
     <div class="grid grid-12">
-      <section class="card col-6">
-        <div class="card-head">
-          <div>
-            <div class="card-title">strategy contribution</div>
-            <div class="card-sub">closed contribution plus current open-position mark</div>
-          </div>
-        </div>
-        <div class="chart" id="chart-portfolio-strategy"></div>
-      </section>
-
-      <section class="card col-6">
-        <div class="card-head">
-          <div>
-            <div class="card-title">capital by venue</div>
-            <div class="card-sub">funded capital after shared-account deduplication</div>
-          </div>
-        </div>
-        <div class="chart" id="chart-portfolio-venue"></div>
-      </section>
+      <section class="card col-6"><div class="card-head"><div><h2 class="card-title">By strategy</h2><p class="card-sub">Realized and open P&amp;L, side by side</p></div></div><div class="chart comparison" id="chart-portfolio-strategy"></div></section>
+      <section class="card col-6"><div class="card-head"><div><h2 class="card-title">By market</h2><p class="card-sub">Largest contributions by absolute impact</p></div></div><div class="chart comparison" id="chart-portfolio-pair"></div></section>
     </div>
-
-    <div class="grid grid-12">
-      <section class="card col-5">
-        <div class="card-head">
-          <div>
-            <div class="card-title">pair contribution</div>
-            <div class="card-sub">top consolidated P&amp;L drivers by absolute impact</div>
-          </div>
-        </div>
-        <div class="chart" id="chart-portfolio-pair"></div>
-      </section>
-
-      <section class="card col-7 card-body flush">
-        <div class="card-head">
-          <div>
-            <div class="card-title">portfolio trade ledger</div>
-            <div class="card-sub">last 30 closes across all live strategies</div>
-          </div>
-        </div>
-        <div class="portfolio-ledger-wrap">
-          <table class="ledger" x-show="recentLiveTrades.length" x-cloak>
-            <thead>
-              <tr><th>closed</th><th>strategy</th><th>pair</th><th class="right">p&amp;l %</th><th class="right">p&amp;l $</th><th>reason</th></tr>
-            </thead>
-            <tbody>
-              <template x-for="trade in recentLiveTrades" :key="trade._bot + ':' + trade.close_timestamp + ':' + trade.pair">
-                <tr>
-                  <td x-text="fmtDate(trade.close_date)"></td>
-                  <td class="label" x-text="trade._botLabel">—</td>
-                  <td class="label" x-text="trade.pair">—</td>
-                  <td class="right" :class="trade.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(trade.profit_pct)">—</td>
-                  <td class="right" :class="trade.profit_abs >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(trade.profit_abs)">—</td>
-                  <td><span class="reason-pill" :class="trade.exit_reason" x-text="trade.exit_reason">—</span></td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-          <div class="empty" x-show="!recentLiveTrades.length"><div class="icon">—</div> no closed trades yet</div>
-        </div>
-      </section>
-    </div>
+    <section class="card"><div class="card-head"><div><h2 class="card-title">Recent closes</h2><p class="card-sub">Last 30 closed trades across live strategies</p></div></div>
+      <div class="portfolio-ledger-wrap"><table class="ledger" x-show="recentLiveTrades.length" x-cloak><thead><tr><th>Closed</th><th>Strategy</th><th>Market</th><th class="right">Return</th><th class="right">P&amp;L</th><th>Exit</th></tr></thead><tbody><template x-for="trade in recentLiveTrades" :key="trade._bot+':'+trade.close_timestamp+':'+trade.pair"><tr><td x-text="fmtDate(trade.close_date)"></td><td x-text="trade._botLabel"></td><td x-text="trade.pair"></td><td class="right" :class="trade.profit_pct>=0?'pos':'neg'" x-text="fmtPctSigned(trade.profit_pct)"></td><td class="right" :class="trade.profit_abs>=0?'pos':'neg'" x-text="fmtUsdSigned(trade.profit_abs)"></td><td><span class="reason-pill" x-text="trade.exit_reason"></span></td></tr></template></tbody></table><div class="empty" x-show="!recentLiveTrades.length">No closed trades in the current live history.</div></div>
+    </section>
   </main>
 
   <!-- ══════════════ DRY-RUN TAB ══════════════ -->
@@ -806,7 +651,7 @@
         <div class="card">
           <div class="card-head">
             <div>
-              <div class="card-title">equity · live vs expected</div>
+              <div class="card-title">Equity · live vs expected</div>
               <div class="card-sub">scaled backtest curve overlaid on dry-run cumulative p&l</div>
             </div>
           </div>
@@ -817,7 +662,7 @@
         <div class="grid grid-12">
           <div class="card col-6">
             <div class="card-head">
-              <div class="card-title">last trade trace</div>
+              <div class="card-title">Last trade trace</div>
               <div class="card-sub">most recent closed trade · entry → exit</div>
             </div>
             <template x-if="lastClosedTrade(bot)">
@@ -841,7 +686,7 @@
 
           <div class="card col-6" x-show="bot.open_trades && bot.open_trades.length > 0" x-cloak>
             <div class="card-head">
-              <div class="card-title">open trade status</div>
+              <div class="card-title">Open trade status</div>
               <div class="card-sub">progress vs ROI target · stop distance</div>
             </div>
             <div class="ot-list">
@@ -870,7 +715,7 @@
         <div class="card card-body flush">
           <div class="card-head">
             <div>
-              <div class="card-title">dry-run ledger</div>
+              <div class="card-title">Dry-run ledger</div>
               <div class="card-sub">closed trades · n=<span x-text="bot.stats?.closed_trade_count ?? 0"></span></div>
             </div>
           </div>
@@ -1119,9 +964,9 @@
       <div class="grid grid-12" x-show="botHasHistory(bot)" x-cloak>
 
         <!-- Open trade status -->
-        <div class="card col-6">
+        <div class="card col-12">
           <div class="card-head">
-            <div class="card-title">open trade status</div>
+            <div class="card-title">Open trade status</div>
             <div class="card-sub" x-text="(bot.open_trades?.length ?? 0) + ' open · ' + fmtUsd(bot.capital_at_risk?.abs_loss || 0) + ' at risk'">0 open</div>
           </div>
           <template x-if="bot.open_trades?.length">
@@ -1149,26 +994,20 @@
         </div>
 
         <!-- Live vs backtest deviation -->
-        <div class="card col-6">
+        <div class="card col-12">
           <div class="card-head">
-            <div class="card-title" x-text="bot.baseline_comparable ? 'live vs backtest' : 'performance'">performance</div>
+            <div class="card-title" x-text="bot.baseline_comparable ? 'Live vs backtest' : 'Performance'">performance</div>
             <div class="card-sub" x-text="bot.baseline_status === 'stale-pre-v2' ? 'fresh v2 epoch · pre-v2 baseline is context only' : (!bot.baseline_comparable ? (bot.strategy_kind === 'copy-trader' ? 'copy-trader · fresh live epoch' : 'autonomous quant · forward live epoch') : 'deviation from expected · all-time')">forward live epoch</div>
           </div>
-          <div class="kv">
-            <span class="k">p&l</span>
-              <span class="v" :class="(bot.pnl?.all_pct ?? 0) >= 0 ? 'pos' : 'neg'"
-                    x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '%' + (!bot.baseline_comparable ? '' : ' · expected ' + (bot.gate2?.profit?.expected_pct ?? bot.baseline?.annual_return_pct ?? 0).toFixed(2) + '%')">—</span>
-            <span class="k">closed / open</span>
-              <span class="v" :class="(bot.pnl?.all_coin ?? 0) >= 0 ? 'pos' : 'neg'"
-                    x-text="fmtUsdSigned(bot.pnl?.closed) + ' / ' + fmtUsdSigned(bot.pnl?.unrealized)">—</span>
-            <span class="k">profit factor</span>
-              <span class="v" x-text="(bot.stats?.profit_factor?.toFixed(2) ?? '—') + (bot.baseline_comparable && bot.baseline?.profit_factor ? ' · lab ' + bot.baseline.profit_factor : '')">—</span>
-            <span class="k">win rate</span>
-              <span class="v" x-text="((bot.stats?.winrate ?? 0) * 100).toFixed(1) + '%' + (bot.baseline_comparable && bot.baseline?.win_rate ? ' · lab ' + ((bot.baseline.win_rate ?? 0) * 100).toFixed(1) + '%' : '')">—</span>
-            <span class="k">trades / yr pace</span>
-              <span class="v" x-text="bot.days_running > 0 ? ((bot.stats?.closed_trade_count ?? 0) / bot.days_running * 365).toFixed(0) + (bot.baseline_comparable && bot.baseline?.trades_per_year ? ' · lab ' + bot.baseline.trades_per_year : '') : '—'">—</span>
-            <span class="k">max drawdown</span>
-              <span class="v" x-text="fmtPct((bot.stats?.max_drawdown ?? 0) * 100, 2) + (bot.baseline_comparable && bot.baseline?.max_dd_pct ? ' · lab ' + fmtPct(bot.baseline.max_dd_pct, 1) : '')">—</span>
+          <div class="bot-performance-facts">
+            <div class="metric-fact"><span class="k">p&l</span><span class="v" :class="(bot.pnl?.all_pct ?? 0) >= 0 ? 'pos' : 'neg'"
+                    x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '%' + (!bot.baseline_comparable ? '' : ' · expected ' + (bot.gate2?.profit?.expected_pct ?? bot.baseline?.annual_return_pct ?? 0).toFixed(2) + '%')">—</span></div>
+            <div class="metric-fact"><span class="k">closed / open</span><span class="v" :class="(bot.pnl?.all_coin ?? 0) >= 0 ? 'pos' : 'neg'"
+                    x-text="fmtUsdSigned(bot.pnl?.closed) + ' / ' + fmtUsdSigned(bot.pnl?.unrealized)">—</span></div>
+            <div class="metric-fact"><span class="k">profit factor</span><span class="v" x-text="(bot.stats?.profit_factor?.toFixed(2) ?? '—') + (bot.baseline_comparable && bot.baseline?.profit_factor ? ' · lab ' + bot.baseline.profit_factor : '')">—</span></div>
+            <div class="metric-fact"><span class="k">win rate</span><span class="v" x-text="((bot.stats?.winrate ?? 0) * 100).toFixed(1) + '%' + (bot.baseline_comparable && bot.baseline?.win_rate ? ' · lab ' + ((bot.baseline.win_rate ?? 0) * 100).toFixed(1) + '%' : '')">—</span></div>
+            <div class="metric-fact"><span class="k">trades / yr pace</span><span class="v" x-text="bot.days_running > 0 ? ((bot.stats?.closed_trade_count ?? 0) / bot.days_running * 365).toFixed(0) + (bot.baseline_comparable && bot.baseline?.trades_per_year ? ' · lab ' + bot.baseline.trades_per_year : '') : '—'">—</span></div>
+            <div class="metric-fact"><span class="k">max drawdown</span><span class="v" x-text="fmtPct((bot.stats?.max_drawdown ?? 0) * 100, 2) + (bot.baseline_comparable && bot.baseline?.max_dd_pct ? ' · lab ' + fmtPct(bot.baseline.max_dd_pct, 1) : '')">—</span></div>
           </div>
           <div class="bot-detail-section" x-show="deviationSummary(bot)">
             <div class="deviation-summary" x-text="deviationSummary(bot)"></div>
@@ -1193,14 +1032,14 @@
       <div class="grid grid-12">
         <div class="card col-8">
           <div class="card-head">
-            <div class="card-title">equity curve</div>
-            <div class="card-sub" x-text="bot.lineage ? equityExplanation(bot) : (bot.baseline_comparable ? 'closed live equity vs expectation · dashed tip is open P&L' : 'closed live equity · dashed tip is current open P&L')">forward live equity</div>
+            <div class="card-title">Equity curve</div>
+            <div class="card-sub" x-text="bot.lineage ? equityExplanation(bot) : (bot.baseline_comparable ? 'Realized live equity · current equity shown separately' : 'Realized live equity · current equity shown separately')">forward live equity</div>
           </div>
           <div class="chart tall" :id="'chart-detail-equity-'+bot.key"></div>
         </div>
         <div class="card col-4">
           <div class="card-head">
-            <div class="card-title">drawdown</div>
+            <div class="card-title">Drawdown</div>
             <div class="card-sub">% below running peak · includes current open mark</div>
           </div>
           <div class="chart short" :id="'chart-detail-dd-'+bot.key"></div>
@@ -1211,13 +1050,13 @@
       <div class="grid grid-12">
         <div class="card col-5">
           <div class="card-head">
-            <div class="card-title">p&l by pair</div>
+            <div class="card-title">P&l by pair</div>
           </div>
           <div class="chart short" :id="'chart-detail-pair-'+bot.key"></div>
         </div>
         <div class="card col-7">
           <div class="card-head">
-            <div class="card-title">expectancy</div>
+            <div class="card-title">Expectancy</div>
             <div class="card-sub" x-text="(bot.expectancy?.sample || bot.stats?.closed_trade_count || 0) + ' trade sample'"></div>
           </div>
           <div class="kv">
@@ -1235,7 +1074,7 @@
       <div class="card card-body flush">
         <div class="card-head">
           <div>
-            <div class="card-title">recent trades</div>
+            <div class="card-title">Recent trades</div>
             <div class="card-sub">last 20</div>
           </div>
         </div>
@@ -1283,7 +1122,7 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=41"></script>
+<script src="/static/dashboard.js?v=44"></script>
 <div class="chart-attribution"><a href="https://www.tradingview.com/" target="_blank" rel="noopener">Charts by TradingView</a> · <a href="/static/CHART-NOTICE.txt">Notice</a> · <a href="/static/CHART-LICENSE.txt">License</a></div>
 </body>
 </html>

@@ -29,3 +29,5 @@ class PriceChart {
   dispose(){this.dead=true;this.chart.remove();}
 }
 (window as unknown as {TradingPriceChart:typeof PriceChart}).TradingPriceChart=PriceChart;
+
+import "./analytics";
