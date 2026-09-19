@@ -110,7 +110,10 @@ Apply shares the receiver's phase-2 lock with TP reconciliation and source close
 updates. It rechecks the preview, archives the complete old target ledger in
 `tp_migrations`, and commits blocked rows before requesting cancellation of the
 normal open order. Native stop orders are excluded. It requires an acknowledged
-cancel **and** a fresh snapshot proving the known exit cancelled with zero fill,
+cancel **and** a fresh snapshot showing no normal open exit and unchanged exit accounting.
+Freqtrade omits cancelled zero-fill orders from its trade JSON; that absence is
+expected after acknowledged cancellation. If the old order remains in the JSON,
+it must explicitly be cancelled with zero fill. The snapshot must also show
 unchanged remaining inventory/stop and no other normal open order. Only then does
 it commit the frozen replacement policy and use the existing idempotent adopter
 to place the first exit. Later exits remain sequential. The old ledger stays in
@@ -158,3 +161,18 @@ The schema addition is additive. Before any apply, reverting this release does
 not require deleting its journal. After an apply, retain code that understands
 frozen policies and migration holds; an old image can omit the first-target
 restart guard. Never roll back private ledger history to force a retry.
+
+### Interactive operator command
+
+From the Mac, use a terminal with a TTY:
+
+```bash
+ssh -t main-instance 'docker exec -it killers-receiver python -m app.tp_migrate review'
+```
+
+This generates a fresh proposal for each legacy position and immediately asks
+for the literal `APPLY`. Enter skips it. It never confirms on the operator's
+behalf, and does not require copying UUIDs between commands. The same five-minute
+expiry, stale-state checks, shared lock and idempotency still apply. A legacy
+cancellation hold with no remaining open TP can be reviewed this way; it posts
+the approved replacement without trying to cancel an absent order again.

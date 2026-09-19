@@ -110,7 +110,7 @@ def test_stale_preview_never_cancels(harness, mutation):
     assert ex.cancels == ex.posts == 0
 
 
-@pytest.mark.parametrize('mutation', ['fill','stop','cross','missing-cancel','still-open','closed'])
+@pytest.mark.parametrize('mutation', ['fill','stop','cross','still-open','closed'])
 def test_changes_during_cancel_hold_without_replacement(harness, mutation):
     w, ex, db = harness
     def hook(t):
@@ -270,3 +270,37 @@ def test_authenticated_routes_serialize_duplicate_apply(harness):
             assert all(r.status_code == 200 and r.json()['state']=='active' for r in results)
     run(exercise())
     assert ex.posts == ex.cancels == 1
+
+
+def test_cancelled_zero_fill_order_omitted_by_freqtrade_serializer(harness):
+    w, ex, db = harness
+    ex.cancel_hook = lambda t: t['orders'].pop(0)
+    assert run(w.apply(run(w.preview(42))['request_id']))['state'] == 'active'
+    assert ex.posts == ex.cancels == 1
+
+
+def test_hidden_fill_accounting_change_blocks_even_if_quantity_is_stale(harness):
+    w, ex, db = harness
+    ex.t.update(nr_of_successful_exits=0,realized_profit=0)
+    def hook(t):
+        t['orders'].pop(0)
+        t.update(nr_of_successful_exits=1,realized_profit=.1)
+    ex.cancel_hook=hook
+    assert run(w.apply(run(w.preview(42))['request_id']))['state'] == 'needs_review'
+    assert ex.posts == 0
+
+
+@pytest.mark.parametrize('answer,expected_applies', [('APPLY',1),('',0),('yes',0)])
+def test_interactive_review_requires_exact_operator_confirmation(harness,monkeypatch,answer,expected_applies):
+    from app import tp_migrate
+    calls=[]
+    def call(cfg,path,body=None):
+        calls.append(path)
+        if path=='/positions': return {'positions':[{'state':'open','ft_trade_id':42,'tp_policy':None}]}
+        if path.endswith('/preview'): return {'state':'preview','request_id':'synthetic','targets':[]}
+        return {'state':'active'}
+    monkeypatch.setattr(tp_migrate,'call',call)
+    monkeypatch.setattr('builtins.input',lambda _:answer)
+    monkeypatch.setattr('sys.argv',['tp_migrate','review'])
+    tp_migrate.main()
+    assert sum(p.endswith('/apply') for p in calls)==expected_applies
