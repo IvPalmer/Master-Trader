@@ -12,8 +12,8 @@ Medido contra 3.910 mensagens rotuladas pelo Claude — o historico completo do
 canal (3.373, rotulos de `ft_userdata/insiders_bridge/out/`) mais a base viva
 (537) — em 2026-09-22 (#62):
 
-    historico   decidiu 2.992/3.373 = 88,7%   concordancia 2.992/2.992 = 100%
-    recente     decidiu   467/537   = 87,0%   concordancia   466/467   = 99,8%
+    historico   decidiu 2.959/3.373 = 87,7%   concordancia 2.959/2.959 = 100%
+    recente     decidiu   457/537   = 85,1%   concordancia   456/457   = 99,8%
 
 A unica divergencia (msg 3520, `signal_update` que o rotulo guarda como
 `chat`) e rotulo anterior a inclusao de `signal_update` no prompt — o exemplo
@@ -32,7 +32,12 @@ no sentido de RECUSAR em vez de decidir:
   3. Alvo atingido com instrucao a mais ("Move SL to entry", "Closed at SL")
      nao e `close_partial` limpo.
 
-O que sobra para o Claude (~12%) e, por construcao, o que e ambiguo.
+  4. Revisao independente achou mais quatro buracos, todos fechados com
+     teste: instrucao na mesma linha do alvo, linha de alvo sem confirmacao,
+     travessao unicode/emoji/SL-TP com verbo de evento, e o boilerplate
+     liberando uma acao escrita no meio dele.
+
+O que sobra para o Claude (~13%) e, por construcao, o que e ambiguo.
 """
 import re
 from typing import Optional, Tuple
@@ -59,7 +64,29 @@ ALL_TARGETS = re.compile(r"ALL\s+TARGETS", re.I)
 # um `CLOSE` seco, `VIP UPDATE: $CVX ... move your stop`, `Close Half Position`,
 # `$ETH - Target 3,4 Achieved`, `MEGA SIGNAL`. Chamar isso de `chat` e dizer
 # "nada a fazer" quando o sinal manda fechar — o erro mais caro possivel aqui.
+# Normalizacao para os testes de vocabulario: travessao unicode vira hifen e
+# emoji/dingbat vira espaco — senao "STOP–LOSS HIT" e "Move 🔥 SL to entry"
+# escapam. Os testes rodam no texto cru E no normalizado (a uniao so aumenta
+# recusas, que e a direcao segura). O ✅ e removido pela normalizacao, por isso
+# a checagem de alvo usa sempre o texto cru.
+_DASHES = re.compile("[\u2010-\u2015\u2212]")
+_SYMBOLS = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\uFE0F\u200D]")
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"[ \t]+", " ", _SYMBOLS.sub(" ", _DASHES.sub("-", text)))
+
+
+def _matches(rx: "re.Pattern", text: str) -> bool:
+    return bool(rx.search(text) or rx.search(_norm(text)))
+
+
 ACTION = re.compile(
+    # SL/TP so contam com verbo de evento: "TP1 HIT", "SL triggered" sao acao;
+    # "Still holding $ICP. TP2 getting closer." e status, rotulado chat.
+    r"\bsl\b\s*(hit|triggered|moved|to\b)|\btp\d*\b\s*(hit|achieved|reached|smashed|done|✅)|"
+    r"\b(hit|triggered|reached|achieved)\s+(the\s+)?(sl|tp\d*)\b|"
+    r"stop[\s-]*loss|stoploss|liquidat\w*|"
     r"^\s*CLOSED?\b|\bclosed\s+(at|all|half|the)\b|\bclosing\b|"
     r"close\s+(half|all|your|the|\d+%)|"
     r"mov(e|ing)\s+(your\s+)?(stops?|sl)\b|trail(ing)?\s+(your\s+)?stop|"
@@ -76,14 +103,20 @@ ACTION = re.compile(
 # FECHOU. Medido no historico: eram as 4 unicas divergencias restantes.
 EXTRA_ACTION = re.compile(
     r"\bclosed?\b|\bclosing\b|mov(e|ing)\s+(your\s+)?(stops?|sl)\b|trail\w*|"
-    r"\bstop\w*|\bsl\b|break[\s-]?even|\bmissed\b|\bexit\w*|re-?enter",
+    r"\bstop\w*|\bsl\b|\btp\d*\b|break[\s-]?even|\bmissed\b|\bexit\w*|re-?enter|"
+    r"adjust\w*|liquidat\w*|cancel\w*|invalid\w*",
     re.I,
 )
 TARGET_LINE_FULL = re.compile(r"^.*Target\s*\d+\s*:.*$", re.I | re.M)
+# So o token "Target N: preco✅". Remover a LINHA inteira apagaria uma
+# instrucao escrita na mesma linha ("Target 1: 101✅ — Closed at trailing SL").
+TARGET_TOKEN = re.compile(r"Target\s*\d+\s*:\s*[\d.,]+\s*(✅|✔)?\uFE0F?", re.I)
 
 # Boilerplate recorrente que a spec do classificador manda chamar de `chat`,
 # mas que fala em "move stops to entries" e "breakeven" — casaria ACTION.
-BOILERPLATE = re.compile(r"^\s*IMPORTANT\b.*Remember to have entry orders", re.I | re.S)
+# Remove apenas a frase conhecida e reavalia o resto: "IMPORTANT / CLOSE ALL NOW
+# / Remember to have entry orders..." continua sendo recusado.
+BOILERPLATE = re.compile(r"Remember to have entry orders.*?breakeven levels\.?", re.I | re.S)
 
 PLAN_CHANGE = re.compile(
     r"\b(adjust\w*|close at (the )?first target|close now|exit at market|"
@@ -146,7 +179,7 @@ def classify(text: Optional[str],
     # Sem cabecalho de sinal: promo, PNL, guia, papo de membro — mas SO se nao
     # houver vocabulario de acao. Na duvida, o Claude decide.
     if not has_header:
-        if ACTION.search(text) and not BOILERPLATE.search(text):
+        if _matches(ACTION, BOILERPLATE.sub(" ", text)):
             return None, "sem cabecalho, com vocabulario de acao"
         return "chat", "sem cabecalho de sinal"
 
@@ -159,6 +192,11 @@ def classify(text: Optional[str],
         return "close_full", "stop atingido"
 
     if target_lines:
+        # Alvo atingido sempre vem confirmado (934/934 no historico). Uma linha
+        # de alvo sem check nao e relato de alvo batido — "Adjust Target 1: 101"
+        # e mudanca de plano.
+        if any("✅" not in ln and "✔" not in ln for ln in TARGET_LINE_FULL.findall(text)):
+            return None, "linha de alvo sem confirmacao"
         # Todos os alvos batidos e AMBIGUO na propria spec: o prompt do
         # classificador define alvo atingido como `close_partial` e reserva
         # `close_full` para linguagem explicita de encerramento, e os rotulos
@@ -171,7 +209,7 @@ def classify(text: Optional[str],
             return None, "alvos sem contagem do open"
         if n >= declared_targets:
             return None, f"{n}>={declared_targets} alvos: parcial x total ambiguo"
-        if EXTRA_ACTION.search(TARGET_LINE_FULL.sub("", text)):
+        if _matches(EXTRA_ACTION, TARGET_TOKEN.sub(" ", text)):
             return None, "alvo atingido com instrucao a mais"
         return "close_partial", f"{n}<{declared_targets} alvos"
 

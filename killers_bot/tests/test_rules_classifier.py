@@ -241,3 +241,38 @@ def test_alvo_atingido_com_instrucao_a_mais_recusa(extra):
 
 def test_alvo_atingido_limpo_continua_parcial():
     assert classify(PARTIAL, declared_targets=8)[0] == "close_partial"
+
+
+# ── Contraexemplos da revisao independente (#62). Cada um retornava uma decisao
+#    errada na versao anterior; todos tem de recusar. ─────────────────────────
+
+_H = "📍SIGNAL ID: #1📍\nCOIN: $BTC/USDT (2-5x)\nDirection: LONG\n"
+
+
+@pytest.mark.parametrize("texto,declared", [
+    # instrucao na MESMA linha do alvo: remover a linha apagava a instrucao
+    (_H + "Target 1: 101✅ — Closed at trailing SL", 8),
+    (_H + "Target 1: 101✅ — Move SL to entry", 8),
+    # linha de alvo sem confirmacao nao e alvo batido
+    ("SIGNAL ID: #1\nCOIN: $BTC/USDT\nAdjust Target 1: 101", 8),
+    (_H + "Target 1: 101✅\n\nPosition fully liquidated.", 8),
+    # travessao unicode, emoji entre palavras, SL/TP com verbo de evento
+    ("STOP–LOSS HIT", None),
+    ("Move 🔥 SL to entry", None),
+    ("SL triggered", None),
+    ("TP1 HIT", None),
+    # o boilerplate so e liberado se nada alem da frase conhecida for acao
+    ("IMPORTANT\nCLOSE ALL NOW\nRemember to have entry orders in place. After "
+     "taking profits, move stops to entries or to breakeven levels.", None),
+])
+def test_contraexemplos_da_revisao_recusam(texto, declared):
+    assert classify(texto, declared_targets=declared)[0] is None
+
+
+@pytest.mark.parametrize("texto", [
+    "Still holding $ICP. TP2 getting closer.",
+    "Still holding $LINK. TP3 within reach.",
+])
+def test_status_sem_evento_continua_chat(texto):
+    """O canal recente posta status sem acao. TP solto nao e evento."""
+    assert classify(texto)[0] == "chat"

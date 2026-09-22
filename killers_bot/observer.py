@@ -210,12 +210,15 @@ def lookup_declared_targets(conn: sqlite3.Connection, text: str,
     if not key:
         return None
     symbol = rules_classifier.signal_symbol(text)
+    if not symbol:
+        # Sem moeda na mensagem, a instancia do sinal e desconhecida: casar so
+        # pelo ID reciclado emprestaria a contagem de outro sinal.
+        return None
     row = conn.execute(
         "SELECT declared FROM signal_targets "
-        "WHERE signal_key = ? AND msg_id <= ? "
-        "  AND (symbol IS NULL OR ? IS NULL OR symbol = ?) "
+        "WHERE signal_key = ? AND symbol = ? AND msg_id <= ? "
         "ORDER BY msg_id DESC, row_id DESC LIMIT 1",
-        (key, before_msg_id, symbol, symbol),
+        (key, symbol, before_msg_id),
     ).fetchone()
     return row[0] if row else None
 

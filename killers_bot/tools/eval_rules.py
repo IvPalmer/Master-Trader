@@ -20,7 +20,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from rules_classifier import classify, declared_target_count, signal_key  # noqa: E402
+from rules_classifier import (  # noqa: E402
+    classify, declared_target_count, signal_key, signal_symbol,
+)
 
 
 def main(path: str) -> int:
@@ -33,14 +35,16 @@ def main(path: str) -> int:
         if r.get("kind") == "open":
             k, n = signal_key(r["text"]), declared_target_count(r["text"])
             if k and n:
-                declared[k] = n
+                declared[(k, signal_symbol(r["text"]))] = n
 
     cm = collections.defaultdict(collections.Counter)
     reasons = collections.Counter()
     disagreements = []
 
     for r in rows:
-        kind, why = classify(r["text"], declared.get(signal_key(r["text"])))
+        # mesma chave de instancia que o observer: SIGNAL ID + simbolo
+        key = (signal_key(r["text"]), signal_symbol(r["text"]))
+        kind, why = classify(r["text"], declared.get(key) if key[1] else None)
         if kind is None:
             reasons[why] += 1
             cm[r["kind"]]["<CLAUDE>"] += 1
