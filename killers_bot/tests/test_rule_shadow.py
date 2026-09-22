@@ -132,14 +132,23 @@ def test_shadow_grava_concordancia(conn):
 
 
 def test_shadow_grava_divergencia(conn):
+    observer.record_signal_targets(conn, msg(1, OPEN_8), {"kind": "open"})
+    # a regra diz parcial; o primario disse chat
+    observer.shadow_rules(conn, msg(2, TWO_TARGETS), {"kind": "chat"}, "claude")
+    row = conn.execute(
+        "SELECT rule_kind, agree FROM rule_shadow WHERE msg_id = 2 "
+        "ORDER BY row_id DESC").fetchone()
+    assert row == ("close_partial", 0)
+
+
+def test_todos_os_alvos_vira_recusa_no_shadow(conn):
     observer.record_signal_targets(conn, msg(1, OPEN_2), {"kind": "open"})
-    # 2 de 2 alvos batidos -> a regra diz fechamento TOTAL
     observer.shadow_rules(conn, msg(2, TWO_TARGETS),
                           {"kind": "close_partial"}, "claude")
     row = conn.execute(
         "SELECT rule_kind, agree FROM rule_shadow WHERE msg_id = 2 "
         "ORDER BY row_id DESC").fetchone()
-    assert row == ("close_full", 0)
+    assert row == (None, -1)
 
 
 def test_shadow_marca_recusa_com_menos_um(conn):

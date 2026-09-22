@@ -8,23 +8,31 @@ maior parte disso por regra.
 Contrato, igual ao do `strict_open`: retorna `None` em QUALQUER duvida, e o
 chamador CAI PARA O CLAUDE. Nenhuma regra aqui adivinha.
 
-Medido contra 537 mensagens classificadas em producao (2026-09-22, issue #62):
+Medido contra 3.910 mensagens rotuladas pelo Claude — o historico completo do
+canal (3.373, rotulos de `ft_userdata/insiders_bridge/out/`) mais a base viva
+(537) — em 2026-09-22 (#62):
 
-    decidiu por regra      481/537 = 89,6%
-    concordancia do que decidiu  478/481 = 99,38%
-    caiu para o Claude      56/537 = 10,4%
+    historico   decidiu 2.992/3.373 = 88,7%   concordancia 2.992/2.992 = 100%
+    recente     decidiu   467/537   = 87,0%   concordancia   466/467   = 99,8%
 
-As 3 discordancias restantes sao erro do Claude, nao da regra:
-  - 1 `signal_update` explicito ("we are adjusting the $KITE setup to close at
-    first target") que o Claude rotulou `chat`. Essa classe executa fechamento
-    total no receiver, entao o miss do Claude e o mais caro dos tres.
-  - 2 mensagens com 8/8 alvos batidos que o Claude chamou `close_partial`
-    enquanto rotulou `close_full` outras estruturalmente identicas. A regra e
-    auto-consistente; o Claude nao e.
+A unica divergencia (msg 3520, `signal_update` que o rotulo guarda como
+`chat`) e rotulo anterior a inclusao de `signal_update` no prompt — o exemplo
+que o prompt atual usa para essa classe e aquela mesma mensagem.
 
-Os 56 fallbacks sao todos `close_partial` cujo OPEN e anterior a janela do
-corpus, logo sem contagem de alvos declarada. Em producao, com estado
-persistente, isso se resolve sozinho conforme os opens entram.
+Historia da medicao, para quem for mexer: a primeira versao foi medida so na
+base viva e reportou 99,4%. Contra o historico, deu 94%, com os erros na
+direcao cara — 66 fechamentos e 53 movimentos de stop chamados de `chat`,
+porque "sem cabecalho de sinal" era tratado como promo. Tres correcoes, todas
+no sentido de RECUSAR em vez de decidir:
+
+  1. Sem cabecalho so e `chat` sem vocabulario de acao (`ACTION`). Recall de
+     158/158 nas acoes sem cabecalho do historico.
+  2. Todos os alvos batidos nao vira `close_full`: a spec do classificador
+     define alvo atingido como `close_partial` e os rotulos variam. Ambiguo.
+  3. Alvo atingido com instrucao a mais ("Move SL to entry", "Closed at SL")
+     nao e `close_partial` limpo.
+
+O que sobra para o Claude (~12%) e, por construcao, o que e ambiguo.
 """
 import re
 from typing import Optional, Tuple
@@ -46,6 +54,37 @@ STOPLOSS = re.compile(r"^\s*(STOP\s*LOSS|SL)\s*:", re.I | re.M)
 TARGET_LINE = re.compile(r"Target\s*(\d+)\s*:", re.I)
 LOSS = re.compile(r"🚫|(?<!\w)Loss\s*\(", re.I)
 ALL_TARGETS = re.compile(r"ALL\s+TARGETS", re.I)
+# Vocabulario de acao. Uma mensagem SEM cabecalho de sinal so e `chat` se nao
+# contiver nada disto. O historico do canal esta cheio de acoes sem cabecalho:
+# um `CLOSE` seco, `VIP UPDATE: $CVX ... move your stop`, `Close Half Position`,
+# `$ETH - Target 3,4 Achieved`, `MEGA SIGNAL`. Chamar isso de `chat` e dizer
+# "nada a fazer" quando o sinal manda fechar — o erro mais caro possivel aqui.
+ACTION = re.compile(
+    r"^\s*CLOSED?\b|\bclosed\s+(at|all|half|the)\b|\bclosing\b|"
+    r"close\s+(half|all|your|the|\d+%)|"
+    r"mov(e|ing)\s+(your\s+)?(stops?|sl)\b|trail(ing)?\s+(your\s+)?stop|"
+    r"stops?\s+(loss(es)?\s+)?(moved|to\s+(entry|entries|break))|break[\s-]?even|"
+    r"target\s*\d[^\n]*(✅|achiev|hit|reached)|all\s+targets|"
+    r"(mega|vip|gem)\s+signal\b|"
+    r"stop[\s-]*loss\s*(hit|triggered)|hit\s+the\s+stop|\bsl\s+hit|stopped\s+out|"
+    r"hit\s+the\s+sl|\bentry\s*:|\btargets?\s*:",
+    re.I | re.M,
+)
+# Instrucao A MAIS numa mensagem de alvo atingido: "Target 1 ✅ ... Move SL to
+# entry", "Closed at trailing SL after hitting 1st target". As linhas de alvo
+# sozinhas dizem "parcial"; a instrucao diz que o stop mudou ou que a posicao
+# FECHOU. Medido no historico: eram as 4 unicas divergencias restantes.
+EXTRA_ACTION = re.compile(
+    r"\bclosed?\b|\bclosing\b|mov(e|ing)\s+(your\s+)?(stops?|sl)\b|trail\w*|"
+    r"\bstop\w*|\bsl\b|break[\s-]?even|\bmissed\b|\bexit\w*|re-?enter",
+    re.I,
+)
+TARGET_LINE_FULL = re.compile(r"^.*Target\s*\d+\s*:.*$", re.I | re.M)
+
+# Boilerplate recorrente que a spec do classificador manda chamar de `chat`,
+# mas que fala em "move stops to entries" e "breakeven" — casaria ACTION.
+BOILERPLATE = re.compile(r"^\s*IMPORTANT\b.*Remember to have entry orders", re.I | re.S)
+
 PLAN_CHANGE = re.compile(
     r"\b(adjust\w*|close at (the )?first target|close now|exit at market|"
     r"move (the )?stop|tighten\w*|be ready to take profit)\b", re.I,
@@ -104,8 +143,11 @@ def classify(text: Optional[str],
     has_header = bool(SIGID.search(text) or COIN.search(text) or GEM.search(text))
     target_lines = TARGET_LINE.findall(text)
 
-    # Sem cabecalho de sinal: promo, PNL, guia, papo de membro.
+    # Sem cabecalho de sinal: promo, PNL, guia, papo de membro — mas SO se nao
+    # houver vocabulario de acao. Na duvida, o Claude decide.
     if not has_header:
+        if ACTION.search(text) and not BOILERPLATE.search(text):
+            return None, "sem cabecalho, com vocabulario de acao"
         return "chat", "sem cabecalho de sinal"
 
     # Setup novo completo.
@@ -117,15 +159,20 @@ def classify(text: Optional[str],
         return "close_full", "stop atingido"
 
     if target_lines:
+        # Todos os alvos batidos e AMBIGUO na propria spec: o prompt do
+        # classificador define alvo atingido como `close_partial` e reserva
+        # `close_full` para linguagem explicita de encerramento, e os rotulos
+        # historicos variam entre os dois para mensagens identicas. A regra nao
+        # desempata — preserva o que o Claude faria.
         if ALL_TARGETS.search(text):
-            return "close_full", "all targets"
+            return None, "all targets: parcial x total ambiguo"
         n = len(target_lines)
         if declared_targets is None:
-            # Sem saber quantos alvos o sinal tinha, parcial e total sao
-            # indistinguiveis. O Claude decide.
             return None, "alvos sem contagem do open"
         if n >= declared_targets:
-            return "close_full", f"{n}>={declared_targets} alvos"
+            return None, f"{n}>={declared_targets} alvos: parcial x total ambiguo"
+        if EXTRA_ACTION.search(TARGET_LINE_FULL.sub("", text)):
+            return None, "alvo atingido com instrucao a mais"
         return "close_partial", f"{n}<{declared_targets} alvos"
 
     # Cabecalho de sinal sem numeros, carregando instrucao: mudanca de plano.
