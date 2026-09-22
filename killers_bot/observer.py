@@ -57,6 +57,10 @@ class Config:
         # Shadow do classificador de regras (#62). Como o `use_fast_path`, e
         # especifico do formato Killers — o fan-out Insiders desliga abaixo.
         self.shadow_rules = True
+        # Regras DECIDEM chat / close_partial / close_full por stop (#74), com o
+        # Claude em shadow. Rollback sem deploy: KILLERS_RULES_PRIMARY=0 no
+        # killers_bot/.env + restart do servico.
+        self.rules_primary = os.getenv("KILLERS_RULES_PRIMARY", "1").strip().lower() not in ("0", "false", "no")
         self.db_path = os.getenv("KILLERS_DB", "/var/lib/killers/state.sqlite")
         self.claude_binary = os.getenv("KILLERS_CLAUDE_BINARY", "claude")
         self.claude_model = os.getenv("KILLERS_CLAUDE_MODEL") or None
@@ -318,12 +322,25 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
         if config.use_fast_path else None
     )
     used_fast_path = classification is not None
-    if used_fast_path:
+    source_label = "rule" if used_fast_path else "claude"
+    if classification is None and getattr(config, "rules_primary", False):
+        # Classificador de regras (#74). Recusa em qualquer ambiguidade; so
+        # decide os tipos em PRIMARY_KINDS. O Claude roda em shadow depois.
+        declared = lookup_declared_targets(conn, text, msg_dict["id"])
+        rule_kind, rule_reason = rules_classifier.classify(text, declared)
+        if rule_kind in rules_classifier.PRIMARY_KINDS:
+            classification = rules_classifier.build_classification(
+                msg_dict["id"], text, rule_kind)
+            used_fast_path = True
+            source_label = "rules"
+            logger.info("[RULES] id=%d kind=%s (%s) — bypassing Claude",
+                        msg_dict["id"], rule_kind, rule_reason)
+    if used_fast_path and source_label == "rule":
         logger.info(
             "[FAST-PATH] id=%d kind=open signal=#%s sym=%s — bypassing Claude",
             msg_dict["id"], classification["signal_id"], classification["symbol"],
         )
-    else:
+    elif not used_fast_path:
         classification = await classifier.classify(
             msg_dict, chain,
             binary=config.claude_binary,
@@ -341,15 +358,17 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     sid = classification.get("signal_id")
     conf = classification.get("confidence", 0)
     logger.info("[CLASSIFY] id=%d kind=%s signal=#%s sym=%s conf=%.2f source=%s",
-                msg_dict["id"], kind, sid, sym, conf,
-                "rule" if used_fast_path else "claude")
+                msg_dict["id"], kind, sid, sym, conf, source_label)
 
     # Shadow observacional do classificador de regras (#62). Puro regex, roda
     # em microssegundos, e nao toca no que segue para o simulador/receiver.
     if getattr(config, "shadow_rules", False):
         record_signal_targets(conn, msg_dict, classification)
-        shadow_rules(conn, msg_dict, classification,
-                     "rule" if used_fast_path else "claude")
+        # Quando a propria regra decidiu, comparar regra com regra nao diz
+        # nada: o veredito util e o do Claude em shadow, gravado por
+        # _shadow_classify.
+        if source_label != "rules":
+            shadow_rules(conn, msg_dict, classification, source_label)
 
     # Route into paper simulator (local audit trail)
     if kind == "open":
@@ -372,13 +391,41 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     # already the primary classifier (no shadow needed).
     if used_fast_path:
         asyncio.create_task(
-            _shadow_classify(msg_dict, chain, classification, config),
+            _shadow_classify(msg_dict, chain, classification, config,
+                             conn=conn, source_label=source_label),
             name=f"shadow-classify-{msg_dict['id']}",
         )
 
 
+def _record_claude_shadow(conn: sqlite3.Connection, msg: dict, rule_cls: dict,
+                          claude_cls: dict, disagree_fields: list) -> None:
+    """Com a regra DECIDINDO (#74), grava o veredito do Claude em shadow na
+    mesma `rule_shadow`. `primary_source = 'claude-shadow'` distingue do caso
+    inverso (Claude decidiu, regra observou). `agree` segue a mesma leitura:
+    1 concorda, 0 diverge — e `agree = 0` e o sinal para investigar."""
+    try:
+        conn.execute(
+            "INSERT INTO rule_shadow (msg_id, evaluated_at, primary_kind, "
+            "primary_source, rule_kind, rule_reason, declared, agree) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (msg["id"], datetime.now(timezone.utc).isoformat(),
+             claude_cls.get("kind"), "claude-shadow", rule_cls.get("kind"),
+             "divergem: " + ",".join(disagree_fields) if disagree_fields else "regra decidiu",
+             None, 0 if disagree_fields else 1),
+        )
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logger.exception("[RULE-SHADOW] falha ao gravar shadow do Claude id=%s",
+                         msg.get("id"))
+
+
 async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
-                           config) -> None:
+                           config, conn: Optional[sqlite3.Connection] = None,
+                           source_label: str = "rule") -> None:
     """Run Claude in the background after a fast-path open, log any
     disagreement. Best-effort — never raises out of the task."""
     try:
@@ -394,7 +441,10 @@ async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
         # Compare critical fields. Disagreement = different kind, symbol,
         # direction, or sl off by >0.5%.
         disagree_fields: list[str] = []
-        for f in ("kind", "symbol", "direction"):
+        # Em `chat` nada acontece a jusante: so o tipo importa. O Claude as
+        # vezes preenche o ticker de um comentario de mercado.
+        both_chat = cls.get("kind") == "chat" and fast_path.get("kind") == "chat"
+        for f in (("kind",) if both_chat else ("kind", "symbol", "direction")):
             if cls.get(f) != fast_path.get(f):
                 disagree_fields.append(f)
         fp_sl = fast_path.get("sl")
@@ -410,6 +460,8 @@ async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
                 {f: fast_path.get(f) for f in disagree_fields},
                 {f: cls.get(f) for f in disagree_fields},
             )
+        if conn is not None and source_label == "rules":
+            _record_claude_shadow(conn, msg_dict, fast_path, cls, disagree_fields)
     except Exception as e:
         logger.warning("shadow classify failed id=%d: %s",
                        msg_dict.get("id"), e)
@@ -572,6 +624,7 @@ def _insiders_config() -> "Optional[Config]":
     # cabecalho `SIGNAL ID:`/`COIN:`, entao a regra o chamaria `chat` e cada
     # mensagem viraria uma divergencia falsa, poluindo a medicao.
     ins.shadow_rules = False
+    ins.rules_primary = False
     return ins
 
 
