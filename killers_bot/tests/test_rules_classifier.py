@@ -116,16 +116,19 @@ def test_stop_atingido_e_fechamento_total():
     assert classify(SL_HIT)[0] == "close_full"
 
 
-def test_all_targets_e_total_mesmo_sem_contagem():
-    assert classify(ALL_SMASHED)[0] == "close_full"
+def test_all_targets_recusa():
+    """Todos os alvos batidos e ambiguo na propria spec (alvo atingido =
+    close_partial; close_full so com linguagem explicita de encerramento) e
+    os rotulos historicos variam. A regra nao desempata."""
+    assert classify(ALL_SMASHED)[0] is None
 
 
 def test_parcial_quando_faltam_alvos():
     assert classify(PARTIAL, declared_targets=8)[0] == "close_partial"
 
 
-def test_total_quando_todos_os_alvos_batem():
-    assert classify(PARTIAL, declared_targets=2)[0] == "close_full"
+def test_todos_os_alvos_declarados_recusa():
+    assert classify(PARTIAL, declared_targets=2)[0] is None
 
 
 def test_alvo_sem_contagem_recusa():
@@ -195,3 +198,81 @@ def test_contagem_nao_inclui_o_stop():
 def test_formato_novo_nao_regrediu():
     assert declared_target_count(OPEN) == 8
     assert classify(OPEN)[0] == "open"
+
+
+# ── Acoes sem cabecalho: o historico mostrou que "sem cabecalho = chat" dizia
+#    "nada a fazer" para fechamentos e movimentos de stop. ─────────────────────
+
+@pytest.mark.parametrize("texto", [
+    "CLOSE",
+    "CLOSED at entry after hitting 2 targets",
+    "VIP UPDATE: $CVX\nIt surged 6.8% from our entry.\nNow traders move your stop loss to entry.",
+    "Back to entry\nClose Half Position.",
+    "$ETH - Target 3,4 Achieved 🔥\n58.3% (10x)",
+    "$ADA - All Targets Achieved🔥\n125.1% [10x]",
+    "*Trail your STOP at ENTRY.",
+    "$ALGO and $ARB,\nHit the stop-loss after reaching Target 1.",
+    "🚨MEGA SIGNAL🚨\n\n$CHESS\nTargets: $0.08 - $0.10",
+])
+def test_acao_sem_cabecalho_recusa(texto):
+    assert classify(texto)[0] is None
+
+
+def test_boilerplate_important_e_chat():
+    """A spec manda chamar isto de chat, mas o texto fala em mover stops para
+    a entrada — casaria o vocabulario de acao sem a excecao."""
+    txt = ("IMPORTANT\n\nRemember to have entry orders in place to average this "
+           "trade's entry, and take 30% of profits in the first 2 Targets. After "
+           "taking profits, move stops to entries or to breakeven levels.")
+    assert classify(txt)[0] == "chat"
+
+
+@pytest.mark.parametrize("extra", [
+    "Move SL to entry",
+    "Closed at trailing SL after hitting 1st target.",
+    "Just missed our third target, stops moved to entry.",
+])
+def test_alvo_atingido_com_instrucao_a_mais_recusa(extra):
+    """As linhas de alvo dizem 'parcial'; a instrucao diz que o stop mudou ou
+    que a posicao fechou."""
+    txt = PARTIAL + "\n\n" + extra
+    assert classify(txt, declared_targets=8)[0] is None
+
+
+def test_alvo_atingido_limpo_continua_parcial():
+    assert classify(PARTIAL, declared_targets=8)[0] == "close_partial"
+
+
+# ── Contraexemplos da revisao independente (#62). Cada um retornava uma decisao
+#    errada na versao anterior; todos tem de recusar. ─────────────────────────
+
+_H = "📍SIGNAL ID: #1📍\nCOIN: $BTC/USDT (2-5x)\nDirection: LONG\n"
+
+
+@pytest.mark.parametrize("texto,declared", [
+    # instrucao na MESMA linha do alvo: remover a linha apagava a instrucao
+    (_H + "Target 1: 101✅ — Closed at trailing SL", 8),
+    (_H + "Target 1: 101✅ — Move SL to entry", 8),
+    # linha de alvo sem confirmacao nao e alvo batido
+    ("SIGNAL ID: #1\nCOIN: $BTC/USDT\nAdjust Target 1: 101", 8),
+    (_H + "Target 1: 101✅\n\nPosition fully liquidated.", 8),
+    # travessao unicode, emoji entre palavras, SL/TP com verbo de evento
+    ("STOP–LOSS HIT", None),
+    ("Move 🔥 SL to entry", None),
+    ("SL triggered", None),
+    ("TP1 HIT", None),
+    # o boilerplate so e liberado se nada alem da frase conhecida for acao
+    ("IMPORTANT\nCLOSE ALL NOW\nRemember to have entry orders in place. After "
+     "taking profits, move stops to entries or to breakeven levels.", None),
+])
+def test_contraexemplos_da_revisao_recusam(texto, declared):
+    assert classify(texto, declared_targets=declared)[0] is None
+
+
+@pytest.mark.parametrize("texto", [
+    "Still holding $ICP. TP2 getting closer.",
+    "Still holding $LINK. TP3 within reach.",
+])
+def test_status_sem_evento_continua_chat(texto):
+    """O canal recente posta status sem acao. TP solto nao e evento."""
+    assert classify(texto)[0] == "chat"

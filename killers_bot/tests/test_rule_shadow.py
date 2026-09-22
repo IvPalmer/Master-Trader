@@ -94,6 +94,14 @@ def test_id_reciclado_em_outra_moeda_nao_empresta_contagem(conn):
     assert observer.lookup_declared_targets(conn, TWO_TARGETS, 99) == 8
 
 
+def test_mensagem_sem_moeda_nao_empresta_contagem(conn):
+    """Sem COIN na mensagem a instancia do sinal e desconhecida. Casar so pelo
+    SIGNAL ID reciclado emprestaria a contagem de outro sinal."""
+    observer.record_signal_targets(conn, msg(1, OPEN_8), {"kind": "open"})
+    sem_moeda = "📍SIGNAL ID: #2143📍\nTarget 1: 0.0945✅"
+    assert observer.lookup_declared_targets(conn, sem_moeda, 99) is None
+
+
 def test_open_editado_gera_duas_linhas_desempate_por_row_id(conn):
     """Um OPEN editado reaparece com o mesmo msg_id. A leitura tem de pegar a
     versao mais nova, nao a primeira."""
@@ -132,14 +140,23 @@ def test_shadow_grava_concordancia(conn):
 
 
 def test_shadow_grava_divergencia(conn):
+    observer.record_signal_targets(conn, msg(1, OPEN_8), {"kind": "open"})
+    # a regra diz parcial; o primario disse chat
+    observer.shadow_rules(conn, msg(2, TWO_TARGETS), {"kind": "chat"}, "claude")
+    row = conn.execute(
+        "SELECT rule_kind, agree FROM rule_shadow WHERE msg_id = 2 "
+        "ORDER BY row_id DESC").fetchone()
+    assert row == ("close_partial", 0)
+
+
+def test_todos_os_alvos_vira_recusa_no_shadow(conn):
     observer.record_signal_targets(conn, msg(1, OPEN_2), {"kind": "open"})
-    # 2 de 2 alvos batidos -> a regra diz fechamento TOTAL
     observer.shadow_rules(conn, msg(2, TWO_TARGETS),
                           {"kind": "close_partial"}, "claude")
     row = conn.execute(
         "SELECT rule_kind, agree FROM rule_shadow WHERE msg_id = 2 "
         "ORDER BY row_id DESC").fetchone()
-    assert row == ("close_full", 0)
+    assert row == (None, -1)
 
 
 def test_shadow_marca_recusa_com_menos_um(conn):
