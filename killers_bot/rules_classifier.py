@@ -65,6 +65,15 @@ def signal_key(text: str) -> Optional[str]:
     return f"gem:{g.group(1).upper()}" if g else None
 
 
+def signal_symbol(text: str) -> Optional[str]:
+    """Ticker do sinal. Junto do SIGNAL ID forma a chave de INSTANCIA: um ID
+    reciclado so empresta contagem de alvos se a moeda tambem casar."""
+    if not text:
+        return None
+    m = COIN.search(text) or GEM.search(text)
+    return m.group(1).upper() if m else None
+
+
 def declared_target_count(open_text: str) -> Optional[int]:
     """Quantos alvos um OPEN declara. Alimenta `declared_targets`."""
     m = re.search(r"TARGETS?\s*:\s*(.+?)(?:\n\n|\nSTOP|\nSL|$)",
