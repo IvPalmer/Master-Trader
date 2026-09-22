@@ -36,7 +36,10 @@ COIN = re.compile(r"COIN\s*:\s*\$?([A-Z0-9]{1,15})\s*/\s*USDT?", re.I)
 GEM = re.compile(r"GEM\s*SIGNAL\s*:\s*[#$]?([A-Z0-9]{1,15})", re.I)
 
 ENTRY = re.compile(r"^\s*ENTRY\s*:", re.I | re.M)
-TARGETS = re.compile(r"^\s*TARGETS?\s*:", re.I | re.M)
+# Dois formatos historicos. O atual escreve `TARGETS: a - b - c` numa linha.
+# O antigo (ate meados de 2024) escreve `TARGETS` sozinho, com os alvos nas
+# linhas `Short Term:` / `Mid Term:` abaixo.
+TARGETS = re.compile(r"^\s*TARGETS?\s*:|^\s*TARGETS?\s*$", re.I | re.M)
 # GEM escreve `SL:`; o formato padrao escreve `STOP LOSS:`.
 STOPLOSS = re.compile(r"^\s*(STOP\s*LOSS|SL)\s*:", re.I | re.M)
 
@@ -76,11 +79,14 @@ def signal_symbol(text: str) -> Optional[str]:
 
 def declared_target_count(open_text: str) -> Optional[int]:
     """Quantos alvos um OPEN declara. Alimenta `declared_targets`."""
-    m = re.search(r"TARGETS?\s*:\s*(.+?)(?:\n\n|\nSTOP|\nSL|$)",
+    # O bloco de alvos vai do cabecalho TARGETS ate a linha em branco seguinte
+    # ou ate o stop. Cobre o formato de uma linha e o antigo, de varias
+    # (`Short Term:` / `Mid Term:`), somando os alvos de todas elas.
+    m = re.search(r"TARGETS?\s*:?[ \t]*\n?(.+?)(?:\n[ \t]*\n|\n\s*STOP|\n\s*SL[:\s]|$)",
                   open_text or "", re.S | re.I)
     if not m:
         return None
-    n = len(re.findall(r"\d+(?:\.\d+)?", m.group(1)))
+    n = len(re.findall(r"\d+(?:[.,]\d+)?", m.group(1)))
     return n or None
 
 

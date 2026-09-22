@@ -80,6 +80,22 @@ TARGETS: 0.0107 – 0.0109 – 0.0111 - 0.0115
 
 SL: Below 0.0083"""
 
+# Formato antigo (ate meados de 2024): `TARGETS` sozinho na linha, alvos
+# distribuidos em `Short Term:` / `Mid Term:`, e um campo `OTE:` no meio.
+OPEN_FORMATO_ANTIGO = """📍SIGNAL ID: #1453📍
+COIN: $ZRX/USDT (3-5x)
+Direction: LONG📈
+➖➖➖➖➖➖➖
+ENTRY: 0.43 - 0.525
+OTE: 0.49
+
+TARGETS
+Short Term: 0.531 - 0.536 - 0.545 - 0.55 - 0.56
+Mid Term: 0.60 - 0.65 - 0.75 - 0.90 - 1.25 - 1.45
+
+STOP LOSS: 0.3823
+- Binance Killers®"""
+
 GEM_PARTIAL = """🔥GEM SIGNAL: $ZIG🔥
 ➖➖➖➖➖➖➖
 Target 1: 0.045✅
@@ -154,3 +170,28 @@ def test_open_nao_e_confundido_com_gestao():
     """Um OPEN tem ENTRY; uma mensagem de gestao nao. A ordem das regras
     precisa garantir que o OPEN ganhe antes do ramo de alvos."""
     assert classify(OPEN, declared_targets=8)[0] == "open"
+
+
+def test_open_formato_antigo():
+    """O canal usava `TARGETS` sem dois-pontos ate meados de 2024. Sem isso,
+    o OPEN nao e reconhecido — e sem OPEN nao ha contagem de alvos, o que
+    derruba tambem toda mensagem de alvo atingido daquele sinal."""
+    assert classify(OPEN_FORMATO_ANTIGO)[0] == "open"
+
+
+def test_contagem_de_alvos_soma_short_e_mid_term():
+    """5 alvos em Short Term + 6 em Mid Term = 11, nao 5."""
+    assert declared_target_count(OPEN_FORMATO_ANTIGO) == 11
+
+
+def test_contagem_nao_inclui_o_stop():
+    """O bloco de alvos termina antes do STOP LOSS — se o stop entrasse na
+    conta, um fechamento parcial viraria total."""
+    n = declared_target_count(OPEN_FORMATO_ANTIGO)
+    assert n == 11
+    assert "0.3823" not in str(n)
+
+
+def test_formato_novo_nao_regrediu():
+    assert declared_target_count(OPEN) == 8
+    assert classify(OPEN)[0] == "open"
