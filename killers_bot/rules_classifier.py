@@ -48,6 +48,8 @@ COIN = re.compile(r"COIN\s*:\s*\$?([A-Z0-9]{1,15})\s*/\s*USDT?", re.I)
 # Formato GEM: cabecalho proprio, sem SIGNAL ID, ticker no titulo.
 GEM = re.compile(r"GEM\s*SIGNAL\s*:\s*[#$]?([A-Z0-9]{1,15})", re.I)
 
+DIRECTION = re.compile(r"Direction\s*:\s*(LONG|SHORT)\b", re.I)
+
 ENTRY = re.compile(r"^\s*ENTRY\s*:", re.I | re.M)
 # Dois formatos historicos. O atual escreve `TARGETS: a - b - c` numa linha.
 # O antigo (ate meados de 2024) escreve `TARGETS` sozinho, com os alvos nas
@@ -218,3 +220,46 @@ def classify(text: Optional[str],
         return "signal_update", "instrucao de mudanca de plano"
 
     return None, "sem regra"
+
+
+# Tipos que a regra DECIDE em producao (#74). `open` fica com o `strict_open`,
+# que extrai e valida entrada/stop/alvos numericos; `signal_update` fica com o
+# Claude, porque o receiver precisa do campo `instruction`.
+PRIMARY_KINDS = frozenset({"chat", "close_partial", "close_full"})
+
+
+def build_classification(msg_id: int, text: str, kind: str) -> dict:
+    """Classificacao completa no schema de `classifier.classify()`, para um tipo
+    que a regra decidiu.
+
+    Equivalencia com o que o Claude produz hoje, medida em 1.055 fechamentos
+    que regra e Claude classificaram igual: `symbol` e `signal_id` identicos
+    em 1.055/1.055; e com o prompt atual o Claude deixa `pct` nulo em todo
+    `close_partial` (218/218 na base viva), entao o receiver usa o tamanho
+    padrao — o mesmo que acontece aqui.
+
+    `notes` e o texto verbatim: o simulador so extrai dele o % publicado, e
+    fazer isso no texto cru da o mesmo resultado que nas notes geradas pelo
+    Claude (236/236 fechamentos).
+    """
+    if kind not in PRIMARY_KINDS:
+        raise ValueError(f"regra nao decide {kind!r} em producao")
+    sid = SIGID.search(text or "")
+    d = DIRECTION.search(text or "")
+    return {
+        "id": msg_id,
+        "kind": kind,
+        "signal_id": int(sid.group(1)) if sid else None,
+        "symbol": signal_symbol(text) if kind != "chat" else None,
+        "direction": d.group(1).lower() if d and kind != "chat" else None,
+        "entry": None,
+        "entry_range": None,
+        "sl": None,
+        "tp": None,
+        "pct": None,
+        "applies_to": None,
+        "confidence": 1.0,
+        "notes": (text or "")[:1000],
+        "instruction": None,
+        "raw_instruction": None,
+    }
