@@ -386,6 +386,7 @@ def killers_tp_ladder(db_path: str, *, strict: bool = False) -> dict[int, dict]:
             "planned_next_tp": pending[0]["price"] if pending else None,
             "status": status,
             "counts": counts,
+            "levels": [{"price": x["price"], "state": x["state"], "label": f"TP {x['idx'] + 1}"} for x in rungs],
         }
     return out
 
@@ -1423,6 +1424,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             row["tps_total"] = tp["tps_total"]
             row["tps_hit"] = tp["tps_hit"]
             row["next_tp"] = tp["next_tp"]
+            row["exit_levels"] = tp["levels"]
             row["tp_execution"] = {
                 "status": tp["status"], "counts": tp["counts"],
                 "planned_next_tp": tp["planned_next_tp"],
@@ -1688,6 +1690,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan, title="master-trader")
+from trade_controls import install as install_trade_controls
+install_trade_controls(app, BOTS, _api_auth)
 
 
 @app.middleware("http")
