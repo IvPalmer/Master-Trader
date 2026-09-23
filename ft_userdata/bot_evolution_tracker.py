@@ -110,7 +110,10 @@ def extract_config_params(bot_name):
     """Extract key parameters from config .json file."""
     config_file = CONFIG_DIR / f"{bot_name}.json"
     if not config_file.exists():
-        return {}
+        # Recorded rather than returned empty: a snapshot cannot be backfilled, so an
+        # absent config has to be distinguishable from one that held no values.
+        print(f"  WARNING: {bot_name} has no {config_file.name}; snapshot records no config")
+        return {"_config_missing": config_file.name}
 
     with open(config_file) as f:
         config = json.load(f)
