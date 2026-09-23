@@ -28,6 +28,11 @@ Env vars:
   KILLERS_RISK_USD          target loss at the signal's posted stop
   KILLERS_MIN_MARGIN_USD    venue minimum; signal is skipped if budget is smaller
   KILLERS_MAX_OPEN          serialized portfolio admission cap
+  KILLERS_BUMP_TO_MIN_NOTIONAL  when "true", an entry whose risk-sized order
+                            falls below the venue minimum is raised TO the
+                            minimum instead of skipped, as long as the loss at
+                            the stop stays within KILLERS_MAX_BUMP_RISK_USD
+  KILLERS_MAX_BUMP_RISK_USD ceiling on the stop loss of a bumped entry
   KILLERS_BOT_LABEL         instance identity. When set, drives BOTH the logger
                             name and the Telegram-alert prefix. When unset (or
                             empty) each keeps its legacy default: logger
@@ -149,6 +154,13 @@ class Config:
             "KILLERS_REQUIRE_POSTED_SL", "true"
         ).lower() in ("true", "1", "yes")
         self.max_open = int(os.environ.get("KILLERS_MAX_OPEN", "10"))
+        # Opt-in: raise a too-small entry to the venue minimum rather than skip
+        # it. Off by default so the "never raise risk for the venue minimum"
+        # contract below still holds unless a deployment chooses otherwise.
+        self.bump_to_min_notional = os.environ.get(
+            "KILLERS_BUMP_TO_MIN_NOTIONAL", "false"
+        ).lower() in ("true", "1", "yes")
+        self.max_bump_risk_usd = float(os.environ.get("KILLERS_MAX_BUMP_RISK_USD", "5"))
         # Telegram-alert prefix identity (see logger note above). Default keeps
         # the Killers tag; the insiders instance sets KILLERS_BOT_LABEL=insiders-scalp.
         # `or` (not a default arg) so an empty string falls back too — matches
@@ -673,6 +685,34 @@ def find_active_position(
 # ── Sizing ─────────────────────────────────────────────────────────────────
 
 
+def _bump_to_min_notional(cfg, sl_dist: float) -> Optional[tuple[float, float, float]]:
+    """Size an entry at exactly the venue minimum notional.
+
+    Used only when the risk-sized order is below the venue minimum and the
+    deployment opted in (KILLERS_BUMP_TO_MIN_NOTIONAL). Loss at the stop becomes
+    ``min_notional × sl_dist``, which must stay within KILLERS_MAX_BUMP_RISK_USD.
+    Returns None when that ceiling, or the margin/leverage caps, cannot be met,
+    in which case the caller skips as before.
+    """
+    notional = float(cfg.min_notional_usd)
+    if notional * sl_dist > float(getattr(cfg, "max_bump_risk_usd", 0.0)) + 1e-9:
+        return None
+    max_margin = max(cfg.min_margin_usd, cfg.max_margin_usd)
+    # Smallest integer leverage that fits the margin cap, then back off while
+    # the margin would fall under the configured minimum.
+    leverage = max(1, math.ceil(notional / max_margin))
+    while leverage > 1 and notional / leverage < cfg.min_margin_usd:
+        leverage -= 1
+    if leverage > cfg.max_leverage:
+        return None
+    # Round margin UP to the cent: flooring could land a cent under the venue
+    # minimum and turn the bump into a skip.
+    stake = math.ceil(notional / leverage * 100.0) / 100.0
+    if not (cfg.min_margin_usd <= stake <= max_margin):
+        return None
+    return stake, float(leverage), sl_dist
+
+
 def compute_stake(
     classification: dict,
     cfg: Config,
@@ -748,8 +788,15 @@ def compute_stake(
         leverage = max(1, min(math.ceil(leverage), math.floor(cfg.max_leverage)))
         stake = notional / leverage
     stake = min(max_margin, stake)
-    # Never increase risk merely to satisfy the venue's minimum order size.
-    # The caller skips an entry whose risk budget cannot fund the minimum.
+    too_small = (stake < cfg.min_margin_usd
+                 or stake * leverage < getattr(cfg, "min_notional_usd", 0.0))
+    if too_small and getattr(cfg, "bump_to_min_notional", False):
+        bumped = _bump_to_min_notional(cfg, sl_dist)
+        if bumped is not None:
+            return bumped
+    # Without the opt-in, never increase risk merely to satisfy the venue's
+    # minimum order size: the caller skips an entry whose risk budget cannot
+    # fund the minimum.
     if stake < cfg.min_margin_usd:
         return 0.0, round(leverage, 2), sl_dist
     # Floor to cents so presentation rounding cannot overshoot the risk cap.

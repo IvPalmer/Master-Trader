@@ -9,7 +9,7 @@
     "stake_amount": "unlimited",
     "tradable_balance_ratio": 0.99,
     "fiat_display_currency": "",
-    "max_open_trades": 5,
+    "max_open_trades": 50,
     "amount_reserve_percent": 0.05,
     "unfilledtimeout": {
         "_entry_note": "24h zone patience (2026-08-27): the channel's retracement zones routinely fill 8-24h after broadcast (ETC #2215 filled 11h in, +4.7% to TP1, missed by the old 4h expiry). A limit crossing toward the SL fills first, so loss stays bounded by the posted-SL warden + native stop.",
