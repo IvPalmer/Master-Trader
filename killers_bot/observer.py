@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import classifier, simulator, strict_open
+from . import classifier, rules_classifier, simulator, strict_open
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,13 @@ class Config:
             "KILLERS_TG_CHANNEL_USERNAME", "BinanceKillers_FreeSignal"
         )
         self.channel_id_override = os.getenv("KILLERS_TG_CHANNEL_ID")
+        # Shadow do classificador de regras (#62). Como o `use_fast_path`, e
+        # especifico do formato Killers — o fan-out Insiders desliga abaixo.
+        self.shadow_rules = True
+        # Regras DECIDEM chat / close_partial / close_full por stop (#74), com o
+        # Claude em shadow. Rollback sem deploy: KILLERS_RULES_PRIMARY=0 no
+        # killers_bot/.env + restart do servico.
+        self.rules_primary = os.getenv("KILLERS_RULES_PRIMARY", "1").strip().lower() not in ("0", "false", "no")
         self.db_path = os.getenv("KILLERS_DB", "/var/lib/killers/state.sqlite")
         self.claude_binary = os.getenv("KILLERS_CLAUDE_BINARY", "claude")
         self.claude_model = os.getenv("KILLERS_CLAUDE_MODEL") or None
@@ -151,6 +158,112 @@ def persist_classification(conn: sqlite3.Connection, classification: dict) -> No
     conn.commit()
 
 
+# ── Shadow do classificador de regras (#62) ────────────────────────────────
+# Observacional: mede a regra contra o que de fato seguiu adiante. NUNCA
+# altera o encaminhamento. Qualquer falha aqui e engolida — uma regressao no
+# shadow nao pode derrubar a ingestao.
+
+
+def record_signal_targets(conn: sqlite3.Connection, msg: dict,
+                          classification: dict) -> None:
+    """Registra quantos alvos um OPEN declarou. Append-only: IDs reciclam.
+
+    Protegido de ponta a ponta: esta funcao roda ANTES do simulador e do POST
+    ao receiver, entao uma excecao aqui pularia os dois. Observacao nunca pode
+    derrubar execucao.
+    """
+    try:
+        if classification.get("kind") != "open":
+            return
+        text = msg.get("text") or msg.get("message") or ""
+        key = rules_classifier.signal_key(text)
+        declared = rules_classifier.declared_target_count(text)
+        if not key or not declared:
+            return
+        conn.execute(
+            "INSERT INTO signal_targets (signal_key, symbol, declared, msg_id, "
+            "posted_at) VALUES (?, ?, ?, ?, ?)",
+            (key, rules_classifier.signal_symbol(text), declared, msg["id"],
+             str(msg.get("date")) if msg.get("date") else None),
+        )
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logger.exception("[RULE-SHADOW] record_signal_targets falhou id=%s "
+                         "— ignorado", msg.get("id"))
+
+
+def lookup_declared_targets(conn: sqlite3.Connection, text: str,
+                            before_msg_id: int) -> Optional[int]:
+    """Alvos declarados pelo OPEN mais recente desta INSTANCIA de sinal.
+
+    Chave de instancia = SIGNAL ID + simbolo. Só o ID nao basta: os IDs
+    reciclam, e se o OPEN da epoca atual ainda nao foi visto, casar so por ID
+    emprestaria silenciosamente a contagem de um sinal antigo — exatamente o
+    erro que o corte cronologico deveria evitar. Exigindo o simbolo, um ID
+    reciclado em outra moeda nao casa, e a regra recusa em vez de chutar.
+
+    `msg_id` e o relogio: no Telegram os IDs sao monotonicos por canal e uma
+    edicao preserva o ID original. O desempate por `row_id` cobre o caso de um
+    OPEN editado gerar duas linhas com o mesmo `msg_id`.
+    """
+    key = rules_classifier.signal_key(text)
+    if not key:
+        return None
+    symbol = rules_classifier.signal_symbol(text)
+    if not symbol:
+        # Sem moeda na mensagem, a instancia do sinal e desconhecida: casar so
+        # pelo ID reciclado emprestaria a contagem de outro sinal.
+        return None
+    row = conn.execute(
+        "SELECT declared FROM signal_targets "
+        "WHERE signal_key = ? AND symbol = ? AND msg_id <= ? "
+        "ORDER BY msg_id DESC, row_id DESC LIMIT 1",
+        (key, symbol, before_msg_id),
+    ).fetchone()
+    return row[0] if row else None
+
+
+def shadow_rules(conn: sqlite3.Connection, msg: dict, classification: dict,
+                 source: str) -> None:
+    """Roda o classificador de regras em paralelo e grava a comparacao."""
+    try:
+        text = msg.get("text") or msg.get("message") or ""
+        declared = lookup_declared_targets(conn, text, msg["id"])
+        rule_kind, reason = rules_classifier.classify(text, declared)
+        primary = classification.get("kind")
+
+        agree = -1 if rule_kind is None else int(rule_kind == primary)
+        # Append-only: uma edicao gera nova linha, nunca apaga a anterior.
+        conn.execute(
+            "INSERT INTO rule_shadow (msg_id, evaluated_at, "
+            "primary_kind, primary_source, rule_kind, rule_reason, declared, agree) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (msg["id"], datetime.now(timezone.utc).isoformat(), primary, source,
+             rule_kind, reason, declared, agree),
+        )
+        conn.commit()
+
+        if agree == 0:
+            logger.warning(
+                "[RULE-SHADOW DIVERGE] id=%d primario=%s(%s) regra=%s (%s)",
+                msg["id"], primary, source, rule_kind, reason,
+            )
+        else:
+            logger.info("[RULE-SHADOW] id=%d %s regra=%s (%s)", msg["id"],
+                        "ok" if agree == 1 else "recusou", rule_kind, reason)
+    except Exception:
+        # Um DML que falhou pode deixar a conexao COMPARTILHADA numa transacao
+        # aberta. Desfaz antes de devolver o controle ao caminho de producao.
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logger.exception("[RULE-SHADOW] falhou id=%s — ignorado", msg.get("id"))
+
 # ── Reply chain (small, in-memory cache + DB fallback) ─────────────────────
 
 
@@ -209,12 +322,25 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
         if config.use_fast_path else None
     )
     used_fast_path = classification is not None
-    if used_fast_path:
+    source_label = "rule" if used_fast_path else "claude"
+    if classification is None and getattr(config, "rules_primary", False):
+        # Classificador de regras (#74). Recusa em qualquer ambiguidade; so
+        # decide os tipos em PRIMARY_KINDS. O Claude roda em shadow depois.
+        declared = lookup_declared_targets(conn, text, msg_dict["id"])
+        rule_kind, rule_reason = rules_classifier.classify(text, declared)
+        if rule_kind in rules_classifier.PRIMARY_KINDS:
+            classification = rules_classifier.build_classification(
+                msg_dict["id"], text, rule_kind)
+            used_fast_path = True
+            source_label = "rules"
+            logger.info("[RULES] id=%d kind=%s (%s) — bypassing Claude",
+                        msg_dict["id"], rule_kind, rule_reason)
+    if used_fast_path and source_label == "rule":
         logger.info(
             "[FAST-PATH] id=%d kind=open signal=#%s sym=%s — bypassing Claude",
             msg_dict["id"], classification["signal_id"], classification["symbol"],
         )
-    else:
+    elif not used_fast_path:
         classification = await classifier.classify(
             msg_dict, chain,
             binary=config.claude_binary,
@@ -232,8 +358,17 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     sid = classification.get("signal_id")
     conf = classification.get("confidence", 0)
     logger.info("[CLASSIFY] id=%d kind=%s signal=#%s sym=%s conf=%.2f source=%s",
-                msg_dict["id"], kind, sid, sym, conf,
-                "rule" if used_fast_path else "claude")
+                msg_dict["id"], kind, sid, sym, conf, source_label)
+
+    # Shadow observacional do classificador de regras (#62). Puro regex, roda
+    # em microssegundos, e nao toca no que segue para o simulador/receiver.
+    if getattr(config, "shadow_rules", False):
+        record_signal_targets(conn, msg_dict, classification)
+        # Quando a propria regra decidiu, comparar regra com regra nao diz
+        # nada: o veredito util e o do Claude em shadow, gravado por
+        # _shadow_classify.
+        if source_label != "rules":
+            shadow_rules(conn, msg_dict, classification, source_label)
 
     # Route into paper simulator (local audit trail)
     if kind == "open":
@@ -256,13 +391,41 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     # already the primary classifier (no shadow needed).
     if used_fast_path:
         asyncio.create_task(
-            _shadow_classify(msg_dict, chain, classification, config),
+            _shadow_classify(msg_dict, chain, classification, config,
+                             conn=conn, source_label=source_label),
             name=f"shadow-classify-{msg_dict['id']}",
         )
 
 
+def _record_claude_shadow(conn: sqlite3.Connection, msg: dict, rule_cls: dict,
+                          claude_cls: dict, disagree_fields: list) -> None:
+    """Com a regra DECIDINDO (#74), grava o veredito do Claude em shadow na
+    mesma `rule_shadow`. `primary_source = 'claude-shadow'` distingue do caso
+    inverso (Claude decidiu, regra observou). `agree` segue a mesma leitura:
+    1 concorda, 0 diverge — e `agree = 0` e o sinal para investigar."""
+    try:
+        conn.execute(
+            "INSERT INTO rule_shadow (msg_id, evaluated_at, primary_kind, "
+            "primary_source, rule_kind, rule_reason, declared, agree) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (msg["id"], datetime.now(timezone.utc).isoformat(),
+             claude_cls.get("kind"), "claude-shadow", rule_cls.get("kind"),
+             "divergem: " + ",".join(disagree_fields) if disagree_fields else "regra decidiu",
+             None, 0 if disagree_fields else 1),
+        )
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logger.exception("[RULE-SHADOW] falha ao gravar shadow do Claude id=%s",
+                         msg.get("id"))
+
+
 async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
-                           config) -> None:
+                           config, conn: Optional[sqlite3.Connection] = None,
+                           source_label: str = "rule") -> None:
     """Run Claude in the background after a fast-path open, log any
     disagreement. Best-effort — never raises out of the task."""
     try:
@@ -278,7 +441,10 @@ async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
         # Compare critical fields. Disagreement = different kind, symbol,
         # direction, or sl off by >0.5%.
         disagree_fields: list[str] = []
-        for f in ("kind", "symbol", "direction"):
+        # Em `chat` nada acontece a jusante: so o tipo importa. O Claude as
+        # vezes preenche o ticker de um comentario de mercado.
+        both_chat = cls.get("kind") == "chat" and fast_path.get("kind") == "chat"
+        for f in (("kind",) if both_chat else ("kind", "symbol", "direction")):
             if cls.get(f) != fast_path.get(f):
                 disagree_fields.append(f)
         fp_sl = fast_path.get("sl")
@@ -294,6 +460,8 @@ async def _shadow_classify(msg_dict: dict, chain: list, fast_path: dict,
                 {f: fast_path.get(f) for f in disagree_fields},
                 {f: cls.get(f) for f in disagree_fields},
             )
+        if conn is not None and source_label == "rules":
+            _record_claude_shadow(conn, msg_dict, fast_path, cls, disagree_fields)
     except Exception as e:
         logger.warning("shadow classify failed id=%d: %s",
                        msg_dict.get("id"), e)
@@ -452,6 +620,11 @@ def _insiders_config() -> "Optional[Config]":
     # a false match would mis-classify).
     ins.classifier_template = classifier.INSIDERS_PROMPT_TEMPLATE
     ins.use_fast_path = False
+    # Mesma razao: as regras sao do formato Killers. Um sinal do Dennis nao tem
+    # cabecalho `SIGNAL ID:`/`COIN:`, entao a regra o chamaria `chat` e cada
+    # mensagem viraria uma divergencia falsa, poluindo a medicao.
+    ins.shadow_rules = False
+    ins.rules_primary = False
     return ins
 
 

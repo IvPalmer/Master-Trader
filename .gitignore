@@ -118,3 +118,5 @@ research/copier-validation/killers/replay_results.json
 research/copier-validation/killers/v2_results_*.json
 research/copier-validation/killers/__pycache__/
 .superpowers/
+
+ft_userdata/ft_dashboard/frontend/node_modules/

@@ -73,6 +73,7 @@ def _make_receiver_db(path):
 def test_tp_ladder_counts_and_next(tmp_path):
     db = tmp_path / "receiver.sqlite"; _make_receiver_db(str(db))
     out = killers_tp_ladder(str(db))
+    assert len(out[11].pop("levels")) == 7
     assert out[11] == {
         "tps_total": 7, "tps_hit": 5, "next_tp": 295.0,
         "planned_next_tp": 320.0, "status": "active",
@@ -95,7 +96,9 @@ def test_tp_ladder_distinguishes_planned_from_active_targets(tmp_path):
     conn.execute("INSERT INTO target_orders VALUES (1,1,0,5.0,'pending')")
     conn.execute("INSERT INTO target_orders VALUES (2,1,1,6.0,'pending')")
     conn.commit(); conn.close()
-    assert killers_tp_ladder(str(db))[7] == {
+    result = killers_tp_ladder(str(db))[7]
+    assert result.pop("levels") == [{"price": 5.0, "state": "pending", "label": "TP 1"}, {"price": 6.0, "state": "pending", "label": "TP 2"}]
+    assert result == {
         "tps_total": 2, "tps_hit": 0, "next_tp": None,
         "planned_next_tp": 5.0, "status": "pending", "counts": {"pending": 2},
     }

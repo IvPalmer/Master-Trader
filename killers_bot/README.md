@@ -1,7 +1,8 @@
 # killers_bot
 
 Copy-trader for the **Binance Killers VIP** Telegram channel. Mirrors every
-classified signal into a Freqtrade Futures dry-run bot. Independent of the
+classified signal into a **live** Freqtrade Futures bot on **Hyperliquid** —
+real money (`dry_run: false`, ~$108 USDC as of 2026-09-23). Independent of the
 `insiders_bridge/` infra (different channel, different `.session`).
 
 ## What it does
@@ -9,15 +10,19 @@ classified signal into a Freqtrade Futures dry-run bot. Independent of the
 ```
 Telegram channel
   → killers_bot.observer (host, systemd user unit)
-    → classifier (Claude CLI via `docker exec elder-brain-bot claude`)
+    → strict_open.py      rule fast-path for clean OPENs
+    → rules_classifier.py rules for chat / close_partial / stop-hit (refuse when unsure)
+    → classifier          Claude CLI (`docker exec elder-brain-bot claude`) for
+                          everything else; also runs in shadow over rule decisions
+                          (rule_shadow table)
     → simulator (local SQLite paper-sim, audit trail)
     → POST /event → killers-receiver (container, port 8089)
                       → maps signal → /forceenter on ft-killers-scalp
                       → tracks (signal_id, symbol) → ft_trade_id in receiver SQLite
                       → reconcile_loop every 60s links orphans + detects missed closes
                     → ft-killers-scalp (Freqtrade Futures, port 8099)
-                      → dry-run wallet $200, max 10 concurrent, lev 5x
-                      → real fills against Binance Futures market data
+                      → LIVE on Hyperliquid via hl-gateway, dedicated API wallet
+                      → risk-sized entries ($2 at the posted stop), up to 50 open
                       → webhook → trade-webhook → @elder_brain_bot Telegram alerts
                     → ft-dashboard polls /api/v1/status, renders in dry-summary
                       tab as a real fleet bot alongside keltner/cascade
@@ -25,7 +30,9 @@ Telegram channel
 
 ## Status (post-2026-05-25)
 
-- Real Freqtrade Futures dry-run bot, $200 wallet.
+- **Live Freqtrade Futures bot on Hyperliquid.** First trade in the live database:
+  2026-08-29. Earlier notes and audits (May–July) describe the dry-run phase and
+  were correct at the time.
 - Paper-sim stays as a local audit trail.
 - Listens to **`Binance Killers Vip`** (private channel, id `-1001655061968`) —
   not the free signals channel.
@@ -88,6 +95,14 @@ tail -f /home/ubuntu/killers-bot/observer.log
 2. **Phase 2 (2026-05-25):** Promoted to real Freqtrade Futures dry-run bot
    with receiver service. Now part of the fleet, visible in dry-summary
    alongside keltner / cascade.
+3. **Phase 3 (by 2026-08-29):** Live on Hyperliquid, dedicated API wallet,
+   risk-sized entries.
+4. **2026-09-22:** Rule classifier decides chat / close_partial / stop-hit
+   ahead of the Claude CLI, with Claude in shadow (#62, #74; research in
+   `docs/research/2026-09-22-jev-decision-models.md`). Rollback:
+   `KILLERS_RULES_PRIMARY=0` in `killers_bot/.env` + restart the observer.
+5. **2026-09-23:** Entry cap 5 → 50 and too-small entries raised to the venue
+   minimum instead of skipped (#81, #78).
 
 ## Setup (one-time, if starting from scratch)
 
@@ -147,7 +162,7 @@ ssh ubuntu@100.96.225.124 sqlite3 /home/ubuntu/killers-bot/state.sqlite \
 # Receiver positions (real Freqtrade tracking)
 ssh ubuntu@100.96.225.124 curl -sf http://127.0.0.1:8089/positions
 
-# Freqtrade open trades (real dry-run fills)
+# Freqtrade open trades (live)
 ssh ubuntu@100.96.225.124 \
   curl -sf -u "$FT_USER:$FT_PASS" http://localhost:8099/api/v1/status
 
@@ -157,12 +172,21 @@ open https://master-trader.grooveops.dev
 
 ## Risk model
 
-- **Dry run only.** `dry_run: true` in `KillersScalpV1.json`; Freqtrade uses
-  exchange data for prices but simulates fills against a virtual wallet.
-- **No keys.** `exchange.key` and `exchange.secret` are empty in the config;
-  there's nothing to leak.
-- **Stake cap.** $20 per trade × 10 max concurrent = $200 max notional, which
-  matches the dry wallet. Receiver's `KILLERS_MAX_OPEN=10` guard enforces.
+- **Live money.** `dry_run: false` in `KillersScalpV1.json`. Orders go to
+  Hyperliquid through `hl-gateway` from a dedicated API wallet; the private key
+  and wallet address come from the environment
+  (`FREQTRADE__EXCHANGE__PRIVATE_KEY`, `FREQTRADE__EXCHANGE__WALLET_ADDRESS`),
+  never the repo.
+- **Risk sizing.** Each entry targets a planned loss of `KILLERS_RISK_USD` ($2)
+  at the posted stop, measured at the adverse stop-limit edge, with margin in
+  [$5, $10] and leverage ≤ 3. An entry the risk budget would size below the
+  venue minimum ($11.30 notional) is raised **to** the minimum when the planned
+  loss stays ≤ `KILLERS_MAX_BUMP_RISK_USD` ($6); otherwise skipped. "Planned"
+  means sized at the mark: market-fill slippage, fees and a stop-limit that
+  misses its edge can exceed it.
+- **Entry cap.** `KILLERS_MAX_OPEN` = 50 (receiver gate — Freqtrade's
+  forceenter does not enforce `max_open_trades`). The practical ceiling is free
+  margin on the account.
 - **Idempotency.** `UNIQUE(open_msg_id)` in receiver schema + dedupe path so
   retries / observer-replay don't double-fire `/forceenter`.
 - **Reconciler.** 60s loop links orphan `requested` positions to their actual
