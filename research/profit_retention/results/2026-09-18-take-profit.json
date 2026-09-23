@@ -1,0 +1,391 @@
+{
+  "input_sha256": "c9545c249852590c0a450749e50bb4db204b152696bf3323c841650dc1e95016",
+  "signal_count": 661,
+  "eligible": 241,
+  "excluded": {
+    "incomplete_signal": 381,
+    "entry_past_stop_or_first_target": 21,
+    "uncached": 17,
+    "incomplete_horizon": 1
+  },
+  "scenarios": {
+    "cost_4.5_carry_-10": {
+      "final_source_target": {
+        "mean_r": -0.1914571781321515,
+        "mean_delta_r": 0.0,
+        "early70_delta_r": 0.0,
+        "late30_delta_r": 0.0,
+        "delta_without_best": 0.0,
+        "win_fraction": 0.2074688796680498,
+        "mean_holding_days": 5.502751844167819,
+        "improved": 0,
+        "worse": 0,
+        "missed_winners": 0,
+        "winner_return_sacrificed_r": 0
+      },
+      "nearer_source_or_2r": {
+        "mean_r": -0.1226770912659092,
+        "mean_delta_r": 0.06878008686624229,
+        "early70_delta_r": 0.14773825627926007,
+        "late30_delta_r": -0.11293186465960689,
+        "delta_without_best": 0.056623425329345826,
+        "win_fraction": 0.3070539419087137,
+        "mean_holding_days": 4.363704472106962,
+        "improved": 32,
+        "worse": 22,
+        "missed_winners": 22,
+        "winner_return_sacrificed_r": 56.92036248971916
+      },
+      "existing_2r_1r_trail": {
+        "mean_r": -0.1536507357395353,
+        "mean_delta_r": 0.03780644239261616,
+        "early70_delta_r": 0.09163412585255035,
+        "late30_delta_r": -0.0860709661179173,
+        "delta_without_best": 0.024678418678454776,
+        "win_fraction": 0.3070539419087137,
+        "mean_holding_days": 4.51424907791609,
+        "improved": 32,
+        "worse": 15,
+        "missed_winners": 15,
+        "winner_return_sacrificed_r": 51.69604507959938
+      }
+    },
+    "cost_4.5_carry_0": {
+      "final_source_target": {
+        "mean_r": -0.2804989499358315,
+        "mean_delta_r": 0.0,
+        "early70_delta_r": 0.0,
+        "late30_delta_r": 0.0,
+        "delta_without_best": 0.0,
+        "win_fraction": 0.1825726141078838,
+        "mean_holding_days": 5.502751844167819,
+        "improved": 0,
+        "worse": 0,
+        "missed_winners": 0,
+        "winner_return_sacrificed_r": 0
+      },
+      "nearer_source_or_2r": {
+        "mean_r": -0.1853169085176941,
+        "mean_delta_r": 0.0951820414181374,
+        "early70_delta_r": 0.17897121433243848,
+        "late30_delta_r": -0.09764783597367883,
+        "delta_without_best": 0.08307300825737964,
+        "win_fraction": 0.29045643153526973,
+        "mean_holding_days": 4.363704472106962,
+        "improved": 32,
+        "worse": 22,
+        "missed_winners": 22,
+        "winner_return_sacrificed_r": 54.774507693872465
+      },
+      "existing_2r_1r_trail": {
+        "mean_r": -0.21920766494341476,
+        "mean_delta_r": 0.06129128499241675,
+        "early70_delta_r": 0.12008304492534053,
+        "late30_delta_r": -0.07401029951075029,
+        "delta_without_best": 0.047626430999859706,
+        "win_fraction": 0.29045643153526973,
+        "mean_holding_days": 4.51424907791609,
+        "improved": 32,
+        "worse": 15,
+        "missed_winners": 15,
+        "winner_return_sacrificed_r": 50.149078540159856
+      }
+    },
+    "cost_4.5_carry_10": {
+      "final_source_target": {
+        "mean_r": -0.3695407217395115,
+        "mean_delta_r": 0.0,
+        "early70_delta_r": 0.0,
+        "late30_delta_r": 0.0,
+        "delta_without_best": 0.0,
+        "win_fraction": 0.17012448132780084,
+        "mean_holding_days": 5.502751844167819,
+        "improved": 0,
+        "worse": 0,
+        "missed_winners": 0,
+        "winner_return_sacrificed_r": 0
+      },
+      "nearer_source_or_2r": {
+        "mean_r": -0.24795672576947902,
+        "mean_delta_r": 0.1215839959700325,
+        "early70_delta_r": 0.2102041723856169,
+        "late30_delta_r": -0.08236380728775079,
+        "delta_without_best": 0.1080298328313088,
+        "win_fraction": 0.27800829875518673,
+        "mean_holding_days": 4.363704472106962,
+        "improved": 33,
+        "worse": 21,
+        "missed_winners": 21,
+        "winner_return_sacrificed_r": 52.878739469262655
+      },
+      "existing_2r_1r_trail": {
+        "mean_r": -0.2847645941472942,
+        "mean_delta_r": 0.08477612759221734,
+        "early70_delta_r": 0.1485319639981307,
+        "late30_delta_r": -0.06194963290358331,
+        "delta_without_best": 0.0698452314879436,
+        "win_fraction": 0.27800829875518673,
+        "mean_holding_days": 4.51424907791609,
+        "improved": 32,
+        "worse": 15,
+        "missed_winners": 15,
+        "winner_return_sacrificed_r": 48.602112000720325
+      }
+    },
+    "cost_10_carry_-10": {
+      "final_source_target": {
+        "mean_r": -0.2195317722172083,
+        "mean_delta_r": 0.0,
+        "early70_delta_r": 0.0,
+        "late30_delta_r": 0.0,
+        "delta_without_best": 0.0,
+        "win_fraction": 0.2074688796680498,
+        "mean_holding_days": 5.502751844167819,
+        "improved": 0,
+        "worse": 0,
+        "missed_winners": 0,
+        "winner_return_sacrificed_r": 0
+      },
+      "nearer_source_or_2r": {
+        "mean_r": -0.15074556591323862,
+        "mean_delta_r": 0.06878620630396966,
+        "early70_delta_r": 0.147723687581828,
+        "late30_delta_r": -0.11287813417110157,
+        "delta_without_best": 0.0566226952647304,
+        "win_fraction": 0.3070539419087137,
+        "mean_holding_days": 4.363704472106962,
+        "improved": 32,
+        "worse": 22,
+        "missed_winners": 22,
+        "winner_return_sacrificed_r": 56.89923650336442
+      },
+      "existing_2r_1r_trail": {
+        "mean_r": -0.18173099218848543,
+        "mean_delta_r": 0.03780078002872288,
+        "early70_delta_r": 0.09160830751322459,
+        "late30_delta_r": -0.08603024212739066,
+        "delta_without_best": 0.024680392297078347,
+        "win_fraction": 0.3070539419087137,
+        "mean_holding_days": 4.51424907791609,
+        "improved": 32,
+        "worse": 15,
+        "missed_winners": 15,
+        "winner_return_sacrificed_r": 51.678468433118034
+      }
+    },
+    "cost_10_carry_0": {
+      "final_source_target": {
+        "mean_r": -0.3085735440208883,
+        "mean_delta_r": 0.0,
+        "early70_delta_r": 0.0,
+        "late30_delta_r": 0.0,
+        "delta_without_best": 0.0,
+        "win_fraction": 0.1825726141078838,
+        "mean_holding_days": 5.502751844167819,
+        "improved": 0,
+        "worse": 0,
+        "missed_winners": 0,
+        "winner_return_sacrificed_r": 0
+      },
+      "nearer_source_or_2r": {
+        "mean_r": -0.21338538316502353,
+        "mean_delta_r": 0.09518816085586478,
+        "early70_delta_r": 0.1789566456350064,
+        "late30_delta_r": -0.0975941054851735,
+        "delta_without_best": 0.0830722781927642,
+        "win_fraction": 0.29045643153526973,
+        "mean_holding_days": 4.363704472106962,
+        "improved": 32,
+        "worse": 22,
+        "missed_winners": 22,
+        "winner_return_sacrificed_r": 54.753381707517725
+      },
+      "existing_2r_1r_trail": {
+        "mean_r": -0.24728792139236486,
+        "mean_delta_r": 0.061285622628523446,
+        "early70_delta_r": 0.12005722658601475,
+        "late30_delta_r": -0.07396957552022367,
+        "delta_without_best": 0.047628404618483264,
+        "win_fraction": 0.29045643153526973,
+        "mean_holding_days": 4.51424907791609,
+        "improved": 32,
+        "worse": 15,
+        "missed_winners": 15,
+        "winner_return_sacrificed_r": 50.131501893678504
+      }
+    },
+    "cost_10_carry_10": {
+      "final_source_target": {
+        "mean_r": -0.3976153158245683,
+        "mean_delta_r": 0.0,
+        "early70_delta_r": 0.0,
+        "late30_delta_r": 0.0,
+        "delta_without_best": 0.0,
+        "win_fraction": 0.17012448132780084,
+        "mean_holding_days": 5.502751844167819,
+        "improved": 0,
+        "worse": 0,
+        "missed_winners": 0,
+        "winner_return_sacrificed_r": 0
+      },
+      "nearer_source_or_2r": {
+        "mean_r": -0.27602520041680845,
+        "mean_delta_r": 0.12159011540775988,
+        "early70_delta_r": 0.21018960368818482,
+        "late30_delta_r": -0.08231007679924544,
+        "delta_without_best": 0.10804285276669338,
+        "win_fraction": 0.27800829875518673,
+        "mean_holding_days": 4.363704472106962,
+        "improved": 33,
+        "worse": 21,
+        "missed_winners": 21,
+        "winner_return_sacrificed_r": 52.85761705176155
+      },
+      "existing_2r_1r_trail": {
+        "mean_r": -0.3128448505962443,
+        "mean_delta_r": 0.08477046522832403,
+        "early70_delta_r": 0.14850614565880493,
+        "late30_delta_r": -0.06190890891305668,
+        "delta_without_best": 0.06984710958942163,
+        "win_fraction": 0.27800829875518673,
+        "mean_holding_days": 4.51424907791609,
+        "improved": 32,
+        "worse": 15,
+        "missed_winners": 15,
+        "winner_return_sacrificed_r": 48.58453535423898
+      }
+    },
+    "cost_25_carry_-10": {
+      "final_source_target": {
+        "mean_r": -0.2960988469946359,
+        "mean_delta_r": 0.0,
+        "early70_delta_r": 0.0,
+        "late30_delta_r": 0.0,
+        "delta_without_best": 0.0,
+        "win_fraction": 0.2033195020746888,
+        "mean_holding_days": 5.502751844167819,
+        "improved": 0,
+        "worse": 0,
+        "missed_winners": 0,
+        "winner_return_sacrificed_r": 0
+      },
+      "nearer_source_or_2r": {
+        "mean_r": -0.22729595131504612,
+        "mean_delta_r": 0.0688028956795898,
+        "early70_delta_r": 0.14768395477064958,
+        "late30_delta_r": -0.11273159647517786,
+        "delta_without_best": 0.05662070417941562,
+        "win_fraction": 0.3029045643153527,
+        "mean_holding_days": 4.363704472106962,
+        "improved": 32,
+        "worse": 22,
+        "missed_winners": 22,
+        "winner_return_sacrificed_r": 56.8416201769424
+      },
+      "existing_2r_1r_trail": {
+        "mean_r": -0.2583135097765311,
+        "mean_delta_r": 0.03778533721810478,
+        "early70_delta_r": 0.09153789386051792,
+        "late30_delta_r": -0.0859191766986816,
+        "delta_without_best": 0.024685774893324408,
+        "win_fraction": 0.3029045643153527,
+        "mean_holding_days": 4.51424907791609,
+        "improved": 32,
+        "worse": 15,
+        "missed_winners": 15,
+        "winner_return_sacrificed_r": 51.630532124532536
+      }
+    },
+    "cost_25_carry_0": {
+      "final_source_target": {
+        "mean_r": -0.38514061879831596,
+        "mean_delta_r": 0.0,
+        "early70_delta_r": 0.0,
+        "late30_delta_r": 0.0,
+        "delta_without_best": 0.0,
+        "win_fraction": 0.17842323651452283,
+        "mean_holding_days": 5.502751844167819,
+        "improved": 0,
+        "worse": 0,
+        "missed_winners": 0,
+        "winner_return_sacrificed_r": 0
+      },
+      "nearer_source_or_2r": {
+        "mean_r": -0.289935768566831,
+        "mean_delta_r": 0.09520485023148491,
+        "early70_delta_r": 0.178916912823828,
+        "late30_delta_r": -0.09744756778924982,
+        "delta_without_best": 0.08307028710744943,
+        "win_fraction": 0.2863070539419087,
+        "mean_holding_days": 4.363704472106962,
+        "improved": 32,
+        "worse": 22,
+        "missed_winners": 22,
+        "winner_return_sacrificed_r": 54.695765381095704
+      },
+      "existing_2r_1r_trail": {
+        "mean_r": -0.32387043898041057,
+        "mean_delta_r": 0.061270179817905356,
+        "early70_delta_r": 0.11998681293330808,
+        "late30_delta_r": -0.07385851009151462,
+        "delta_without_best": 0.04763378721472933,
+        "win_fraction": 0.2863070539419087,
+        "mean_holding_days": 4.51424907791609,
+        "improved": 32,
+        "worse": 15,
+        "missed_winners": 15,
+        "winner_return_sacrificed_r": 50.08356558509301
+      }
+    },
+    "cost_25_carry_10": {
+      "final_source_target": {
+        "mean_r": -0.47418239060199596,
+        "mean_delta_r": 0.0,
+        "early70_delta_r": 0.0,
+        "late30_delta_r": 0.0,
+        "delta_without_best": 0.0,
+        "win_fraction": 0.16597510373443983,
+        "mean_holding_days": 5.502751844167819,
+        "improved": 0,
+        "worse": 0,
+        "missed_winners": 0,
+        "winner_return_sacrificed_r": 0
+      },
+      "nearer_source_or_2r": {
+        "mean_r": -0.3525755858186159,
+        "mean_delta_r": 0.12160680478338003,
+        "early70_delta_r": 0.2101498708770064,
+        "late30_delta_r": -0.08216353910332176,
+        "delta_without_best": 0.1080783616813786,
+        "win_fraction": 0.27385892116182575,
+        "mean_holding_days": 4.363704472106962,
+        "improved": 33,
+        "worse": 21,
+        "missed_winners": 21,
+        "winner_return_sacrificed_r": 52.80001045857673
+      },
+      "existing_2r_1r_trail": {
+        "mean_r": -0.38942736818429,
+        "mean_delta_r": 0.08475502241770594,
+        "early70_delta_r": 0.14843573200609825,
+        "late30_delta_r": -0.06179784348434762,
+        "delta_without_best": 0.0698522316843617,
+        "win_fraction": 0.27385892116182575,
+        "mean_holding_days": 4.51424907791609,
+        "improved": 32,
+        "worse": 15,
+        "missed_winners": 15,
+        "winner_return_sacrificed_r": 48.53659904565349
+      }
+    }
+  },
+  "limitations": [
+    "Previously studied Binance corpus; temporal blocks are diagnostics, not holdout.",
+    "Whole-position final source target baseline is a proxy, not actual executable grouping.",
+    "Next full bar entry, 14-day horizon; no source updates, liquidation or capital capacity.",
+    "Adverse-first mark stop, trade-bar TP touch assumes fill; no queue/depth/nonfill model.",
+    "Fixed transaction costs and signed carry stresses, not settled fees/funding.",
+    "No independent-trade significance claim; overlapping signals are dependent.",
+    "Missed winners means reduced positive baseline return, not necessarily a losing candidate."
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "input_sha256": "c9545c249852590c0a450749e50bb4db204b152696bf3323c841650dc1e95016",
+  "signal_count": 661,
+  "eligible": 241,
+  "excluded": {
+    "incomplete_signal": 381,
+    "entry_past_stop_or_first_target": 21,
+    "uncached": 17,
+    "incomplete_horizon": 1
+  },
+  "scenarios": {
+    "cost_4.5_bps_each_side_carry_-10_bps_day": {
+      "baseline_mean_r": -0.1914571781321515,
+      "candidate_mean_r": -0.1536507357395353,
+      "mean_delta_r": 0.03780644239261616,
+      "improved": 32,
+      "worse": 15,
+      "armed": 54,
+      "early70_delta_r": 0.09163412585255035,
+      "late30_delta_r": -0.0860709661179173,
+      "delta_without_best": 0.024678418678454776
+    },
+    "cost_4.5_bps_each_side_carry_0_bps_day": {
+      "baseline_mean_r": -0.2804989499358315,
+      "candidate_mean_r": -0.21920766494341476,
+      "mean_delta_r": 0.06129128499241675,
+      "improved": 32,
+      "worse": 15,
+      "armed": 54,
+      "early70_delta_r": 0.12008304492534053,
+      "late30_delta_r": -0.07401029951075029,
+      "delta_without_best": 0.047626430999859706
+    },
+    "cost_4.5_bps_each_side_carry_10_bps_day": {
+      "baseline_mean_r": -0.3695407217395115,
+      "candidate_mean_r": -0.2847645941472942,
+      "mean_delta_r": 0.08477612759221734,
+      "improved": 32,
+      "worse": 15,
+      "armed": 54,
+      "early70_delta_r": 0.1485319639981307,
+      "late30_delta_r": -0.06194963290358331,
+      "delta_without_best": 0.0698452314879436
+    },
+    "cost_10_bps_each_side_carry_-10_bps_day": {
+      "baseline_mean_r": -0.2195317722172083,
+      "candidate_mean_r": -0.18173099218848543,
+      "mean_delta_r": 0.03780078002872288,
+      "improved": 32,
+      "worse": 15,
+      "armed": 54,
+      "early70_delta_r": 0.09160830751322459,
+      "late30_delta_r": -0.08603024212739066,
+      "delta_without_best": 0.024680392297078347
+    },
+    "cost_10_bps_each_side_carry_0_bps_day": {
+      "baseline_mean_r": -0.3085735440208883,
+      "candidate_mean_r": -0.24728792139236486,
+      "mean_delta_r": 0.061285622628523446,
+      "improved": 32,
+      "worse": 15,
+      "armed": 54,
+      "early70_delta_r": 0.12005722658601475,
+      "late30_delta_r": -0.07396957552022367,
+      "delta_without_best": 0.047628404618483264
+    },
+    "cost_10_bps_each_side_carry_10_bps_day": {
+      "baseline_mean_r": -0.3976153158245683,
+      "candidate_mean_r": -0.3128448505962443,
+      "mean_delta_r": 0.08477046522832403,
+      "improved": 32,
+      "worse": 15,
+      "armed": 54,
+      "early70_delta_r": 0.14850614565880493,
+      "late30_delta_r": -0.06190890891305668,
+      "delta_without_best": 0.06984710958942163
+    },
+    "cost_25_bps_each_side_carry_-10_bps_day": {
+      "baseline_mean_r": -0.2960988469946359,
+      "candidate_mean_r": -0.2583135097765311,
+      "mean_delta_r": 0.03778533721810478,
+      "improved": 32,
+      "worse": 15,
+      "armed": 54,
+      "early70_delta_r": 0.09153789386051792,
+      "late30_delta_r": -0.0859191766986816,
+      "delta_without_best": 0.024685774893324408
+    },
+    "cost_25_bps_each_side_carry_0_bps_day": {
+      "baseline_mean_r": -0.38514061879831596,
+      "candidate_mean_r": -0.32387043898041057,
+      "mean_delta_r": 0.061270179817905356,
+      "improved": 32,
+      "worse": 15,
+      "armed": 54,
+      "early70_delta_r": 0.11998681293330808,
+      "late30_delta_r": -0.07385851009151462,
+      "delta_without_best": 0.04763378721472933
+    },
+    "cost_25_bps_each_side_carry_10_bps_day": {
+      "baseline_mean_r": -0.47418239060199596,
+      "candidate_mean_r": -0.38942736818429,
+      "mean_delta_r": 0.08475502241770594,
+      "improved": 32,
+      "worse": 15,
+      "armed": 54,
+      "early70_delta_r": 0.14843573200609825,
+      "late30_delta_r": -0.06179784348434762,
+      "delta_without_best": 0.0698522316843617
+    }
+  },
+  "limitations": [
+    "Previously researched Binance corpus, not holdout or current Hyperliquid execution.",
+    "Next full bar market entry; not bounded copier admission. Full exit at final posted target, not actual TP grouping.",
+    "14-day endpoint; ignores source revisions, liquidation and portfolio capacity.",
+    "Mark triggers and adverse-first bar ordering; no order-book nonfill model. Signed funding stress, not actual funding.",
+    "Cost/funding scenarios are sensitivity checks, not nine independently selected policies."
+  ]
+}

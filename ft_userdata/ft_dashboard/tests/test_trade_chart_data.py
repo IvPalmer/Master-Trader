@@ -70,7 +70,7 @@ const chart = { getDom() { assert.equal(this, chart); return el; },
   isDisposed() { assert.equal(this, chart); return false; },
   dispose() { assert.equal(this, chart); } };
 global.document = { getElementById: () => el };
-global.echarts = { init: () => chart };
+global.window = { TradingAnalytics: function() { return chart; } };
 function reactive(obj) {
   return new Proxy(obj, { get(target,key,receiver) {
     const value = Reflect.get(target,key,receiver);

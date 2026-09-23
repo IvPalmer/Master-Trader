@@ -1,0 +1,23 @@
+{
+  "name": "master-trader-charts",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/price-chart.ts --bundle --format=iife --target=es2020 --outfile=../static/price-chart.js",
+    "typecheck": "tsc --noEmit --strict --target ES2020 --module ESNext --moduleResolution bundler src/price-chart.ts",
+    "test": "node tests/price-chart.cjs && node tests/workspace.cjs"
+  },
+  "dependencies": {
+    "d3-scale": "^4.0.2",
+    "d3-shape": "^3.2.0",
+    "lightweight-charts": "5.0.9"
+  },
+  "devDependencies": {
+    "@fontsource/inter": "^5.2.6",
+    "@types/d3-scale": "^4.0.9",
+    "@types/d3-shape": "^3.1.7",
+    "alpinejs": "3.14.3",
+    "esbuild": "0.25.10",
+    "playwright": "1.55.1",
+    "typescript": "5.9.2"
+  }
+}
