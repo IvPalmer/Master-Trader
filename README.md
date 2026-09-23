@@ -89,7 +89,7 @@ $V -m pytest tests/ -q
 (cd services/insiders-receiver && $V -m pytest tests/ -q)
 (cd ft_userdata/ft_dashboard   && $V -m pytest tests/ -q)
 (cd services/hl-gateway        && $V -m pytest tests/ -q)
-$V -m pytest killers_bot/tests/test_strict_open.py -q
+$V -m pytest killers_bot/tests/ -q
 ```
 
 These are the same six suites CI runs on every pull request, in the same order

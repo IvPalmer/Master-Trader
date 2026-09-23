@@ -38,8 +38,8 @@ jobs:
       - name: Hyperliquid gateway
         working-directory: services/hl-gateway
         run: python -m pytest tests/ -q
-      - name: Copier strict parsing
-        run: python -m pytest killers_bot/tests/test_strict_open.py -q
+      - name: Copier classifiers and observer
+        run: python -m pytest killers_bot/tests/ -q
       - name: Dashboard chart dependencies
         working-directory: ft_userdata/ft_dashboard/frontend
         run: npm ci
