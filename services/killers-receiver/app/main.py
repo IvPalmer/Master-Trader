@@ -32,7 +32,10 @@ Env vars:
                             falls below the venue minimum is raised TO the
                             minimum instead of skipped, as long as the loss at
                             the stop stays within KILLERS_MAX_BUMP_RISK_USD
-  KILLERS_MAX_BUMP_RISK_USD ceiling on the stop loss of a bumped entry
+  KILLERS_MAX_BUMP_RISK_USD cap on the PLANNED stop loss of a bumped entry —
+                            same semantics as KILLERS_RISK_USD: sized at the
+                            mark, so market-fill slippage, fees and a stop-limit
+                            that misses its edge can exceed it
   KILLERS_BOT_LABEL         instance identity. When set, drives BOTH the logger
                             name and the Telegram-alert prefix. When unset (or
                             empty) each keeps its legacy default: logger
@@ -689,8 +692,10 @@ def _bump_to_min_notional(cfg, sl_dist: float) -> Optional[tuple[float, float, f
     """Size an entry at exactly the venue minimum notional.
 
     Used only when the risk-sized order is below the venue minimum and the
-    deployment opted in (KILLERS_BUMP_TO_MIN_NOTIONAL). Loss at the stop becomes
-    ``min_notional × sl_dist``, which must stay within KILLERS_MAX_BUMP_RISK_USD.
+    deployment opted in (KILLERS_BUMP_TO_MIN_NOTIONAL). Planned loss at the stop
+    becomes ``min_notional × sl_dist`` (sl_dist already at the adverse
+    stop-limit edge), which must stay within KILLERS_MAX_BUMP_RISK_USD. Like
+    KILLERS_RISK_USD this is a sizing target, not a hard guarantee.
     Returns None when that ceiling, or the margin/leverage caps, cannot be met,
     in which case the caller skips as before.
     """

@@ -187,10 +187,15 @@ services:
       KILLERS_MAX_OPEN: "50"
       # 2026-09-23, operador: nao perder sinal por posicao abaixo do minimo da
       # venue. So as entradas pequenas demais sobem ate o minimo ($11,30); as
-      # normais seguem no risco de KILLERS_RISK_USD. Teto do risco de uma
-      # entrada ajustada: $5 (cobre 100% dos stops historicos; pior caso $4,77).
+      # normais seguem no risco de KILLERS_RISK_USD. KILLERS_MAX_BUMP_RISK_USD
+      # limita a perda PLANEJADA no stop de uma entrada ajustada — mesma
+      # semantica do RISK_USD: dimensionada no preco de marca, entao slippage
+      # da ordem a mercado, taxas e stop-limit que nao executa na borda podem
+      # passar dele. $6 cobre os 75 stops historicos (pior $4,90 com o ratio
+      # 0,98) e o CATI #3886 ($5,08), com folga para a entrada se afastar do
+      # sinal.
       KILLERS_BUMP_TO_MIN_NOTIONAL: "true"
-      KILLERS_MAX_BUMP_RISK_USD: "5"
+      KILLERS_MAX_BUMP_RISK_USD: "6"
       # Posted-SL hard-stop mode ON (2026-06-06): force-exit a position once
       # mark breaches the signal's posted SL, instead of riding to the channel's
       # close / liquidation. Per research/killers_sl_replay this halves the loss
