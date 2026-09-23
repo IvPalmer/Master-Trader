@@ -40,3 +40,18 @@ jobs:
         run: python -m pytest tests/ -q
       - name: Copier strict parsing
         run: python -m pytest killers_bot/tests/test_strict_open.py -q
+      - name: Dashboard chart dependencies
+        working-directory: ft_userdata/ft_dashboard/frontend
+        run: npm ci
+      - name: Dashboard chart types and reproducible build
+        working-directory: ft_userdata/ft_dashboard/frontend
+        run: |
+          npm run typecheck
+          npm run build
+          git diff --exit-code -- ../static/price-chart.js
+      - name: Install chart test browser
+        working-directory: ft_userdata/ft_dashboard/frontend
+        run: npx playwright install --with-deps chromium
+      - name: Dashboard chart behavior
+        working-directory: ft_userdata/ft_dashboard/frontend
+        run: npm test

@@ -1,0 +1,100 @@
+diff --git a/src/config.ts b/src/config.ts
+index 9821afd..b98f48a 100644
+--- a/src/config.ts
++++ b/src/config.ts
+@@ -28,7 +28,7 @@ export const config = {
+   pendingBlocks: 10, // give up on a tx with no receipt after this many blocks
+   refreshBlocks: 200, // how often to refresh the fee estimate, margin balances and the vault check
+   horizonBlocks: Number(env("HORIZON_BLOCKS", "100")), // the model is asked about the move over this many blocks (~30 s)
+-  model: env("MODEL", "mock") as "mock" | "jev",
++  model: env("MODEL", "mock") as "mock" | "jev" | "oss",
+   jevModelId: env("JEV_MODEL_ID", "jev-latest")!,
+   jevUsdPerMTok: 0.042,
+   port: Number(env("PORT", "3000")),
+diff --git a/src/model.ts b/src/model.ts
+index 8d3cd3e..a6eda9b 100644
+--- a/src/model.ts
++++ b/src/model.ts
+@@ -104,4 +104,59 @@ export class MockModel implements Model {
+   }
+ }
+ 
+-export const createModel = (): Model => (config.model === "jev" ? new JevModel() : new MockModel());
++/**
++ * Open-source stand-in for Jev, OpenJev-style: an open-weight LLM reads the SAME state and the SAME
++ * question/criteria that JevModel sends, and the buy/sell probability comes from the log-likelihood of
++ * the two candidate answers (one forward pass, one output token). Served locally by ollama.
++ */
++export class OssModel implements Model {
++  readonly name = `oss:${process.env.OSS_MODEL ?? "qwen3:4b-instruct"}`;
++  private url = (process.env.OLLAMA_URL ?? "http://127.0.0.1:11434") + "/api/chat";
++  private model = process.env.OSS_MODEL ?? "qwen3:4b-instruct";
++
++  async decide(state: TradeState): Promise<Decision> {
++    const t0 = performance.now();
++    const q = QUESTIONS.direction;
++    const system = [
++      "You are a trading decision function. You output exactly one word: buy or sell.",
++      `Goal: ${q.instructions.goal}`,
++      `Timing: ${q.instructions.timing}`,
++      `Inputs: ${q.instructions.inputs}`,
++    ].join("\n");
++    const user = [
++      `State (JSON):\n${JSON.stringify(state)}`,
++      `Question: ${q.instructions.question.replace("`horizonBlocks`", String(state.horizonBlocks))}`,
++      `buy: ${q.criteria.buy}`,
++      `sell: ${q.criteria.sell}`,
++      "Answer with exactly one word: buy or sell.",
++    ].join("\n\n");
++    const res = await fetch(this.url, {
++      method: "POST",
++      headers: { "content-type": "application/json" },
++      body: JSON.stringify({
++        model: this.model, stream: false, keep_alive: -1,
++        messages: [{ role: "system", content: system }, { role: "user", content: user }],
++        logprobs: true, top_logprobs: 20,
++        options: { num_predict: 1, temperature: 0 },
++      }),
++    });
++    const d: any = await res.json();
++    // Sum the probability mass of every surface form of each candidate ("buy", " Buy", "BUY", ...).
++    let pb = 0, ps = 0;
++    for (const c of d.logprobs?.[0]?.top_logprobs ?? []) {
++      const w = String(c.token).trim().toLowerCase(), pr = Math.exp(c.logprob);
++      if (w === "buy") pb += pr; else if (w === "sell") ps += pr;
++    }
++    const buy = pb + ps > 0 ? pb / (pb + ps) : 0.5;
++    return {
++      action: buy >= 0.5 ? "buy" : "sell",
++      probabilities: { buy, sell: 1 - buy, hold: 0 },
++      upIn10: buy,
++      latencyMs: performance.now() - t0,
++      inputTokens: d.prompt_eval_count ?? 0,
++    };
++  }
++}
++
++export const createModel = (): Model =>
++  config.model === "jev" ? new JevModel() : config.model === "oss" ? new OssModel() : new MockModel();
+diff --git a/src/trader.ts b/src/trader.ts
+index f63ba29..682e8e1 100644
+--- a/src/trader.ts
++++ b/src/trader.ts
+@@ -101,7 +101,16 @@ export class Trader {
+       if (this.mids.length > 400) this.mids.shift();
+       this.trades?.poll(block).then(() => this.harvest()); // off the hot path: eth_getLogs for prints (and our fills) since the last poll
+ 
+-      const decision = await this.model.decide(this.buildState(block, book));
++      const state = this.buildState(block, book);
++      const decision = await this.model.decide(state);
++      // experiment recorder: every decision with the exact state the model saw (outcome labeled offline)
++      if (process.env.RECORD_PATH) {
++        const { appendFileSync } = await import("node:fs");
++        appendFileSync(process.env.RECORD_PATH, JSON.stringify({
++          t: Date.now(), block, mid: book.mid, spreadBps: state.spreadBps, model: this.model.name,
++          pBuy: decision.probabilities.buy, action: decision.action, latencyMs: Math.round(decision.latencyMs), state,
++        }) + "\n");
++      }
+       const wanted: Side = decision.action === "sell" ? "sell" : "buy";
+       const other: Side = wanted === "buy" ? "sell" : "buy";
+       // The position cap (and, live, margin funds) can only pick the reducing side. The probabilities still show the model's call.

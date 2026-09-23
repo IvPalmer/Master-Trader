@@ -1,0 +1,18 @@
+[Unit]
+Description=Read-only exchange cash-flow collection and paired exit report
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+UMask=0077
+ExecStart=/usr/bin/python3 /home/ubuntu/master-trader/research/profit-retention-accounting-v1/ledger.py --directory /home/ubuntu/master-trader/research/profit-retention-forward-v1
+ExecStart=/usr/bin/python3 /home/ubuntu/master-trader/research/profit-retention-accounting-v1/accounting.py /home/ubuntu/master-trader/research/profit-retention-forward-v1 --write
+TimeoutStartSec=300
+Nice=10
+MemoryMax=512M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/master-trader/research/profit-retention-forward-v1

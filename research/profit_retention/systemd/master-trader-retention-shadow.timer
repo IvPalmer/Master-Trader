@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect read-only exit research observations every minute
+
+[Timer]
+OnBootSec=30s
+OnUnitInactiveSec=60s
+AccuracySec=1s
+Unit=master-trader-retention-shadow.service
+
+[Install]
+WantedBy=timers.target

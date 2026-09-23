@@ -7,6 +7,7 @@ training window whenever val_days < train_days, which is the default (20 < 60).
 
 import importlib
 import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -22,16 +23,22 @@ DOWNLOADED_HISTORY_DAYS = 90
 
 @pytest.fixture(scope="module")
 def optimizer(tmp_path_factory):
-    """Redirect HOME: importing the module creates log and proposal dirs under it."""
+    """Redirect HOME: importing the module creates log and proposal dirs under it.
+
+    The module is dropped from sys.modules either side so this test and
+    test_hyperopt_validation_params.py cannot inherit each other's temporary HOME.
+    """
     home = tmp_path_factory.mktemp("home")
-    config = home / "ft_userdata" / "user_data" / "configs" / f"{STRATEGY}.json"
+    config = home / "ft_userdata" / "user_data" / "config-backtest.json"
     config.parent.mkdir(parents=True, exist_ok=True)
     config.write_text("{}")
 
     with pytest.MonkeyPatch.context() as mp:
         mp.setenv("HOME", str(home))
         mp.syspath_prepend(str(FT_DIR))
+        sys.modules.pop("hyperopt_optimizer", None)
         yield importlib.import_module("hyperopt_optimizer")
+    sys.modules.pop("hyperopt_optimizer", None)
 
 
 @pytest.fixture
