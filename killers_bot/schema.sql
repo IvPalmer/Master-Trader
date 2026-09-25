@@ -97,3 +97,46 @@ CREATE TABLE IF NOT EXISTS rule_shadow (
 CREATE INDEX IF NOT EXISTS idx_signal_targets_key ON signal_targets(signal_key, symbol, msg_id);
 CREATE INDEX IF NOT EXISTS idx_rule_shadow_agree ON rule_shadow(agree);
 CREATE INDEX IF NOT EXISTS idx_rule_shadow_msg ON rule_shadow(msg_id, row_id);
+
+-- ── Revisoes de mensagens editadas (#64) ───────────────────────────────────
+-- `raw_messages` e `classifications` continuam "a mais recente vence" (INSERT
+-- OR REPLACE por msg_id) porque o resto do codigo as le assim. Estas tabelas
+-- guardam CADA gravacao, append-only, para que uma edicao nao apague a entrada
+-- nem a classificacao originais. A versao autoritativa de uma mensagem e a
+-- linha da tabela principal (= a revisao de maior rev_id).
+-- Toda chamada de persist grava uma revisao: reentrega da mesma mensagem sem
+-- edicao (backfill, reinicio) e busca de mensagem-pai na cadeia de resposta
+-- tambem geram linha. E intencional: cada uma foi uma leitura real. Distinga
+-- edicoes por `edited_at`.
+CREATE TABLE IF NOT EXISTS raw_message_revisions (
+    rev_id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    msg_id          INTEGER NOT NULL,
+    received_at     TEXT NOT NULL,
+    posted_at       TEXT,
+    edited_at       TEXT,                -- NULL = versao original
+    reply_to_msg_id INTEGER,
+    text            TEXT,
+    raw_json        TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS classification_revisions (
+    rev_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    msg_id        INTEGER NOT NULL,
+    classified_at TEXT NOT NULL,
+    kind          TEXT NOT NULL,
+    signal_id     INTEGER,
+    symbol        TEXT,
+    direction     TEXT,
+    entry_lo      REAL,
+    entry_hi      REAL,
+    sl            REAL,
+    sl_str        TEXT,
+    tp            REAL,
+    pct           REAL,
+    confidence    REAL,
+    notes         TEXT,
+    raw_json      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_raw_rev_msg ON raw_message_revisions(msg_id, rev_id);
+CREATE INDEX IF NOT EXISTS idx_cls_rev_msg ON classification_revisions(msg_id, rev_id);
