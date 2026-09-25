@@ -259,6 +259,11 @@ services:
       - ./user_data/strategies:/freqtrade/user_data/strategies
     ports:
       - 127.0.0.1:8099:8080
+    # #11: every CCXT call goes through hl-gateway; don't start the bot (and
+    # its startup reconciliation) against a gateway that isn't serving yet.
+    depends_on:
+      hl-gateway:
+        condition: service_healthy
     healthcheck: *a2
     deploy:
       resources:
@@ -317,6 +322,10 @@ services:
       - ./user_data/strategies:/freqtrade/user_data/strategies
     ports:
       - 127.0.0.1:8098:8080
+    # #11: CCXT urls point at hl-gateway; wait for it to be healthy.
+    depends_on:
+      hl-gateway:
+        condition: service_healthy
     healthcheck: *a2
     deploy:
       resources:
@@ -420,6 +429,10 @@ services:
       - ./user_data/strategies:/freqtrade/user_data/strategies
     ports:
       - 127.0.0.1:8103:8080
+    # #11: CCXT urls point at hl-gateway; wait for it to be healthy.
+    depends_on:
+      hl-gateway:
+        condition: service_healthy
     healthcheck: *a2
     deploy:
       resources:
