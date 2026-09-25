@@ -312,6 +312,11 @@ def analyze_pairs(
     Expects run_full_backtest to have already run (uses its trade export).
     Falls back to re-running backtest if export not found.
 
+    The export is keyed by whichever strategy run_full_backtest actually ran,
+    which is the *Viability wrapper wherever one exists. It records that name as
+    `_bt_strategy`, so read the key from there; strategy_name is only correct for
+    a record written before that key existed, or for the newest-zip fallback.
+
     Returns:
         dict with: pairs (list), top_5 (list), bottom_5 (list),
         concentration_risk (bool), concentration_details (str),
@@ -329,6 +334,7 @@ def analyze_pairs(
     # Find the exported trades from the most recent backtest result
     # The result file path is stashed in backtest_metrics by run_full_backtest
     result_file = backtest_metrics.get("_result_file") if backtest_metrics else None
+    archive_key = (backtest_metrics or {}).get("_bt_strategy") or strategy_name
 
     if not result_file:
         # Fallback: find most recent result zip
@@ -354,7 +360,7 @@ def analyze_pairs(
                     data = _json.loads(zf.read(name))
                     if isinstance(data, dict) and "strategy" in data:
                         for sname, sdata in data["strategy"].items():
-                            if sname == strategy_name:
+                            if sname == archive_key:
                                 trades = sdata.get("trades", [])
                                 break
                     break
@@ -363,7 +369,8 @@ def analyze_pairs(
         result["error"] = str(e)
         return result
     if not trades:
-        log.warning("No trades parsed from export for %s", strategy_name)
+        log.warning("No trades parsed from export for %s under archive key %s",
+                    strategy_name, archive_key)
         result["error"] = "no trades in export"
         return result
 
