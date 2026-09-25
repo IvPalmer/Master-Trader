@@ -708,6 +708,50 @@ def find_active_position(
     return None, "no_match"
 
 
+def _prior_action_kind_for_msg(conn: sqlite3.Connection, pos: dict,
+                               msg_id, kind: str) -> Optional[str]:
+    """#64: at most ONE executing action per (position, source message).
+
+    An edited Telegram message is re-forwarded with a fresh classification,
+    so UNIQUE(pos_id, msg_id, kind) alone lets one message act twice on the
+    same position if its kind changes between edits. Returns the kind that
+    message already acted as on this position (so the caller must NOT
+    execute), or None.
+
+    Every `events` row is an executed or claimed action (only the open,
+    close_* and signal_update paths insert; chat/skipped/logged write none),
+    so any row counts. The position's own open message also counts even
+    before its 'open' row lands (that row is written after the FT await).
+
+    A same-kind redelivery returns None so the caller's existing
+    INSERT OR IGNORE dedupe path handles it unchanged. Synchronous — callers
+    must run this and their claim INSERT with no await in between.
+    """
+    kinds = [r[0] for r in conn.execute(
+        "SELECT kind FROM events WHERE pos_id = ? AND msg_id = ? "
+        "ORDER BY event_id",
+        (pos["pos_id"], msg_id),
+    ).fetchall()]
+    if kind in kinds:
+        return None
+    if kinds:
+        return kinds[0]
+    if pos.get("open_msg_id") is not None and pos.get("open_msg_id") == msg_id:
+        return "open"
+    return None
+
+
+def _kind_change_deduped(pos: dict, msg_id, kind: str, prior_kind: str) -> dict:
+    logger.warning(
+        "[EDIT KIND-CHANGE IGNORED] msg_id=%s pos_id=%d already acted as %s; "
+        "edited delivery as %s NOT executed", msg_id, pos["pos_id"],
+        prior_kind, kind)
+    return {"action": "deduped",
+            "reason": (f"msg already acted as {prior_kind} on this position "
+                       f"(edited message, kind changed to {kind})"),
+            "pos_id": pos["pos_id"], "kind": kind, "prior_kind": prior_kind}
+
+
 # ── Sizing ─────────────────────────────────────────────────────────────────
 
 
@@ -2461,11 +2505,17 @@ def _format_event_summary(cfg: Config, payload: EventPayload, result: dict) -> O
     # Chat is 60% of the corpus — filter to keep Telegram readable.
     if kind == "chat" or action == "ignored":
         return None
+    head = f"[{cfg.bot_label}]"
+    # #64: an edit that changed the kind of a message that already acted is
+    # NOT executed — surface it, the operator may need to act by hand.
+    if action == "deduped" and result.get("prior_kind"):
+        return (f"⚠ {head} EDIT IGNORED · #{sig} {kind} {sym}  · "
+                f"pos={result.get('pos_id', '?')} · msg already acted as "
+                f"{result['prior_kind']}")
     # Duplicate observer redelivery: already alerted on the first pass.
     if action == "deduped":
         return None
 
-    head = f"[{cfg.bot_label}]"
     if action == "force_enter":
         pos = result.get("pos_id", "?")
         ft  = (result.get("ft") or {}).get("status", "?")
@@ -3150,6 +3200,10 @@ async def _process_event_inner(payload: EventPayload, phase2_locked=False):
             "pct_remaining_before": pct_remaining_before,
             "pending": True,
         })
+        # #64: no await between this check and the claim below.
+        prior_kind = _prior_action_kind_for_msg(conn, pos, msg_id, kind)
+        if prior_kind is not None:
+            return _kind_change_deduped(pos, msg_id, kind, prior_kind)
         claim = conn.execute(
             "INSERT OR IGNORE INTO events "
             "(pos_id, msg_id, event_at, kind, payload, response) "
@@ -3400,6 +3454,10 @@ async def _process_event_inner(payload: EventPayload, phase2_locked=False):
             "instruction": instruction,
             "pending": True,
         })
+        # #64: no await between this check and the claim below.
+        prior_kind = _prior_action_kind_for_msg(conn, pos, msg_id, kind)
+        if prior_kind is not None:
+            return _kind_change_deduped(pos, msg_id, kind, prior_kind)
         claim = conn.execute(
             "INSERT OR IGNORE INTO events "
             "(pos_id, msg_id, event_at, kind, payload, response) "
