@@ -5,6 +5,7 @@ Validates: snapshots work, changelogs save, peaks detect, graduation gates calcu
 """
 
 import json
+import re
 import subprocess
 import sys
 import pytest
@@ -213,16 +214,18 @@ def test_override_creates_missing_parent_dirs(tmp_path, monkeypatch):
 # Config capture: an absent config must be recorded, never a silent {}
 
 
-def probe_config_params(bot_name):
+def probe_config_params(bot_name, config_name=None):
     """Call extract_config_params out of process, as the data-dir probe above does."""
     result = subprocess.run(
         [
             sys.executable,
             "-c",
             "import json, sys, bot_evolution_tracker as t\n"
-            "print('JSON:' + json.dumps(t.extract_config_params(sys.argv[1])))",
+            "name = sys.argv[2] if len(sys.argv) > 2 else None\n"
+            "print('JSON:' + json.dumps(t.extract_config_params(sys.argv[1], name)))",
             bot_name,
-        ],
+        ]
+        + ([config_name] if config_name else []),
         capture_output=True,
         text=True,
         cwd=str(FT_DIR),
@@ -233,37 +236,65 @@ def probe_config_params(bot_name):
     return json.loads(payload.removeprefix("JSON:")), result.stdout
 
 
-BOTS_WITH_CONFIG = [b for b in ACTIVE_BOTS if (CONFIG_DIR / f"{b}.json").exists()]
-BOTS_MISSING_CONFIG = [b for b in ACTIVE_BOTS if b not in BOTS_WITH_CONFIG]
+CONFIG_KEYS = {
+    "dry_run",
+    "dry_run_wallet",
+    "max_open_trades",
+    "stake_amount",
+    "stoploss_on_exchange",
+    "trading_mode",
+}
 
 
-@pytest.mark.parametrize("bot", BOTS_MISSING_CONFIG)
-def test_missing_config_is_recorded(bot):
-    params, stdout = probe_config_params(bot)
-    assert params.get("_config_missing") == f"{bot}.json"
+def deployed_configs():
+    """strategy -> config filename, read from the prod compose `freqtrade trade` commands."""
+    text = (FT_DIR / "docker-compose.prod.yml").read_text()
+    pairs = re.findall(
+        r"exec freqtrade trade .*?--config /freqtrade/user_data/configs/(\S+) --strategy (\S+)",
+        text,
+    )
+    return {strategy: config for config, strategy in pairs}
+
+
+@pytest.mark.parametrize("bot", ACTIVE_BOTS)
+def test_runtime_config_matches_the_deployed_config(bot):
+    """runtime_config has to name the file prod actually runs, or the snapshot records
+    parameters from a config the bot never loaded."""
+    deployed = deployed_configs()
+    assert bot in deployed, f"{bot} has no freqtrade command in docker-compose.prod.yml"
+    runtime = json.loads(BOTS_CONFIG.read_text())["bots"][bot].get("runtime_config")
+    assert runtime == deployed[bot]
+
+
+@pytest.mark.parametrize("bot", ACTIVE_BOTS)
+def test_active_bot_config_is_extracted(bot):
+    params, _ = probe_config_params(bot)
+    assert "_config_missing" not in params
+    assert set(params) == CONFIG_KEYS
+
+
+def test_bot_without_runtime_config_resolves_by_name():
+    """Paired control for the fallback: no runtime_config, <name>.json exists."""
+    bots = json.loads(BOTS_CONFIG.read_text())["bots"]
+    assert not bots["SupertrendStrategy"].get("runtime_config")
+    assert (CONFIG_DIR / "SupertrendStrategy.json").exists()
+    params, _ = probe_config_params("SupertrendStrategy")
+    assert set(params) == CONFIG_KEYS
+
+
+def test_missing_config_is_recorded():
+    params, stdout = probe_config_params("NoSuchBotV0")
+    assert params == {"_config_missing": "NoSuchBotV0.json"}
     assert "WARNING" in stdout
 
 
-@pytest.mark.parametrize("bot", BOTS_WITH_CONFIG)
-def test_present_config_is_still_extracted(bot):
-    """Paired control: asserting only that absence is flagged would also pass on code
-    that flags everything."""
-    params, _ = probe_config_params(bot)
-    assert "_config_missing" not in params
-    assert set(params) == {
-        "dry_run",
-        "dry_run_wallet",
-        "max_open_trades",
-        "stake_amount",
-        "stoploss_on_exchange",
-        "trading_mode",
-    }
-
-
-def test_both_config_cases_are_covered():
-    """Neither parametrized test above may pass vacuously on an empty list."""
-    assert BOTS_MISSING_CONFIG, "no active bot lacks a config; absence untested"
-    assert BOTS_WITH_CONFIG, "no active bot has a config; control untested"
+def test_recorded_config_that_is_absent_does_not_fall_back_to_name():
+    """KeltnerBounceV1.json exists, but a recorded config that does not must be flagged
+    rather than silently replaced by it."""
+    assert (CONFIG_DIR / "KeltnerBounceV1.json").exists()
+    params, stdout = probe_config_params("KeltnerBounceV1", "KeltnerBounceV1.gone.json")
+    assert params == {"_config_missing": "KeltnerBounceV1.gone.json"}
+    assert "WARNING" in stdout
 
 
 def test_snapshot_never_records_an_empty_config(evolution_dir, snapshot_result):

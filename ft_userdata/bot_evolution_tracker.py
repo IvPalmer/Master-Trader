@@ -48,6 +48,25 @@ def _load_active_bots() -> list[str]:
 
 ACTIVE_BOTS = _load_active_bots()
 
+
+def _load_runtime_configs() -> dict[str, str]:
+    """Config filename each bot is deployed from, where bots_config.json records one."""
+    config_path = Path(__file__).parent / "bots_config.json"
+    try:
+        with open(config_path) as f:
+            data = json.load(f)
+        return {name: info["runtime_config"] for name, info in data["bots"].items()
+                if info.get("runtime_config")}
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return {}
+
+RUNTIME_CONFIGS = _load_runtime_configs()
+
+
+def config_filename(bot_name):
+    """The deployed config's filename: runtime_config when recorded, else <name>.json."""
+    return RUNTIME_CONFIGS.get(bot_name) or f"{bot_name}.json"
+
 GRADUATION = {
     "min_trades": 30,
     "min_days": 14,
@@ -106,12 +125,14 @@ def extract_strategy_params(bot_name):
     return params
 
 
-def extract_config_params(bot_name):
-    """Extract key parameters from config .json file."""
-    config_file = CONFIG_DIR / f"{bot_name}.json"
+def extract_config_params(bot_name, config_name=None):
+    """Extract key parameters from the config file the bot is deployed from."""
+    config_file = CONFIG_DIR / (config_name or config_filename(bot_name))
     if not config_file.exists():
         # Recorded rather than returned empty: a snapshot cannot be backfilled, so an
         # absent config has to be distinguishable from one that held no values.
+        # A recorded runtime_config that is absent does not fall back to <name>.json:
+        # that file, if it exists, is not what the bot runs.
         print(f"  WARNING: {bot_name} has no {config_file.name}; snapshot records no config")
         return {"_config_missing": config_file.name}
 
