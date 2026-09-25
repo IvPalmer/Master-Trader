@@ -77,6 +77,24 @@ def _load_bots_config() -> dict:
 
 BOTS = _load_bots_config()
 
+
+def _load_uncovered_bots() -> list[str]:
+    """Bots outside BOTS (not `active`) that still run on real or monitored
+    accounts: receiver-managed copiers (`production_live`) and `monitor` bots.
+    The report does not value their accounts (the exporter's circuit breaker
+    does, through venue adapters), so its capital figures name them as not
+    covered instead of implying fleet-wide equity."""
+    try:
+        with open(Path(__file__).parent / "bots_config.json") as f:
+            data = json.load(f)
+        return sorted(name for name, info in data["bots"].items()
+                      if not info.get("active", True)
+                      and (info.get("production_live") or info.get("monitor")))
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return []
+
+UNCOVERED_BOTS = _load_uncovered_bots()
+
 API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "freqtrader")
 API_PASS = os.environ.get("FREQTRADE__API_SERVER__PASSWORD", "mastertrader")
 AUTH = HTTPBasicAuth(API_USER, API_PASS)
@@ -643,11 +661,19 @@ def elect_account_owner(account: str, members: list[str], bots: dict) -> str:
 def compute_capital_basis(bot_metrics: list[dict]) -> dict:
     """Derive the live capital basis from exchange account equity (#60).
 
-    Same rules as the exporter's circuit breaker: dry-run bots are excluded
+    Scope: the `active` strategy bots in BOTS only. Receiver-managed and
+    monitor-only accounts (UNCOVERED_BOTS, e.g. the Hyperliquid copiers) are
+    not valued here; the exporter's circuit breaker values them through its
+    venue adapters. Figures are labelled accordingly.
+
+    Rules mirror the exporter's owner election: dry-run bots are excluded
     (runtime /show_config dry_run, missing flag = dry-run), bots are grouped by
     `capital_account`, and each live account is valued ONCE from its
     representative bot's /balance: `total` is observed equity and
-    `starting_capital` is the return denominator. Live P&L is the realized +
+    `starting_capital` is the return denominator. On a shared wallet that
+    figure is Freqtrade's per-bot reconstruction for the owner, so the return
+    is approximate (the exporter treats it as a diagnostic baseline only).
+    Live P&L is the realized +
     unrealized P&L of live bots only; dry-run P&L is reported separately and
     never divided by live capital.
 
@@ -720,6 +746,7 @@ def compute_capital_basis(bot_metrics: list[dict]) -> dict:
         "dry_run_bots": dry,
         "live_accounts": accounts,
         "capital_basis_errors": errors,
+        "uncovered_live_bots": list(UNCOVERED_BOTS),
     }
 
 
@@ -1101,10 +1128,13 @@ def _format_capital_lines(portfolio: dict) -> list[str]:
     if value is None:
         lines = [f"  Value: n/a ({reason})"]
     elif ret is None:
-        lines = [f"  Value: ${value:,.2f} live equity (return n/a: {reason})"]
+        lines = [f"  Value: ${value:,.2f} strategy-fleet live equity (return n/a: {reason})"]
     else:
-        lines = [f"  Value: ${value:,.2f} live equity ({ret:+.2f}% on "
-                 f"${start:,.2f} starting capital)"]
+        lines = [f"  Value: ${value:,.2f} strategy-fleet live equity ({ret:+.2f}% on "
+                 f"~${start:,.2f} starting capital)"]
+    uncovered = portfolio.get("uncovered_live_bots") or []
+    if uncovered:
+        lines.append(f"  Not covered (valued by the exporter): {', '.join(uncovered)}")
     live_pnl = portfolio.get("live_true_pnl")
     lines.append("  Live P&L: " + ("n/a" if live_pnl is None else f"${live_pnl:+.2f}"))
     if portfolio.get("dry_run_bots"):

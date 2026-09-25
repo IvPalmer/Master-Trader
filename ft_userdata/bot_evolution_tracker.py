@@ -664,7 +664,7 @@ def show_dashboard():
                 f"{peak_pf:>8} {changes:>8} {days:>5} {pairs:>5}"
             )
         else:
-            print(f"  {bot:<28} {'0':>6} {'—':>5} {'—':>6} {'—':>9} {peak_pf:>8} {changes:>8}  NO DATA")
+            print(f"  {bot:<28} {'0':>6} {'—':>5} {'—':>6} {'—':>9} {peak_pf:>8} {changes:>8} {'—':>5} {'—':>5}")
 
     print()
     print("  Graduation facts (v4, no verdicts): bot_evolution_tracker.py graduation")

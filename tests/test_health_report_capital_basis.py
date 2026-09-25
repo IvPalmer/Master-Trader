@@ -109,7 +109,7 @@ def test_basis_counts_shared_account_once_and_excludes_dry_run(monkeypatch):
 def test_formatter_prints_live_equity_and_separate_dry_run(monkeypatch):
     metrics, p = run_report(monkeypatch)
     text = shr.format_telegram_report(metrics, p, {})
-    assert "Value: $224.00 live equity (+2.50% on $200.00 starting capital)" in text
+    assert "Value: $224.00 strategy-fleet live equity (+2.50% on ~$200.00 starting capital)" in text
     assert "Live P&L: $+5.00" in text
     assert "Dry-run P&L (simulated, excluded from return): $+400.00" in text
 
@@ -181,7 +181,7 @@ def test_missing_open_marks_block_live_return(monkeypatch):
     assert p["return_pct"] is None
     assert "live P&L unavailable: KeltnerBounceV1" in p["capital_basis_errors"]
     text = shr.format_telegram_report(metrics, p, {})
-    assert "Value: $224.00 live equity (return n/a: live P&L unavailable: KeltnerBounceV1)" in text
+    assert "Value: $224.00 strategy-fleet live equity (return n/a: live P&L unavailable: KeltnerBounceV1)" in text
 
 
 def test_open_pnl_counts_before_first_close(monkeypatch):
@@ -210,3 +210,19 @@ def test_no_hardcoded_capital_constant_in_health_report():
     src = (FT_DIR / "strategy_health_report.py").read_text()
     assert not re.search(r"\b528\b", src)
     assert "INITIAL_CAPITAL" not in src
+
+
+def test_uncovered_live_accounts_are_named_not_implied(monkeypatch):
+    """Review finding: the headline read as fleet-wide equity while the
+    receiver-managed Hyperliquid accounts were never valued."""
+    uncovered = shr._load_uncovered_bots()
+    assert {"KillersScalpV1", "InsidersScalpV1"} <= set(uncovered)
+    assert not set(uncovered) & set(shr.BOTS)
+    lines = shr._format_capital_lines({
+        "portfolio_value": 224.0, "return_pct": 2.5, "live_starting_capital": 200.0,
+        "live_true_pnl": 5.0, "capital_basis_errors": [],
+        "uncovered_live_bots": uncovered,
+    })
+    assert any(l.startswith("  Not covered (valued by the exporter): ") and
+               "KillersScalpV1" in l for l in lines)
+
