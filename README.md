@@ -187,11 +187,18 @@ Multi-layered defense system:
 1. **Per-trade**: Stoploss (-2% futures, -5% spot intraday, -10%/-15% daily), trailing stops
 2. **Per-bot**: Protections (StoplossGuard, MaxDrawdown, CooldownPeriod, LowProfitPairs)
 3. **Time-based**: Force-close stale trades (24h BollingerRSI, 48h MasterTraderV1)
-4. **Anti-correlation**: OffsetFilter splits pairlists so dip-buyers don't overlap
+4. **Anti-correlation**: not in force. No deployed config uses `OffsetFilter`; the only one that
+   does is `BollingerRSIMeanReversion.json`, which is not deployed. `FundingFadeV1` and
+   `KeltnerBounceV1` trade overlapping `StaticPairList` whitelists from the same `binance-spot`
+   wallet, so their exposure is correlated rather than split.
 5. **Portfolio**: Circuit breaker stops ALL bots at 10% portfolio drawdown
-6. **Automated**: Health scores auto-pause strategies scoring <30 for 3+ days
+6. **Automated pause**: not in force for the deployed fleet. `tournament_manager.py` (scheduled
+   weekly by `automation_scheduler.sh`) has a score-below-30 rule, but its hardcoded bot list
+   names only retired strategies and its "pause" sets allocation to zero without stopping a
+   container. `bot_rotator.py` reads `bots_config.json` and does `docker stop` after two
+   consecutive flagged evaluations, but no tracked scheduler runs it. See #31.
 
-See `research/risk-implementation-plan.md` for the full implementation plan.
+`research/risk-implementation-plan.md` is the original 2026-03 plan, kept as a historical record.
 
 ## Monitoring
 
