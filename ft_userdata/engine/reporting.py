@@ -18,7 +18,7 @@ from typing import Optional
 
 import requests
 
-from .registry import RESULTS_DIR, WEBHOOK_URL
+from .registry import MODES, RESULTS_DIR, WEBHOOK_URL
 
 log = logging.getLogger("engine.reporting")
 
@@ -154,7 +154,14 @@ def _mc_ok(results: dict, mc_score: Optional[float]) -> bool:
         return _stage_not_requested(results, "robustness")
     if not isinstance(robustness, dict):
         return False
-    return robustness.get("mc_skip_reason") == "disabled"
+    if "mc_skip_reason" in robustness:
+        return robustness["mc_skip_reason"] == "disabled"
+    # Legacy artifact from before the marker: the stage ran without error and
+    # produced no MC, in a run whose mode has mc_iterations == 0 -- that is
+    # the same deliberate skip the marker now records.
+    mode = MODES.get(results.get("run_mode"))
+    return (mode is not None and mode.get("mc_iterations") == 0
+            and "error" not in robustness and robustness.get("monte_carlo") is None)
 
 
 def classify_recommendation(results: dict) -> str:
@@ -186,7 +193,8 @@ def classify_recommendation(results: dict) -> str:
         not treated as a measurement); MC was requested but had no trades
         (``mc_skip_reason == "no_trades"``); the stage key is absent without a
         ``stages_requested`` stamp showing it was left out; or a legacy
-        robustness artifact has no ``mc_skip_reason`` marker.
+        robustness artifact has no ``mc_skip_reason`` marker, unless the run's
+        stamped ``run_mode`` has mc_iterations == 0 (legacy fast mode).
       - ``{"skipped": true, "reason": "classified DEAD..."}`` robustness only
         occurs for DEAD strategies, which KILL/REGIME_DEPENDENT resolve first.
 

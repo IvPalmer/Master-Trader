@@ -177,12 +177,19 @@ def _stamp_stages_requested(results: dict) -> dict:
     the stages that run actually requested. A strategy that already carries
     a stamp is left alone.
     """
-    requested = (results.get("meta") or {}).get("stages_requested")
-    if not isinstance(requested, list):
-        return results
+    meta = results.get("meta") or {}
+    requested = meta.get("stages_requested")
+    mode = meta.get("mode")
     for strat_results in (results.get("strategies") or {}).values():
-        if isinstance(strat_results, dict):
+        if not isinstance(strat_results, dict):
+            continue
+        if isinstance(requested, list):
             strat_results.setdefault("stages_requested", list(requested))
+        # Lets classify_recommendation recognise a legacy robustness artifact
+        # (written before mc_skip_reason existed) from a mode whose
+        # mc_iterations is 0 as deliberately disabled rather than missing.
+        if isinstance(mode, str):
+            strat_results.setdefault("run_mode", mode)
     return results
 
 

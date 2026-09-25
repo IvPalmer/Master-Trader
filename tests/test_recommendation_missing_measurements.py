@@ -386,3 +386,39 @@ def test_unassessed_pair_analysis_does_not_mask_dead(viability):
         metrics, CLEAN, NO_RECURSIVE_WARNING, pair_analysis
     )
     assert classification == "DEAD"
+
+
+# ── Legacy fast-mode artifacts keep their verdicts on --report ─────────
+
+
+@pytest.mark.parametrize("consensus,expected", [(True, "OPTIMIZE"), (False, "KEEP")])
+def test_legacy_fast_run_without_marker_is_disabled_not_missing(reporting, consensus, expected):
+    """Review finding: re-reporting an older fast run flipped KEEP/OPTIMIZE to
+    MONITOR because its robustness predates mc_skip_reason."""
+    results = _base(consensus=consensus)
+    results["robustness"] = copy.deepcopy(ROB_LEGACY_NULL_MC)
+    results["run_mode"] = "fast"
+    assert reporting.classify_recommendation(results) == expected
+
+
+@pytest.mark.parametrize("rob", [ROB_LEGACY_NULL_MC, ROB_ERROR], ids=["legacy", "error"])
+def test_legacy_rigorous_run_without_marker_is_still_missing(reporting, rob):
+    results = _base()
+    results["robustness"] = copy.deepcopy(rob)
+    results["run_mode"] = "rigorous"
+    assert reporting.classify_recommendation(results) == "MONITOR"
+
+
+def test_legacy_fast_run_that_crashed_is_still_missing(reporting):
+    results = _base()
+    results["robustness"] = copy.deepcopy(ROB_ERROR)
+    results["run_mode"] = "fast"
+    assert reporting.classify_recommendation(results) == "MONITOR"
+
+
+def test_stamp_copies_meta_mode_to_each_strategy(engine):
+    results = {"meta": {"mode": "fast", "stages_requested": ["robustness"]},
+               "strategies": {"A": {}}}
+    engine._stamp_stages_requested(results)
+    assert results["strategies"]["A"]["run_mode"] == "fast"
+
