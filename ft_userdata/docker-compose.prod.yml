@@ -158,6 +158,10 @@ services:
       # leveraged positions and this container shares dokploy-network with
       # ~25 unrelated applications. Generate with `openssl rand -hex 24`.
       KILLERS_INGRESS_TOKEN: ${KILLERS_INGRESS_TOKEN:-}
+      # Sent as X-Notify-Token to trade-webhook /test/notify (#59). Must equal
+      # the value on trade-webhook and insiders-receiver. Empty = legacy
+      # unauthenticated notify (accepted until trade-webhook sets its token).
+      TRADE_WEBHOOK_NOTIFY_TOKEN: ${TRADE_WEBHOOK_NOTIFY_TOKEN:-}
       # Read from the shared anchor — sibling Freqtrade containers inherit
       # *a1 which sets FREQTRADE__API_SERVER__USERNAME/PASSWORD. Hardcoding
       # would 401 against rotated creds.
@@ -375,6 +379,8 @@ services:
       KILLERS_POSTED_SL: "true"
       KILLERS_EXECUTION_VENUE: hyperliquid
       KILLERS_NOTIFY_URL: http://trade-webhook:8088/test/notify
+      # Same shared value as killers-receiver and trade-webhook (#59).
+      TRADE_WEBHOOK_NOTIFY_TOKEN: ${TRADE_WEBHOOK_NOTIFY_TOKEN:-}
     volumes:
       - insiders_receiver_state:/var/lib/killers
     ports:

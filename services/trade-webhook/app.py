@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import fcntl
+import hmac
 import json
 import logging
 import os
@@ -39,6 +40,47 @@ TRADES_DIR = pathlib.Path(os.environ.get("TRADES_DIR", "/srv/lake/raw/trades"))
 OPS_BOT_TOKEN = os.environ.get("OPS_BOT_TOKEN", "").strip()
 OPS_BOT_CHAT_ID = os.environ.get("OPS_BOT_CHAT_ID", "").strip()
 TELEGRAM_TIMEOUT = float(os.environ.get("TELEGRAM_TIMEOUT", "10"))
+
+# Shared secret for POST /test/notify (#59). That route relays caller-chosen
+# text straight to the ops Telegram chat, and this container sits on
+# dokploy-network next to ~25 unrelated applications. Its only callers are
+# killers-receiver and insiders-receiver, which send the value as the
+# X-Notify-Token header when TRADE_WEBHOOK_NOTIFY_TOKEN is set on them.
+#
+# Rollout stage 1 (this code): optional. Unset keeps the legacy open route so
+# the token can be deployed to the receivers and this service in any order;
+# startup logs a WARNING while it is unset.
+# Stage 2 (after the token is deployed everywhere): make it mandatory — refuse
+# to start without it, like killers-receiver's KILLERS_INGRESS_TOKEN.
+#
+# /freqtrade/event and /healthz are deliberately NOT covered: Freqtrade's
+# webhook config cannot be updated in the same change.
+NOTIFY_TOKEN_HEADER = "X-Notify-Token"
+# Same floor as killers-receiver's _MIN_INGRESS_TOKEN_LEN: `openssl rand -hex 24`
+# (48 chars) clears it. Stage 1 only warns; stage 2 should refuse to start.
+_MIN_NOTIFY_TOKEN_LEN = 24
+
+
+def _load_notify_token() -> str:
+    token = os.environ.get("TRADE_WEBHOOK_NOTIFY_TOKEN", "").strip()
+    if not token:
+        log.warning(
+            "TRADE_WEBHOOK_NOTIFY_TOKEN is not set — POST /test/notify is "
+            "UNAUTHENTICATED and relays any caller's text to the ops Telegram "
+            "chat. Set the same value here and on killers-receiver / "
+            "insiders-receiver (generate with `openssl rand -hex 24`)."
+        )
+    elif len(token) < _MIN_NOTIFY_TOKEN_LEN:
+        # Never log the token itself, only its length.
+        log.warning(
+            "TRADE_WEBHOOK_NOTIFY_TOKEN is shorter than %d characters (got %d); "
+            "generate one with `openssl rand -hex 24`",
+            _MIN_NOTIFY_TOKEN_LEN, len(token),
+        )
+    return token
+
+
+NOTIFY_TOKEN = _load_notify_token()
 
 app = FastAPI(title="elder-brain trade-webhook")
 
@@ -272,7 +314,19 @@ async def freqtrade_event(request: Request) -> dict[str, Any]:
 
 @app.post("/test/notify")
 async def test_notify(request: Request) -> dict[str, Any]:
-    """Manual smoke-test endpoint: sends a Telegram message directly."""
+    """Relay a caller-supplied message to the ops Telegram chat.
+
+    Used by killers-receiver / insiders-receiver alerts and as a manual smoke
+    test. Requires the X-Notify-Token header when TRADE_WEBHOOK_NOTIFY_TOKEN is
+    configured (see NOTIFY_TOKEN above).
+    """
+    if NOTIFY_TOKEN:
+        supplied = request.headers.get(NOTIFY_TOKEN_HEADER, "")
+        # compare_digest on bytes: str inputs raise TypeError on non-ASCII.
+        if not hmac.compare_digest(
+            supplied.encode("utf-8"), NOTIFY_TOKEN.encode("utf-8")
+        ):
+            raise HTTPException(status_code=401, detail="invalid notify token")
     try:
         body = await request.json()
         text = body.get("text", "synthetic test from trade-webhook")

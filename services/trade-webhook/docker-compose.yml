@@ -18,6 +18,14 @@ services:
     environment:
       LOG_LEVEL: INFO
       TRADES_DIR: /srv/lake/raw/trades
+      # TRADE_WEBHOOK_NOTIFY_TOKEN (#59) is read from /etc/lake/ops-bot.env
+      # with the other secrets — deliberately NOT listed here: an
+      # `environment:` entry such as `${TRADE_WEBHOOK_NOTIFY_TOKEN:-}` takes
+      # precedence over env_file and would silently blank the value unless
+      # the deploying shell also exported it. When set, POST /test/notify
+      # requires a matching X-Notify-Token header (same value as on
+      # killers-receiver / insiders-receiver); unset keeps the legacy open
+      # route and logs a startup WARNING.
     # Bind to host loopback so VPS host-side scripts (e.g. run-health-report.sh
     # cron) can POST to localhost:8088 without joining the docker network.
     # Loopback-only — no external exposure.

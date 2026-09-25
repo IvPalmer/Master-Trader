@@ -175,6 +175,10 @@ class Config:
         self.notify_url = os.environ.get(
             "KILLERS_NOTIFY_URL", "http://trade-webhook:8088/test/notify"
         )
+        # Shared secret trade-webhook requires on /test/notify once it sets
+        # TRADE_WEBHOOK_NOTIFY_TOKEN (#59). Sent as X-Notify-Token only when
+        # set here; unset keeps the legacy unauthenticated POST. Never logged.
+        self.notify_token = os.environ.get("TRADE_WEBHOOK_NOTIFY_TOKEN", "").strip()
         # Max acceptable slippage from the signal's entry boundary, as
         # percent. LONG: skip if mark > entry_hi * (1 + pct/100).
         # SHORT: skip if mark < entry_lo * (1 - pct/100).
@@ -2462,6 +2466,22 @@ _notified_msg_ids: dict = {}
 _NOTIFIED_CAP = 5000
 
 
+def _notify_headers(cfg: Config) -> Optional[dict]:
+    """X-Notify-Token for trade-webhook's /test/notify, only when configured."""
+    token = getattr(cfg, "notify_token", "")
+    return {"X-Notify-Token": token} if token else None
+
+
+def _warn_notify_rejected(status: int) -> None:
+    # A 401 means trade-webhook enforces a token this receiver lacks or has
+    # wrong; surface it instead of silently losing every alert. No token logged.
+    if status == 401:
+        logger.warning(
+            "telegram notify rejected (401): TRADE_WEBHOOK_NOTIFY_TOKEN missing "
+            "or different from trade-webhook's"
+        )
+
+
 async def _notify_telegram(cfg: Config, text: str, session=None) -> None:
     """Best-effort POST to trade-webhook /test/notify → @elder_brain_bot.
     Silent on failure; observability shouldn't block the signal pipeline.
@@ -2475,16 +2495,19 @@ async def _notify_telegram(cfg: Config, text: str, session=None) -> None:
         return
     timeout = aiohttp.ClientTimeout(total=5)
     payload = {"text": text}
+    headers = _notify_headers(cfg)
     try:
         if session is not None:
             async with session.post(cfg.notify_url, json=payload,
-                                    timeout=timeout) as r:
+                                    headers=headers, timeout=timeout) as r:
                 # Read body to release connection cleanly. Don't care about content.
                 await r.read()
+                _warn_notify_rejected(r.status)
             return
         async with aiohttp.ClientSession(timeout=timeout) as s:
-            async with s.post(cfg.notify_url, json=payload) as r:
+            async with s.post(cfg.notify_url, json=payload, headers=headers) as r:
                 await r.read()
+                _warn_notify_rejected(r.status)
     except Exception as e:
         logger.warning("telegram notify failed: %s", e)
 
