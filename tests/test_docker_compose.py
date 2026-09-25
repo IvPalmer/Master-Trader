@@ -154,10 +154,16 @@ def test_hyperliquid_bots_wait_for_healthy_gateway():
         assert depends.get('hl-gateway', {}).get('condition') == 'service_healthy', name
 
 
-def test_receivers_do_not_wait_for_gateway():
-    """Receivers must keep ingesting/auditing while the gateway is down; their
-    entries already fail closed without a mark."""
+def test_receivers_reach_the_gateway_only_through_their_bot():
+    """Receivers declare no direct gateway dependency, but they depend on their
+    Freqtrade bot, which waits for a healthy gateway. So a fresh `compose up`
+    does not start a receiver while the gateway is unhealthy; already-running
+    containers and restart-policy restarts are unaffected (depends_on only
+    orders `up`). Pinned here so the transitive edge stays visible."""
     services = _prod_services()
-    for name in ('killers-receiver', 'insiders-receiver'):
+    for name, bot in (('killers-receiver', 'ft-killers-scalp'),
+                      ('insiders-receiver', 'ft-insiders-scalp')):
         depends = services[name].get('depends_on') or []
         assert 'hl-gateway' not in depends, name
+        assert bot in depends, name
+        assert services[bot]['depends_on']['hl-gateway']['condition'] == 'service_healthy'
