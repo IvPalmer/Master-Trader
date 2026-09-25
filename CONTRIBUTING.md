@@ -28,18 +28,32 @@ python3 -m venv .venv
 .venv/bin/python -m pytest tests/ -q
 ```
 
-CI uses Python 3.13 and separately runs the root, both receiver, dashboard, gateway
-and strict copier parsing suites. Its checks have no production credentials,
-exchange access or Docker runtime. VPS integration tests are explicit opt-in and
-must never be enabled in PR CI. Skipped Freqtrade-specific tests do not validate
-live trading behavior.
+That is the root suite alone. [Clone and run the tests](README.md#1-clone-and-run-the-tests)
+lists all six Python suites in the order CI runs them. Neither block covers the
+frontend gates below, so a green local run is not a green CI run.
+
+CI uses Python 3.13 and runs six Python suites separately: root, both receivers,
+dashboard, gateway, and the copier classifiers and observer under `killers_bot/tests/`.
+It then runs four gates in `ft_userdata/ft_dashboard/frontend`: `npm ci`;
+`npm run typecheck` and `npm run build` followed by
+`git diff --exit-code -- ../static/price-chart.js`; a Chromium install; and `npm test`.
+The commands and what they check are documented in the
+[dashboard chart components README](ft_userdata/ft_dashboard/frontend/README.md).
+
+The bundle diff is the gate a Python-only local run cannot catch: editing
+`frontend/src/*.ts` without committing the rebuilt bundle passes every test above and
+still fails CI.
+
+CI checks have no production credentials, exchange access or Docker runtime. VPS
+integration tests are explicit opt-in and must never be enabled in PR CI. Skipped
+Freqtrade-specific tests do not validate live trading behavior.
 
 ## Organization
 
-Reuse the existing area labels and milestones:
-- M1: reproducible contributor setup and CI.
-- M2: validation and promotion correctness.
-- M3: documentation matches enforcement.
+Reuse the existing area labels and milestones. Each milestone states its own exit
+condition in its description, so read the current set on the
+[milestones page](https://github.com/IvPalmer/Master-Trader/milestones) rather than
+from a copy here, which goes stale whenever one is added.
 
 Priorities: `priority:P1` affects correctness or blocks trustworthy decisions;
 `priority:P2` is normal planned work; `priority:P3` is exploratory/later work.
