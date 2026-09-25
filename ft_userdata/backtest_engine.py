@@ -166,6 +166,26 @@ def _load_latest_results() -> Optional[dict]:
     return None
 
 
+def _stamp_stages_requested(results: dict) -> dict:
+    """Copy meta.stages_requested onto each strategy's results.
+
+    classify_recommendation only sees one strategy's results, and treats a
+    missing calibration/robustness measurement as advisory only when that
+    stamp shows the stage was not requested. Also applied when reloading a
+    saved run for --report, so older pipeline_results.json files (which
+    recorded meta.stages_requested but no per-strategy stamp) are judged by
+    the stages that run actually requested. A strategy that already carries
+    a stamp is left alone.
+    """
+    requested = (results.get("meta") or {}).get("stages_requested")
+    if not isinstance(requested, list):
+        return results
+    for strat_results in (results.get("strategies") or {}).values():
+        if isinstance(strat_results, dict):
+            strat_results.setdefault("stages_requested", list(requested))
+    return results
+
+
 def _is_stage_available(stage: str) -> bool:
     """Check if a stage's module is imported and available."""
     mapping = {
@@ -377,6 +397,10 @@ def run_pipeline(
         "strategies": {name: {} for name in strat_names},
         "stage_durations": {},
     }
+    # Per-strategy copy of the requested stages, so classify_recommendation
+    # can tell a stage deliberately left out (advisory) from one that was
+    # requested but produced no measurement (blocks OPTIMIZE/KEEP).
+    _stamp_stages_requested(results)
 
     # Track which strategies are dead (skip expensive stages for them)
     dead_strategies: set[str] = set()
@@ -849,6 +873,7 @@ def main() -> int:
         if results is None:
             log.error("No previous results found in %s", RESULTS_DIR)
             return 2
+        _stamp_stages_requested(results)
 
         if _is_stage_available("reporting"):
             try:

@@ -100,6 +100,63 @@ def _calibration_label(score: Optional[int]) -> str:
 
 # ── Recommendation Logic ────────────────────────────────────────────────────
 
+def _stage_not_requested(results: dict, stage: str) -> bool:
+    """True only when the run positively records that `stage` was not requested.
+
+    backtest_engine stamps each strategy's results with the run's
+    ``stages_requested`` list. Without that stamp (legacy per-stage artifacts,
+    hand-built dicts) there is no evidence the stage was deliberately left
+    out, so this returns False and a missing measurement counts as missing.
+    """
+    requested = results.get("stages_requested")
+    return isinstance(requested, (list, tuple)) and stage not in requested
+
+
+def _calibration_score(results: dict) -> Optional[float]:
+    """Calibration score, or None when calibration did not produce one.
+
+    The calibration stage returns ``score: 0`` alongside ``error`` when it
+    could not measure anything (no trade DB, no closed trades, backtest
+    failed). That 0 is a placeholder, not a measurement.
+    """
+    cal = results.get("calibration")
+    if not isinstance(cal, dict) or cal.get("error"):
+        return None
+    return cal.get("score")
+
+
+def _calibration_ok(results: dict, calibration: Optional[float]) -> bool:
+    """Calibration clears the OPTIMIZE/KEEP bar.
+
+    Measured: score >= OPTIMIZE_CALIBRATION. Unmeasured: ok only when the
+    calibration stage was deliberately not requested for this run.
+    """
+    if calibration is not None:
+        return calibration >= OPTIMIZE_CALIBRATION
+    return _stage_not_requested(results, "calibration")
+
+
+def _mc_ok(results: dict, mc_score: Optional[float]) -> bool:
+    """Monte Carlo clears the OPTIMIZE/KEEP bar.
+
+    Measured: mc_score >= OPTIMIZE_MC_SCORE. Unmeasured: ok only when MC was
+    deliberately not requested -- robustness was not in the run's requested
+    stages, or it ran and recorded ``mc_skip_reason == "disabled"``
+    (mc_iterations == 0, i.e. fast mode). Every other absence -- robustness
+    missing with no evidence it was not requested, ``{"error": ...}`` from a
+    stage crash, ``mc_skip_reason == "no_trades"``, or a legacy artifact with
+    no marker -- is a requested measurement that is missing, so not ok.
+    """
+    if mc_score is not None:
+        return mc_score >= OPTIMIZE_MC_SCORE
+    robustness = results.get("robustness")
+    if robustness is None:
+        return _stage_not_requested(results, "robustness")
+    if not isinstance(robustness, dict):
+        return False
+    return robustness.get("mc_skip_reason") == "disabled"
+
+
 def classify_recommendation(results: dict) -> str:
     """
     Determine recommendation from combined stage results.
@@ -107,10 +164,31 @@ def classify_recommendation(results: dict) -> str:
     Decision tree:
         REGIME_DEPENDENT: viability=DEAD BUT calibration>=70 (works live, backtests poorly)
         KILL:             viability=DEAD AND calibration<70 (or no calibration)
+        KILL:             mc_score<40
         INVESTIGATE:      calibration<50 (engine broken, NOT strategy fault)
         MONITOR:          viability=MARGINAL OR calibration 50-69 OR mc_score 40-59
-        OPTIMIZE:         viability=VIABLE AND calibration>=70 AND mc_score>=60
-        KEEP:             All checks pass, no param changes needed
+        OPTIMIZE:         viability=VIABLE AND calibration ok AND mc ok
+                          AND walk-forward consensus params (>=50% windows profitable)
+        KEEP:             viability=VIABLE AND calibration ok AND mc ok
+        MONITOR:          fallback for everything else
+
+    "calibration ok" is score>=70; "mc ok" is mc_score>=60.
+
+    Missing measurements: a measurement that was deliberately not requested
+    is advisory; a measurement that was requested but is missing blocks the
+    permissive verdicts (OPTIMIZE/KEEP), which then fall through to MONITOR.
+      - Deliberately not requested (counts as ok): the stage is absent from
+        the strategy's ``stages_requested`` stamp (written by backtest_engine),
+        or robustness ran with ``mc_skip_reason == "disabled"``
+        (mc_iterations == 0, fast mode).
+      - Requested but missing (not ok): the stage raised (``{"error": ...}``);
+        the calibration stage returned an error (its placeholder score of 0 is
+        not treated as a measurement); MC was requested but had no trades
+        (``mc_skip_reason == "no_trades"``); the stage key is absent without a
+        ``stages_requested`` stamp showing it was left out; or a legacy
+        robustness artifact has no ``mc_skip_reason`` marker.
+      - ``{"skipped": true, "reason": "classified DEAD..."}`` robustness only
+        occurs for DEAD strategies, which KILL/REGIME_DEPENDENT resolve first.
 
     NOTE: Low calibration means the backtest engine doesn't reproduce live results.
     This is an ENGINE problem, not a strategy problem. Don't kill strategies
@@ -119,7 +197,7 @@ def classify_recommendation(results: dict) -> str:
     Returns: 'KILL', 'REGIME_DEPENDENT', 'INVESTIGATE', 'OPTIMIZE', 'MONITOR', or 'KEEP'
     """
     viability = _safe_get(results, "viability", "classification", default="UNKNOWN")
-    calibration = _safe_get(results, "calibration", "score")
+    calibration = _calibration_score(results)
     mc_score = _safe_get(results, "robustness", "monte_carlo", "mc_score")
     wf_profitable = _safe_get(results, "walk_forward", "consensus", "windows_profitable", default=0)
     wf_total = _safe_get(results, "walk_forward", "consensus", "windows_total", default=0)
@@ -153,25 +231,23 @@ def classify_recommendation(results: dict) -> str:
     if is_marginal or cal_monitor or mc_monitor:
         return "MONITOR"
 
+    cal_ok = _calibration_ok(results, calibration)
+    mc_ok = _mc_ok(results, mc_score)
+
     # ── OPTIMIZE: viable with good scores, but walk-forward suggests tuning
-    if viability == "VIABLE":
-        cal_ok = calibration is None or calibration >= OPTIMIZE_CALIBRATION
-        mc_ok = mc_score is None or mc_score >= OPTIMIZE_MC_SCORE
-        if cal_ok and mc_ok:
-            # Check if walk-forward produced consensus params worth applying
-            has_consensus = _safe_get(results, "walk_forward", "consensus", "consensus_params") is not None
-            wf_profitable_enough = wf_total == 0 or (wf_profitable / wf_total >= 0.5)
-            if has_consensus and wf_profitable_enough:
-                return "OPTIMIZE"
+    if viability == "VIABLE" and cal_ok and mc_ok:
+        # Check if walk-forward produced consensus params worth applying
+        has_consensus = _safe_get(results, "walk_forward", "consensus", "consensus_params") is not None
+        wf_profitable_enough = wf_total == 0 or (wf_profitable / wf_total >= 0.5)
+        if has_consensus and wf_profitable_enough:
+            return "OPTIMIZE"
 
     # ── KEEP: everything passes, no param changes needed ─────────────────
-    if viability == "VIABLE":
-        cal_ok = calibration is None or calibration >= OPTIMIZE_CALIBRATION
-        mc_ok = mc_score is None or mc_score >= OPTIMIZE_MC_SCORE
-        if cal_ok and mc_ok:
-            return "KEEP"
+    if viability == "VIABLE" and cal_ok and mc_ok:
+        return "KEEP"
 
-    # Fallback: if we can't determine clearly, monitor
+    # Fallback: if we can't determine clearly (including a requested
+    # measurement that is missing), monitor
     return "MONITOR"
 
 
