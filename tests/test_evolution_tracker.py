@@ -247,13 +247,21 @@ CONFIG_KEYS = {
 
 
 def deployed_configs():
-    """strategy -> config filename, read from the prod compose `freqtrade trade` commands."""
-    text = (FT_DIR / "docker-compose.prod.yml").read_text()
-    pairs = re.findall(
-        r"exec freqtrade trade .*?--config /freqtrade/user_data/configs/(\S+) --strategy (\S+)",
-        text,
+    """strategy -> config filenames, from the prod compose `freqtrade trade` commands.
+
+    A set per strategy: one strategy can run under several configs
+    (InsidersScalpV2.json runs --strategy KillersScalpV1). Commented lines are ignored.
+    """
+    pattern = re.compile(
+        r"exec freqtrade trade .*?--config /freqtrade/user_data/configs/(\S+) --strategy (\S+)"
     )
-    return {strategy: config for config, strategy in pairs}
+    deployed = {}
+    for line in (FT_DIR / "docker-compose.prod.yml").read_text().splitlines():
+        if line.lstrip().startswith("#"):
+            continue
+        for config, strategy in pattern.findall(line):
+            deployed.setdefault(strategy, set()).add(config)
+    return deployed
 
 
 @pytest.mark.parametrize("bot", ACTIVE_BOTS)
@@ -262,8 +270,9 @@ def test_runtime_config_matches_the_deployed_config(bot):
     parameters from a config the bot never loaded."""
     deployed = deployed_configs()
     assert bot in deployed, f"{bot} has no freqtrade command in docker-compose.prod.yml"
+    assert len(deployed[bot]) == 1, f"{bot} runs under several configs: {deployed[bot]}"
     runtime = json.loads(BOTS_CONFIG.read_text())["bots"][bot].get("runtime_config")
-    assert runtime == deployed[bot]
+    assert {runtime} == deployed[bot]
 
 
 @pytest.mark.parametrize("bot", ACTIVE_BOTS)
