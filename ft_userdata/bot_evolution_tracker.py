@@ -10,7 +10,7 @@ Usage:
     python3 bot_evolution_tracker.py compare BOT ID1 ID2    # Compare two snapshots
     python3 bot_evolution_tracker.py peak BOT               # Show peak performance snapshot
     python3 bot_evolution_tracker.py dashboard              # Overview of all bots
-    python3 bot_evolution_tracker.py graduation             # Check graduation gate status
+    python3 bot_evolution_tracker.py graduation             # Report v4 graduation facts (no verdicts)
 """
 
 import argparse
@@ -67,16 +67,58 @@ def config_filename(bot_name):
     """The deployed config's filename: runtime_config when recorded, else <name>.json."""
     return RUNTIME_CONFIGS.get(bot_name) or f"{bot_name}.json"
 
-GRADUATION = {
-    "min_trades": 30,
-    "min_days": 14,
-    "min_pairs": 8,
-    "min_pf": 2.0,
-    "min_wr": 55,
-    "max_single_loss_pct": 5.0,
-    "max_drawdown_pct": 15.0,
-    "max_consec_losses": 4,
-    "max_force_exits": 0,
+# Trade database the metrics are read from: the dry-run (paper) database, so
+# every figure this tracker prints is a paper-trading measurement.
+TRADE_DB_NAME = "tradesv3.dryrun.{bot}.sqlite"
+
+# ── Graduation criteria v4 (GRADUATION_CRITERIA.md, revised 2026-05-10) ──────
+# Only the thresholds v4 states as plain numbers are recorded here. v4 makes
+# every tier-up an explicit operator decision (GRADUATION_CRITERIA.md:52, :58,
+# :211), so this tracker reports these as reference facts next to the raw
+# metrics and never labels a bot as passing or failing them. The v1 absolute
+# gates this file used to hold (PF >= 2.0, WR >= 55%, max loss < 5%,
+# max DD < 15%, consec losses <= 4) were discarded 2026-04-20
+# (GRADUATION_CRITERIA.md:298-302) and are not used.
+# Line numbers refer to both copies (repo root and ft_userdata/), which match.
+
+# Pilot -> Scale: "at least 30 closed trades" (GRADUATION_CRITERIA.md:58)
+V4_PILOT_TO_SCALE_MIN_CLOSED_TRADES = 30
+
+# Probe -> Pilot post-flip minimums by strategy class (GRADUATION_CRITERIA.md:116-120).
+# The class comes from backtest cadence, which this tracker does not know.
+V4_PROBE_TO_PILOT_MINIMUMS = [
+    ("Active (>100 trades/yr backtest)", {"min_days": 14, "min_closed_trades": 15, "min_pairs": 4}),
+    ("Sparse (40-100/yr backtest)", {"min_days": 30, "min_closed_trades": 8, "min_pairs": 3}),
+    ("Very sparse (<40/yr backtest)", {"min_days": 45, "min_closed_trades": 5, "min_pairs": 2}),
+]
+
+# Any auto-action on a wallet movement below $5 is suppressed (GRADUATION_CRITERIA.md:215)
+V4_AUTO_ACTION_DOLLAR_FLOOR = 5.0
+
+# Fleet-wide kill trigger: force_exit/emergency_exit 3 times in 24h
+# (GRADUATION_CRITERIA.md:177). This tracker counts force/emergency exits over
+# the whole history, not per 24h, so it cannot evaluate this trigger.
+V4_FLEET_FORCE_EXITS_PER_24H = 3
+
+# Per-bot demotion triggers that map onto metrics this tracker computes
+# (GRADUATION_CRITERIA.md:150-172). Percentage-drawdown triggers are left out:
+# they need a capital basis this tracker does not have.
+V4_DEMOTION_REFERENCE = {
+    "FundingFadeV1": [
+        "pause: any single closed trade < -7% (GRADUATION_CRITERIA.md:153)",
+        "DD pause dollar floor $10 (GRADUATION_CRITERIA.md:154)",
+        "kill: 3 consecutive emergency exits (GRADUATION_CRITERIA.md:157)",
+    ],
+    "KeltnerBounceV1": [
+        "pause: any single closed trade < -10% (GRADUATION_CRITERIA.md:160)",
+        "DD pause dollar floor $10 (GRADUATION_CRITERIA.md:161)",
+        "kill: 6 consecutive losses (GRADUATION_CRITERIA.md:164)",
+    ],
+    "CascadeFaderV1": [
+        "pause: any single closed trade < -12% (GRADUATION_CRITERIA.md:167)",
+        "DD pause dollar floor $5 (GRADUATION_CRITERIA.md:169)",
+        "kill: 7 consecutive losses (GRADUATION_CRITERIA.md:172)",
+    ],
 }
 
 
@@ -152,7 +194,7 @@ def extract_config_params(bot_name, config_name=None):
 def get_trade_metrics(bot_name):
     """Pull comprehensive metrics from trade database."""
     db_patterns = [
-        TRADE_DB_DIR / f"tradesv3.dryrun.{bot_name}.sqlite",
+        TRADE_DB_DIR / TRADE_DB_NAME.format(bot=bot_name),
     ]
 
     db_path = None
@@ -583,7 +625,8 @@ def show_dashboard():
     print(f"  BOT EVOLUTION DASHBOARD — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"{'=' * 90}\n")
 
-    print(f"  {'Bot':<28} {'Trades':>6} {'WR%':>5} {'PF':>6} {'P/L$':>9} {'Peak PF':>8} {'Changes':>8} {'Status'}")
+    print(f"  Source: {TRADE_DB_NAME.format(bot='<bot>')} (dry-run / paper trades)\n")
+    print(f"  {'Bot':<28} {'Trades':>6} {'WR%':>5} {'PF':>6} {'P/L$':>9} {'Peak PF':>8} {'Changes':>8} {'Days':>5} {'Pairs':>5}")
     print(f"  {'-' * 85}")
 
     for bot in ACTIVE_BOTS:
@@ -611,34 +654,64 @@ def show_dashboard():
             wr = metrics["win_rate"]
             pf = metrics["profit_factor"]
             pnl = metrics["total_pnl"]
+            days = metrics.get("days_running", 0)
+            pairs = metrics.get("unique_pairs", 0)
 
-            # Status based on graduation gates
-            if trades < GRADUATION["min_trades"]:
-                status = f"GATE1 ({trades}/{GRADUATION['min_trades']} trades)"
-            elif pf < GRADUATION["min_pf"]:
-                status = f"GATE2 (PF {pf}<{GRADUATION['min_pf']})"
-            elif wr < GRADUATION["min_wr"]:
-                status = f"GATE2 (WR {wr}<{GRADUATION['min_wr']})"
-            elif pnl <= 0:
-                status = "GATE2 (negative P/L)"
-            else:
-                status = "CANDIDATE"
-
+            # Raw facts only: graduation is an operator decision under v4
+            # (see check_graduation), so no gate status is derived here.
             print(
                 f"  {bot:<28} {trades:>6} {wr:>4.0f}% {pf:>5.1f}x ${pnl:>+8.2f} "
-                f"{peak_pf:>8} {changes:>8}  {status}"
+                f"{peak_pf:>8} {changes:>8} {days:>5} {pairs:>5}"
             )
         else:
             print(f"  {bot:<28} {'0':>6} {'—':>5} {'—':>6} {'—':>9} {peak_pf:>8} {changes:>8}  NO DATA")
 
     print()
+    print("  Graduation facts (v4, no verdicts): bot_evolution_tracker.py graduation")
+    print()
+
+
+def _print_v4_reference():
+    """The numeric thresholds v4 defines, as reference text (no comparisons)."""
+    print("  v4 numeric thresholds (GRADUATION_CRITERIA.md), for reference:")
+    print("    Probe -> Pilot post-flip minimums, by strategy class (:116-120):")
+    for label, mins in V4_PROBE_TO_PILOT_MINIMUMS:
+        print(
+            f"      {label:<34} {mins['min_days']} days, "
+            f"{mins['min_closed_trades']} closed trades, {mins['min_pairs']} pairs"
+        )
+    print(
+        f"    Pilot -> Scale: at least {V4_PILOT_TO_SCALE_MIN_CLOSED_TRADES} closed trades, "
+        "plus >=1 regime transition and no kill-trigger events (:58)"
+    )
+    print(
+        f"    Dollar floor: auto-actions on wallet movements < ${V4_AUTO_ACTION_DOLLAR_FLOOR:.0f} "
+        "are suppressed (:215)"
+    )
+    print(
+        f"    Fleet kill trigger: force/emergency exit {V4_FLEET_FORCE_EXITS_PER_24H} times "
+        "in 24h (:177; not evaluated here, exits are counted all-time)"
+    )
+    print()
 
 
 def check_graduation():
-    """Check each bot against graduation gates."""
+    """Report the facts v4 graduation decisions are made from, with no verdicts.
+
+    GRADUATION_CRITERIA.md v4 makes every tier-up an explicit operator decision
+    and defines only a few numeric thresholds. This prints those thresholds as
+    reference and each bot's raw metrics, without PASS/FAIL/OK labels.
+    """
     print(f"\n{'=' * 80}")
-    print(f"  GRADUATION GATE CHECK — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"  GRADUATION FACTS (criteria v4) — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"{'=' * 80}\n")
+    print("  Tier-ups (Probe -> Pilot -> Scale) are an explicit operator decision under v4")
+    print("  (GRADUATION_CRITERIA.md:211). This report lists facts; it does not grade bots.")
+    print(f"  Source: {TRADE_DB_NAME.format(bot='<bot>')} (dry-run / paper trades).")
+    print("  v4 tier minimums count closed LIVE trades after the probe flip, so these")
+    print("  paper figures are context for that decision, not the count it uses.\n")
+
+    _print_v4_reference()
 
     for bot in ACTIVE_BOTS:
         m = get_trade_metrics(bot)
@@ -647,48 +720,27 @@ def check_graduation():
         print(f"  {bot}")
         print(f"  {'─' * 40}")
 
-        if trades == 0:
-            print(f"    GATE 1: FAIL — 0 trades (need {GRADUATION['min_trades']})")
-            print()
-            continue
+        if m.get("error"):
+            print(f"    No trade data: {m['error']}")
+        elif trades == 0:
+            print("    Closed trades:        0")
+        else:
+            print(f"    Closed trades:        {trades}")
+            print(f"    Days running:         {m.get('days_running', 0)}")
+            print(f"    Pairs traded:         {m.get('unique_pairs', 0)}")
+            print(f"    Profit factor:        {m['profit_factor']:.2f}")
+            print(f"    Win rate:             {m['win_rate']:.1f}%")
+            print(f"    Net P/L:              ${m['total_pnl']:+.2f}")
+            print(
+                f"    Max single loss:      ${m.get('worst_loss_abs', 0):+.2f} "
+                f"({m.get('worst_loss_pct', 0):+.1f}%)"
+            )
+            print(f"    Max drawdown:         ${m['max_drawdown']:.2f} (closed-trade P/L, peak to trough)")
+            print(f"    Max consecutive losses: {m['max_consec_losses']}")
+            print(f"    Force/emergency exits (all-time): {m.get('force_exits', 0)}")
 
-        # Gate 1
-        g1_trades = trades >= GRADUATION["min_trades"]
-        g1_days = m.get("days_running", 0) >= GRADUATION["min_days"]
-        g1_pairs = m.get("unique_pairs", 0) >= GRADUATION["min_pairs"]
-        g1 = g1_trades and g1_days and g1_pairs
-
-        print(f"    GATE 1 (Sample Size):  {'PASS' if g1 else 'FAIL'}")
-        print(f"      Trades:  {trades}/{GRADUATION['min_trades']} {'OK' if g1_trades else 'NEED MORE'}")
-        print(f"      Days:    {m.get('days_running', 0)}/{GRADUATION['min_days']} {'OK' if g1_days else 'NEED MORE'}")
-        print(f"      Pairs:   {m.get('unique_pairs', 0)}/{GRADUATION['min_pairs']} {'OK' if g1_pairs else 'NEED MORE'}")
-
-        if not g1:
-            print()
-            continue
-
-        # Gate 2
-        g2_pf = m["profit_factor"] >= GRADUATION["min_pf"]
-        g2_wr = m["win_rate"] >= GRADUATION["min_wr"]
-        g2_pnl = m["total_pnl"] > 0
-        g2_loss = abs(m.get("worst_loss_pct", 0)) <= GRADUATION["max_single_loss_pct"]
-        g2_dd = m["max_drawdown"] <= (GRADUATION["max_drawdown_pct"] / 100 * 1000)  # 15% of $1000
-        g2_consec = m["max_consec_losses"] <= GRADUATION["max_consec_losses"]
-        g2_force = m.get("force_exits", 0) <= GRADUATION["max_force_exits"]
-        g2 = all([g2_pf, g2_wr, g2_pnl, g2_loss, g2_dd, g2_consec, g2_force])
-
-        print(f"    GATE 2 (Metrics):      {'PASS' if g2 else 'FAIL'}")
-        print(f"      PF:         {m['profit_factor']:.2f}x >= {GRADUATION['min_pf']}x {'OK' if g2_pf else 'FAIL'}")
-        print(f"      WR:         {m['win_rate']:.0f}% >= {GRADUATION['min_wr']}% {'OK' if g2_wr else 'FAIL'}")
-        print(f"      P/L:        ${m['total_pnl']:+.2f} > $0 {'OK' if g2_pnl else 'FAIL'}")
-        print(f"      Max Loss:   {abs(m.get('worst_loss_pct', 0)):.1f}% <= {GRADUATION['max_single_loss_pct']}% {'OK' if g2_loss else 'FAIL'}")
-        print(f"      Max DD:     ${m['max_drawdown']:.2f} <= ${GRADUATION['max_drawdown_pct'] / 100 * 1000:.0f} {'OK' if g2_dd else 'FAIL'}")
-        print(f"      Consec L:   {m['max_consec_losses']} <= {GRADUATION['max_consec_losses']} {'OK' if g2_consec else 'FAIL'}")
-        print(f"      Force Exit: {m.get('force_exits', 0)} <= {GRADUATION['max_force_exits']} {'OK' if g2_force else 'FAIL'}")
-
-        if g2:
-            print(f"    GATE 3 (Consistency):  (manual review required)")
-            print(f"    GATE 4 (Technical):    (checklist in GRADUATION_CRITERIA.md)")
+        for line in V4_DEMOTION_REFERENCE.get(bot, []):
+            print(f"    v4 per-bot trigger:   {line}")
         print()
 
 
@@ -715,7 +767,7 @@ def main():
     peak_p.add_argument("bot", help="Bot name")
 
     sub.add_parser("dashboard", help="Overview of all bots")
-    sub.add_parser("graduation", help="Check graduation gates")
+    sub.add_parser("graduation", help="Report v4 graduation facts (no pass/fail verdicts)")
 
     args = parser.parse_args()
 
