@@ -217,3 +217,62 @@ def test_kind_change_dedupe_renders_operator_alert():
     # Plain same-kind redelivery stays silent.
     plain = {"action": "deduped", "pos_id": 7, "kind": "close_full"}
     assert receiver_main._format_event_summary(cfg, payload, plain) is None
+
+
+def test_message_that_closed_cannot_be_edited_into_a_new_open():
+    """Review finding: the open path only deduped on open_msg_id, so a close
+    edited into `open` could open a second leveraged position."""
+    _cfg, conn, pos_id = _setup()
+    ft = _FT()
+    M = 200070
+    r1 = _process(ft, _payload("close_partial", M, pct=50))
+    assert r1["action"] == "force_exit"
+
+    with patch.object(receiver_main, "ft_force_enter") as enter:
+        r2 = _process(ft, _payload("open", M, entry_range=[1.0, 1.1], sl=0.9))
+    assert r2["action"] == "deduped"
+    assert r2["prior_kind"] == "close_partial"
+    assert r2["kind"] == "open"
+    enter.assert_not_called()
+    assert conn.execute("SELECT COUNT(*) FROM positions").fetchone()[0] == 1
+
+
+def test_ignored_edit_alert_is_not_suppressed_by_the_first_alert():
+    """Review finding: the per-msg_id alert suppression ran after the
+    formatter, so the EDIT IGNORED line for an already-alerted msg was dropped."""
+    _cfg, _conn, _pos_id = _setup()
+    M = 200080
+    receiver_main._notified_msg_ids.clear()
+    results = iter([
+        {"action": "force_exit", "pos_id": 1, "ft": {"status": 200},
+         "pct_closed_of_original": 50.0, "pct_open_after": 50.0},
+        {"action": "deduped", "pos_id": 1, "kind": "close_full",
+         "prior_kind": "close_partial",
+         "reason": "msg already acted as close_partial on this position "
+                   "(edited message, kind changed to close_full)"},
+        {"action": "deduped", "pos_id": 1, "kind": "close_full",
+         "prior_kind": "close_partial",
+         "reason": "msg already acted as close_partial on this position "
+                   "(edited message, kind changed to close_full)"},
+    ])
+    sent = []
+
+    async def fake_process(_payload):
+        return next(results)
+
+    async def fake_notify(_cfg, text, session=None):
+        sent.append(text)
+
+    async def deliver(payload):
+        await receiver_main.handle_event(payload)
+        await asyncio.gather(*receiver_main.app.state.notify_tasks)
+
+    with patch.object(receiver_main, "_process_event", side_effect=fake_process), \
+         patch.object(receiver_main, "_notify_telegram", side_effect=fake_notify):
+        _run(deliver(_payload("close_partial", M, pct=50)))
+        _run(deliver(_payload("close_full", M)))
+        _run(deliver(_payload("close_full", M)))  # redelivered edit stays quiet
+
+    assert len(sent) == 2, sent
+    assert "CLOSE_PARTIAL" in sent[0]
+    assert "EDIT IGNORED" in sent[1]

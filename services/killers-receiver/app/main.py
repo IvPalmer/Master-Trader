@@ -745,6 +745,22 @@ def _prior_action_kind_for_msg(conn: sqlite3.Connection, pos: dict,
     return None
 
 
+def _open_edit_refusal(conn: sqlite3.Connection, msg_id, kind: str) -> Optional[dict]:
+    """#64 for the open path: a message that already acted as a close or
+    update on some position and is edited into `open` must not open a new
+    position. chat writes no events rows, so a chat -> open edit still opens
+    once; an `open` row for this msg is left to the open_msg_id dedupe."""
+    prior = conn.execute(
+        "SELECT pos_id, kind FROM events WHERE msg_id = ? AND kind != 'open' "
+        "ORDER BY event_id LIMIT 1",
+        (msg_id,),
+    ).fetchone()
+    if prior is None:
+        return None
+    return _kind_change_deduped({"pos_id": prior["pos_id"]}, msg_id, kind,
+                                prior["kind"])
+
+
 def _kind_change_deduped(pos: dict, msg_id, kind: str, prior_kind: str) -> dict:
     logger.warning(
         "[EDIT KIND-CHANGE IGNORED] msg_id=%s pos_id=%d already acted as %s; "
@@ -2644,6 +2660,11 @@ async def handle_event(payload: EventPayload):
 
     text = _format_event_summary(cfg, payload, result)
     _dedup_msg_id = payload.msg.get("id") if isinstance(payload.msg, dict) else None
+    if _dedup_msg_id is not None and isinstance(result, dict) and result.get("prior_kind"):
+        # An ignored edit (#64) is a new fact about an already-alerted msg:
+        # key it separately so the first alert does not suppress it, while a
+        # redelivery of the same edit still stays quiet.
+        _dedup_msg_id = (_dedup_msg_id, "edit_ignored", result.get("kind"))
     if text and _dedup_msg_id is not None and _dedup_msg_id in _notified_msg_ids:
         # Observer redelivery of the same message — already alerted; suppress repeat.
         text = None
@@ -2794,6 +2815,11 @@ async def _process_event_inner(payload: EventPayload, phase2_locked=False):
         return {"action": "ignored", "reason": "chat"}
 
     if kind == "open":
+        # #64: checked here to skip the pricing work, and again right before
+        # the position INSERT (no await between that check and the INSERT).
+        edited = _open_edit_refusal(conn, msg_id, kind)
+        if edited is not None:
+            return edited
         if not symbol or not cls.get("direction"):
             return {"action": "skipped", "reason": "missing symbol or direction"}
         pair = to_freqtrade_pair(symbol)
@@ -3074,6 +3100,13 @@ async def _process_event_inner(payload: EventPayload, phase2_locked=False):
         # spine even if the call fails. UNIQUE constraint on open_msg_id makes
         # this idempotent — duplicate event delivery returns the existing row.
         targets_json = json.dumps(remaining_targets) if remaining_targets else None
+        # #64: a message that already acted (close/update on some position)
+        # and is edited into `open` must not open a new position. Checked with
+        # no await before the INSERT below. chat writes no events rows, so a
+        # chat -> open edit still opens once.
+        edited = _open_edit_refusal(conn, msg_id, kind)
+        if edited is not None:
+            return edited
         try:
             cur = conn.execute(
                 "INSERT INTO positions (signal_id, symbol, pair, direction, state, "
