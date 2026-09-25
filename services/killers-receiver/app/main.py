@@ -1784,6 +1784,13 @@ async def target_orders_reconcile_loop(cfg: Config, conn: sqlite3.Connection,
         await asyncio.sleep(cfg.target_reconcile_sec)
 
 
+# A 'requested' position with no Freqtrade trade on its (pair, side) after
+# this long is an orphan from a /forceenter transport failure (#82) and is
+# expired to 'failed' by the reconcile loop. Far above the 10s forceenter
+# timeout so an in-flight request is never expired.
+REQUESTED_ORPHAN_TTL_SEC = 600  # 10 min
+
+
 async def _reconcile_loop_once(cfg: Config, conn: sqlite3.Connection,
                                session=None) -> str:
     """One position-level reconcile tick. Returns 'skipped' when FT was
@@ -1820,6 +1827,43 @@ async def _reconcile_loop_once(cfg: Config, conn: sqlite3.Connection,
             )
             logger.info("[RECONCILE] orphan pos_id=%d linked to ft_trade_id=%d",
                         pos["pos_id"], ft["trade_id"])
+
+    # (1b) expire orphans that never reached Freqtrade (#82). A transport
+    # exception on /forceenter leaves the row 'requested' forever, where it
+    # counts in the active-position gate. Only reached with a genuine FT
+    # response (the `is None` guard above), and only for rows still
+    # unlinked after step (1) with no FT trade on their (pair, side). FT
+    # lists a trade in /status as soon as the entry order is placed (even
+    # unfilled), so an accepted-but-unacknowledged forceenter is linked,
+    # not expired. Age is measured from the receiver's insert time
+    # (last_event_at), not the channel msg date.
+    now_dt = datetime.now(timezone.utc)
+    for pos in conn.execute(
+        "SELECT pos_id, pair, direction, open_date, last_event_at FROM positions "
+        "WHERE state = 'requested' AND ft_trade_id IS NULL"
+    ).fetchall():
+        if (pos["pair"], pos["direction"] == "short") in ft_by_pair:
+            continue
+        try:
+            born = datetime.fromisoformat(pos["last_event_at"] or pos["open_date"])
+        except (TypeError, ValueError):
+            continue  # unknown age: never expire
+        if born.tzinfo is None:
+            born = born.replace(tzinfo=timezone.utc)
+        age = (now_dt - born).total_seconds()
+        if age < REQUESTED_ORPHAN_TTL_SEC:
+            continue
+        now_iso = now_dt.isoformat()
+        conn.execute(
+            "UPDATE positions SET state = 'failed', "
+            "close_reason = 'requested_expired_no_ft_trade', close_date = ?, "
+            "last_event_at = ? WHERE pos_id = ? AND state = 'requested' "
+            "AND ft_trade_id IS NULL",
+            (now_iso, now_iso, pos["pos_id"]),
+        )
+        logger.warning("[RECONCILE] orphan pos_id=%d %s %s requested %.0fs ago with "
+                       "no FT trade; marked failed (requested_expired_no_ft_trade)",
+                       pos["pos_id"], pos["pair"], pos["direction"], age)
 
     # (2) detect closes we missed. Only safe when ft_open is a genuine
     # response (handled above by the `is None` guard).
