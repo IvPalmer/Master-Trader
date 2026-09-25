@@ -140,3 +140,25 @@ CREATE TABLE IF NOT EXISTS classification_revisions (
 
 CREATE INDEX IF NOT EXISTS idx_raw_rev_msg ON raw_message_revisions(msg_id, rev_id);
 CREATE INDEX IF NOT EXISTS idx_cls_rev_msg ON classification_revisions(msg_id, rev_id);
+
+-- ── Gate de confianca em SHADOW (#65) ──────────────────────────────────────
+-- Veredito que o gate daria a cada classificacao do CLAUDE antes do
+-- encaminhamento. Observacional: nada aqui bloqueia. Decisoes das regras
+-- (strict_open / rules_classifier) nao geram linha. Append-only: edicao ou
+-- reentrega geram nova linha. Ligar enforcing e mudanca posterior (#62/#65).
+CREATE TABLE IF NOT EXISTS confidence_gate (
+    row_id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    msg_id                INTEGER NOT NULL,
+    evaluated_at          TEXT NOT NULL,
+    kind                  TEXT,              -- NULL = kind ausente/nao string
+    source                TEXT NOT NULL,     -- claude
+    confidence            REAL,              -- NULL = ausente ou nao numerica
+    threshold             REAL,              -- NULL = sem limiar (desligado / kind desconhecido)
+    verdict               TEXT NOT NULL,     -- pass | would_block | disabled
+    reason                TEXT NOT NULL,
+    mode                  TEXT NOT NULL,     -- shadow
+    config_schema_version INTEGER NOT NULL   -- 0 = arquivo de config ausente
+);
+
+CREATE INDEX IF NOT EXISTS idx_conf_gate_msg ON confidence_gate(msg_id, row_id);
+CREATE INDEX IF NOT EXISTS idx_conf_gate_verdict ON confidence_gate(verdict);

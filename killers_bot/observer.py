@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from . import classifier, rules_classifier, simulator, strict_open
+from . import classifier, confidence_gate, rules_classifier, simulator, strict_open
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,10 @@ class Config:
         # is Killers-only, so it's disabled for insiders).
         self.classifier_template = classifier.PROMPT_TEMPLATE
         self.use_fast_path = True
+        # Gate de confianca em SHADOW (#65): so grava o veredito, nunca
+        # bloqueia. Arquivo malformado derruba a subida aqui (de proposito);
+        # arquivo ausente vira shadow sem limiares + WARNING.
+        self.confidence_gate = confidence_gate.load_config()
 
 
 def _required(name: str) -> str:
@@ -295,6 +299,46 @@ def shadow_rules(conn: sqlite3.Connection, msg: dict, classification: dict,
             pass
         logger.exception("[RULE-SHADOW] falhou id=%s — ignorado", msg.get("id"))
 
+
+# ── Gate de confianca em SHADOW (#65) ──────────────────────────────────────
+
+
+def record_confidence_gate(conn: sqlite3.Connection, msg: dict,
+                           classification: dict, source: str,
+                           gate_cfg: "confidence_gate.GateConfig") -> None:
+    """Calcula e GRAVA o veredito do gate. Nunca bloqueia, nunca levanta.
+
+    Chamado so para classificacoes do Claude, ANTES de persistir/simular/
+    encaminhar — o lugar onde um gate de verdade teria de agir. Em shadow o
+    retorno e sempre None e o chamador segue exatamente como antes. Mesmo
+    padrao de `shadow_rules`: falha e engolida com rollback da conexao
+    compartilhada."""
+    try:
+        v = confidence_gate.evaluate(gate_cfg, classification)
+        conn.execute(
+            "INSERT INTO confidence_gate (msg_id, evaluated_at, kind, source, "
+            "confidence, threshold, verdict, reason, mode, config_schema_version) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (msg["id"], datetime.now(timezone.utc).isoformat(), v.kind, source,
+             v.confidence, v.threshold, v.verdict, v.reason, gate_cfg.mode,
+             gate_cfg.schema_version),
+        )
+        conn.commit()
+        if v.verdict == confidence_gate.WOULD_BLOCK:
+            logger.warning(
+                "[CONF-GATE WOULD_BLOCK] id=%s kind=%s conf=%s limiar=%s (%s) — "
+                "shadow: encaminhado mesmo assim",
+                msg.get("id"), v.kind, v.confidence, v.threshold, v.reason)
+        else:
+            logger.info("[CONF-GATE] id=%s kind=%s %s (%s)", msg.get("id"),
+                        v.kind, v.verdict, v.reason)
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        logger.exception("[CONF-GATE] falhou id=%s — ignorado", msg.get("id"))
+
 # ── Reply chain (small, in-memory cache + DB fallback) ─────────────────────
 
 
@@ -382,6 +426,13 @@ async def process_message(client, channel_id, conn, config, msg_dict: dict, sour
     if classification is None:
         logger.warning("[CLASSIFY FAIL] id=%d skipping downstream", msg_dict["id"])
         return
+
+    # Gate de confianca em SHADOW (#65): so para o que o Claude decidiu. As
+    # regras sao deterministicas (confidence fixo em 1.0) e nao sao avaliadas.
+    # Grava o veredito e segue — o encaminhamento abaixo NAO depende dele.
+    gate_cfg = getattr(config, "confidence_gate", None)
+    if source_label == "claude" and gate_cfg is not None:
+        record_confidence_gate(conn, msg_dict, classification, source_label, gate_cfg)
 
     persist_classification(conn, classification)
     kind = classification.get("kind")

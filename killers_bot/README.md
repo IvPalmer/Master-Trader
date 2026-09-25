@@ -48,6 +48,8 @@ killers_bot/
 ├── README.md                 this file
 ├── observer.py               systemd-launched Telethon listener (host)
 ├── classifier.py             Claude CLI subprocess wrapper (Killers prompt)
+├── confidence_gate.json      versioned confidence-gate thresholds (#65; SHADOW, provisional)
+├── confidence_gate.py        loads/validates it; verdict recorded to `confidence_gate`, never blocks
 ├── simulator.py              virtual position state machine (audit only)
 ├── schema.sql                SQLite: raw_messages, classifications, paper_positions
 ├── generate_session.py       one-shot interactive auth (legacy)

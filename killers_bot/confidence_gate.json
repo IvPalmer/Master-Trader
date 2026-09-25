@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "mode": "shadow",
+  "provisional": true,
+  "_about": [
+    "Gate de confianca do observer (#65). Lido por killers_bot/confidence_gate.py.",
+    "MODO SHADOW: o veredito e so GRAVADO (tabela confidence_gate) e logado; nada e bloqueado e o encaminhamento ao receiver nao muda.",
+    "Os limiares sao PROVISORIOS: o `confidence` do Claude e autodeclarado e nao calibrado. Nao ha base para justificar nenhum numero ainda.",
+    "Passar `mode` para enforcing e uma mudanca POSTERIOR, revisada separadamente, quando a tabela tiver desfechos rotulados suficientes para calibrar os limiares (#62, #65). A acao de enforcing prevista para close_full/signal_update e 'alertar e segurar' (alert and hold), nao descartar.",
+    "Nesta versao do codigo so `mode: shadow` e aceito; qualquer outro valor faz o observer recusar a subir.",
+    "Aplica-se so a classificacoes do Claude. Decisoes das regras (strict_open / rules_classifier) sao deterministicas e nao sao avaliadas.",
+    "`chat` nao e acao: limiar 0.0 e confianca ausente nao reprova. Para qualquer outro tipo, confianca ausente, nao numerica ou fora de [0,1] e would_block."
+  ],
+  "label_order": ["open", "close_full", "close_partial", "move_sl", "increase", "signal_update", "chat"],
+  "thresholds": {
+    "open": 0.8,
+    "close_full": 0.9,
+    "close_partial": 0.8,
+    "move_sl": 0.8,
+    "increase": 0.8,
+    "signal_update": 0.9,
+    "chat": 0.0
+  }
+}
