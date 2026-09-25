@@ -8,8 +8,10 @@ esta calibrado, entao nenhum limiar se justifica ainda.
 
 - Configuracao versionada em `confidence_gate.json`, ao lado do classificador
   (nao em variaveis de ambiente). Carregada uma vez na subida (`Config`).
-- Arquivo malformado -> `GateConfigError` na subida (falha alta). Arquivo
-  AUSENTE -> shadow com limiares desligados + WARNING; o observer sobe.
+- Arquivo malformado -> `load_config` levanta `GateConfigError`; o observer
+  registra ERROR e segue com o gate desligado (um gate de observacao nunca
+  derruba o encaminhamento). A falha alta fica no CI, que valida o arquivo
+  versionado. Arquivo AUSENTE -> shadow com limiares desligados + WARNING.
 - So `mode = "shadow"` e aceito. Ligar o enforcing e uma mudanca posterior,
   revisada a parte, quando houver desfechos rotulados para calibrar (#62,
   #65); a acao prevista para close_full/signal_update e "alertar e segurar".

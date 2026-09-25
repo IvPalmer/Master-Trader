@@ -83,9 +83,14 @@ class Config:
         self.classifier_template = classifier.PROMPT_TEMPLATE
         self.use_fast_path = True
         # Gate de confianca em SHADOW (#65): so grava o veredito, nunca
-        # bloqueia. Arquivo malformado derruba a subida aqui (de proposito);
-        # arquivo ausente vira shadow sem limiares + WARNING.
-        self.confidence_gate = confidence_gate.load_config()
+        # bloqueia. Um gate que so observa nao pode derrubar o encaminhamento:
+        # arquivo malformado vira shadow sem limiares + ERROR (o CI valida o
+        # arquivo versionado); arquivo ausente idem, com WARNING.
+        try:
+            self.confidence_gate = confidence_gate.load_config()
+        except confidence_gate.GateConfigError as e:
+            logger.error("[CONF-GATE] config invalida, gate DESLIGADO: %s", e)
+            self.confidence_gate = confidence_gate.disabled_config()
 
 
 def _required(name: str) -> str:

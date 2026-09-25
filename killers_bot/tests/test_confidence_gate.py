@@ -126,12 +126,22 @@ def base_env(monkeypatch):
         monkeypatch.setenv(var, val)
 
 
-def test_subida_recusa_config_malformada(base_env, monkeypatch, tmp_path):
+def test_config_malformada_nao_derruba_o_observer(base_env, monkeypatch, tmp_path, caplog):
+    """Revisao: um gate so de observacao nao pode parar o encaminhamento de
+    sinais (inclusive fechamentos) por um erro de digitacao no JSON."""
     p = tmp_path / "g.json"
     p.write_text(json.dumps(dict(_valid(), mode="enforce")))
     monkeypatch.setattr(cg, "DEFAULT_PATH", p)
-    with pytest.raises(cg.GateConfigError):
-        observer.Config()
+    with caplog.at_level(logging.ERROR):
+        c = observer.Config()
+    assert c.confidence_gate.enabled is False
+    assert "gate DESLIGADO" in caplog.text
+
+
+def test_config_versionada_e_valida():
+    """A falha alta fica no CI: o arquivo do repositorio tem de parsear."""
+    c = cg.load_config(cg.DEFAULT_PATH)
+    assert c.enabled and c.mode == "shadow"
 
 
 def test_subida_aceita_config_ausente(base_env, monkeypatch, tmp_path):
