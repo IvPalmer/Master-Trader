@@ -108,3 +108,36 @@ def test_init_db_migrates_legacy_db(tmp_path):
     assert {"raw_message_revisions", "classification_revisions"} <= tables
     assert c.execute("SELECT COUNT(*) FROM raw_messages").fetchone()[0] == 1
     c.close()
+
+
+def _file_conn(path):
+    c = sqlite3.connect(path)
+    c.row_factory = sqlite3.Row
+    c.executescript(SCHEMA)
+    return c
+
+
+def test_statement_level_revision_failure_keeps_committed_main_write(tmp_path):
+    """Falha da revisao desfaz so a revisao: a escrita principal chega ao disco."""
+    db = tmp_path / "obs.db"
+    c = _file_conn(db)
+    c.execute("CREATE TRIGGER boom BEFORE INSERT ON raw_message_revisions "
+              "BEGIN SELECT RAISE(ABORT, 'audit down'); END")
+    observer.persist_raw(c, {"id": 11, "text": "gm"})
+    c.close()
+    check = sqlite3.connect(db)
+    assert check.execute("SELECT text FROM raw_messages WHERE msg_id=11").fetchone()[0] == "gm"
+    assert check.execute("SELECT COUNT(*) FROM raw_message_revisions").fetchone()[0] == 0
+    check.close()
+
+
+def test_transaction_abort_in_revision_is_not_silently_committed(tmp_path):
+    """Se o SQLite abortou a transacao inteira, a escrita principal se perdeu:
+    o erro tem de subir, nao um commit vazio que finge sucesso."""
+    db = tmp_path / "obs.db"
+    c = _file_conn(db)
+    c.execute("CREATE TRIGGER boom BEFORE INSERT ON raw_message_revisions "
+              "BEGIN SELECT RAISE(ROLLBACK, 'disk gone'); END")
+    with pytest.raises(sqlite3.DatabaseError):
+        observer.persist_raw(c, {"id": 12, "text": "gm"})
+    c.close()

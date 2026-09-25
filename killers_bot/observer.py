@@ -117,13 +117,24 @@ def _append_revision(conn: sqlite3.Connection, table: str, cols: str,
                      row: tuple) -> None:
     """Trilha de auditoria append-only (#64). A tabela principal guarda so a
     versao mais recente (INSERT OR REPLACE); aqui fica cada versao. Falha na
-    auditoria e engolida — nunca pode derrubar a ingestao."""
+    auditoria e engolida — nunca pode derrubar a ingestao.
+
+    O SAVEPOINT isola a falha: desfaz so a revisao, nao a escrita principal
+    da mesma transacao. Se o SQLite ja abortou a transacao inteira (disco
+    cheio, I/O), a escrita principal se perdeu e o erro sobe em vez de um
+    commit vazio fingir sucesso."""
+    conn.execute("SAVEPOINT audit_revision")
     try:
         conn.execute(
             f"INSERT INTO {table} {cols} VALUES ({', '.join('?' * len(row))})",
             row,
         )
+        conn.execute("RELEASE audit_revision")
     except Exception:
+        if not conn.in_transaction:
+            raise
+        conn.execute("ROLLBACK TO audit_revision")
+        conn.execute("RELEASE audit_revision")
         logger.exception("[AUDIT] %s falhou msg_id=%s — ignorado", table, row[0])
 
 
