@@ -531,6 +531,29 @@ CREATE TABLE IF NOT EXISTS ingress_events (
 CREATE INDEX IF NOT EXISTS idx_ingress_kind ON ingress_events(kind);
 CREATE INDEX IF NOT EXISTS idx_ingress_action ON ingress_events(final_action);
 
+CREATE TABLE IF NOT EXISTS ingress_revisions (
+    -- Append-only: ONE row per /event delivery (#64). `ingress_events` keeps
+    -- the FIRST payload per msg_id (INSERT OR IGNORE) but its final_* columns
+    -- are overwritten by every later delivery, so after an edit (e.g. chat ->
+    -- open) that row pairs the old input with the new outcome. Use THIS table
+    -- to pair each delivery's input with its own outcome; `ingress_events` is
+    -- left unchanged for existing readers (/ingress, reprocess_ingress).
+    -- Identical redeliveries (observer retry/backfill) also get a row: each
+    -- is a real delivery. Audit only: nothing here gates execution.
+    rev_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    msg_id        INTEGER NOT NULL,
+    received_at   TEXT NOT NULL,
+    msg_edit_date TEXT,                      -- payload.msg.edit_date, if any
+    kind          TEXT,
+    symbol        TEXT,
+    signal_id     INTEGER,
+    raw_payload   TEXT NOT NULL,             -- full {msg, classification} json
+    final_action  TEXT,                      -- this delivery's own outcome
+    final_status  INTEGER,                   -- NULL if the handler died
+    completed_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ingress_rev_msg ON ingress_revisions(msg_id, rev_id);
+
 CREATE TABLE IF NOT EXISTS target_orders (
     -- Phase 2: active limit-order placement at each signal TP.
     -- Set-and-forget on open: parse TARGETS line → place LIMIT exit at
@@ -2517,6 +2540,8 @@ async def handle_event(payload: EventPayload):
     # 2026-05-27 bug: msg 3471 hit a NameError and left zero audit because
     # the only event-recording code path ran AFTER processing decisions.
     ingress_id = _ingress_log_start(conn, payload)
+    # Per-delivery audit (#64): pairs THIS delivery's input with its outcome.
+    revision_id = _ingress_revision_start(conn, payload)
 
     try:
         if payload.classification.get("kind") == "open":
@@ -2535,11 +2560,14 @@ async def handle_event(payload: EventPayload):
                          msg_id, kind, e)
         _ingress_log_finish(conn, ingress_id,
                              {"action": "error", "reason": str(e)}, 500)
+        _ingress_revision_finish(conn, revision_id,
+                                 {"action": "error", "reason": str(e)}, 500)
         raise HTTPException(status_code=500,
                             detail={"error": str(e), "msg_id": msg_id,
                                     "kind": kind})
 
     _ingress_log_finish(conn, ingress_id, result, 200)
+    _ingress_revision_finish(conn, revision_id, result, 200)
 
     text = _format_event_summary(cfg, payload, result)
     _dedup_msg_id = payload.msg.get("id") if isinstance(payload.msg, dict) else None
@@ -2605,7 +2633,9 @@ def _ingress_log_start(conn: sqlite3.Connection,
 
 def _ingress_log_finish(conn: sqlite3.Connection, ingress_id: Optional[int],
                         result: dict, status: int) -> None:
-    """Stamp the handler outcome onto the ingress row."""
+    """Stamp the handler outcome onto the ingress row. The LATEST delivery's
+    outcome wins here while raw_payload keeps the FIRST; ingress_revisions
+    holds the correctly paired per-delivery record (#64)."""
     if ingress_id is None:
         return
     try:
@@ -2617,6 +2647,52 @@ def _ingress_log_finish(conn: sqlite3.Connection, ingress_id: Optional[int],
         )
     except Exception as e:
         logger.warning("ingress_log_finish failed: %s", e)
+
+
+def _ingress_revision_start(conn: sqlite3.Connection,
+                            payload: EventPayload) -> Optional[int]:
+    """Append one ingress_revisions row for this delivery (#64). Unlike
+    ingress_events there is no dedupe: every delivery, edited or not, gets
+    its own row. Audit failure never breaks the handler."""
+    try:
+        msg = payload.msg if isinstance(payload.msg, dict) else {}
+        cls = payload.classification if isinstance(payload.classification, dict) else {}
+        msg_id = msg.get("id")
+        if msg_id is None:
+            return None  # malformed payload, can't audit
+        edit_date = msg.get("edit_date")
+        cur = conn.execute(
+            "INSERT INTO ingress_revisions "
+            "(msg_id, received_at, msg_edit_date, kind, symbol, signal_id, raw_payload) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (msg_id,
+             datetime.now(timezone.utc).isoformat(),
+             str(edit_date) if edit_date is not None else None,
+             cls.get("kind"),
+             cls.get("symbol"),
+             cls.get("signal_id"),
+             json.dumps({"msg": msg, "classification": cls}, default=str)),
+        )
+        return cur.lastrowid
+    except Exception as e:
+        logger.exception("ingress_revision_start failed: %s", e)
+        return None
+
+
+def _ingress_revision_finish(conn: sqlite3.Connection, revision_id: Optional[int],
+                             result: dict, status: int) -> None:
+    """Stamp this delivery's own outcome onto its revision row."""
+    if revision_id is None:
+        return
+    try:
+        action = result.get("action") if isinstance(result, dict) else None
+        conn.execute(
+            "UPDATE ingress_revisions SET final_action=?, final_status=?, completed_at=? "
+            "WHERE rev_id=?",
+            (action, status, datetime.now(timezone.utc).isoformat(), revision_id),
+        )
+    except Exception as e:
+        logger.warning("ingress_revision_finish failed: %s", e)
 
 
 async def _process_event(payload: EventPayload):

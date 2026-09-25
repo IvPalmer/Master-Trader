@@ -282,6 +282,107 @@ def test_ingress_endpoint_lists_recent():
     assert 44442 in msg_ids
 
 
+def _cls(mid, kind, **kw):
+    base = {"id": mid, "kind": kind, "signal_id": None, "symbol": None,
+            "direction": None, "pct": None, "entry": None,
+            "entry_range": None, "sl": None, "tp": None,
+            "confidence": 0.9, "notes": ""}
+    base.update(kw)
+    return base
+
+
+def test_edited_message_keeps_every_delivery_paired_with_its_outcome():
+    """#64: an edited message is redelivered under a different kind. Each
+    delivery gets its own ingress_revisions row with ITS payload and ITS
+    outcome; ingress_events keeps its existing (first-payload, last-outcome)
+    behaviour unchanged."""
+    mid = 55501
+    with _client() as (client, m):
+        r1 = client.post("/event", json={
+            "msg": {"id": mid, "date": "2026-05-27T20:00:00+00:00",
+                    "text": "GM"},
+            "classification": _cls(mid, "chat"),
+        })
+        r2 = client.post("/event", json={
+            "msg": {"id": mid, "date": "2026-05-27T20:00:00+00:00",
+                    "edit_date": "2026-05-27T20:05:00+00:00",
+                    "text": "📍SIGNAL ID: #2142📍\nCOIN: $XLM/USDT\n"
+                            "Target 1: 0.1515✅"},
+            "classification": _cls(mid, "close_partial", signal_id=2142,
+                                   symbol="XLM", direction="long"),
+        })
+        assert r1.status_code == 200 and r1.json()["action"] == "ignored"
+        assert r2.status_code == 200 and r2.json()["action"] == "skipped"
+        import json
+        import sqlite3
+        conn = sqlite3.connect(os.environ["KILLERS_DB"])
+        conn.row_factory = sqlite3.Row
+        revs = conn.execute(
+            "SELECT * FROM ingress_revisions WHERE msg_id=? ORDER BY rev_id",
+            (mid,),
+        ).fetchall()
+        ingress = conn.execute(
+            "SELECT * FROM ingress_events WHERE msg_id=?", (mid,)
+        ).fetchall()
+
+    assert len(revs) == 2
+    first, second = revs
+    assert first["kind"] == "chat"
+    assert first["msg_edit_date"] is None
+    assert first["final_action"] == "ignored"
+    assert first["final_status"] == 200
+    assert json.loads(first["raw_payload"])["msg"]["text"] == "GM"
+    assert second["kind"] == "close_partial"
+    assert second["symbol"] == "XLM" and second["signal_id"] == 2142
+    assert second["msg_edit_date"] == "2026-05-27T20:05:00+00:00"
+    assert second["final_action"] == "skipped"
+    assert second["final_status"] == 200
+    assert json.loads(second["raw_payload"])["classification"]["kind"] == "close_partial"
+
+    # ingress_events unchanged: one row, first payload, latest outcome.
+    assert len(ingress) == 1
+    assert ingress[0]["kind"] == "chat"
+    assert ingress[0]["final_action"] == "skipped"
+
+
+def test_ingress_revision_on_handler_crash():
+    """A crashing delivery still leaves a revision stamped error/500."""
+    with _client() as (client, m):
+        async def crash(*args, **kwargs):
+            raise RuntimeError("simulated handler crash")
+        with patch.object(m, "_process_event", side_effect=crash):
+            r = client.post("/event", json={
+                "msg": {"id": 55502, "text": "boom"},
+                "classification": _cls(55502, "chat"),
+            })
+        assert r.status_code == 500
+        import sqlite3
+        conn = sqlite3.connect(os.environ["KILLERS_DB"])
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM ingress_revisions WHERE msg_id=?", (55502,)
+        ).fetchone()
+    assert row is not None
+    assert row["final_action"] == "error"
+    assert row["final_status"] == 500
+
+
+def test_ingress_revision_audit_failure_does_not_break_handler():
+    """Audit table missing/broken must not change the handler's response."""
+    with _client() as (client, m):
+        import sqlite3
+        side = sqlite3.connect(os.environ["KILLERS_DB"])
+        side.execute("DROP TABLE ingress_revisions")
+        side.commit()
+        side.close()
+        r = client.post("/event", json={
+            "msg": {"id": 55503, "text": "GM"},
+            "classification": _cls(55503, "chat"),
+        })
+    assert r.status_code == 200
+    assert r.json()["action"] == "ignored"
+
+
 def test_position_by_ft_id_exposes_posted_stop():
     with _client() as (client, m):
         import sqlite3
