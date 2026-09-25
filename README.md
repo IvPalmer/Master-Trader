@@ -202,6 +202,9 @@ Multi-layered defense system:
 
 ## Monitoring
 
+Dashboard product rules and the design system live in [PRODUCT.md](PRODUCT.md) and
+[DESIGN.md](DESIGN.md); changes to the dashboard must stay consistent with them.
+
 - **ft-dashboard**: the operator dashboard (`ft_userdata/ft_dashboard/`, FastAPI), portfolio summary
   and per-bot analytics. Served behind Traefik in production rather than on a published port.
 - **FreqUI**: `http://127.0.0.1:<port>` per bot, the native Freqtrade web UI. Ports are listed under

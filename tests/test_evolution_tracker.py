@@ -93,13 +93,135 @@ def test_dashboard_shows_all_bots():
 
 def test_graduation_runs():
     result = run_tracker("graduation")
-    assert result.returncode == 0
-    assert "GRADUATION GATE CHECK" in result.stdout
+    assert result.returncode == 0, result.stderr
+    assert "GRADUATION FACTS" in result.stdout
+    for bot in ACTIVE_BOTS:
+        assert bot in result.stdout
 
 
-def test_graduation_shows_gates():
+def test_graduation_states_tier_up_is_an_operator_decision():
     result = run_tracker("graduation")
-    assert "GATE 1" in result.stdout
+    assert "explicit operator decision" in result.stdout
+    assert "dry-run / paper trades" in result.stdout
+
+
+# In-process graduation report with known metrics (#19, #24). The committed
+# repo has no trade databases, so the subprocess runs above only ever see the
+# no-data branch; these drive the metrics branch.
+
+VERDICT_WORDS = re.compile(r"\b(PASS|FAIL|OK|NEED MORE|CANDIDATE|GATE ?\d)\b")
+
+FAKE_METRICS = {
+    "total_trades": 31,
+    "open_trades": 1,
+    "open_stake": 15.0,
+    "winners": 20,
+    "losers": 11,
+    "win_rate": 64.5,
+    "profit_factor": 1.37,
+    "risk_reward": 0.9,
+    "avg_win": 1.1,
+    "avg_loss": 1.2,
+    "total_pnl": 6.42,
+    "worst_loss_abs": -2.87,
+    "worst_loss_pct": -6.1,
+    "max_drawdown": 7.55,
+    "max_consec_losses": 3,
+    "unique_pairs": 5,
+    "days_running": 22,
+    "exit_reasons": {"roi": 20, "stop_loss": 11},
+    "force_exits": 1,
+    "trades_per_day": 1.4,
+}
+
+
+@pytest.fixture
+def tracker(monkeypatch):
+    monkeypatch.syspath_prepend(str(FT_DIR))
+    import importlib
+    return importlib.import_module("bot_evolution_tracker")
+
+
+def graduation_output(tracker, monkeypatch, capsys, bots, metrics):
+    monkeypatch.setattr(tracker, "ACTIVE_BOTS", bots)
+    monkeypatch.setattr(tracker, "get_trade_metrics", lambda bot: dict(metrics))
+    tracker.check_graduation()
+    return capsys.readouterr().out
+
+
+def test_graduation_prints_raw_metrics_without_verdicts(tracker, monkeypatch, capsys):
+    out = graduation_output(tracker, monkeypatch, capsys, ["FundingFadeV1"], FAKE_METRICS)
+    for fact in ["31", "22", "1.37", "64.5%", "$+6.42", "$-2.87", "-6.1%", "$7.55"]:
+        assert fact in out, f"{fact} missing from graduation report"
+    assert "Max consecutive losses: 3" in out
+    assert "Force/emergency exits (all-time): 1" in out
+    assert not VERDICT_WORDS.search(out), VERDICT_WORDS.search(out)
+
+
+def test_graduation_uses_no_discarded_v1_thresholds(tracker, monkeypatch, capsys):
+    """v1 (PF 2.0, WR 55%, 5% max loss, 15% DD, 4 consec) was discarded 2026-04-20,
+    and the DD check converted 15% against an invented $1000 basis."""
+    assert not hasattr(tracker, "GRADUATION")
+    out = graduation_output(tracker, monkeypatch, capsys, ["SomeBotV1"], FAKE_METRICS)
+    for discarded in ["2.0x", "55%", "$150", "1000", "<= 4"]:
+        assert discarded not in out
+    assert "1000" not in TRACKER.read_text().split("def check_graduation")[1].split("def main")[0]
+
+
+def test_graduation_reports_v4_thresholds(tracker, monkeypatch, capsys):
+    out = graduation_output(tracker, monkeypatch, capsys, ["SomeBotV1"], FAKE_METRICS)
+    assert "at least 30 closed trades" in out
+    assert "14 days, 15 closed trades, 4 pairs" in out
+    assert "30 days, 8 closed trades, 3 pairs" in out
+    assert "45 days, 5 closed trades, 2 pairs" in out
+    assert "< $5" in out
+
+
+def test_graduation_v4_constants_match_the_doc(tracker):
+    """The constants cite GRADUATION_CRITERIA.md lines; keep them honest."""
+    doc = (FT_DIR / "GRADUATION_CRITERIA.md").read_text().splitlines()
+    assert "at least 30 closed trades" in doc[58 - 1]
+    assert tracker.V4_PILOT_TO_SCALE_MIN_CLOSED_TRADES == 30
+    rows = {
+        "Active": doc[118 - 1],
+        "Sparse": doc[119 - 1],
+        "Very sparse": doc[120 - 1],
+    }
+    for (label, mins), row in zip(tracker.V4_PROBE_TO_PILOT_MINIMUMS, rows.values()):
+        cells = [c.strip() for c in row.strip("|").split("|")]
+        assert cells[1] == f"{mins['min_days']} days", (label, cells)
+        assert cells[2] == str(mins["min_closed_trades"]), (label, cells)
+        assert cells[3] == str(mins["min_pairs"]), (label, cells)
+    assert "< $5" in doc[215 - 1]
+    assert tracker.V4_AUTO_ACTION_DOLLAR_FLOOR == 5.0
+    assert "3 times in 24h" in doc[177 - 1]
+    assert (FT_DIR.parent / "GRADUATION_CRITERIA.md").read_text() == (
+        FT_DIR / "GRADUATION_CRITERIA.md"
+    ).read_text()
+
+
+def test_graduation_prints_per_bot_v4_triggers(tracker, monkeypatch, capsys):
+    out = graduation_output(tracker, monkeypatch, capsys, ["KeltnerBounceV1"], FAKE_METRICS)
+    assert "single closed trade < -10%" in out
+    assert "6 consecutive losses" in out
+
+
+def test_graduation_reports_missing_data(tracker, monkeypatch, capsys):
+    out = graduation_output(
+        tracker, monkeypatch, capsys, ["SomeBotV1"], {"error": "no database found"}
+    )
+    assert "No trade data: no database found" in out
+    assert not VERDICT_WORDS.search(out)
+
+
+def test_dashboard_has_no_gate_status(tracker, monkeypatch, capsys, evolution_dir):
+    monkeypatch.setattr(tracker, "DATA_DIR", evolution_dir)
+    monkeypatch.setattr(tracker, "ACTIVE_BOTS", ["SomeBotV1"])
+    monkeypatch.setattr(tracker, "get_trade_metrics", lambda bot: dict(FAKE_METRICS))
+    tracker.show_dashboard()
+    out = capsys.readouterr().out
+    assert "SomeBotV1" in out
+    assert not VERDICT_WORDS.search(out)
 
 
 # ── Snapshot command ──────────────────────────────────────────────

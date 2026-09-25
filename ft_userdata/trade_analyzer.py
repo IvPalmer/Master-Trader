@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 """
-Trade Analyzer — Deep Trade Analysis for Claude Agent
-=====================================================
+Trade Analyzer — Deep Trade Analysis for Claude Agent  --  LEGACY
+=================================================================
+
+LEGACY (see issues #60 and #31): no scheduler or module invokes this script;
+it was written for a Mac-era scheduled agent and queries bots on loopback ports
+with the shared default credentials. Its registry comes from bots_config.json,
+but its fallback list names retired strategies. It never carried a live capital
+basis; the unused per-bot capital constant of the retired R$3,000 fleet was
+removed under #60. The live capital basis is derived from exchange account
+equity in strategy_health_report.py / metrics_exporter.py.
 
 Outputs structured trade data with entry/exit quality analysis that a Claude
 agent can interpret to suggest specific strategy improvements.
@@ -55,7 +63,6 @@ BOTS = _load_bots_config()
 API_USER = "freqtrader"
 API_PASS = "mastertrader"
 AUTH = HTTPBasicAuth(API_USER, API_PASS)
-INITIAL_CAPITAL_PER_BOT = 88.0  # R$500 per bot = $88 USDT
 
 
 def fetch_json(url: str, timeout: int = 10) -> Optional[Any]:

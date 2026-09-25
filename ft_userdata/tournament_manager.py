@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 """
-Strategy Tournament Manager for Freqtrade
-==========================================
+Strategy Tournament Manager for Freqtrade  --  RETIRED / LEGACY
+================================================================
+
+RETIRED (see issues #60 and #31). The hardcoded BOTS registry below names only
+retired strategies from the old six-bot dry-run fleet, and TOTAL_CAPITAL is
+that fleet's historical paper budget, not a live capital basis. This module is
+not on any live decision path: it does not read bots_config.json, and nothing
+imports it. It is still listed in automation_scheduler.sh (weekly Sun 05:00);
+where that cron is installed it rewrites dry_run_wallet in the retired bots'
+configs and restarts their containers. Do not wire it to live capital; the
+single capital basis is the one strategy_health_report.py / metrics_exporter.py
+derive from exchange account equity (#60).
 
 Monitors all Freqtrade bot instances, tracks performance metrics,
 ranks strategies, and dynamically reallocates capital to the best performers.
@@ -48,9 +58,9 @@ API_USER = "freqtrader"
 API_PASS = "mastertrader"
 BASE_URL = "http://127.0.0.1"
 
-TOTAL_CAPITAL = 528.0      # R$3,000 = $528 USDT (6x R$500/bot)
-MIN_ALLOC_PCT = 0.10       # 10% -> $52.80
-MAX_ALLOC_PCT = 0.30       # 30% -> $158.40
+TOTAL_CAPITAL = 528.0      # legacy paper budget of the retired fleet; NOT live capital (#60)
+MIN_ALLOC_PCT = 0.10
+MAX_ALLOC_PCT = 0.30
 MIN_ALLOC = TOTAL_CAPITAL * MIN_ALLOC_PCT
 MAX_ALLOC = TOTAL_CAPITAL * MAX_ALLOC_PCT
 

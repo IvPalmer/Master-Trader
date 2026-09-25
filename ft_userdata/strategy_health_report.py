@@ -18,6 +18,7 @@ Cron (daily 23:00 UTC = 20:00 São Paulo):
 import argparse
 import json
 import logging
+import math
 import os
 import sqlite3
 import sys
@@ -76,10 +77,30 @@ def _load_bots_config() -> dict:
 
 BOTS = _load_bots_config()
 
+
+def _load_uncovered_bots() -> list[str]:
+    """Bots outside BOTS (not `active`) that still run on real or monitored
+    accounts: receiver-managed copiers (`production_live`) and `monitor` bots.
+    The report does not value their accounts (the exporter's circuit breaker
+    does, through venue adapters), so its capital figures name them as not
+    covered instead of implying fleet-wide equity."""
+    try:
+        with open(Path(__file__).parent / "bots_config.json") as f:
+            data = json.load(f)
+        return sorted(name for name, info in data["bots"].items()
+                      if not info.get("active", True)
+                      and (info.get("production_live") or info.get("monitor")))
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return []
+
+UNCOVERED_BOTS = _load_uncovered_bots()
+
 API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "freqtrader")
 API_PASS = os.environ.get("FREQTRADE__API_SERVER__PASSWORD", "mastertrader")
 AUTH = HTTPBasicAuth(API_USER, API_PASS)
-INITIAL_CAPITAL = 528.0   # 6x R$500/bot = R$3,000 = $528 USDT
+# There is deliberately no capital constant here. The portfolio basis is read
+# from each live exchange account's /balance at report time; see
+# compute_capital_basis() and issue #60.
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "http://localhost:8088/webhooks/freqtrade")
 FT_DIR = Path(os.environ.get("FT_DIR", str(Path.home() / "ft_userdata")))
 DB_DIR = FT_DIR / "user_data"
@@ -201,18 +222,15 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
     # Separate closed vs open
     closed = [t for t in trades if t.get("close_date") is not None]
     open_list = open_trades if isinstance(open_trades, list) else []
+    # A failed /status read must not look like "no open positions": the live
+    # return in compute_capital_basis() refuses to treat missing marks as zero.
+    metrics["open_marks_ok"] = isinstance(open_trades, list)
 
     metrics["total_trades"] = len(closed)
     metrics["open_trades"] = len(open_list)
 
-    if not closed:
-        metrics["health_label"] = "NO DATA"
-        metrics["flags"].append("Zero closed trades")
-        if len(open_list) == 0:
-            metrics["recommendations"].append("Investigate: no trades taken. Check pairlist/entry conditions.")
-        return metrics
-
-    # --- P&L ---
+    # --- P&L --- (before the no-closed-trades early return, so a bot whose
+    # first positions are still open reports their unrealized P&L)
     closed_pnl = sum((t.get("profit_abs", 0) or 0) for t in closed)
     open_pnl = sum((t.get("profit_abs", 0) or 0) for t in open_list)
     true_pnl = closed_pnl + open_pnl
@@ -220,6 +238,13 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
     metrics["closed_pnl"] = round(closed_pnl, 2)
     metrics["open_pnl"] = round(open_pnl, 2)
     metrics["true_pnl"] = round(true_pnl, 2)
+
+    if not closed:
+        metrics["health_label"] = "NO DATA"
+        metrics["flags"].append("Zero closed trades")
+        if len(open_list) == 0:
+            metrics["recommendations"].append("Investigate: no trades taken. Check pairlist/entry conditions.")
+        return metrics
 
     # --- Win Rate ---
     winners = [t for t in closed if t.get("profit_ratio", 0) > 0]
@@ -611,6 +636,120 @@ def _generate_flags(m: dict) -> None:
 # Portfolio-Level Analysis
 # ---------------------------------------------------------------------------
 
+def _finite_float(value: Any) -> Optional[float]:
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
+def elect_account_owner(account: str, members: list[str], bots: dict) -> str:
+    """Pick the one bot whose /balance represents `account`.
+
+    Mirrors metrics_exporter.observe_accounts(): `members` are the LIVE bots on
+    the account; a shared account needs exactly one live `capital_owner`, a
+    single-bot account is represented by that bot. Balances never elect the
+    reader. Raises ValueError when the choice is ambiguous.
+    """
+    owners = [s for s in members if bots[s].get("capital_owner")]
+    if len(members) > 1 and len(owners) != 1:
+        raise ValueError(f"no unique live capital_owner for {account}")
+    return owners[0] if owners else members[0]
+
+
+def compute_capital_basis(bot_metrics: list[dict]) -> dict:
+    """Derive the live capital basis from exchange account equity (#60).
+
+    Scope: the `active` strategy bots in BOTS only. Receiver-managed and
+    monitor-only accounts (UNCOVERED_BOTS, e.g. the Hyperliquid copiers) are
+    not valued here; the exporter's circuit breaker values them through its
+    venue adapters. Figures are labelled accordingly.
+
+    Rules mirror the exporter's owner election: dry-run bots are excluded
+    (runtime /show_config dry_run, missing flag = dry-run), bots are grouped by
+    `capital_account`, and each live account is valued ONCE from its
+    representative bot's /balance: `total` is observed equity and
+    `starting_capital` is the return denominator. On a shared wallet that
+    figure is Freqtrade's per-bot reconstruction for the owner, so the return
+    is approximate (the exporter treats it as a diagnostic baseline only).
+    Live P&L is the realized +
+    unrealized P&L of live bots only; dry-run P&L is reported separately and
+    never divided by live capital.
+
+    Any gap (unknown run mode, missing/invalid balance, missing live P&L)
+    yields None for the affected figures plus a reason in `errors`. There is
+    no fallback constant: a wrong denominator is worse than no number.
+    """
+    errors: list[str] = []
+    live: list[str] = []
+    dry: list[str] = []
+    for strategy, info in BOTS.items():
+        account = info.get("capital_account") or strategy
+        cfg = get_bot_config(info["port"])
+        if not isinstance(cfg, dict):
+            errors.append(f"run mode unavailable: {strategy} ({account})")
+            continue
+        (dry if bool(cfg.get("dry_run", True)) else live).append(strategy)
+
+    groups: dict[str, list[str]] = {}
+    for strategy in live:
+        groups.setdefault(BOTS[strategy].get("capital_account") or strategy, []).append(strategy)
+
+    accounts: dict[str, dict] = {}
+    balance_ok = True
+    for account, members in groups.items():
+        try:
+            owner = elect_account_owner(account, members, BOTS)
+            bal = fetch_json(BOTS[owner]["port"], "balance")
+            if not isinstance(bal, dict):
+                raise ValueError("balance unavailable")
+            equity = _finite_float(bal.get("total"))
+            start = _finite_float(bal.get("starting_capital"))
+            if equity is None or equity < 0 or start is None or start <= 0:
+                raise ValueError("invalid balance")
+            accounts[account] = {"owner": owner, "bots": members,
+                                 "equity": round(equity, 2),
+                                 "starting_capital": round(start, 2)}
+        except ValueError:
+            balance_ok = False
+            errors.append(f"balance unavailable: {account}")
+    if not groups and not errors:
+        errors.append("no live accounts")
+    complete = balance_ok and bool(groups) and not any(
+        e.startswith("run mode unavailable") for e in errors)
+
+    by_name = {m["strategy"]: m for m in bot_metrics}
+    live_pnl: Optional[float] = 0.0
+    for strategy in live:
+        m = by_name.get(strategy)
+        if not m or not m.get("online") or not m.get("open_marks_ok", False) \
+                or "true_pnl" not in m:
+            errors.append(f"live P&L unavailable: {strategy}")
+            live_pnl = None
+        elif live_pnl is not None:
+            live_pnl += m["true_pnl"]
+    dry_pnl = sum(by_name[s].get("true_pnl", 0) for s in dry
+                  if s in by_name and by_name[s].get("online"))
+
+    equity_total = sum(a["equity"] for a in accounts.values()) if complete else None
+    start_total = sum(a["starting_capital"] for a in accounts.values()) if complete else None
+    return_pct = (round(live_pnl / start_total * 100, 2)
+                  if start_total and live_pnl is not None else None)
+    return {
+        "portfolio_value": round(equity_total, 2) if equity_total is not None else None,
+        "return_pct": return_pct,
+        "live_starting_capital": round(start_total, 2) if start_total is not None else None,
+        "live_true_pnl": round(live_pnl, 2) if live_pnl is not None else None,
+        "dry_run_true_pnl": round(dry_pnl, 2),
+        "live_bots": live,
+        "dry_run_bots": dry,
+        "live_accounts": accounts,
+        "capital_basis_errors": errors,
+        "uncovered_live_bots": list(UNCOVERED_BOTS),
+    }
+
+
 def compute_portfolio_metrics(bot_metrics: list[dict]) -> dict:
     """Compute portfolio-level aggregates."""
     online = [m for m in bot_metrics if m["online"]]
@@ -660,12 +799,15 @@ def compute_portfolio_metrics(bot_metrics: list[dict]) -> dict:
     if critical_bots:
         portfolio_flags.append(f"Critical bots: {', '.join(critical_bots)}")
 
+    # closed/open/true P&L above are all online bots, dry-run included; the
+    # capital basis and the return use live bots only.
+    basis = compute_capital_basis(bot_metrics)
+
     return {
         "closed_pnl": round(total_closed_pnl, 2),
         "open_pnl": round(total_open_pnl, 2),
         "true_pnl": round(total_true_pnl, 2),
-        "portfolio_value": round(INITIAL_CAPITAL + total_true_pnl, 2),
-        "return_pct": round(total_true_pnl / INITIAL_CAPITAL * 100, 2),
+        **basis,
         "total_trades": total_trades,
         "open_positions": total_open,
         "bots_online": bots_online,
@@ -976,6 +1118,31 @@ def check_preregistrations() -> list[str]:
     return lines
 
 
+def _format_capital_lines(portfolio: dict) -> list[str]:
+    """Live-equity lines; every figure may be None when the basis is unknown."""
+    errors = portfolio.get("capital_basis_errors") or []
+    reason = "; ".join(errors) or "capital basis unavailable"
+    value = portfolio.get("portfolio_value")
+    ret = portfolio.get("return_pct")
+    start = portfolio.get("live_starting_capital")
+    if value is None:
+        lines = [f"  Value: n/a ({reason})"]
+    elif ret is None:
+        lines = [f"  Value: ${value:,.2f} strategy-fleet live equity (return n/a: {reason})"]
+    else:
+        lines = [f"  Value: ${value:,.2f} strategy-fleet live equity ({ret:+.2f}% on "
+                 f"~${start:,.2f} starting capital)"]
+    uncovered = portfolio.get("uncovered_live_bots") or []
+    if uncovered:
+        lines.append(f"  Not covered (valued by the exporter): {', '.join(uncovered)}")
+    live_pnl = portfolio.get("live_true_pnl")
+    lines.append("  Live P&L: " + ("n/a" if live_pnl is None else f"${live_pnl:+.2f}"))
+    if portfolio.get("dry_run_bots"):
+        lines.append(f"  Dry-run P&L (simulated, excluded from return): "
+                     f"${portfolio.get('dry_run_true_pnl', 0):+.2f}")
+    return lines
+
+
 def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dict,
                            prereg_lines: Optional[list[str]] = None) -> str:
     """Format a structured Telegram report."""
@@ -987,10 +1154,10 @@ def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dic
 
     # Portfolio summary
     lines.append("PORTFOLIO")
-    lines.append(f"  Value: ${portfolio['portfolio_value']:,.2f} ({portfolio['return_pct']:+.2f}%)")
-    lines.append(f"  Closed P&L: ${portfolio['closed_pnl']:+.2f}")
-    lines.append(f"  Open P&L: ${portfolio['open_pnl']:+.2f}")
-    lines.append(f"  True P&L: ${portfolio['true_pnl']:+.2f}")
+    lines.extend(_format_capital_lines(portfolio))
+    lines.append(f"  Closed P&L (all bots): ${portfolio['closed_pnl']:+.2f}")
+    lines.append(f"  Open P&L (all bots): ${portfolio['open_pnl']:+.2f}")
+    lines.append(f"  True P&L (all bots): ${portfolio['true_pnl']:+.2f}")
     lines.append(f"  Trades: {portfolio['total_trades']} closed, {portfolio['open_positions']} open")
     lines.append(f"  Bots: {portfolio['bots_online']}/{portfolio.get('bots_total', portfolio['bots_online'])} online")
     lines.append(f"  Avg Health: {portfolio['avg_health_score']:.0f}/100")

@@ -166,6 +166,33 @@ def _load_latest_results() -> Optional[dict]:
     return None
 
 
+def _stamp_stages_requested(results: dict) -> dict:
+    """Copy meta.stages_requested onto each strategy's results.
+
+    classify_recommendation only sees one strategy's results, and treats a
+    missing calibration/robustness measurement as advisory only when that
+    stamp shows the stage was not requested. Also applied when reloading a
+    saved run for --report, so older pipeline_results.json files (which
+    recorded meta.stages_requested but no per-strategy stamp) are judged by
+    the stages that run actually requested. A strategy that already carries
+    a stamp is left alone.
+    """
+    meta = results.get("meta") or {}
+    requested = meta.get("stages_requested")
+    mode = meta.get("mode")
+    for strat_results in (results.get("strategies") or {}).values():
+        if not isinstance(strat_results, dict):
+            continue
+        if isinstance(requested, list):
+            strat_results.setdefault("stages_requested", list(requested))
+        # Lets classify_recommendation recognise a legacy robustness artifact
+        # (written before mc_skip_reason existed) from a mode whose
+        # mc_iterations is 0 as deliberately disabled rather than missing.
+        if isinstance(mode, str):
+            strat_results.setdefault("run_mode", mode)
+    return results
+
+
 def _is_stage_available(stage: str) -> bool:
     """Check if a stage's module is imported and available."""
     mapping = {
@@ -377,6 +404,10 @@ def run_pipeline(
         "strategies": {name: {} for name in strat_names},
         "stage_durations": {},
     }
+    # Per-strategy copy of the requested stages, so classify_recommendation
+    # can tell a stage deliberately left out (advisory) from one that was
+    # requested but produced no measurement (blocks OPTIMIZE/KEEP).
+    _stamp_stages_requested(results)
 
     # Track which strategies are dead (skip expensive stages for them)
     dead_strategies: set[str] = set()
@@ -849,6 +880,7 @@ def main() -> int:
         if results is None:
             log.error("No previous results found in %s", RESULTS_DIR)
             return 2
+        _stamp_stages_requested(results)
 
         if _is_stage_available("reporting"):
             try:

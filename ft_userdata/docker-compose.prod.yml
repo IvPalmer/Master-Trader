@@ -158,6 +158,10 @@ services:
       # leveraged positions and this container shares dokploy-network with
       # ~25 unrelated applications. Generate with `openssl rand -hex 24`.
       KILLERS_INGRESS_TOKEN: ${KILLERS_INGRESS_TOKEN:-}
+      # Sent as X-Notify-Token to trade-webhook /test/notify (#59). Must equal
+      # the value on trade-webhook and insiders-receiver. Empty = legacy
+      # unauthenticated notify (accepted until trade-webhook sets its token).
+      TRADE_WEBHOOK_NOTIFY_TOKEN: ${TRADE_WEBHOOK_NOTIFY_TOKEN:-}
       # Read from the shared anchor — sibling Freqtrade containers inherit
       # *a1 which sets FREQTRADE__API_SERVER__USERNAME/PASSWORD. Hardcoding
       # would 401 against rotated creds.
@@ -255,6 +259,11 @@ services:
       - ./user_data/strategies:/freqtrade/user_data/strategies
     ports:
       - 127.0.0.1:8099:8080
+    # #11: every CCXT call goes through hl-gateway; don't start the bot (and
+    # its startup reconciliation) against a gateway that isn't serving yet.
+    depends_on:
+      hl-gateway:
+        condition: service_healthy
     healthcheck: *a2
     deploy:
       resources:
@@ -313,6 +322,10 @@ services:
       - ./user_data/strategies:/freqtrade/user_data/strategies
     ports:
       - 127.0.0.1:8098:8080
+    # #11: CCXT urls point at hl-gateway; wait for it to be healthy.
+    depends_on:
+      hl-gateway:
+        condition: service_healthy
     healthcheck: *a2
     deploy:
       resources:
@@ -375,6 +388,8 @@ services:
       KILLERS_POSTED_SL: "true"
       KILLERS_EXECUTION_VENUE: hyperliquid
       KILLERS_NOTIFY_URL: http://trade-webhook:8088/test/notify
+      # Same shared value as killers-receiver and trade-webhook (#59).
+      TRADE_WEBHOOK_NOTIFY_TOKEN: ${TRADE_WEBHOOK_NOTIFY_TOKEN:-}
     volumes:
       - insiders_receiver_state:/var/lib/killers
     ports:
@@ -414,6 +429,10 @@ services:
       - ./user_data/strategies:/freqtrade/user_data/strategies
     ports:
       - 127.0.0.1:8103:8080
+    # #11: CCXT urls point at hl-gateway; wait for it to be healthy.
+    depends_on:
+      hl-gateway:
+        condition: service_healthy
     healthcheck: *a2
     deploy:
       resources:

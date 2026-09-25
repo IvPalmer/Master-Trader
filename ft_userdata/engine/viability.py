@@ -554,6 +554,15 @@ def classify_viability(
         )
         is_marginal = True
 
+    # Pair analysis that failed never assessed concentration. The
+    # concentration_risk=False it leaves behind is a default, not a finding,
+    # so an unassessed analysis cannot support VIABLE.
+    if pair_analysis.get("error"):
+        reasons.append(
+            f"MARGINAL: Pair concentration not assessed: {pair_analysis['error']}"
+        )
+        is_marginal = True
+
     if is_marginal:
         return "MARGINAL", reasons
 

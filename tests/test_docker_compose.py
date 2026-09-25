@@ -127,3 +127,43 @@ def test_hyperliquid_market_discovery_matches_native_perp_configs():
         assert config['exchange']['ccxt_config']['options']['fetchMarkets']['types'] == ['swap']
         assert config['trading_mode'] == 'futures'
         assert not config['exchange'].get('hip3_dexes')
+
+
+def _prod_services():
+    return yaml.safe_load((FT_DIR / 'docker-compose.prod.yml').read_text())['services']
+
+
+def _ccxt_via_hl_gateway(service):
+    env = service.get('environment') or {}
+    return any('CCXT_CONFIG__urls' in key and 'hl-gateway' in str(value)
+               for key, value in env.items())
+
+
+def test_hyperliquid_bots_wait_for_healthy_gateway():
+    """#11: a bot whose CCXT traffic goes through hl-gateway must not start
+    before the gateway passes its healthcheck."""
+    services = _prod_services()
+    assert services['hl-gateway'].get('healthcheck'), \
+        'service_healthy needs hl-gateway to define a healthcheck'
+    bots = {name for name, svc in services.items() if _ccxt_via_hl_gateway(svc)}
+    # Guard against the detector silently matching nothing.
+    assert bots == {'ft-killers-scalp', 'ft-insiders-scalp', 'ft-short-keltner-hl-live'}
+    for name in bots:
+        depends = services[name].get('depends_on')
+        assert isinstance(depends, dict), f'{name}: depends_on must be map form'
+        assert depends.get('hl-gateway', {}).get('condition') == 'service_healthy', name
+
+
+def test_receivers_reach_the_gateway_only_through_their_bot():
+    """Receivers declare no direct gateway dependency, but they depend on their
+    Freqtrade bot, which waits for a healthy gateway. So a fresh `compose up`
+    does not start a receiver while the gateway is unhealthy; already-running
+    containers and restart-policy restarts are unaffected (depends_on only
+    orders `up`). Pinned here so the transitive edge stays visible."""
+    services = _prod_services()
+    for name, bot in (('killers-receiver', 'ft-killers-scalp'),
+                      ('insiders-receiver', 'ft-insiders-scalp')):
+        depends = services[name].get('depends_on') or []
+        assert 'hl-gateway' not in depends, name
+        assert bot in depends, name
+        assert services[bot]['depends_on']['hl-gateway']['condition'] == 'service_healthy'
