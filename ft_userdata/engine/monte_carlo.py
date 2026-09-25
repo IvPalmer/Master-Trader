@@ -404,20 +404,23 @@ def run_parameter_perturbation(
 
     Returns: {
         per_param: {param_name: {variants: [...], sensitivity, pct_change}},
-        overall: PASS/WARN/FAIL,
-        stability_score: int (0-100),
+        overall: PASS/WARN/FAIL, or SKIP when there is nothing to perturb,
+        stability_score: int (0-100), or None when SKIP,
         total_backtests_run: int,
     }
     """
     numeric_params = _extract_numeric_params(base_params)
 
     if not numeric_params:
+        # Nothing was perturbed, so nothing was assessed: report SKIP with no
+        # score rather than a PASS/100 that would carry the combined verdict.
         log.warning("No numeric parameters found to perturb for %s", strategy_name)
         return {
             "per_param": {},
-            "overall": "PASS",
-            "stability_score": 100,
+            "overall": "SKIP",
+            "stability_score": None,
             "total_backtests_run": 0,
+            "reason": "no numeric parameters to perturb",
         }
 
     log.info(

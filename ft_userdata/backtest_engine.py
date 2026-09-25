@@ -191,6 +191,16 @@ def _viability_trades(via_data: dict) -> list[dict]:
     return _load_backtest_trades(result_file, bt_strategy)
 
 
+def _consensus_base_params(wf_data: dict) -> dict:
+    """Consensus params from a walk-forward result, or {} when there are none.
+
+    Walk-forward writes `consensus_params: None` when no consensus is reached,
+    and `.get(key, {})` returns that None, so null has to resolve to {} here.
+    """
+    consensus = (wf_data or {}).get("consensus") or {}
+    return consensus.get("consensus_params") or {}
+
+
 def _print_registry_table() -> None:
     """Print a formatted table of all registered strategies."""
     header = f"{'Strategy':<25} {'TF':<5} {'Mode':<8} {'Port':<6} {'Stake':<7} {'Status':<8}"
@@ -660,8 +670,7 @@ def run_pipeline(
                         pairs = futures_pairs if strat_cfg["trading_mode"] == "futures" else spot_pairs
                     # Get consensus params from walk-forward results
                     wf_data = results["strategies"][strat_name].get("walk_forward", {})
-                    consensus = wf_data.get("consensus", {})
-                    base_params = consensus.get("consensus_params", {})
+                    base_params = _consensus_base_params(wf_data)
                     # Collect trades from viability backtest for MC shuffle
                     via_data = results["strategies"][strat_name].get("viability", {})
                     trades = _viability_trades(via_data)
