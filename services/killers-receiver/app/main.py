@@ -531,6 +531,29 @@ CREATE TABLE IF NOT EXISTS ingress_events (
 CREATE INDEX IF NOT EXISTS idx_ingress_kind ON ingress_events(kind);
 CREATE INDEX IF NOT EXISTS idx_ingress_action ON ingress_events(final_action);
 
+CREATE TABLE IF NOT EXISTS ingress_revisions (
+    -- Append-only: ONE row per /event delivery (#64). `ingress_events` keeps
+    -- the FIRST payload per msg_id (INSERT OR IGNORE) but its final_* columns
+    -- are overwritten by every later delivery, so after an edit (e.g. chat ->
+    -- open) that row pairs the old input with the new outcome. Use THIS table
+    -- to pair each delivery's input with its own outcome; `ingress_events` is
+    -- left unchanged for existing readers (/ingress, reprocess_ingress).
+    -- Identical redeliveries (observer retry/backfill) also get a row: each
+    -- is a real delivery. Audit only: nothing here gates execution.
+    rev_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    msg_id        INTEGER NOT NULL,
+    received_at   TEXT NOT NULL,
+    msg_edit_date TEXT,                      -- payload.msg.edit_date, if any
+    kind          TEXT,
+    symbol        TEXT,
+    signal_id     INTEGER,
+    raw_payload   TEXT NOT NULL,             -- full {msg, classification} json
+    final_action  TEXT,                      -- this delivery's own outcome
+    final_status  INTEGER,                   -- NULL if the handler died
+    completed_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_ingress_rev_msg ON ingress_revisions(msg_id, rev_id);
+
 CREATE TABLE IF NOT EXISTS target_orders (
     -- Phase 2: active limit-order placement at each signal TP.
     -- Set-and-forget on open: parse TARGETS line → place LIMIT exit at
@@ -1784,6 +1807,13 @@ async def target_orders_reconcile_loop(cfg: Config, conn: sqlite3.Connection,
         await asyncio.sleep(cfg.target_reconcile_sec)
 
 
+# A 'requested' position with no Freqtrade trade on its (pair, side) after
+# this long is an orphan from a /forceenter transport failure (#82) and is
+# expired to 'failed' by the reconcile loop. Far above the 10s forceenter
+# timeout so an in-flight request is never expired.
+REQUESTED_ORPHAN_TTL_SEC = 600  # 10 min
+
+
 async def _reconcile_loop_once(cfg: Config, conn: sqlite3.Connection,
                                session=None) -> str:
     """One position-level reconcile tick. Returns 'skipped' when FT was
@@ -1820,6 +1850,43 @@ async def _reconcile_loop_once(cfg: Config, conn: sqlite3.Connection,
             )
             logger.info("[RECONCILE] orphan pos_id=%d linked to ft_trade_id=%d",
                         pos["pos_id"], ft["trade_id"])
+
+    # (1b) expire orphans that never reached Freqtrade (#82). A transport
+    # exception on /forceenter leaves the row 'requested' forever, where it
+    # counts in the active-position gate. Only reached with a genuine FT
+    # response (the `is None` guard above), and only for rows still
+    # unlinked after step (1) with no FT trade on their (pair, side). FT
+    # lists a trade in /status as soon as the entry order is placed (even
+    # unfilled), so an accepted-but-unacknowledged forceenter is linked,
+    # not expired. Age is measured from the receiver's insert time
+    # (last_event_at), not the channel msg date.
+    now_dt = datetime.now(timezone.utc)
+    for pos in conn.execute(
+        "SELECT pos_id, pair, direction, open_date, last_event_at FROM positions "
+        "WHERE state = 'requested' AND ft_trade_id IS NULL"
+    ).fetchall():
+        if (pos["pair"], pos["direction"] == "short") in ft_by_pair:
+            continue
+        try:
+            born = datetime.fromisoformat(pos["last_event_at"] or pos["open_date"])
+        except (TypeError, ValueError):
+            continue  # unknown age: never expire
+        if born.tzinfo is None:
+            born = born.replace(tzinfo=timezone.utc)
+        age = (now_dt - born).total_seconds()
+        if age < REQUESTED_ORPHAN_TTL_SEC:
+            continue
+        now_iso = now_dt.isoformat()
+        conn.execute(
+            "UPDATE positions SET state = 'failed', "
+            "close_reason = 'requested_expired_no_ft_trade', close_date = ?, "
+            "last_event_at = ? WHERE pos_id = ? AND state = 'requested' "
+            "AND ft_trade_id IS NULL",
+            (now_iso, now_iso, pos["pos_id"]),
+        )
+        logger.warning("[RECONCILE] orphan pos_id=%d %s %s requested %.0fs ago with "
+                       "no FT trade; marked failed (requested_expired_no_ft_trade)",
+                       pos["pos_id"], pos["pair"], pos["direction"], age)
 
     # (2) detect closes we missed. Only safe when ft_open is a genuine
     # response (handled above by the `is None` guard).
@@ -2473,6 +2540,8 @@ async def handle_event(payload: EventPayload):
     # 2026-05-27 bug: msg 3471 hit a NameError and left zero audit because
     # the only event-recording code path ran AFTER processing decisions.
     ingress_id = _ingress_log_start(conn, payload)
+    # Per-delivery audit (#64): pairs THIS delivery's input with its outcome.
+    revision_id = _ingress_revision_start(conn, payload)
 
     try:
         if payload.classification.get("kind") == "open":
@@ -2491,11 +2560,14 @@ async def handle_event(payload: EventPayload):
                          msg_id, kind, e)
         _ingress_log_finish(conn, ingress_id,
                              {"action": "error", "reason": str(e)}, 500)
+        _ingress_revision_finish(conn, revision_id,
+                                 {"action": "error", "reason": str(e)}, 500)
         raise HTTPException(status_code=500,
                             detail={"error": str(e), "msg_id": msg_id,
                                     "kind": kind})
 
     _ingress_log_finish(conn, ingress_id, result, 200)
+    _ingress_revision_finish(conn, revision_id, result, 200)
 
     text = _format_event_summary(cfg, payload, result)
     _dedup_msg_id = payload.msg.get("id") if isinstance(payload.msg, dict) else None
@@ -2561,7 +2633,9 @@ def _ingress_log_start(conn: sqlite3.Connection,
 
 def _ingress_log_finish(conn: sqlite3.Connection, ingress_id: Optional[int],
                         result: dict, status: int) -> None:
-    """Stamp the handler outcome onto the ingress row."""
+    """Stamp the handler outcome onto the ingress row. The LATEST delivery's
+    outcome wins here while raw_payload keeps the FIRST; ingress_revisions
+    holds the correctly paired per-delivery record (#64)."""
     if ingress_id is None:
         return
     try:
@@ -2573,6 +2647,52 @@ def _ingress_log_finish(conn: sqlite3.Connection, ingress_id: Optional[int],
         )
     except Exception as e:
         logger.warning("ingress_log_finish failed: %s", e)
+
+
+def _ingress_revision_start(conn: sqlite3.Connection,
+                            payload: EventPayload) -> Optional[int]:
+    """Append one ingress_revisions row for this delivery (#64). Unlike
+    ingress_events there is no dedupe: every delivery, edited or not, gets
+    its own row. Audit failure never breaks the handler."""
+    try:
+        msg = payload.msg if isinstance(payload.msg, dict) else {}
+        cls = payload.classification if isinstance(payload.classification, dict) else {}
+        msg_id = msg.get("id")
+        if msg_id is None:
+            return None  # malformed payload, can't audit
+        edit_date = msg.get("edit_date")
+        cur = conn.execute(
+            "INSERT INTO ingress_revisions "
+            "(msg_id, received_at, msg_edit_date, kind, symbol, signal_id, raw_payload) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (msg_id,
+             datetime.now(timezone.utc).isoformat(),
+             str(edit_date) if edit_date is not None else None,
+             cls.get("kind"),
+             cls.get("symbol"),
+             cls.get("signal_id"),
+             json.dumps({"msg": msg, "classification": cls}, default=str)),
+        )
+        return cur.lastrowid
+    except Exception as e:
+        logger.exception("ingress_revision_start failed: %s", e)
+        return None
+
+
+def _ingress_revision_finish(conn: sqlite3.Connection, revision_id: Optional[int],
+                             result: dict, status: int) -> None:
+    """Stamp this delivery's own outcome onto its revision row."""
+    if revision_id is None:
+        return
+    try:
+        action = result.get("action") if isinstance(result, dict) else None
+        conn.execute(
+            "UPDATE ingress_revisions SET final_action=?, final_status=?, completed_at=? "
+            "WHERE rev_id=?",
+            (action, status, datetime.now(timezone.utc).isoformat(), revision_id),
+        )
+    except Exception as e:
+        logger.warning("ingress_revision_finish failed: %s", e)
 
 
 async def _process_event(payload: EventPayload):
