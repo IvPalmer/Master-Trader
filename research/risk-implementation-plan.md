@@ -2,6 +2,8 @@
 
 > Created 2026-03-11. This is the master plan for implementing risk controls.
 > All research files are in /research/ — read them before implementing.
+>
+> **Historical (2026-03).** Describes a fleet and file layout that no longer exist; kept as a record, not current guidance.
 
 ---
 
@@ -25,7 +27,7 @@
 - `docker-compose.yml` — CombinedBinH commented out, depends_on updated
 - `metrics_exporter.py` — CombinedBinH commented out
 - `tournament_manager.py` — CombinedBinH commented out
-- `strategies/ClucHAnix.py` — ADX regime threshold 25→35
+- `strategies/ClucHAnix.py` — ADX regime threshold 25→35 (historical: that root `strategies/` copy was removed in #89; the loaded file is `ft_userdata/user_data/strategies/ClucHAnix.py`)
 
 ---
 
