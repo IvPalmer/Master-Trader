@@ -214,6 +214,12 @@ services:
       # limit-fill price, not merely the trigger price.
       KILLERS_STOP_LIMIT_RATIO: "0.98"
       KILLERS_MIN_NOTIONAL_USD: "11.3"
+      # Entry when the mark has run past the posted zone (#162, operator,
+      # 2026-10-03): market up to 5% past the zone edge; beyond that the
+      # signal is skipped. The 24h limit-in-zone order (since 2026-06-04)
+      # filled 1 of 13 times and missed the moves the other 12 made.
+      KILLERS_MAX_ENTRY_SLIPPAGE_PCT: "5.0"
+      KILLERS_ENTRY_LIMIT_IN_ZONE: "false"
       KILLERS_REQUIRE_POSTED_SL: "true"
       # 2026-09-23, operador: sem limite de entradas (o teto real passa a ser
       # a margem livre na Hyperliquid). 50 em vez de infinito porque o

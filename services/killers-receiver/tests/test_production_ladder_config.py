@@ -51,6 +51,12 @@ SIGNALS = [
 ]
 
 
+def test_entry_chases_up_to_5pct_then_skips():
+    env = _env()
+    assert env["KILLERS_MAX_ENTRY_SLIPPAGE_PCT"] == "5.0"
+    assert env["KILLERS_ENTRY_LIMIT_IN_ZONE"] == "false"
+
+
 def test_pinned_equal_ladder_policy():
     env = _env()
     assert env["KILLERS_TP_MODE"] == "legacy"
