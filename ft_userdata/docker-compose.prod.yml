@@ -617,6 +617,9 @@ services:
       # when a token is wrong, which localises the fault to auth.
       KILLERS_RECEIVER_TOKEN: ${KILLERS_INGRESS_TOKEN:-}
       INSIDERS_RECEIVER_TOKEN: ${INSIDERS_INGRESS_TOKEN:-}
+      # Bearer for /widgets* only (the operator's widget platform, via the
+      # tailnet widgets-gate). Unset => /widgets* answers 503; nothing else changes.
+      WIDGETS_TOKEN: ${WIDGETS_TOKEN:-}
       FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
       POLL_INTERVAL: "30"
