@@ -4,7 +4,9 @@ One widget, `bots`: the rolling 24 h P&L of the live bots (Master Trader keeps a
 rolling 24-hour figure, delta_24h.pnl_usd, not a calendar day), one row per bot
 with a status tone, the live bots' summed realized equity (only when every live
 bot has a series, so never a partial total), and the fleet status
-as an alert when it is yellow or red. Paper and live are never mixed in a number.
+as an alert when it is yellow or red, and a `metrics` view that repeats the dashboard
+header (account equity, realized, unrealized and 24 h P&L of the live bots; the math is
+`get hero()` in static/dashboard.js). Paper and live are never mixed in a number.
 
 Its own bearer (WIDGETS_TOKEN) guards /widgets* only; every other route and the
 Cloudflare Access edge are unchanged. Unset token => 503, never open.
@@ -23,7 +25,7 @@ CATALOG = {
     "contract": 1,
     "app": "trader",
     "widgets": [{
-        "id": "bots", "title": "Bots", "views": ["stat", "list", "spark", "alert"],
+        "id": "bots", "title": "Bots", "views": ["stat", "list", "spark", "alert", "metrics"],
         "default_view": "stat", "refresh_s": 60, "actions": [],
     }],
 }
@@ -93,7 +95,8 @@ def fleet_equity(series_list: list[list], max_points: int = MAX_POINTS) -> list[
 
 
 def build_bots(state: dict) -> dict:
-    """The `bots` payload from an /api/state subset. Pure. Needs last_poll."""
+    """The `bots` payload from an /api/state subset. Pure. Needs last_poll;
+    account_health is optional (only the equity row reads it)."""
     bots = list((state.get("bots") or {}).values())
     live = [b for b in bots if not b.get("dry_run", True)]
     pnl = sum(_pnl(b) for b in live)
@@ -104,6 +107,7 @@ def build_bots(state: dict) -> dict:
         "as_of": datetime.fromtimestamp(float(state["last_poll"]), timezone.utc).isoformat(timespec="seconds"),
         "stat": {"value": usd(pnl), "label": "24 h P&L · live",
                  "delta": f"{trades} trade{'' if trades == 1 else 's'} closed", "tone": stat_tone},
+        "metrics": build_metrics(state),
     }
     ordered = sorted(bots, key=lambda b: (bool(b.get("dry_run", True)), str(b.get("label") or b.get("key"))))
     if ordered:
@@ -121,6 +125,72 @@ def build_bots(state: dict) -> dict:
         tone = max(stat_tone, alert_tone, key=TONE_RANK.__getitem__)
     data["tone"] = tone
     return data
+
+
+def _num(value) -> float:
+    """JS `value ?? 0`: only None falls back, so a real 0 is kept."""
+    return 0.0 if value is None else float(value)
+
+
+def _signed(value: float) -> tuple[str, str]:
+    """Signed dollars and the tone for the sign. Rounds to cents first, so float drift
+    in a sum never shows as a green or red $0.00."""
+    value = round(value, 2)
+    return usd(value), "good" if value > 0 else "bad" if value < 0 else "neutral"
+
+
+def _is_pending_entry(trade: dict) -> bool:
+    """An unfilled entry order is not a position (dashboard.js isPendingEntry)."""
+    if (trade.get("entry") or {}).get("state") != "pending":
+        return False
+    try:
+        return not float(trade.get("amount")) > 0   # a missing amount counts as unfilled
+    except (TypeError, ValueError):
+        return True
+
+
+def _count(n: int, noun: str) -> str:
+    return f"{n} {noun}{'' if n == 1 else 's'}"
+
+
+def build_metrics(state: dict) -> dict:
+    """The `metrics` view: the dashboard header, `get hero()` in static/dashboard.js,
+    for the live bots only (`dry_run === false`). Pure."""
+    fleet = {name: b for name, b in (state.get("bots") or {}).items() if b.get("dry_run") is False}
+    live = list(fleet.values())
+    # Bots sharing one exchange account count its capital once: the largest wallet.
+    accounts: dict = {}
+    for name, b in fleet.items():
+        wallet = b.get("wallet") or {}
+        owned = wallet.get("bot_owned")
+        if owned is None:
+            owned = wallet.get("starting_capital")
+        group = b.get("account_group") or b.get("key") or name
+        accounts[group] = max(accounts.get(group, 0.0), _num(owned))
+    observed = state.get("account_health")
+    if observed is None:
+        equity = sum(accounts.values())
+    else:
+        equity = observed.get("equity") if observed.get("complete") else None
+    pnls = [b.get("pnl") or {} for b in live]
+    realized = sum(_num(p.get("closed")) for p in pnls)
+    unrealized = sum(_num(p["unrealized"]) if p.get("unrealized") is not None
+                     else _num(p.get("all_coin")) - _num(p.get("closed")) for p in pnls)
+    closed = sum(int(_num((b.get("stats") or {}).get("closed_trade_count"))) for b in live)
+    trades = [t for b in live for t in b.get("open_trades") or []]
+    positions = sum(1 for t in trades if not _is_pending_entry(t))
+    day = sum(_pnl(b) for b in live)
+    rows = [{"label": "Account equity",
+             "value": "—" if equity is None
+                      else ("−" if float(equity) < 0 else "") + f"${abs(float(equity)):,.2f}",
+             "detail": "shared accounts counted once" if equity is not None else "valuation incomplete",
+             "tone": "neutral" if equity is not None else "warn"}]
+    for label, value, detail in (("Realized P&L", realized, f"{_count(closed, 'closed trade')} · live epochs"),
+                                 ("Unrealized P&L", unrealized, _count(positions, "open position")),
+                                 ("24 h P&L", day, "live bots · rolling 24 h")):
+        text, tone = _signed(value)
+        rows.append({"label": label, "value": text, "detail": detail, "tone": tone})
+    return {"rows": rows}
 
 
 def _authorized(request: Request) -> JSONResponse | None:

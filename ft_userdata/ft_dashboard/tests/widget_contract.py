@@ -1,7 +1,10 @@
 """Widget contract v1: the single validator (spec: The widget contract, A1).
 
 The gateway runs it on every app response at the boundary; each app keeps an
-unchanged copy for its conformance test. Stdlib only. Beyond the shapes, it
+unchanged copy for its conformance test. Stdlib only. Five views: stat, list,
+spark, alert and metrics (2026-10-07, part 5: one to eight labelled rows, each
+with a value, an optional detail and an optional tone, for the dashboard
+numbers the TRMNL pages show). Beyond the shapes, it
 checks that default_view is one of views, that widget and action ids are
 unique, that a payload's id is the widget asked for, that a payload carries
 only views its catalog entry lists, that an item's actions exist in its
@@ -24,7 +27,7 @@ AS_OF_RE = re.compile(
     r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})"
     r"(?:\.[0-9]+)?(?:Z|[+-]([0-9]{2}):([0-9]{2}))")
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
-VIEWS = ("stat", "list", "spark", "alert")
+VIEWS = ("stat", "list", "spark", "alert", "metrics")
 TONES = ("neutral", "good", "warn", "bad")
 RISKS = ("low", "medium", "high")
 RISK_RANK = {"low": 0, "medium": 1, "high": 2}
@@ -38,6 +41,7 @@ _VIEW_KEYS = {
     "list": (("groups",), ()),
     "spark": (("label", "points"), ("unit",)),
     "alert": (("text", "tone"), ()),
+    "metrics": (("rows",), ()),
 }
 
 
@@ -213,6 +217,18 @@ def _check_list(body: dict, actions: set[str]) -> None:
                 _unique(ids, f"{iw}.actions")
 
 
+def _check_metrics(body: dict) -> None:
+    for ri, row in enumerate(_list(body["rows"], "data.metrics.rows", 1, 8)):
+        rw = f"data.metrics.rows[{ri}]"
+        _obj(row, rw, ("label", "value"), ("detail", "tone"))
+        _str(row["label"], f"{rw}.label")
+        _str(row["value"], f"{rw}.value")
+        if "detail" in row:
+            _str(row["detail"], f"{rw}.detail")
+        if "tone" in row:
+            _enum(row["tone"], f"{rw}.tone", TONES)
+
+
 def check_data(doc, entry: dict) -> dict:
     """A payload for the catalog entry `entry` (already checked)."""
     _obj(doc, "data", ("id", "title", "as_of"), ("tone",) + VIEWS)
@@ -239,6 +255,8 @@ def check_data(doc, entry: dict) -> dict:
                 _enum(body["tone"], "data.stat.tone", TONES)
         elif view == "list":
             _check_list(body, actions)
+        elif view == "metrics":
+            _check_metrics(body)
         elif view == "spark":
             _str(body["label"], "data.spark.label")
             for p in _list(body["points"], "data.spark.points", 2, 500):
