@@ -1,2 +1,2 @@
-telethon==1.36.0
+telethon==1.45.0
 aiohttp==3.11.10
