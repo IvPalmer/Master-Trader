@@ -359,6 +359,64 @@ def test_killers_stop_is_absolute_recomputed_and_after_fill_aware():
     assert first != second  # relative value is not cached/trailing.
 
 
+def _killers_cold_strategy():
+    """A freshly restarted strategy whose receiver lookup is failing."""
+    module = _load_strategy("KillersScalpV1.py")
+    strategy = module.KillersScalpV1.__new__(module.KillersScalpV1)
+    strategy._sl_cache = {}
+    strategy._sl_cache_updated = {}
+    strategy._sl_refreshing = set()
+    strategy._schedule_stop_refresh = lambda trade_id: None
+    return strategy
+
+
+@pytest.mark.parametrize(
+    "is_short, tag_stop, raised_stop, rate",
+    [(False, 95, 100.0, 104.0), (True, 105, 100.0, 96.0)],
+)
+def test_killers_exit_fill_does_not_loosen_a_raised_stop(is_short, tag_stop, raised_stop, rate):
+    # #181: Freqtrade calls custom_stoploss(after_fill=True) after a TP fill and
+    # lets that call widen the stop. With an empty cache and the receiver down
+    # the strategy falls back to the entry-tag stop, which would undo a stop
+    # the receiver had already raised.
+    strategy = _killers_cold_strategy()
+    trade = SimpleNamespace(
+        id=7, enter_tag=f"signal:2144|sl:{tag_stop}", entry_tag=None,
+        is_short=is_short, leverage=1.0, nr_of_successful_exits=1,
+        stop_loss=raised_stop,
+    )
+
+    assert strategy.custom_stoploss("BTC/USDC:USDC", trade, None, rate, 0.04, True) is None
+
+
+def test_killers_exit_fill_still_applies_a_tighter_stop():
+    strategy = _killers_cold_strategy()
+    strategy._sl_cache[7] = 101.0  # receiver has raised the stop past the held one
+    strategy._sl_cache_updated[7] = 1.0
+    trade = SimpleNamespace(
+        id=7, enter_tag="signal:2144|sl:95", entry_tag=None,
+        is_short=False, leverage=1.0, nr_of_successful_exits=2,
+        stop_loss=100.0,
+    )
+
+    result = strategy.custom_stoploss("BTC/USDC:USDC", trade, None, 104.0, 0.04, True)
+
+    assert result == pytest.approx(101.0 / 104.0)
+
+
+def test_killers_entry_fill_still_widens_to_the_posted_stop():
+    strategy = _killers_cold_strategy()
+    trade = SimpleNamespace(
+        id=7, enter_tag="signal:2144|sl:90", entry_tag=None,
+        is_short=False, leverage=1.0, nr_of_successful_exits=0,
+        stop_loss=93.0,  # Freqtrade's initial -7% floor at entry 100
+    )
+
+    result = strategy.custom_stoploss("BTC/USDC:USDC", trade, None, 100.0, 0.0, True)
+
+    assert result == pytest.approx(0.90)  # widened below the floor to the posted stop
+
+
 def test_killers_rejects_freqtrade_minimum_stake_bump():
     module = _load_strategy("KillersScalpV1.py")
     strategy = module.KillersScalpV1.__new__(module.KillersScalpV1)
