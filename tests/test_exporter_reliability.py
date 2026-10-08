@@ -190,10 +190,10 @@ def test_account_migration_preserves_drawdown_and_ignores_changing_bot_base(expo
     exporter._live_bots = [{'service': 'a', 'strategy': 'A'}]
     exporter._portfolio_peak = 180
     monkeypatch.setattr(exporter, '_save_peak_state', lambda: None)
-    exporter.check_circuit_breaker(5, 195)
+    exporter.check_circuit_breaker(5, _binance(195))
     assert exporter._portfolio_peak == 200  # preserve the old $5 drawdown
     exporter._live_initial_capital = 120  # new position altered FT's margin estimate
-    exporter.check_circuit_breaker(5, 195)
+    exporter.check_circuit_breaker(5, _binance(195))
     assert exporter._portfolio_peak == 200
 
 
@@ -211,10 +211,14 @@ def test_external_cash_flows_preserve_dollar_drawdown(exporter, monkeypatch):
     exporter._equity_basis = 'accounts-v1'
     exporter._portfolio_peak = 100
     monkeypatch.setattr(exporter, '_save_peak_state', lambda: None)
-    exporter.check_circuit_breaker(0, 195, net_transfers=100)
+    exporter.check_circuit_breaker(0, _binance(195, transfers=100))
     assert exporter._portfolio_peak == 200
-    exporter.check_circuit_breaker(0, 145, net_transfers=50)
+    exporter.check_circuit_breaker(0, _binance(145, transfers=50))
     assert exporter._portfolio_peak == 150
+
+
+def _binance(equity, transfers=0.0):
+    return {"binance-spot": {"equity": equity, "transfers": transfers}}
 
 
 def _gateway_ok(exporter, monkeypatch):
@@ -369,8 +373,10 @@ KELTNER = {"service": "keltnerbouncev1", "strategy": "KeltnerBounceV1",
            "capital_account": "binance-spot"}
 KILLERS = {"service": "ft-killers-scalp", "strategy": "KillersScalpV1",
            "capital_account": "hyperliquid-killers", "capital_owner": True}
-LEDGER_TOTAL = sum(row["amount"] for row in json.loads(
-    (FT_DIR / "account_transfers.json").read_text())["transfers"])
+LEDGER = json.loads((FT_DIR / "account_transfers.json").read_text())["transfers"]
+LEDGER_TOTAL = sum(row["amount"] for row in LEDGER)
+BINANCE_T = sum(row["amount"] for row in LEDGER if row["account"] == "binance-spot")
+KILLERS_T = sum(row["amount"] for row in LEDGER if row["account"] == "hyperliquid-killers")
 
 
 def _registry_bot(exporter, strategy):
@@ -421,6 +427,10 @@ def test_todays_valued_accounts_observe_exactly_as_before(exporter, monkeypatch)
     assert result["breaker_complete"] is True
     assert result["breaker_equity"] == result["equity"]
     assert result["net_transfers"] == pytest.approx(LEDGER_TOTAL)
+    assert result["breaker_accounts"] == {
+        "binance-spot": {"equity": 300.0, "transfers": pytest.approx(BINANCE_T)},
+        "hyperliquid-killers": {"equity": 100.0, "transfers": pytest.approx(KILLERS_T)},
+    }
     assert result["errors"] == []
     assert "unvalued_accounts" not in result
 
@@ -437,6 +447,7 @@ def test_live_bot_on_unvalued_account_leaves_breaker_running_on_the_rest(exporte
     assert result["breaker_complete"] is True, "one unvalued account must not freeze the breaker"
     assert result["breaker_equity"] == 400.0
     assert result["net_transfers"] == pytest.approx(LEDGER_TOTAL)
+    assert set(result["breaker_accounts"]) == {"binance-spot", "hyperliquid-killers"}
     # The whole-portfolio total is still not claimed: the Insiders wallet is unobserved.
     assert result["complete"] is False
     assert result["equity"] is None
@@ -455,6 +466,7 @@ def test_transient_failure_on_a_valued_account_still_freezes_the_breaker(exporte
     result = exporter.observe_accounts()
     assert result["breaker_complete"] is False, "a partial total would fake a drawdown"
     assert result["breaker_equity"] is None
+    assert result["breaker_accounts"] is None
     assert "Account equity unavailable: hyperliquid-killers" in result["errors"]
 
 
@@ -627,31 +639,31 @@ def test_failed_halt_is_retried_alone_without_repeating_the_alert(exporter, monk
     the global alert on every 60-second scrape."""
     clock, stops, alerts = _breached_fleet(
         exporter, monkeypatch, failing={"ft-insiders-scalp": [True, True, False]})
-    exporter.check_circuit_breaker(0.0, 400.0)
+    exporter.check_circuit_breaker(0.0, _binance(400.0))
     assert stops == ["FundingFadeV1", "InsidersScalpV1"] and len(alerts) == 1
 
     for _ in range(3):  # Insiders fails once more, then succeeds
         clock.now += 60
-        exporter.check_circuit_breaker(0.0, 400.0)
+        exporter.check_circuit_breaker(0.0, _binance(400.0))
     assert stops[2:] == ["InsidersScalpV1", "InsidersScalpV1"], "only the failed halt is retried"
     assert len(alerts) == 1, "a retry is not a new breach"
 
     clock.now += 60
-    exporter.check_circuit_breaker(0.0, 400.0)
+    exporter.check_circuit_breaker(0.0, _binance(400.0))
     assert len(stops) == 4 and len(alerts) == 1, "nothing left to retry"
 
     clock.now += exporter.CIRCUIT_BREAKER_COOLDOWN
-    exporter.check_circuit_breaker(0.0, 400.0)
+    exporter.check_circuit_breaker(0.0, _binance(400.0))
     assert len(alerts) == 2, "the hourly re-halt and reminder while still breached is unchanged"
     assert stops[4:] == ["FundingFadeV1", "InsidersScalpV1"]
 
 
 def test_pending_halts_clear_when_the_breach_recovers(exporter, monkeypatch):
     clock, stops, alerts = _breached_fleet(exporter, monkeypatch, failing={"ft-insiders-scalp": [True]})
-    exporter.check_circuit_breaker(0.0, 400.0)
+    exporter.check_circuit_breaker(0.0, _binance(400.0))
     assert exporter._pending_halts == {"ft-insiders-scalp"}
     clock.now += 60
-    exporter.check_circuit_breaker(0.0, 495.0)  # 1% drawdown: the breaker resets
+    exporter.check_circuit_breaker(0.0, _binance(495.0))  # 1% drawdown: the breaker resets
     assert exporter._circuit_breaker_triggered is False
     assert exporter._pending_halts == set(), "no halt is retried once the breach has cleared"
 
@@ -664,3 +676,147 @@ def test_pending_halts_survive_an_exporter_restart(exporter, monkeypatch, tmp_pa
     exporter._pending_halts = set()
     exporter._load_peak_state()
     assert exporter._pending_halts == {"ft-insiders-scalp"}
+
+
+# ── #142: an account entering or leaving the breaker's scope ──────────────
+def _scoped_breaker(exporter, monkeypatch):
+    exporter._live_bots = [FUNDING, KILLERS]
+    exporter._live_initial_capital = 400.0
+    exporter._equity_basis = "accounts-v1"
+    exporter._portfolio_peak = 0.0
+    exporter._circuit_breaker_triggered = False
+    exporter._pending_halts = set()
+    stopped = []
+    monkeypatch.setattr(exporter, "_save_peak_state", lambda: None)
+    monkeypatch.setattr(exporter, "stop_bot", lambda bot: stopped.append(bot["strategy"]) or True)
+    monkeypatch.setattr(exporter, "send_circuit_breaker_alert", lambda *a: None)
+    return stopped
+
+
+def _both(binance, killers):
+    return {"binance-spot": {"equity": binance, "transfers": BINANCE_T},
+            "hyperliquid-killers": {"equity": killers, "transfers": KILLERS_T}}
+
+
+def _dollar_drawdown(exporter, value):
+    return exporter._portfolio_peak - value
+
+
+def test_demoting_the_only_bot_on_an_account_halts_nothing(exporter, monkeypatch):
+    """Issue #142 repro: Killers demoted, Binance keeps its real $15 drawdown."""
+    stopped = _scoped_breaker(exporter, monkeypatch)
+    exporter.check_circuit_breaker(0, _both(221.0, 309.0))
+    exporter.check_circuit_breaker(0, _both(206.0, 309.0))
+    assert _dollar_drawdown(exporter, 515.0) == pytest.approx(15.0)
+
+    exporter._live_bots = [FUNDING]
+    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
+    assert stopped == []
+    assert _dollar_drawdown(exporter, 206.0) == pytest.approx(15.0), "the Binance drawdown is unchanged"
+
+
+def test_promoting_an_account_keeps_an_existing_drawdown(exporter, monkeypatch):
+    """Killers enters holding more than its ledger total; Binance's loss must survive."""
+    stopped = _scoped_breaker(exporter, monkeypatch)
+    exporter.check_circuit_breaker(0, _binance(221.0, transfers=BINANCE_T))
+    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
+    exporter.check_circuit_breaker(0, _both(206.0, 300.0))
+    assert stopped == []
+    assert _dollar_drawdown(exporter, 506.0) == pytest.approx(15.0)
+
+
+def test_promoting_an_account_below_its_ledger_total_trips_nothing(exporter, monkeypatch):
+    """Killers enters holding less than its ledger total; that loss predates its scope."""
+    stopped = _scoped_breaker(exporter, monkeypatch)
+    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
+    exporter.check_circuit_breaker(0, _both(206.0, 150.0))
+    assert stopped == []
+    assert _dollar_drawdown(exporter, 356.0) == pytest.approx(0.0)
+
+
+def test_real_loss_after_a_scope_change_still_trips(exporter, monkeypatch):
+    stopped = _scoped_breaker(exporter, monkeypatch)
+    exporter.check_circuit_breaker(0, _both(206.0, 324.0))
+    exporter._live_bots = [FUNDING]
+    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
+    exporter.check_circuit_breaker(0, _binance(180.0, transfers=BINANCE_T))
+    assert stopped == ["FundingFadeV1"]
+
+
+def test_departure_keeps_the_dollar_drawdown_on_a_smaller_peak(exporter, monkeypatch):
+    """Approved trade-off: a $40 loss is 7.5% of $530 but 18% of the $221 left."""
+    stopped = _scoped_breaker(exporter, monkeypatch)
+    exporter.check_circuit_breaker(0, _both(221.0, 309.0))
+    exporter.check_circuit_breaker(0, _both(181.0, 309.0))
+    assert stopped == []
+    exporter._live_bots = [FUNDING]
+    exporter.check_circuit_breaker(0, _binance(181.0, transfers=BINANCE_T))
+    assert _dollar_drawdown(exporter, 181.0) == pytest.approx(40.0)
+    assert stopped == ["FundingFadeV1"]
+
+def test_cash_flow_and_departure_in_one_cycle_both_apply(exporter, monkeypatch):
+    stopped = _scoped_breaker(exporter, monkeypatch)
+    exporter.check_circuit_breaker(0, _both(206.0, 324.0))
+    exporter._live_bots = [FUNDING]
+    exporter.check_circuit_breaker(0, _binance(256.0, transfers=BINANCE_T + 50.0))
+    assert stopped == []
+    assert exporter._portfolio_peak == pytest.approx(256.0)
+
+
+def test_account_scope_survives_an_exporter_restart(exporter, monkeypatch, tmp_path):
+    save = exporter._save_peak_state
+    stopped = _scoped_breaker(exporter, monkeypatch)
+    monkeypatch.setattr(exporter, "_save_peak_state", save)
+    monkeypatch.setattr(exporter, "PEAK_STATE_FILE", tmp_path / "portfolio_peak.json")
+    exporter.check_circuit_breaker(0, _both(206.0, 324.0))
+
+    exporter._account_scope = None
+    exporter._portfolio_peak = 0.0
+    exporter._load_peak_state()
+    exporter._live_bots = [FUNDING]
+    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
+    assert stopped == []
+    assert exporter._portfolio_peak == pytest.approx(206.0)
+
+
+def test_malformed_saved_scope_is_reseeded_instead_of_crashing(exporter, monkeypatch, tmp_path):
+    monkeypatch.setattr(exporter, "PEAK_STATE_FILE", tmp_path / "portfolio_peak.json")
+    (tmp_path / "portfolio_peak.json").write_text(json.dumps({
+        "peak": 530.0, "equity_basis": "accounts-v1", "account_transfer_total": LEDGER_TOTAL,
+        "accounts": {"hyperliquid-killers": {"equity": "n/a"}}}))
+    exporter._load_peak_state()
+    assert exporter._portfolio_peak == 530.0
+    assert exporter._account_scope is None
+
+def test_state_without_account_scope_seeds_it_without_a_shift(exporter, monkeypatch):
+    """The deployed peak file predates per-account scope: it holds one transfer total."""
+    stopped = _scoped_breaker(exporter, monkeypatch)
+    exporter._portfolio_peak = 530.0
+    exporter._account_scope = None
+    exporter._account_transfer_total = LEDGER_TOTAL
+    exporter.check_circuit_breaker(0, _both(206.0, 324.0))
+    assert exporter._portfolio_peak == pytest.approx(530.0)
+
+    exporter._live_bots = [FUNDING]
+    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
+    assert stopped == []
+    assert exporter._portfolio_peak == pytest.approx(206.0)
+
+
+def test_seeding_still_applies_a_transfer_recorded_before_the_upgrade(exporter, monkeypatch):
+    _scoped_breaker(exporter, monkeypatch)
+    exporter._portfolio_peak = 320.0
+    exporter._account_scope = None
+    exporter._account_transfer_total = BINANCE_T
+    exporter.check_circuit_breaker(0, _both(206.0, 300.0))
+    assert exporter._portfolio_peak == pytest.approx(320.0 + KILLERS_T)
+
+
+def test_saved_state_keeps_a_transfer_total_old_code_can_read(exporter, monkeypatch, tmp_path):
+    monkeypatch.setattr(exporter, "PEAK_STATE_FILE", tmp_path / "portfolio_peak.json")
+    exporter._live_bots = [FUNDING, KILLERS]
+    exporter._equity_basis = "accounts-v1"
+    exporter.check_circuit_breaker(0, _both(206.0, 324.0))
+    saved = json.loads((tmp_path / "portfolio_peak.json").read_text())
+    assert saved["account_transfer_total"] == pytest.approx(LEDGER_TOTAL)
+    assert saved["accounts"]["hyperliquid-killers"] == {"equity": 324.0, "transfers": pytest.approx(KILLERS_T)}

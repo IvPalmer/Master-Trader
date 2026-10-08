@@ -133,6 +133,7 @@ _last_trigger_time = 0.0
 _pending_halts: set[str] = set()
 _equity_basis = "legacy"
 _account_transfer_total = 0.0
+_account_scope: dict[str, dict] | None = None
 ACCOUNT_STATE_FILE = PEAK_STATE_FILE.with_name("account_health.json")
 GATEWAY_URL = os.environ.get("HL_GATEWAY_URL", "http://hl-gateway:8080")
 
@@ -141,7 +142,7 @@ def _load_peak_state() -> None:
     """Restore high-water mark from disk so a restart mid-drawdown doesn't
     erase the real peak. Without this, _portfolio_peak resets every restart
     and the breaker silently shifts its threshold downward."""
-    global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time, _equity_basis, _account_transfer_total, _pending_halts
+    global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time, _equity_basis, _account_transfer_total, _pending_halts, _account_scope
     try:
         if PEAK_STATE_FILE.exists():
             with open(PEAK_STATE_FILE) as f:
@@ -153,6 +154,10 @@ def _load_peak_state() -> None:
             _equity_basis = state.get("equity_basis", "legacy")
             _account_transfer_total = float(state.get("account_transfer_total", 0))
             _pending_halts = set(state.get("pending_halts", []))
+            scope = state.get("accounts")
+            _account_scope = None if scope is None else {
+                name: {"equity": float(a["equity"]), "transfers": float(a["transfers"])}
+                for name, a in scope.items()}
             log.info(
                 "Restored portfolio peak from %s: $%.2f (triggered=%s)",
                 PEAK_STATE_FILE, _portfolio_peak, _circuit_breaker_triggered,
@@ -176,6 +181,7 @@ def _save_peak_state() -> None:
                 "equity_basis": _equity_basis,
                 "account_transfer_total": _account_transfer_total,
                 "pending_halts": sorted(_pending_halts),
+                "accounts": _account_scope,
             }, f)
         os.replace(tmp, PEAK_STATE_FILE)
     except Exception as exc:
@@ -347,6 +353,7 @@ def observe_accounts() -> dict:
     except (requests.RequestException, ValueError):
         result["errors"].append("Hyperliquid request telemetry unavailable")
     groups = {}
+    transfers = {}
     for bot in _live_bots:
         groups.setdefault(bot.get("capital_account") or bot["service"], []).append(bot)
     unvalued = unvalued_live_accounts(_live_bots)
@@ -386,7 +393,11 @@ def observe_accounts() -> dict:
         ids = [row["id"] for row in ledger]
         if len(ids) != len(set(ids)):
             raise ValueError("duplicate transfer")
-        result["net_transfers"] = sum(float(row["amount"]) for row in ledger if row["account"] in covered)
+        transfers = {account: 0.0 for account in covered}
+        for row in ledger:
+            if row["account"] in transfers:
+                transfers[row["account"]] += float(row["amount"])
+        result["net_transfers"] = sum(transfers.values())
         if not math.isfinite(result["net_transfers"]):
             raise ValueError("invalid transfer")
     except (OSError, ValueError, KeyError, TypeError):
@@ -398,6 +409,8 @@ def observe_accounts() -> dict:
     result["breaker_complete"] = result["complete"] and bool(covered)
     result["breaker_equity"] = (sum(result["accounts"][a]["equity"] for a in covered)
                                 if result["breaker_complete"] else None)
+    result["breaker_accounts"] = ({a: {"equity": result["accounts"][a]["equity"], "transfers": transfers[a]}
+                                   for a in covered} if result["breaker_complete"] else None)
     if unvalued:
         result["complete"] = False  # the portfolio total itself is not observed
         result["unvalued_accounts"] = unvalued
@@ -672,14 +685,38 @@ def watch_breaker(observation: dict, evaluated: bool, now: float) -> None:
         now, BREAKER_STALL_ALERT_AFTER)
 
 
-def check_circuit_breaker(live_pnl: float, account_equity: float | None = None, net_transfers: float = 0) -> None:
+def _rebase_account_scope(accounts: dict[str, dict]) -> None:
+    """Shift the peak so an account entering or leaving scope moves dollar drawdown by zero."""
+    global _portfolio_peak, _account_scope, _account_transfer_total
+    transfer_total = sum(a["transfers"] for a in accounts.values())
+    if _account_scope is None:
+        shift = transfer_total - _account_transfer_total
+    else:
+        shift = -sum(prev["equity"] for name, prev in _account_scope.items() if name not in accounts)
+        for name, current in accounts.items():
+            prev = _account_scope.get(name)
+            shift += current["equity"] if prev is None else current["transfers"] - prev["transfers"]
+        left = sorted(set(_account_scope) - set(accounts))
+        entered = sorted(set(accounts) - set(_account_scope))
+        if left or entered:
+            log.info("Breaker scope changed (left %s, entered %s); shifting peak $%.2f -> $%.2f",
+                     left or "none", entered or "none", _portfolio_peak, max(0, _portfolio_peak + shift))
+    if shift:
+        _portfolio_peak = max(0, _portfolio_peak + shift)
+    _account_scope = {name: {"equity": a["equity"], "transfers": a["transfers"]} for name, a in accounts.items()}
+    _account_transfer_total = transfer_total
+    _save_peak_state()
+
+
+def check_circuit_breaker(live_pnl: float, accounts: dict[str, dict] | None = None) -> None:
     """Check if LIVE portfolio drawdown exceeds threshold and stop LIVE bots if so.
 
     Inputs are scoped to live (non-dry-run) bots only. The dry-run sleeve has
     no real money and must not influence the breaker.
     """
-    global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time, _equity_basis, _account_transfer_total, _pending_halts
+    global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time, _equity_basis, _pending_halts, _account_scope
 
+    account_equity = None if accounts is None else sum(a["equity"] for a in accounts.values())
     if not _live_bots or (account_equity is None and _live_initial_capital <= 0):
         # No live bots configured — breaker is a no-op. Don't update Prometheus
         # gauges so a stale 'all good' signal doesn't show on Grafana.
@@ -688,7 +725,7 @@ def check_circuit_breaker(live_pnl: float, account_equity: float | None = None, 
     portfolio_value = _live_initial_capital + live_pnl if account_equity is None else account_equity
     if not math.isfinite(portfolio_value) or portfolio_value < 0:
         return
-    if account_equity is not None:
+    if accounts is not None:
         if _equity_basis != "accounts-v1":
             # Preserve the previously measured dollar drawdown at migration;
             # changing valuation must not erase an existing loss or trip the
@@ -697,14 +734,9 @@ def check_circuit_breaker(live_pnl: float, account_equity: float | None = None, 
             prior_drawdown = max(0, _portfolio_peak - legacy_value) if _portfolio_peak else 0
             _portfolio_peak = portfolio_value + prior_drawdown
             _equity_basis = "accounts-v1"
-            _account_transfer_total = net_transfers
+            _account_scope = {name: dict(a) for name, a in accounts.items()}
             log.info("Migrated to actual account equity; retained $%.2f drawdown", prior_drawdown)
-            _save_peak_state()
-        flow_delta = net_transfers - _account_transfer_total
-        if flow_delta:
-            _portfolio_peak = max(0, _portfolio_peak + flow_delta)
-            _account_transfer_total = net_transfers
-            _save_peak_state()
+        _rebase_account_scope(accounts)
 
     # Rebase the peak when the live set changes. On 2026-08-30 22:00 the peak
     # stood at $254.96 from a three-live-bot fleet; demoting FundingFadeV1 to
@@ -804,7 +836,7 @@ def main() -> None:
             observation["errors"].append("Live bot status or P&L observation unavailable")
         evaluated = observation["breaker_complete"] and (live_pnl is not None or _equity_basis == "accounts-v1")
         if evaluated:
-            check_circuit_breaker(live_pnl or 0.0, observation["breaker_equity"], observation["net_transfers"])
+            check_circuit_breaker(live_pnl or 0.0, observation["breaker_accounts"])
         watch_breaker(observation, evaluated, time.time())
         save_account_health(observation)
         if total_pnl is None:
