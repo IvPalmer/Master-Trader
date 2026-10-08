@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 import widgets
 from tests import widget_contract as contract
-from tests.test_widgets import STATE, TOKEN, state
+from tests.test_widgets import HERO_BOTS, STATE, TOKEN, state
 
 
 def test_catalog_data_and_action_answer_pass(monkeypatch):
@@ -13,7 +13,11 @@ def test_catalog_data_and_action_answer_pass(monkeypatch):
     auth = {"Authorization": f"Bearer {TOKEN}"}
     variants = [state(),
                 state() | {"status": {"level": "green", "summary": "ok"}},
-                state() | {"bots": {"gamma": STATE["bots"]["gamma"]}}]   # paper only: no spark
+                state() | {"bots": {"gamma": STATE["bots"]["gamma"]}},   # paper only: no spark
+                state() | {"bots": HERO_BOTS},
+                state() | {"bots": HERO_BOTS, "account_health": {"complete": True, "equity": 1234.56}},
+                state() | {"bots": HERO_BOTS, "account_health": {"complete": False}},   # equity is a dash
+                state() | {"bots": {}}]
     for current in variants:
         app = FastAPI()
         widgets.install(app, lambda current=current: current)
@@ -22,6 +26,7 @@ def test_catalog_data_and_action_answer_pass(monkeypatch):
         r = c.get("/widgets/bots", headers=auth)
         assert r.status_code == 200
         contract.check_data(r.json(), entry)
+        assert "metrics" in entry["views"] and len(r.json()["metrics"]["rows"]) == 4
     r = c.post("/widgets/bots/actions/close", headers=auth, json={"key": "bot:alpha", "request_id": "x"})
     assert r.status_code == 404
     contract.check_action_response(r.json())

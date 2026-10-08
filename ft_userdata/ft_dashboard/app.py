@@ -1848,7 +1848,8 @@ from trade_controls import install as install_trade_controls
 install_trade_controls(app, BOTS, _api_auth)
 from widgets import install as install_widgets
 install_widgets(app, lambda: {"last_poll": _cache.get("last_poll_finished_at"),
-                              "bots": _cache.get("bots", {}), "status": _fleet_status()})
+                              "bots": _cache.get("bots", {}), "status": _fleet_status(),
+                              "account_health": _account_health()})
 
 
 @app.middleware("http")
