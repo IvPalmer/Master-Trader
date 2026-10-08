@@ -194,6 +194,20 @@ def test_equity_absent_sums_the_max_wallet_per_account_group():
     assert _metrics(bots)[0]["value"] == "$35.00"
 
 
+def test_account_group_falls_back_to_the_key_then_groups_by_it():
+    bots = {"a": _bot(key="k1", wallet={"bot_owned": 10.0}),
+            "b": _bot(key="k2", wallet={"bot_owned": 20.0}),
+            "c": _bot(key="k1", wallet={"bot_owned": 40.0}),                     # shares k1 with a: max, once
+            "d": _bot(account_group="g", key="k3", wallet={"bot_owned": 5.0}),
+            "e": _bot(account_group="g", key="k4", wallet={"bot_owned": 7.0})}   # the group wins over the key
+    assert _metrics(bots)[0]["value"] == "$67.00"                                # 40 + 20 + 7
+
+
+def test_negative_equity_uses_the_minus_sign_like_usd():
+    row = _metrics(HERO_BOTS, account_health={"complete": True, "equity": -12.0})[0]
+    assert row["value"] == "−$12.00" and row["tone"] == "neutral"
+
+
 def test_a_zero_wallet_is_not_replaced_by_the_starting_capital():
     bots = {"a": _bot(wallet={"bot_owned": 0.0, "starting_capital": 50.0})}   # JS `??` keeps 0
     assert _metrics(bots)[0]["value"] == "$0.00"

@@ -181,7 +181,8 @@ def build_metrics(state: dict) -> dict:
     positions = sum(1 for t in trades if not _is_pending_entry(t))
     day = sum(_pnl(b) for b in live)
     rows = [{"label": "Account equity",
-             "value": "—" if equity is None else f"${float(equity):,.2f}",
+             "value": "—" if equity is None
+                      else ("−" if float(equity) < 0 else "") + f"${abs(float(equity)):,.2f}",
              "detail": "shared accounts counted once" if equity is not None else "valuation incomplete",
              "tone": "neutral" if equity is not None else "warn"}]
     for label, value, detail in (("Realized P&L", realized, f"{_count(closed, 'closed trade')} · live epochs"),
