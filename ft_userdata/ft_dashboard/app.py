@@ -406,10 +406,9 @@ def exit_fills(trade: dict, closed: bool | None = None) -> list[list]:
     filled exit is valued as Freqtrade's recalc_trade_from_orders values it:
     average entry price, open and close fees, and the funding booked since the
     previous exit when the order records carry it (/trades does, /status does
-    not). The remainder is not given a fill time: a closed trade books it at
-    its close, an open trade returns it undated (None). Without usable fill
-    records the whole total is returned that way. ``closed`` defaults to the
-    record's own ``is_open`` flag.
+    not). Whatever has no fill time (the remainder, an exit without a
+    timestamp) is booked at a closed trade's close; an open trade returns it
+    undated (None). ``closed`` defaults to the record's own ``is_open`` flag.
     """
     if closed is None:
         closed = trade.get("is_open") is False
@@ -444,10 +443,9 @@ def exit_fills(trade: dict, closed: bool | None = None) -> list[list]:
             if held > 0:
                 avg = cost / held
             continue
-        ts = _parse_ts_ms(order.get("order_filled_timestamp"))
-        if avg is None or not ts:
-            fills = []
-            break
+        if avg is None:
+            funding = 0.0  # nothing to value it against: it stays in the remainder
+            continue
         # Like Freqtrade, value every exit at the average entry price, even
         # when its records exit more than entered (#184).
         held -= amount
@@ -455,12 +453,14 @@ def exit_fills(trade: dict, closed: bool | None = None) -> list[list]:
         open_value = amount * avg * (1 - fee_open if short else 1 + fee_open)
         close_value = amount * price * (1 + fee_close if short else 1 - fee_close)
         pnl = open_value - close_value if short else close_value - open_value
-        fills.append([ts, pnl + funding])
+        fills.append([_parse_ts_ms(order.get("order_filled_timestamp")) or None, pnl + funding])
         funding = 0.0
     remainder = total - sum(pnl for _, pnl in fills)
     if abs(remainder) > 1e-6:  # below that it is Freqtrade's rounding
-        close_ts = _parse_ts_ms(trade.get("close_timestamp")) if closed else None
-        fills.append([close_ts or None, remainder])
+        fills.append([None, remainder])
+    if closed:
+        close_ts = _parse_ts_ms(trade.get("close_timestamp")) or None
+        fills = [[ts or close_ts, pnl] for ts, pnl in fills]
     return fills
 
 
@@ -757,13 +757,17 @@ def _retain_complete_history(
 
 
 # ── Computations ───────────────────────────────────────────────────────────
-def _per_pair_pnl(trades: list[dict]) -> list[dict]:
-    agg: dict[str, dict] = defaultdict(lambda: {"pair": "", "trades": 0, "pnl": 0.0, "wins": 0})
+def _per_pair_pnl(trades: list[dict], epoch_start_ts_ms: int = 0) -> list[dict]:
+    """Closed trades by pair. ``pnl``, ``trades`` and ``wins`` are whole-trade;
+    ``realized`` counts only exits filled inside the epoch."""
+    agg: dict[str, dict] = defaultdict(
+        lambda: {"pair": "", "trades": 0, "pnl": 0.0, "wins": 0, "realized": 0.0})
     for t in trades:
         p = t.get("pair", "?")
         agg[p]["pair"] = p
         agg[p]["trades"] += 1
         agg[p]["pnl"] += t.get("profit_abs", 0.0) or 0.0
+        agg[p]["realized"] += sum(pnl for _, pnl in _realized_events([t], [], epoch_start_ts_ms))
         if (t.get("profit_abs") or 0.0) > 0:
             agg[p]["wins"] += 1
     return sorted(agg.values(), key=lambda r: r["pnl"], reverse=True)
@@ -1622,7 +1626,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     )
     days_running = (time.time() - bot_start_ts) / 86400.0 if bot_start_ts else 0
 
-    per_pair = _per_pair_pnl(closed_trades)
+    per_pair = _per_pair_pnl(closed_trades, epoch_start_ts_ms)
     epoch_pnl, epoch_stats, closed_pnl = _epoch_stats(
         closed_trades, open_trades, starting_capital, epoch_start_ts_ms
     )

@@ -298,3 +298,44 @@ def test_overbooked_stop_after_a_partial_tp_is_valued_like_freqtrade():
         ],
     }
     assert app.exit_fills(trade) == [[T3, pytest.approx(stop)], [T2, pytest.approx(tp)]]
+
+
+def test_an_exit_without_a_fill_time_keeps_the_other_fill_times():
+    trade, final, funding = closed_jup()
+    del trade["orders"][2]["order_filled_timestamp"]
+    fills = app.exit_fills(trade)
+    close = trade["close_timestamp"]
+    assert [ts for ts, _ in fills] == [T1, close, T3, close]
+    assert sum(p for _, p in fills) == pytest.approx(trade["profit_abs"], abs=1e-12)
+
+
+def test_pair_realized_follows_the_epoch_like_the_headline(monkeypatch):
+    closed, _, _ = closed_jup()
+    payloads = {
+        "profit": {"bot_start_timestamp": 0}, "status": [],
+        "balance": {"starting_capital": 100.0, "total_bot": 100.0, "total": 100.0},
+        "show_config": {"dry_run": False, "timeframe": "5m", "stake_currency": "USDC"},
+        "whitelist": {"whitelist": []},
+    }
+
+    async def fake_get(client, url, path, *args, **kwargs):
+        return payloads.get(path.split("?")[0]), None
+
+    async def fake_plain(*args, **kwargs):
+        return None, "unavailable"
+
+    async def fake_history(client, bot, epoch_start_ts_ms):
+        return [closed], True, None
+
+    bot = app._bot_meta("killers-ft")
+    monkeypatch.setattr(app, "_get", fake_get)
+    monkeypatch.setattr(app, "_get_plain", fake_plain)
+    monkeypatch.setattr(app, "_fetch_epoch_trades", fake_history)
+    monkeypatch.setattr(app, "killers_tp_ladder", lambda *a, **k: {})
+    monkeypatch.setitem(bot, "epoch_start_ts_ms", T2)
+    snapshot = asyncio.run(app._poll_bot(None, bot))
+
+    row = snapshot["per_pair"][0]
+    assert round(row["realized"], 2) == snapshot["pnl"]["closed"]
+    assert row["pnl"] == pytest.approx(closed["profit_abs"])  # whole trade
+    assert row["trades"] == 1

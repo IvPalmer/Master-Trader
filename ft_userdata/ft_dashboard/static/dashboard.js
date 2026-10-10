@@ -770,7 +770,7 @@ function dash() {
       for (const bot of this.liveBots) {
         for (const row of bot.per_pair || []) {
           const current = pairs.get(row.pair) || { pair: row.pair, realized: 0, unrealized: 0, pnl: 0, trades: 0 };
-          current.realized += Number(row.pnl || 0);
+          current.realized += Number(row.realized ?? row.pnl ?? 0);
           current.trades += Number(row.count || row.trades || 0);
           pairs.set(row.pair, current);
         }
@@ -1423,7 +1423,7 @@ function dash() {
       for (const bot of bots) {
         for (const row of bot.per_pair || []) {
           const item = pairs.get(row.pair) || {label:row.pair, realized:0, unrealized:0};
-          item.realized += Number(row.pnl || 0); pairs.set(row.pair,item);
+          item.realized += Number(row.realized ?? row.pnl ?? 0); pairs.set(row.pair,item);
         }
         for (const row of bot.open_trades || []) {
           const item = pairs.get(row.pair) || {label:row.pair, realized:0, unrealized:0};
