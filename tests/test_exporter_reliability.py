@@ -664,3 +664,20 @@ def test_pending_halts_survive_an_exporter_restart(exporter, monkeypatch, tmp_pa
     exporter._pending_halts = set()
     exporter._load_peak_state()
     assert exporter._pending_halts == {"ft-insiders-scalp"}
+
+
+def test_true_pnl_includes_booked_partial_exits_of_open_trades(exporter, monkeypatch):
+    # #185: Freqtrade's /status profit_abs marks only the size still open; a
+    # filled TP rung sits in realized_profit until the last piece exits.
+    bot = {"service": "killers", "strategy": "KillersScalpV1"}
+    payloads = {
+        "profit": {"profit_closed_coin": -10.0, "closed_trade_count": 1},
+        "status": [{"profit_abs": 7.33, "realized_profit": 3.68},
+                   {"profit_abs": -0.34, "realized_profit": 0.0}],
+        "balance": {"total": 100.0},
+    }
+    monkeypatch.setattr(exporter, "fetch_json", lambda service, endpoint: payloads[endpoint])
+    assert exporter.scrape_bot(bot) == pytest.approx(-10.0 + 3.68 + 7.33 - 0.34)
+
+    payloads["status"] = None  # missing open marks still fail closed
+    assert exporter.scrape_bot(bot) is None

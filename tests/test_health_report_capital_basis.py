@@ -226,3 +226,20 @@ def test_uncovered_live_accounts_are_named_not_implied(monkeypatch):
     assert any(l.startswith("  Not covered (valued by the exporter): ") and
                "KillersScalpV1" in l for l in lines)
 
+
+
+def test_booked_partial_exits_count_as_realized_pnl(monkeypatch):
+    # #185: an open trade's filled TP rungs sit in realized_profit; /status
+    # profit_abs marks only the remaining size.
+    def fetch(port, endpoint, timeout=10):
+        if endpoint == "status" and port == 8200:
+            return [{"pair": "JUP/USDC:USDC", "profit_abs": 1.5, "realized_profit": 3.0,
+                     "open_date": "2026-09-25 00:00:00"}]
+        return make_fetch()(port, endpoint, timeout)
+
+    monkeypatch.setattr(shr, "BOTS", BOTS)
+    monkeypatch.setattr(shr, "fetch_json", fetch)
+    m = shr.compute_bot_metrics("SoloLive", BOTS["SoloLive"])
+    assert m["closed_pnl"] == pytest.approx(-1.0 + 3.0)
+    assert m["open_pnl"] == pytest.approx(1.5)
+    assert m["true_pnl"] == pytest.approx(3.5)

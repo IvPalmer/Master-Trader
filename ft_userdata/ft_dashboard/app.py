@@ -397,6 +397,55 @@ def booked_pct_from_fills(trade: dict) -> float | None:
     return compute_booked_pct(entered - exited, entered, entries)
 
 
+def partial_exit_fills(trade: dict) -> list[list]:
+    """Booked P&L of an open trade's filled exits: [[fill_ts_ms | None, usd], ...].
+
+    While a position stays open, Freqtrade keeps its filled partial exits
+    (TP rungs) in ``realized_profit``; /status ``profit_abs`` covers only the
+    remaining amount. The total is Freqtrade's ``realized_profit``, dated by
+    splitting it across the filled exits with Freqtrade's per-exit formula
+    (average entry price, open and close fees). The API's order records omit
+    funding, so the remainder goes to the last fill. Without fill times the
+    total is returned undated rather than given an invented date.
+    """
+    try:
+        realized = float(trade.get("realized_profit"))
+    except (TypeError, ValueError):
+        return []
+    if not math.isfinite(realized) or not realized:
+        return []
+    short = bool(trade.get("is_short"))
+    entry_side = "sell" if short else "buy"
+    fee_open = _quantity(trade.get("fee_open")) or 0.0
+    fee_close = _quantity(trade.get("fee_close")) or 0.0
+    held = cost = 0.0
+    fills: list[list] = []
+    for order in trade.get("orders") or []:
+        amount = _quantity(order.get("filled"))
+        price = _quantity(order.get("safe_price"))
+        # Freqtrade skips orders that are still open, even partially filled.
+        if order.get("is_open") or not amount or not price:
+            continue
+        amount -= _quantity(order.get("ft_fee_base")) or 0.0
+        if str(order.get("ft_order_side") or "").lower() == entry_side:
+            held += amount
+            cost += amount * price
+            continue
+        ts = _parse_ts_ms(order.get("order_filled_timestamp"))
+        if held <= 0 or not ts:
+            return [[None, realized]]
+        avg = cost / held
+        held -= amount
+        cost = avg * held
+        open_value = amount * avg * (1 - fee_open if short else 1 + fee_open)
+        close_value = amount * price * (1 + fee_close if short else 1 - fee_close)
+        fills.append([ts, open_value - close_value if short else close_value - open_value])
+    if not fills:
+        return [[None, realized]]
+    fills[-1][1] += realized - sum(pnl for _, pnl in fills)
+    return fills
+
+
 def killers_tp_ladder(db_path: str, *, strict: bool = False) -> dict[int, dict]:
     """Map {ft_trade_id: {tps_total, tps_hit, next_tp}} for OPEN killers
     positions, read from the live receiver.sqlite. Read-only, busy-timeout'd,
@@ -1064,13 +1113,46 @@ def _drawdown_curve(equity: list[list]) -> list[list]:
     return out
 
 
+def _epoch_partial_fills(open_trades: list[dict], epoch_start_ts_ms: int = 0) -> list[list]:
+    """Booked partial exits of open trades that fall inside the epoch."""
+    return [
+        fill for t in open_trades for fill in partial_exit_fills(t)
+        if fill[0] is None or fill[0] >= epoch_start_ts_ms
+    ]
+
+
+def _realized_events(
+    closed_trades: list[dict], open_trades: list[dict], epoch_start_ts_ms: int = 0
+) -> list[dict]:
+    """Closed trades plus booked partial exits, as realized equity events.
+
+    An undated partial is placed at the observation time: it is known to be
+    booked by now, and nothing earlier is claimed.
+    """
+    now_ms = int(time.time() * 1000)
+    return closed_trades + [
+        {"close_timestamp": ts or now_ms, "profit_abs": pnl}
+        for ts, pnl in _epoch_partial_fills(open_trades, epoch_start_ts_ms)
+    ]
+
+
 def _epoch_stats(
-    closed_trades: list[dict], open_trades: list[dict], starting_capital: float
+    closed_trades: list[dict],
+    open_trades: list[dict],
+    starting_capital: float,
+    epoch_start_ts_ms: int = 0,
 ) -> tuple[dict, dict, float]:
-    """Derive every displayed performance metric from the active epoch."""
+    """Derive every displayed performance metric from the active epoch.
+
+    ``closed`` is realized P&L: closed trades plus the booked partial exits of
+    open trades. ``unrealized`` marks only the size still open. Trade-level
+    statistics count closed trades alone.
+    """
     closed_pnl = sum(float(t.get("profit_abs") or 0) for t in closed_trades)
+    partial_pnl = sum(pnl for _, pnl in _epoch_partial_fills(open_trades, epoch_start_ts_ms))
+    realized = closed_pnl + partial_pnl
     unrealized = sum(float(t.get("profit_abs") or 0) for t in open_trades)
-    all_pnl = closed_pnl + unrealized
+    all_pnl = realized + unrealized
     wins = [t for t in closed_trades if float(t.get("profit_abs") or 0) > 0]
     losses = [t for t in closed_trades if float(t.get("profit_abs") or 0) < 0]
     gross_profit = sum(float(t.get("profit_abs") or 0) for t in wins)
@@ -1079,10 +1161,12 @@ def _epoch_stats(
                  if t.get("trade_duration") is not None]
     per_pair = _per_pair_pnl(closed_trades)
     pnl = {
-        "closed": round(closed_pnl, 2),
+        "closed": round(realized, 2),
+        "closed_trades": round(closed_pnl, 2),
+        "partial_exits": round(partial_pnl, 2),
         "unrealized": round(unrealized, 2),
         "all_coin": round(all_pnl, 2),
-        "closed_pct": round(closed_pnl / starting_capital * 100, 2) if starting_capital else 0.0,
+        "closed_pct": round(realized / starting_capital * 100, 2) if starting_capital else 0.0,
         "unrealized_pct": round(unrealized / starting_capital * 100, 2) if starting_capital else 0.0,
         "all_pct": round(all_pnl / starting_capital * 100, 2) if starting_capital else 0.0,
     }
@@ -1395,16 +1479,19 @@ def _delta_24h(
     current_dd_pct: float,
     baseline: dict | None,
     bot: dict,
+    partial_fills: list[list] = (),
 ) -> dict:
     """Compute 24-hour rolling window metrics.
 
     closed_trades — all closed trades for the bot (not just recent 30).
     current_dd_pct — current max drawdown as a percentage (0-100 scale).
     baseline — bot baseline dict or None for observational bots.
+    partial_fills — booked partial exits of open trades ([[ts_ms, usd], ...]).
 
     Returns:
       new_trades        — closed trades in the last 24 h
-      pnl_usd           — sum of profit_abs for those trades
+      pnl_usd           — profit_abs of those trades plus partial exits
+                          filled in the last 24 h
       dd_breach         — True if current drawdown > 1.5× baseline drawdown cap
       signals_observed  — placeholder (killers-style bots would populate this
                           from SQLite; for Freqtrade bots always 0)
@@ -1413,6 +1500,7 @@ def _delta_24h(
     recent = [t for t in closed_trades
               if not t.get("is_open") and (t.get("close_timestamp") or 0) >= cutoff_ms]
     pnl_usd = sum(float(t.get("profit_abs") or 0) for t in recent)
+    pnl_usd += sum(pnl for ts, pnl in partial_fills if ts and ts >= cutoff_ms)
 
     dd_breach = False
     if baseline and baseline.get("max_dd_pct"):
@@ -1515,11 +1603,12 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
 
     per_pair = _per_pair_pnl(closed_trades)
     epoch_pnl, epoch_stats, closed_pnl = _epoch_stats(
-        closed_trades, open_trades, starting_capital
+        closed_trades, open_trades, starting_capital, epoch_start_ts_ms
     )
     bot_start_ts_ms = int(bot_start_ts * 1000) if bot_start_ts else 0
-    realized_equity = _equity_curve_live(closed_trades, [], starting_capital, bot_start_ts_ms)
-    live_equity = _equity_curve_live(closed_trades, open_trades, starting_capital, bot_start_ts_ms)
+    realized_events = _realized_events(closed_trades, open_trades, epoch_start_ts_ms)
+    realized_equity = _equity_curve_live(realized_events, [], starting_capital, bot_start_ts_ms)
+    live_equity = _equity_curve_live(realized_events, open_trades, starting_capital, bot_start_ts_ms)
     drawdown_curve = _drawdown_curve(live_equity)
 
     # ── New: compute current DD % for dd_breach check ──────────────────────
@@ -1551,6 +1640,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     open_trades_out = []
     for t in open_trades:
         bp = booked_pct_from_fills(t)
+        partials = _epoch_partial_fills([t], epoch_start_ts_ms)
         row = {
             "trade_id": t.get("trade_id"),
             "pair": t.get("pair"),
@@ -1558,6 +1648,9 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             "current_rate": t.get("current_rate"),
             "profit_pct": t.get("profit_pct"),
             "profit_abs": t.get("profit_abs"),
+            # Booked partial exits (TP rungs); profit_abs marks only the rest.
+            "realized_abs": sum(pnl for _, pnl in partials),
+            "partial_exits": partials,
             "stake_amount": t.get("stake_amount"),
             "open_date": t.get("open_date"),
             "open_timestamp": t.get("open_timestamp"),
@@ -1680,6 +1773,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
                 current_dd_pct,
                 baseline if baseline_comparable else None,
                 bot,
+                _epoch_partial_fills(open_trades, epoch_start_ts_ms),
             ),
             "signals_observed": readiness.get("signals_24h", 0),
         },

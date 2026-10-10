@@ -469,7 +469,10 @@ def scrape_bot(bot: dict) -> float | None:
         trades_open.labels(strategy=strategy).set(len(status_data))
         open_pnl = sum(t.get("profit_abs", 0) for t in status_data)
         unrealized_pnl.labels(strategy=strategy).set(round(open_pnl, 2))
-        bot_true_pnl = closed_pnl + open_pnl
+        # profit_abs marks only the size still open; filled partial exits
+        # (TP rungs) sit in realized_profit until the last piece exits.
+        booked_partials = sum(t.get("realized_profit") or 0 for t in status_data)
+        bot_true_pnl = closed_pnl + booked_partials + open_pnl
         true_pnl.labels(strategy=strategy).set(round(bot_true_pnl, 2))
     else:
         bot_up.labels(strategy=strategy).set(0)
