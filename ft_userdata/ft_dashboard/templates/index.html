@@ -847,7 +847,7 @@
             <div class="trade-card-meta">
               <span class="trade-pnl" x-show="!trade.entry_pending" :class="trade.is_win ? 'pos' : 'neg'">
                 <span x-text="(trade.profit_pct >= 0 ? '+' : '') + (trade.profit_pct||0).toFixed(2) + '%'">—</span>
-                <span class="abs" x-text="'(' + fmtUsdSigned(trade.profit_abs) + ')'">—</span>
+                <span class="abs" x-text="'(' + fmtUsdSigned(trade.profit_abs) + (trade.realized_abs ? ' · booked ' + fmtUsdSigned(trade.realized_abs) : '') + ')'">—</span>
               </span>
               <span class="trade-reason"
                     :class="trade.is_open ? (trade.entry_pending ? 'reason-entry-pending' : 'reason-open') : ('reason-' + (trade.exit_reason||'unknown'))"
@@ -1062,7 +1062,7 @@
           <div class="bot-performance-facts">
             <div class="metric-fact"><span class="k">p&l</span><span class="v" :class="(bot.pnl?.all_pct ?? 0) >= 0 ? 'pos' : 'neg'"
                     x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '%' + (!bot.baseline_comparable ? '' : ' · expected ' + (bot.gate2?.profit?.expected_pct ?? bot.baseline?.annual_return_pct ?? 0).toFixed(2) + '%')">—</span></div>
-            <div class="metric-fact"><span class="k">closed / open</span><span class="v" :class="(bot.pnl?.all_coin ?? 0) >= 0 ? 'pos' : 'neg'"
+            <div class="metric-fact"><span class="k">realized / open</span><span class="v" :class="(bot.pnl?.all_coin ?? 0) >= 0 ? 'pos' : 'neg'"
                     x-text="fmtUsdSigned(bot.pnl?.closed) + ' / ' + fmtUsdSigned(bot.pnl?.unrealized)">—</span></div>
             <div class="metric-fact"><span class="k">profit factor</span><span class="v" x-text="(bot.stats?.profit_factor?.toFixed(2) ?? '—') + (bot.baseline_comparable && bot.baseline?.profit_factor ? ' · lab ' + bot.baseline.profit_factor : '')">—</span></div>
             <div class="metric-fact"><span class="k">win rate</span><span class="v" x-text="((bot.stats?.winrate ?? 0) * 100).toFixed(1) + '%' + (bot.baseline_comparable && bot.baseline?.win_rate ? ' · lab ' + ((bot.baseline.win_rate ?? 0) * 100).toFixed(1) + '%' : '')">—</span></div>

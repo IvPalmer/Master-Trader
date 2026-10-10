@@ -254,7 +254,9 @@ function dash() {
       const grossProfit = live.reduce((s, b) => s + Number(b.stats?.gross_profit || 0), 0);
       const grossLoss = live.reduce((s, b) => s + Number(b.stats?.gross_loss || 0), 0);
       const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : null;
-      const expectancyPerTrade = closedTrades > 0 ? totalRealizedPnl / closedTrades : null;
+      // Per closed trade: booked partial exits of open trades are realized but belong to no closed trade yet.
+      const closedTradePnl = live.reduce((s, b) => s + (b.pnl?.closed_trades ?? b.pnl?.closed ?? 0), 0);
+      const expectancyPerTrade = closedTrades > 0 ? closedTradePnl / closedTrades : null;
       const ddMax = live.length ? Math.max(...live.map(b => (b.stats?.max_drawdown ?? 0) * 100)) : 0;
       const ddCurrentPerBot = live.map(b => {
         const dd = b.drawdown_curve;
@@ -666,25 +668,26 @@ function dash() {
       };
     },
     get fleetPerformanceData() {
-      const trades = this.closedTrades
-        .filter(t => t.close_ts)
-        .map(t => ({ ...t, close_timestamp: t.close_ts, _bot: t.bot_key }))
-        .sort((a, b) => toMs(a.close_timestamp) - toMs(b.close_timestamp));
+      // Realized P&L of live bots by fill time: closed-trade exits plus booked
+      // partial exits (TP rungs) of open trades. null = booked by now, time unknown.
+      const now = Date.now();
+      const realizedEvents = this.liveBots
+        .flatMap(bot => (bot.realized_events || []).map(([ts, pnl]) => [ts ? toMs(ts) : now, Number(pnl || 0)]))
+        .sort((a, b) => a[0] - b[0]);
       const start = this.hero.walletStart || this.hero.walletNow || 0;
       let equity = start;
       const epochStarts = this.liveBots.map(bot => toMs(bot.epoch?.start_ts_ms || 0)).filter(Boolean);
       const openStarts = this.openPositions.map(position => toMs(position.open_timestamp || 0)).filter(Boolean);
-      const firstTs = trades.length
-        ? toMs(trades[0].close_timestamp)
-        : Math.min(...[...epochStarts, ...openStarts, Date.now()]);
+      const firstTs = realizedEvents.length
+        ? realizedEvents[0][0]
+        : Math.min(...[...epochStarts, ...openStarts, now]);
       const live = [[Math.max(0, firstTs - 1000), Number(start.toFixed(4))]];
       const drawdown = [[Math.max(0, firstTs - 1000), 0]];
       let peak = start;
-      for (const trade of trades) {
-        equity += Number(trade.profit_abs || 0);
+      for (const [ts, pnl] of realizedEvents) {
+        equity += pnl;
         peak = Math.max(peak, equity);
         const dd = peak > 0 ? (equity - peak) / peak * 100 : 0;
-        const ts = toMs(trade.close_timestamp);
         live.push([ts, Number(equity.toFixed(4))]);
         drawdown.push([ts, Number(dd.toFixed(4))]);
       }
@@ -693,12 +696,11 @@ function dash() {
       if (this.hero.openCount > 0) {
         equity += this.hero.totalUnrealizedPnl;
         peak = Math.max(peak, equity);
-        const now = Date.now();
         const dd = peak > 0 ? (equity - peak) / peak * 100 : 0;
         live.push([now, Number(equity.toFixed(4))]);
         drawdown.push([now, Number(dd.toFixed(4))]);
       }
-      return { live, realized, drawdown, drawdownRealized, trades, hasOpenMark: this.hero.openCount > 0 };
+      return { live, realized, drawdown, drawdownRealized, hasOpenMark: this.hero.openCount > 0 };
     },
 
     get portfolioAccounts() {
@@ -768,12 +770,13 @@ function dash() {
       for (const bot of this.liveBots) {
         for (const row of bot.per_pair || []) {
           const current = pairs.get(row.pair) || { pair: row.pair, realized: 0, unrealized: 0, pnl: 0, trades: 0 };
-          current.realized += Number(row.pnl || 0);
+          current.realized += Number(row.realized ?? row.pnl ?? 0);
           current.trades += Number(row.count || row.trades || 0);
           pairs.set(row.pair, current);
         }
         for (const trade of bot.open_trades || []) {
           const current = pairs.get(trade.pair) || { pair: trade.pair, realized: 0, unrealized: 0, pnl: 0, trades: 0 };
+          current.realized += Number(trade.realized_abs || 0);
           current.unrealized += Number(trade.profit_abs || 0);
           pairs.set(trade.pair, current);
         }
@@ -1036,6 +1039,7 @@ function dash() {
             stoploss_pct: t.stop_loss_pct,
             duration_min: openMs ? Math.round((now - openMs) / 60000) : 0,
             booked_pct: t.booked_pct ?? null,
+            realized_abs: t.realized_abs ?? 0,
             riding_pct: t.riding_pct ?? null,
             tps_total: t.tps_total ?? null,
             tps_hit: t.tps_hit ?? null,
@@ -1419,10 +1423,11 @@ function dash() {
       for (const bot of bots) {
         for (const row of bot.per_pair || []) {
           const item = pairs.get(row.pair) || {label:row.pair, realized:0, unrealized:0};
-          item.realized += Number(row.pnl || 0); pairs.set(row.pair,item);
+          item.realized += Number(row.realized ?? row.pnl ?? 0); pairs.set(row.pair,item);
         }
         for (const row of bot.open_trades || []) {
           const item = pairs.get(row.pair) || {label:row.pair, realized:0, unrealized:0};
+          item.realized += Number(row.realized_abs || 0);
           item.unrealized += Number(row.profit_abs || 0); pairs.set(row.pair,item);
         }
       }
