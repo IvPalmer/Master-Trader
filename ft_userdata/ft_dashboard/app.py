@@ -407,8 +407,11 @@ def exit_fills(trade: dict, closed: bool | None = None) -> list[list]:
     average entry price, open and close fees, and the funding booked since the
     previous exit when the order records carry it (/trades does, /status does
     not). Whatever has no fill time (the remainder, an exit without a
-    timestamp) is booked at a closed trade's close; an open trade returns it
-    undated (None). ``closed`` defaults to the record's own ``is_open`` flag.
+    timestamp) is booked at a closed trade's close, by which it was certainly
+    realized (the pre-#185 attribution of every closed trade; Freqtrade stamps
+    filled orders, so in practice only legacy records without orders take this
+    path); an open trade returns it undated (None). ``closed`` defaults to the
+    record's own ``is_open`` flag.
     """
     if closed is None:
         closed = trade.get("is_open") is False
