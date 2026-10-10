@@ -19,6 +19,8 @@ def test_epoch_stats_ignore_lifetime_values_and_use_complete_trade_set():
     assert closed_pnl == 2.0
     assert pnl == {
         "closed": 2.0,
+        "closed_trades": 2.0,
+        "partial_exits": 0.0,
         "unrealized": 0.5,
         "all_coin": 2.5,
         "closed_pct": 2.0,
