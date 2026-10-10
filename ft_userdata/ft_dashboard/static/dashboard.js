@@ -668,17 +668,12 @@ function dash() {
       };
     },
     get fleetPerformanceData() {
-      const trades = this.closedTrades
-        .filter(t => t.close_ts)
-        .map(t => ({ ...t, close_timestamp: t.close_ts, _bot: t.bot_key }))
-        .sort((a, b) => toMs(a.close_timestamp) - toMs(b.close_timestamp));
-      // Booked partial exits (TP rungs) of open trades are realized at their fill time.
+      // Realized P&L of live bots by fill time: closed-trade exits plus booked
+      // partial exits (TP rungs) of open trades. null = booked by now, time unknown.
       const now = Date.now();
-      const realizedEvents = [
-        ...trades.map(t => [toMs(t.close_timestamp), Number(t.profit_abs || 0)]),
-        ...this.liveBots.flatMap(bot => (bot.open_trades || []).flatMap(t => (t.partial_exits || [])
-          .map(([ts, pnl]) => [ts ? toMs(ts) : now, Number(pnl || 0)]))),
-      ].sort((a, b) => a[0] - b[0]);
+      const realizedEvents = this.liveBots
+        .flatMap(bot => (bot.realized_events || []).map(([ts, pnl]) => [ts ? toMs(ts) : now, Number(pnl || 0)]))
+        .sort((a, b) => a[0] - b[0]);
       const start = this.hero.walletStart || this.hero.walletNow || 0;
       let equity = start;
       const epochStarts = this.liveBots.map(bot => toMs(bot.epoch?.start_ts_ms || 0)).filter(Boolean);
@@ -705,7 +700,7 @@ function dash() {
         live.push([now, Number(equity.toFixed(4))]);
         drawdown.push([now, Number(dd.toFixed(4))]);
       }
-      return { live, realized, drawdown, drawdownRealized, trades, hasOpenMark: this.hero.openCount > 0 };
+      return { live, realized, drawdown, drawdownRealized, hasOpenMark: this.hero.openCount > 0 };
     },
 
     get portfolioAccounts() {

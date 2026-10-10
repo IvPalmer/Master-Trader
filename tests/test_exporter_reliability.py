@@ -681,3 +681,16 @@ def test_true_pnl_includes_booked_partial_exits_of_open_trades(exporter, monkeyp
 
     payloads["status"] = None  # missing open marks still fail closed
     assert exporter.scrape_bot(bot) is None
+
+
+@pytest.mark.parametrize("bad", [
+    {"profit_abs": float("nan"), "realized_profit": 0.0},
+    {"profit_abs": 1.0, "realized_profit": float("nan")},
+    {"profit_abs": 1.0, "realized_profit": float("inf")},
+    {"profit_abs": 1.0, "realized_profit": "x"},
+])
+def test_non_finite_open_pnl_is_unavailable_not_a_breaker_reading(exporter, monkeypatch, bad):
+    bot = {"service": "killers", "strategy": "KillersScalpV1"}
+    payloads = {"profit": {"profit_closed_coin": -10.0}, "status": [bad], "balance": {"total": 1.0}}
+    monkeypatch.setattr(exporter, "fetch_json", lambda service, endpoint: payloads[endpoint])
+    assert exporter.scrape_bot(bot) is None
