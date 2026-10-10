@@ -397,6 +397,76 @@ def booked_pct_from_fills(trade: dict) -> float | None:
     return compute_booked_pct(entered - exited, entered, entries)
 
 
+def exit_fills(trade: dict, closed: bool | None = None) -> list[list]:
+    """Realized P&L of a trade's filled exits: [[fill_ts_ms | None, usd], ...].
+
+    A closed trade's total is ``profit_abs`` (all of its exits). An open
+    trade's is Freqtrade's ``realized_profit``: its filled partial exits (TP
+    rungs), since /status ``profit_abs`` marks only the size still open. Each
+    filled exit is valued as Freqtrade's recalc_trade_from_orders values it:
+    average entry price, open and close fees, and the funding booked since the
+    previous exit when the order records carry it (/trades does, /status does
+    not). Whatever has no fill time (the remainder, an exit without a
+    timestamp) is booked at a closed trade's close, by which it was certainly
+    realized (the pre-#185 attribution of every closed trade; Freqtrade stamps
+    filled orders, so in practice only legacy records without orders take this
+    path); an open trade returns it undated (None). ``closed`` defaults to the
+    record's own ``is_open`` flag.
+    """
+    if closed is None:
+        closed = trade.get("is_open") is False
+    try:
+        total = float(trade.get("profit_abs" if closed else "realized_profit"))
+    except (TypeError, ValueError):
+        return []
+    if not math.isfinite(total):
+        return []
+    short = bool(trade.get("is_short"))
+    entry_side = "sell" if short else "buy"
+    fee_open = _quantity(trade.get("fee_open")) or 0.0
+    fee_close = _quantity(trade.get("fee_close")) or 0.0
+    held = cost = funding = 0.0
+    avg = None
+    fills: list[list] = []
+    for order in trade.get("orders") or []:
+        amount = _quantity(order.get("filled"))
+        price = _quantity(order.get("safe_price"))
+        # Freqtrade skips orders that are still open, even partially filled.
+        if order.get("is_open") or not amount or not price:
+            continue
+        try:
+            fee = float(order.get("funding_fee") or 0.0)
+        except (TypeError, ValueError):
+            fee = 0.0
+        funding += fee if math.isfinite(fee) else 0.0
+        amount -= _quantity(order.get("ft_fee_base")) or 0.0
+        if str(order.get("ft_order_side") or "").lower() == entry_side:
+            held += amount
+            cost += amount * price
+            if held > 0:
+                avg = cost / held
+            continue
+        if avg is None:
+            funding = 0.0  # nothing to value it against: it stays in the remainder
+            continue
+        # Like Freqtrade, value every exit at the average entry price, even
+        # when its records exit more than entered (#184).
+        held -= amount
+        cost -= avg * amount
+        open_value = amount * avg * (1 - fee_open if short else 1 + fee_open)
+        close_value = amount * price * (1 + fee_close if short else 1 - fee_close)
+        pnl = open_value - close_value if short else close_value - open_value
+        fills.append([_parse_ts_ms(order.get("order_filled_timestamp")) or None, pnl + funding])
+        funding = 0.0
+    remainder = total - sum(pnl for _, pnl in fills)
+    if abs(remainder) > 1e-6:  # below that it is Freqtrade's rounding
+        fills.append([None, remainder])
+    if closed:
+        close_ts = _parse_ts_ms(trade.get("close_timestamp")) or None
+        fills = [[ts or close_ts, pnl] for ts, pnl in fills]
+    return fills
+
+
 def killers_tp_ladder(db_path: str, *, strict: bool = False) -> dict[int, dict]:
     """Map {ft_trade_id: {tps_total, tps_hit, next_tp}} for OPEN killers
     positions, read from the live receiver.sqlite. Read-only, busy-timeout'd,
@@ -690,13 +760,17 @@ def _retain_complete_history(
 
 
 # ── Computations ───────────────────────────────────────────────────────────
-def _per_pair_pnl(trades: list[dict]) -> list[dict]:
-    agg: dict[str, dict] = defaultdict(lambda: {"pair": "", "trades": 0, "pnl": 0.0, "wins": 0})
+def _per_pair_pnl(trades: list[dict], epoch_start_ts_ms: int = 0) -> list[dict]:
+    """Closed trades by pair. ``pnl``, ``trades`` and ``wins`` are whole-trade;
+    ``realized`` counts only exits filled inside the epoch."""
+    agg: dict[str, dict] = defaultdict(
+        lambda: {"pair": "", "trades": 0, "pnl": 0.0, "wins": 0, "realized": 0.0})
     for t in trades:
         p = t.get("pair", "?")
         agg[p]["pair"] = p
         agg[p]["trades"] += 1
         agg[p]["pnl"] += t.get("profit_abs", 0.0) or 0.0
+        agg[p]["realized"] += sum(pnl for _, pnl in _realized_events([t], [], epoch_start_ts_ms))
         if (t.get("profit_abs") or 0.0) > 0:
             agg[p]["wins"] += 1
     return sorted(agg.values(), key=lambda r: r["pnl"], reverse=True)
@@ -1064,13 +1138,43 @@ def _drawdown_curve(equity: list[list]) -> list[list]:
     return out
 
 
+def _realized_events(
+    closed_trades: list[dict], open_trades: list[dict], epoch_start_ts_ms: int = 0
+) -> list[list]:
+    """Realized P&L by fill time inside the epoch: [[ts_ms | None, usd], ...].
+
+    Exits of closed trades plus the booked partial exits of open trades. An
+    amount without a fill time stays None: it is booked by now, and no earlier
+    date is claimed for it.
+    """
+    fills = [fill for t in closed_trades for fill in exit_fills(t, closed=True)]
+    fills += [fill for t in open_trades for fill in exit_fills(t, closed=False)]
+    return [fill for fill in fills if fill[0] is None or fill[0] >= epoch_start_ts_ms]
+
+
+def _event_rows(events: list[list]) -> list[dict]:
+    """Realized events as the trade-shaped rows the equity curve stacks."""
+    now_ms = int(time.time() * 1000)
+    return [{"close_timestamp": ts or now_ms, "profit_abs": pnl} for ts, pnl in events]
+
+
 def _epoch_stats(
-    closed_trades: list[dict], open_trades: list[dict], starting_capital: float
+    closed_trades: list[dict],
+    open_trades: list[dict],
+    starting_capital: float,
+    epoch_start_ts_ms: int = 0,
 ) -> tuple[dict, dict, float]:
-    """Derive every displayed performance metric from the active epoch."""
+    """Derive every displayed performance metric from the active epoch.
+
+    ``closed`` is realized P&L by fill time inside the epoch: exits of closed
+    trades plus the booked partial exits of open trades. ``unrealized`` marks
+    only the size still open. Trade-level statistics count closed trades alone.
+    """
     closed_pnl = sum(float(t.get("profit_abs") or 0) for t in closed_trades)
+    realized = sum(pnl for _, pnl in _realized_events(closed_trades, open_trades, epoch_start_ts_ms))
+    partial_pnl = sum(pnl for _, pnl in _realized_events([], open_trades, epoch_start_ts_ms))
     unrealized = sum(float(t.get("profit_abs") or 0) for t in open_trades)
-    all_pnl = closed_pnl + unrealized
+    all_pnl = realized + unrealized
     wins = [t for t in closed_trades if float(t.get("profit_abs") or 0) > 0]
     losses = [t for t in closed_trades if float(t.get("profit_abs") or 0) < 0]
     gross_profit = sum(float(t.get("profit_abs") or 0) for t in wins)
@@ -1079,10 +1183,12 @@ def _epoch_stats(
                  if t.get("trade_duration") is not None]
     per_pair = _per_pair_pnl(closed_trades)
     pnl = {
-        "closed": round(closed_pnl, 2),
+        "closed": round(realized, 2),
+        "closed_trades": round(closed_pnl, 2),
+        "partial_exits": round(partial_pnl, 2),
         "unrealized": round(unrealized, 2),
         "all_coin": round(all_pnl, 2),
-        "closed_pct": round(closed_pnl / starting_capital * 100, 2) if starting_capital else 0.0,
+        "closed_pct": round(realized / starting_capital * 100, 2) if starting_capital else 0.0,
         "unrealized_pct": round(unrealized / starting_capital * 100, 2) if starting_capital else 0.0,
         "all_pct": round(all_pnl / starting_capital * 100, 2) if starting_capital else 0.0,
     }
@@ -1395,16 +1501,20 @@ def _delta_24h(
     current_dd_pct: float,
     baseline: dict | None,
     bot: dict,
+    realized_events: list[list] | None = None,
 ) -> dict:
     """Compute 24-hour rolling window metrics.
 
     closed_trades — all closed trades for the bot (not just recent 30).
     current_dd_pct — current max drawdown as a percentage (0-100 scale).
     baseline — bot baseline dict or None for observational bots.
+    realized_events — realized P&L by fill time (_realized_events); defaults
+                      to the exits of closed_trades.
 
     Returns:
       new_trades        — closed trades in the last 24 h
-      pnl_usd           — sum of profit_abs for those trades
+      pnl_usd           — realized P&L of exits filled in the last 24 h,
+                          including booked partial exits of open trades
       dd_breach         — True if current drawdown > 1.5× baseline drawdown cap
       signals_observed  — placeholder (killers-style bots would populate this
                           from SQLite; for Freqtrade bots always 0)
@@ -1412,7 +1522,9 @@ def _delta_24h(
     cutoff_ms = (time.time() - 86_400) * 1000
     recent = [t for t in closed_trades
               if not t.get("is_open") and (t.get("close_timestamp") or 0) >= cutoff_ms]
-    pnl_usd = sum(float(t.get("profit_abs") or 0) for t in recent)
+    if realized_events is None:
+        realized_events = _realized_events(closed_trades, [])
+    pnl_usd = sum(pnl for ts, pnl in realized_events if ts and ts >= cutoff_ms)
 
     dd_breach = False
     if baseline and baseline.get("max_dd_pct"):
@@ -1469,6 +1581,10 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     closed_trades, history_using_cache = _retain_complete_history(
         bot["key"], fetched_trades, history_complete
     )
+    # A trade that closes between the /status and /trades reads is in both;
+    # the closed record is the newer one.
+    closed_ids = {t.get("trade_id") for t in closed_trades if t.get("trade_id") is not None}
+    open_trades = [t for t in open_trades if t.get("trade_id") not in closed_ids]
     all_trades = closed_trades + open_trades
 
     readiness: dict
@@ -1513,13 +1629,15 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     )
     days_running = (time.time() - bot_start_ts) / 86400.0 if bot_start_ts else 0
 
-    per_pair = _per_pair_pnl(closed_trades)
+    per_pair = _per_pair_pnl(closed_trades, epoch_start_ts_ms)
     epoch_pnl, epoch_stats, closed_pnl = _epoch_stats(
-        closed_trades, open_trades, starting_capital
+        closed_trades, open_trades, starting_capital, epoch_start_ts_ms
     )
     bot_start_ts_ms = int(bot_start_ts * 1000) if bot_start_ts else 0
-    realized_equity = _equity_curve_live(closed_trades, [], starting_capital, bot_start_ts_ms)
-    live_equity = _equity_curve_live(closed_trades, open_trades, starting_capital, bot_start_ts_ms)
+    realized_events = _realized_events(closed_trades, open_trades, epoch_start_ts_ms)
+    event_rows = _event_rows(realized_events)
+    realized_equity = _equity_curve_live(event_rows, [], starting_capital, bot_start_ts_ms)
+    live_equity = _equity_curve_live(event_rows, open_trades, starting_capital, bot_start_ts_ms)
     drawdown_curve = _drawdown_curve(live_equity)
 
     # ── New: compute current DD % for dd_breach check ──────────────────────
@@ -1551,6 +1669,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     open_trades_out = []
     for t in open_trades:
         bp = booked_pct_from_fills(t)
+        partials = _realized_events([], [t], epoch_start_ts_ms)
         row = {
             "trade_id": t.get("trade_id"),
             "pair": t.get("pair"),
@@ -1558,6 +1677,9 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             "current_rate": t.get("current_rate"),
             "profit_pct": t.get("profit_pct"),
             "profit_abs": t.get("profit_abs"),
+            # Booked partial exits (TP rungs); profit_abs marks only the rest.
+            "realized_abs": sum(pnl for _, pnl in partials),
+            "partial_exits": partials,
             "stake_amount": t.get("stake_amount"),
             "open_date": t.get("open_date"),
             "open_timestamp": t.get("open_timestamp"),
@@ -1669,6 +1791,9 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "baseline": baseline,
         "equity_realized": realized_equity,
         "equity_live": live_equity,
+        # Realized P&L by fill time ([[ts_ms | null, usd], ...]); null = booked
+        # by now without a known fill time. The fleet curve stacks these.
+        "realized_events": realized_events,
         "drawdown_realized": _drawdown_curve(realized_equity),
         "drawdown_curve": drawdown_curve,
         "whitelist_size": len((whitelist or {}).get("whitelist", [])) if whitelist else None,
@@ -1680,6 +1805,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
                 current_dd_pct,
                 baseline if baseline_comparable else None,
                 bot,
+                realized_events,
             ),
             "signals_observed": readiness.get("signals_24h", 0),
         },
