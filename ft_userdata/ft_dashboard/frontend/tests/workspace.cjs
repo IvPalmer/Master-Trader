@@ -65,6 +65,17 @@ const fs=require('fs');const luminance=([r,g,b])=>{const [x,y,z]=[r,g,b].map(v=>
  // Hyperliquid can report amount before the order record's fill: never pending then.
  const lagging=await page.evaluate(()=>{const d=Alpine.$data(document.body);const list=d.raw.bots['killers-ft'].open_trades;list.push({...list.find(t=>t.trade_id===15),trade_id:16,pair:'SUI/USDC:USDC',amount:50});const row=d.openTradesAll.find(t=>t.trade_id===16);const out=[row.entry_pending,d.canCancelEntry(row),d.hero.pendingEntries];list.pop();return out;});
  assert.deepEqual(lagging,[false,false,1]);
+ // #185: a booked partial exit (TP rung) of an open trade is realized at its fill time, not only when the trade closes.
+ const fillTs=Date.now()-86400000;
+ const booked=await page.evaluate(fillTs=>{const d=Alpine.$data(document.body);const bot=d.raw.bots['killers-ft'];const t=bot.open_trades.find(x=>x.pair==='LINK/USDC:USDC');
+  const pairBefore=d.portfolioPairRows.find(r=>r.pair===t.pair).realized;const expBefore=d.hero.expectancyPerTrade;
+  bot._pnl=bot.pnl;bot._events=bot.realized_events;bot.pnl={...bot.pnl,closed:bot.pnl.closed+3,closed_trades:bot.pnl.closed,all_coin:bot.pnl.all_coin+3};bot.realized_events=[...bot.realized_events,[fillTs,3]];t.partial_exits=[[fillTs,3]];t.realized_abs=3;
+  const curve=d.fleetPerformanceData.realized;const i=curve.findIndex(p=>p[0]===fillTs);
+  return {step:i>0?Number((curve[i][1]-curve[i-1][1]).toFixed(4)):null,pair:Number((d.portfolioPairRows.find(r=>r.pair===t.pair).realized-pairBefore).toFixed(4)),expectancyUnchanged:d.hero.expectancyPerTrade===expBefore};},fillTs);
+ assert.deepEqual(booked,{step:3,pair:3,expectancyUnchanged:true});
+ await page.waitForTimeout(200);
+ assert.match(await page.locator('.trade-card',{hasText:'LINK/USDC:USDC'}).locator('.trade-pnl .abs').textContent(),/booked \+\$3\.00\)$/);
+ await page.evaluate(()=>{const bot=Alpine.$data(document.body).raw.bots['killers-ft'];const t=bot.open_trades.find(x=>x.pair==='LINK/USDC:USDC');bot.pnl=bot._pnl;bot.realized_events=bot._events;delete bot._pnl;delete bot._events;delete t.partial_exits;delete t.realized_abs;});
  const partialCard=page.locator('.trade-card',{hasText:'OP/USDT'});
  assert.equal((await partialCard.locator('.trade-reason').textContent()).trim(),'OPEN');assert.equal(await partialCard.locator('.trade-pnl').isVisible(),true);
  assert.equal(await partialCard.getByRole('button',{name:/Cancel entry order|Close position/}).count(),0,'No dashboard cancel once any quantity fills');

@@ -230,7 +230,11 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
 
     # --- P&L --- (before the no-closed-trades early return, so a bot whose
     # first positions are still open reports their unrealized P&L)
-    closed_pnl = sum((t.get("profit_abs", 0) or 0) for t in closed)
+    # Realized = closed trades + filled partial exits (TP rungs) of open
+    # trades, which Freqtrade keeps in realized_profit; /status profit_abs
+    # marks only the size still open.
+    closed_pnl = (sum((t.get("profit_abs", 0) or 0) for t in closed)
+                  + sum((t.get("realized_profit", 0) or 0) for t in open_list))
     open_pnl = sum((t.get("profit_abs", 0) or 0) for t in open_list)
     true_pnl = closed_pnl + open_pnl
 
@@ -1154,7 +1158,7 @@ def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dic
     # Portfolio summary
     lines.append("PORTFOLIO")
     lines.extend(_format_capital_lines(portfolio))
-    lines.append(f"  Closed P&L (all bots): ${portfolio['closed_pnl']:+.2f}")
+    lines.append(f"  Realized P&L (all bots): ${portfolio['closed_pnl']:+.2f}")
     lines.append(f"  Open P&L (all bots): ${portfolio['open_pnl']:+.2f}")
     lines.append(f"  True P&L (all bots): ${portfolio['true_pnl']:+.2f}")
     lines.append(f"  Trades: {portfolio['total_trades']} closed, {portfolio['open_positions']} open")
