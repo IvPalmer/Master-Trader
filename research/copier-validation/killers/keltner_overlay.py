@@ -11,7 +11,10 @@ from datetime import datetime, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "keltner_1h")
 DAY = 86400_000
-FEE = 0.001  # ~0.1% round trip (applied to all trades; cancels in the comparison)
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[3]))
+from ft_userdata.analysis.costs import fee_fraction  # noqa: E402
+FEE = 2 * fee_fraction("binance", "perp", "taker")  # round trip, shared cost model (applied to all trades; cancels in the comparison)
 
 # Keltner params (frozen, from KeltnerBounceV1.py)
 KP, KMULT, VMULT, VSMA = 25, 2.5, 1.75, 20
