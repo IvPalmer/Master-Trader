@@ -161,8 +161,10 @@ pill shapes.
 
 - **Overview:** incidents precede account equity, realized P&L, unrealized P&L
   and estimated loss to bot stops. Shared accounts count once. The realized
-  series represents closed results in live epochs; current unrealized P&L is a
-  separate measurement. Secondary research stays behind disclosure controls.
+  series represents closed results in live epochs: closed trades plus the
+  filled partial exits (TP rungs) of open trades, each at its fill time. Current
+  unrealized P&L marks only the size still open and is a separate measurement.
+  Secondary research stays behind disclosure controls.
 - **Analytics:** D3 scales and shapes render responsive SVG equity and drawdown
   plots on a continuous calendar-time domain. Sparse observations keep their
   elapsed-time spacing. Realized equity and drawdown use step-after curves,
