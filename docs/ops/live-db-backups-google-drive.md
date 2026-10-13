@@ -1,7 +1,9 @@
 # Live SQLite backups to Google Drive
 
-This runbook covers GH #99. It is an installation and recovery procedure, not
-evidence that the schedule is installed or that any backup has run.
+This runbook covers GH #99. The local root cron has run daily at 03:15 UTC
+since 2026-10-09; a 2026-10-13 check found 25 files and an `OK` result. That
+local receipt is not evidence that the rclone/off-host changes on `main` have
+been released or that Google Drive uploads are configured.
 
 ## Contract
 
@@ -9,29 +11,32 @@ The daily job takes WAL-consistent online copies of:
 
 - all `tradesv3.live.*.sqlite` files in the Dokploy `ft_user_data` volume;
 - all `*.sqlite` files in `killers_receiver_state`;
-- all `*.sqlite` files in `insiders_receiver_state`.
+- all `*.sqlite` files in `insiders_receiver_state`;
+- `/home/ubuntu/killers-bot/state.sqlite` when the observer database exists.
 
 It never stops or restarts a bot. Each standalone copy must pass SQLite
 `PRAGMA integrity_check`, is compressed with gzip, and is recorded in a SHA-256
 manifest. The completed run is copied to the dedicated
 `operator-drive:Master-Trader/backups/<UTC stamp>` directory and a downloading
-`rclone check` must succeed. Only timestamped run directories older than 30
-days are removed, locally and remotely. An unparseable remote directory name
-is never removed.
+`rclone check` must succeed. The same tiered retention applies locally and
+remotely: every run for 30 days, the newest run of each ISO week for 8 weeks,
+and never fewer than the 7 newest. An unparseable remote directory name is
+never removed.
 
-The script deliberately excludes dry-run databases, exporter state, observer
-state, credentials, configs and logs. A failure keeps the new local snapshot,
-does not run local retention, exits non-zero and alerts through trade-webhook.
+The script deliberately excludes dry-run databases, exporter state,
+credentials, configs and logs. A failure keeps the new local snapshot, does
+not run local retention, exits non-zero and alerts through trade-webhook.
 
 ## Approval boundary
 
-Do not perform these steps merely because the PR is merged. The operator must
-separately approve installation/deployment and must personally complete Google
-OAuth. Do not copy an existing rclone configuration, browser profile, refresh
-token or another person's Google token. The agent does not receive or paste the
-OAuth result. No bot restart is part of this procedure.
+Do not perform these off-host setup steps merely because the PR is merged. The
+operator must separately approve releasing/configuring the rclone version and
+must personally complete Google OAuth. Do not copy an existing rclone
+configuration, browser profile, refresh token or another person's Google token.
+The agent does not receive or paste the OAuth result. No bot restart is part of
+this procedure.
 
-## Exact installation steps (operator-approved window only)
+## Exact off-host setup steps (operator-approved window only)
 
 Run on the VPS. Root is required because Docker volume directories are
 root-readable. Use the root-owned Dokploy checkout path; do not schedule through
@@ -45,9 +50,9 @@ sudo install -d -o root -g root -m 0700 /home/ubuntu/backups/master-trader
 sudo /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_live_dbs.py --list
 ```
 
-Confirm that `--list` contains only the expected live Freqtrade and two receiver
-databases. Do not proceed if a required volume is missing or an unexpected file
-is present.
+Confirm that `--list` contains only the expected live Freqtrade databases, the
+two receiver databases and the observer database. Do not proceed if a required
+volume is missing or an unexpected file is present.
 
 ### Operator-owned Google Drive authorization
 
@@ -56,7 +61,7 @@ this backup and uses the operator's own Google account. Start the interactive
 configuration with the final config path from a private terminal:
 
 ```bash
-sudo /usr/bin/rclone config --config /etc/master-trader-backup/rclone.conf
+sudo /usr/local/bin/rclone config --config /etc/master-trader-backup/rclone.conf
 ```
 
 Rclone's shared Google client ID is retired during 2026, so create an
@@ -84,8 +89,8 @@ Lock down and validate the resulting config without printing it:
 ```bash
 sudo chown root:root /etc/master-trader-backup/rclone.conf
 sudo chmod 0600 /etc/master-trader-backup/rclone.conf
-sudo /usr/bin/rclone mkdir operator-drive:Master-Trader/backups --config /etc/master-trader-backup/rclone.conf
-sudo /usr/bin/rclone lsd operator-drive:Master-Trader --config /etc/master-trader-backup/rclone.conf
+sudo /usr/local/bin/rclone mkdir operator-drive:Master-Trader/backups --config /etc/master-trader-backup/rclone.conf
+sudo /usr/local/bin/rclone lsd operator-drive:Master-Trader --config /etc/master-trader-backup/rclone.conf
 ```
 
 The dedicated client ID avoids the retired shared client and isolates its API
@@ -97,16 +102,17 @@ The first command below creates and uploads a real backup. Run it only after the
 operator explicitly approves that action:
 
 ```bash
-sudo /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_live_dbs.py
+sudo /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_live_dbs.py --rclone /usr/local/bin/rclone
 sudo find /home/ubuntu/backups/master-trader -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort
-sudo /usr/bin/rclone lsf operator-drive:Master-Trader/backups --dirs-only --config /etc/master-trader-backup/rclone.conf
+sudo /usr/local/bin/rclone lsf operator-drive:Master-Trader/backups --dirs-only --config /etc/master-trader-backup/rclone.conf
 ```
 
-After the first run and restore drill succeed, install the daily 03:15 UTC job:
+After the first upload and restore drill succeed, replace the existing local-only
+03:15 UTC cron entry with the released off-host command:
 
 ```bash
 ( sudo crontab -l 2>/dev/null | grep -v 'deploy/vps/backup_live_dbs.py'
-  echo '15 3 * * * /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_live_dbs.py >> /var/log/master-trader-backup.log 2>&1'
+  echo '15 3 * * * /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_live_dbs.py --rclone /usr/local/bin/rclone >> /var/log/master-trader-backup.log 2>&1'
 ) | sudo crontab -
 sudo crontab -l | grep 'deploy/vps/backup_live_dbs.py'
 ```
@@ -124,8 +130,8 @@ that file's `sha256` value in `MANIFEST.json`.
 
 ```bash
 sudo install -d -o root -g root -m 0700 /home/ubuntu/backups/restore-drill
-sudo /usr/bin/rclone copyto operator-drive:Master-Trader/backups/<stamp>/MANIFEST.json /home/ubuntu/backups/restore-drill/MANIFEST.json --config /etc/master-trader-backup/rclone.conf
-sudo /usr/bin/rclone copyto operator-drive:Master-Trader/backups/<stamp>/killers_receiver_state/receiver-hyperliquid.sqlite.gz /home/ubuntu/backups/restore-drill/receiver-hyperliquid.sqlite.gz --config /etc/master-trader-backup/rclone.conf
+sudo /usr/local/bin/rclone copyto operator-drive:Master-Trader/backups/<stamp>/MANIFEST.json /home/ubuntu/backups/restore-drill/MANIFEST.json --config /etc/master-trader-backup/rclone.conf
+sudo /usr/local/bin/rclone copyto operator-drive:Master-Trader/backups/<stamp>/killers_receiver_state/receiver-hyperliquid.sqlite.gz /home/ubuntu/backups/restore-drill/receiver-hyperliquid.sqlite.gz --config /etc/master-trader-backup/rclone.conf
 sudo gzip --test /home/ubuntu/backups/restore-drill/receiver-hyperliquid.sqlite.gz
 sudo sh -c 'gzip -dc /home/ubuntu/backups/restore-drill/receiver-hyperliquid.sqlite.gz > /home/ubuntu/backups/restore-drill/receiver-hyperliquid.sqlite'
 sudo sha256sum /home/ubuntu/backups/restore-drill/receiver-hyperliquid.sqlite
