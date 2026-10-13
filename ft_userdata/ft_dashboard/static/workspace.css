@@ -190,3 +190,4 @@ button:focus-visible,a:focus-visible,summary:focus-visible { outline:2px solid v
 .trade-reason.reason-entry-pending { color:var(--exit-pending-text); background:var(--exit-pending-bg); border-color:rgb(var(--warn-rgb) / .3); }
 .trade-entry-price.pending { color:var(--exit-pending-text); }
 .trade-entry-price.pending::before { border-top-style:dotted; }
+.pnl-audit { display:block; margin-top:2px; color:var(--text-3); font-size:10px; font-weight:500; white-space:nowrap; }

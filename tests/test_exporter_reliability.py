@@ -84,6 +84,56 @@ def test_short_keltner_breaker_membership_uses_runtime_mode(exporter, monkeypatc
     assert live_pnl == (0.0 if dry_run else -7.0)
 
 
+def test_exporter_attribution_corrects_hl_stop_but_breaker_return_stays_raw(exporter, monkeypatch):
+    class Sink:
+        def __init__(self):
+            self.value = None
+        def labels(self, **_kwargs):
+            return self
+        def set(self, value):
+            self.value = value
+
+    for name in (
+        "profit_total", "profit_total_raw", "profit_pct", "trades_total", "drawdown",
+        "win_rate", "trades_open", "unrealized_pnl", "true_pnl", "balance", "bot_up",
+        "hyperliquid_overbooked_stops", "hyperliquid_fill_reconciliation_up",
+    ):
+        monkeypatch.setattr(exporter, name, Sink())
+    bot = {"service": "ft-killers-scalp", "strategy": "KillersScalpV1",
+           "venue": "hyperliquid", "wallet_env": "TEST_HL_WALLET"}
+    trade = {
+        "close_date": "2026-10-08 15:23:00", "open_rate": 11.24,
+        "fee_open": 0.0004, "fee_close": 0.00015, "profit_abs": -10.04074610245,
+        "orders": [{"order_id": "avax-stop-16", "ft_order_side": "stoploss",
+                    "is_open": False, "filled": 8.33}],
+    }
+
+    def fetch(_service, endpoint):
+        if endpoint == "profit":
+            return {"profit_closed_coin": -10.04074610245, "closed_trade_count": 1,
+                    "winning_trades": 0, "losing_trades": 1}
+        if endpoint.startswith("trades"):
+            return {"trades": [trade]}
+        if endpoint == "status":
+            return []
+        if endpoint == "balance":
+            return {"total": 90}
+        raise AssertionError(endpoint)
+
+    monkeypatch.setattr(exporter, "fetch_json", fetch)
+    monkeypatch.setattr(exporter, "fetch_hyperliquid_user_fills", lambda _bot: [
+        {"oid": "avax-stop-16", "sz": "7.29", "px": "9.9851"}
+    ])
+
+    breaker_pnl = exporter.scrape_bot(bot)
+
+    assert exporter.profit_total.value == pytest.approx(-8.72941658685)
+    assert exporter.profit_total_raw.value == pytest.approx(-10.04074610245)
+    assert exporter.true_pnl.value == pytest.approx(-8.73)
+    assert exporter.hyperliquid_overbooked_stops.value == 1
+    assert breaker_pnl == pytest.approx(-10.04074610245)
+
+
 def test_emergency_alert_matches_trade_webhook_json_contract(exporter, monkeypatch):
     captured = []
 

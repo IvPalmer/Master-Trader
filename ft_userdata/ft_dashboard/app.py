@@ -39,6 +39,8 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from hyperliquid_reconciliation import reconcile_trades
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("ft-dashboard")
 
@@ -142,6 +144,7 @@ BOTS: list[dict[str, Any]] = [
         "account_group": "hyperliquid-short-keltner",
         "strategy_kind": "autonomous-quant",
         "venue": "hyperliquid",
+        "wallet_env": "HYPERLIQUID_SHORT_KELTNER_WALLET_ADDRESS",
         "epoch_start_ts_ms": 1787525718059,
         "epoch_label": "live v1 · dedicated 40 USDC account",
         "strategy_version": "ShortKeltnerV2HL · live v1",
@@ -181,6 +184,7 @@ BOTS: list[dict[str, Any]] = [
         # deterministic quant strategy; the dashboard should show realised
         # performance without comparing it to an invented backtest baseline.
         "venue": "hyperliquid",
+        "wallet_env": "HYPERLIQUID_KILLERS_WALLET_ADDRESS",
         "epoch_start_ts_ms": KILLERS_ROUND5_EPOCH_TS_MS,
         "epoch_label": "round 5 · wide-stop admission · 24h zone patience",
         "strategy_version": "KillersScalpV1 · r5",
@@ -215,6 +219,7 @@ BOTS: list[dict[str, Any]] = [
         "account_group": "hyperliquid-insiders",
         "strategy_kind": "copy-trader",
         "venue": "hyperliquid",
+        "wallet_env": "HYPERLIQUID_INSIDERS_WALLET_ADDRESS",
         "epoch_start_ts_ms": INSIDERS_ROUND5_EPOCH_TS_MS,
         "epoch_label": "round 5 · wide-stop admission · 24h zone patience",
         "strategy_version": "InsidersScalp · r5",
@@ -314,6 +319,9 @@ API_USER = os.environ.get("FREQTRADE__API_SERVER__USERNAME", "")
 API_PASS = os.environ.get("FREQTRADE__API_SERVER__PASSWORD", "")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
 REQUEST_TIMEOUT = float(os.environ.get("REQUEST_TIMEOUT", "10"))
+HL_INFO_URL = os.environ.get("HL_INFO_URL", "http://hl-gateway:8080/accounting/info")
+HL_FILLS_CACHE_SECONDS = float(os.environ.get("HL_FILLS_CACHE_SECONDS", "300"))
+_HL_FILLS_CACHE: dict[str, tuple[float, list[dict]]] = {}
 OVERLAYS_DIR = Path(os.environ.get("OVERLAYS_DIR", "/overlays"))
 KILLERS_DB = Path(os.environ.get("KILLERS_DB", "/var/lib/killers/state.sqlite"))
 LINEAGE_DB_DIR = Path(os.environ.get("LINEAGE_DB_DIR", "/var/lib/freqtrade-history"))
@@ -697,6 +705,36 @@ async def _get_plain(
         return None, f"HTTP {r.status_code}"
     except Exception as exc:
         return None, f"{type(exc).__name__}: {exc}"
+
+
+async def _hyperliquid_user_fills(
+    client: httpx.AsyncClient, bot: dict
+) -> tuple[list[dict] | None, str | None]:
+    """Read account fills through the observation-only gateway path."""
+    env_name = bot.get("wallet_env")
+    wallet = os.environ.get(env_name, "").strip() if env_name else ""
+    if bot.get("venue") != "hyperliquid":
+        return [], None
+    if not wallet:
+        return None, "Hyperliquid wallet address unavailable"
+    cached = _HL_FILLS_CACHE.get(wallet)
+    if cached and time.time() - cached[0] < HL_FILLS_CACHE_SECONDS:
+        return cached[1], None
+    try:
+        response = await client.post(
+            HL_INFO_URL,
+            json={"type": "userFills", "user": wallet},
+            timeout=max(REQUEST_TIMEOUT, 30.0),
+        )
+        if response.status_code != 200:
+            return None, f"Hyperliquid fills HTTP {response.status_code}"
+        payload = response.json()
+        if isinstance(payload, list):
+            _HL_FILLS_CACHE[wallet] = (time.time(), payload)
+            return payload, None
+        return None, "invalid Hyperliquid fills"
+    except Exception as exc:
+        return None, f"Hyperliquid fills {type(exc).__name__}: {exc}"
 
 
 async def _fetch_epoch_trades(
@@ -1585,6 +1623,24 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     # the closed record is the newer one.
     closed_ids = {t.get("trade_id") for t in closed_trades if t.get("trade_id") is not None}
     open_trades = [t for t in open_trades if t.get("trade_id") not in closed_ids]
+    fill_reconciliation = {"status": "not_applicable", "overbooked_trades": 0}
+    if bot.get("venue") == "hyperliquid":
+        exchange_fills, fill_error = await _hyperliquid_user_fills(client, bot)
+        if exchange_fills is None:
+            fill_reconciliation = {
+                "status": "unavailable",
+                "detail": fill_error or "Hyperliquid fills unavailable",
+                "overbooked_trades": 0,
+            }
+        else:
+            closed_trades = reconcile_trades(closed_trades, exchange_fills)
+            open_trades = reconcile_trades(open_trades, exchange_fills)
+            fill_reconciliation = {
+                "status": "ok",
+                "overbooked_trades": sum(
+                    bool(t.get("stop_fill_overbooked")) for t in closed_trades + open_trades
+                ),
+            }
     all_trades = closed_trades + open_trades
 
     readiness: dict
@@ -1730,6 +1786,9 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
                 "close_rate": t.get("close_rate"),
                 "profit_pct": t.get("profit_pct"),
                 "profit_abs": t.get("profit_abs"),
+                "freqtrade_profit_abs": t.get("freqtrade_profit_abs"),
+                "stop_fill_overbooked": bool(t.get("stop_fill_overbooked")),
+                "hyperliquid_stop_reconciliation": t.get("hyperliquid_stop_reconciliation"),
                 "exit_reason": t.get("exit_reason"),
                 "trade_duration": t.get("trade_duration"),
             }
@@ -1747,6 +1806,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "account_group": bot.get("account_group", bot["key"]),
         "strategy_kind": bot.get("strategy_kind", "autonomous-quant"),
         "venue": bot.get("venue", "binance"),
+        "fill_reconciliation": fill_reconciliation,
         "epoch_start_ts_ms": epoch_start_ts_ms,
         "epoch": {
             "start_ts_ms": epoch_start_ts_ms,
@@ -1901,6 +1961,7 @@ def _fleet_status() -> dict:
     position_faults: list[str] = []
     execution_faults: list[str] = []
     execution_warnings: list[str] = []
+    reconciliation_warnings: list[str] = []
 
     for bot in BOTS:
         key = bot["key"]
@@ -1916,6 +1977,8 @@ def _fleet_status() -> dict:
             execution_faults.append(key)
         elif execution_status in {"critical", "warning"}:
             execution_warnings.append(key)
+        if is_live and (snap.get("fill_reconciliation") or {}).get("status") == "unavailable":
+            reconciliation_warnings.append(key)
 
         if is_stale:
             stale_bots.append(key)
@@ -1937,6 +2000,12 @@ def _fleet_status() -> dict:
     elif account_warnings:
         level = "yellow"
         summary = "; ".join(account_warnings)
+    elif reconciliation_warnings:
+        level = "yellow"
+        summary = (
+            "Hyperliquid fill reconciliation unavailable; P&L is Freqtrade raw: "
+            + ", ".join(reconciliation_warnings)
+        )
     elif stale_bots:
         level = "yellow"
         summary = f"{len(stale_bots)} bot(s) stale: {', '.join(stale_bots)}"

@@ -300,6 +300,53 @@ def test_overbooked_stop_after_a_partial_tp_is_valued_like_freqtrade():
     assert app.exit_fills(trade) == [[T3, pytest.approx(stop)], [T2, pytest.approx(tp)]]
 
 
+def test_poll_uses_hyperliquid_stop_fills_and_exposes_freqtrade_raw(monkeypatch):
+    tp = _ft_exit_pnl(1.04, 11.7, 11.24) - 0.0094
+    stop = _ft_exit_pnl(8.33, 9.9851, 11.24)
+    trade = {
+        "trade_id": 16, "pair": "AVAX/USDC:USDC", "is_open": False,
+        "is_short": False, "open_rate": 11.24, "close_rate": 9.9851,
+        "fee_open": FEE_OPEN, "fee_close": FEE_CLOSE,
+        "profit_abs": tp + stop, "profit_pct": -10.0,
+        "close_timestamp": T3, "close_date": "2026-10-08 15:23:00",
+        "orders": [
+            {**_order("buy", 8.33, 11.24, T1), "order_id": "entry-16"},
+            {**_order("stoploss", 8.33, 9.9851, T3), "order_id": "avax-stop-16"},
+            {**_order("sell", 1.04, 11.7, T2, funding=-0.0094), "order_id": "tp-16"},
+        ],
+    }
+    payloads = {
+        "profit": {"bot_start_timestamp": 0}, "status": [],
+        "balance": {"starting_capital": 98.0, "total_bot": 98.0, "total": 90.0},
+        "show_config": {"dry_run": False, "timeframe": "5m", "stake_currency": "USDC"},
+        "whitelist": {"whitelist": []},
+    }
+    async def fake_get(client, url, path, *args, **kwargs):
+        return payloads.get(path.split("?")[0]), None
+    async def fake_plain(*args, **kwargs):
+        return None, "unavailable"
+    async def fake_history(*args, **kwargs):
+        return [trade], True, None
+    async def fake_fills(*args, **kwargs):
+        return [{"oid": "avax-stop-16", "sz": "7.29", "px": "9.9851"}], None
+
+    bot = app._bot_meta("killers-ft")
+    monkeypatch.setattr(app, "_get", fake_get)
+    monkeypatch.setattr(app, "_get_plain", fake_plain)
+    monkeypatch.setattr(app, "_fetch_epoch_trades", fake_history)
+    monkeypatch.setattr(app, "_hyperliquid_user_fills", fake_fills)
+    monkeypatch.setattr(app, "killers_tp_ladder", lambda *a, **k: {})
+    monkeypatch.setitem(bot, "epoch_start_ts_ms", T1 - 1)
+
+    snapshot = asyncio.run(app._poll_bot(None, bot))
+
+    row = snapshot["recent_trades"][0]
+    assert row["profit_abs"] == pytest.approx(tp + _ft_exit_pnl(7.29, 9.9851, 11.24))
+    assert row["freqtrade_profit_abs"] == pytest.approx(tp + stop)
+    assert row["stop_fill_overbooked"] is True
+    assert snapshot["fill_reconciliation"] == {"status": "ok", "overbooked_trades": 1}
+
+
 def test_an_exit_without_a_fill_time_keeps_the_other_fill_times():
     trade, final, funding = closed_jup()
     del trade["orders"][2]["order_filled_timestamp"]

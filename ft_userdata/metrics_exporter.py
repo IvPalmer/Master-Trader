@@ -19,6 +19,7 @@ from prometheus_client import start_http_server, Gauge, Info
 
 from api_utils import api_get as _api_get_with_retry
 from api_utils import auth_candidates_for
+from hyperliquid_reconciliation import reconcile_trades
 
 logging.basicConfig(
     level=logging.INFO,
@@ -79,7 +80,9 @@ def _load_bots_config() -> list[dict]:
             service = service_map.get(name, service)
             bots.append({"service": service, "strategy": name,
                          "capital_account": info.get("capital_account") or service,
-                         "capital_owner": info.get("capital_owner", False)})
+                         "capital_owner": info.get("capital_owner", False),
+                         "venue": info.get("venue"),
+                         "wallet_env": info.get("wallet_env")})
         return bots
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return [
@@ -99,6 +102,8 @@ AUTH = HTTPBasicAuth(
 )
 API_PORT = 8080
 SCRAPE_INTERVAL = 60  # seconds
+HL_FILLS_CACHE_SECONDS = 300
+_hl_fills_cache: dict[str, tuple[float, list[dict]]] = {}
 
 # ── Circuit Breaker ───────────────────────────────────────────────
 # Dynamic capital tracking: starting capital is read from each LIVE bot's
@@ -238,6 +243,21 @@ bot_up = Gauge(
     "Whether the bot API is reachable (1=up, 0=down)",
     ["strategy"],
 )
+profit_total_raw = Gauge(
+    "freqtrade_profit_total_raw",
+    "Unmodified Freqtrade closed profit retained for reconciliation audit",
+    ["strategy"],
+)
+hyperliquid_overbooked_stops = Gauge(
+    "freqtrade_hyperliquid_overbooked_stops",
+    "Closed trades whose stop quantity was corrected from Hyperliquid userFills",
+    ["strategy"],
+)
+hyperliquid_fill_reconciliation_up = Gauge(
+    "freqtrade_hyperliquid_fill_reconciliation_up",
+    "Whether Hyperliquid userFills were available for reporting reconciliation",
+    ["strategy"],
+)
 portfolio_drawdown_pct = Gauge(
     "freqtrade_portfolio_drawdown_pct",
     "Portfolio drawdown from high-water mark as percentage",
@@ -251,6 +271,33 @@ portfolio_value_total = Gauge(
 def fetch_json(service: str, endpoint: str, timeout: int = 10) -> dict | None:
     """GET JSON from a Freqtrade API endpoint with retry logic."""
     return _api_get_with_retry(API_PORT, endpoint, timeout=timeout, base_host=service)
+
+
+def fetch_hyperliquid_user_fills(bot: dict) -> list[dict] | None:
+    """Read userFills through the gateway; never fall back to guessed data."""
+    if bot.get("venue") != "hyperliquid":
+        return []
+    env_name = bot.get("wallet_env")
+    wallet = os.environ.get(env_name, "").strip() if env_name else ""
+    if not wallet:
+        return None
+    cached = _hl_fills_cache.get(wallet)
+    if cached and time.time() - cached[0] < HL_FILLS_CACHE_SECONDS:
+        return cached[1]
+    try:
+        response = requests.post(
+            GATEWAY_URL + "/accounting/info",
+            json={"type": "userFills", "user": wallet},
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if isinstance(payload, list):
+            _hl_fills_cache[wallet] = (time.time(), payload)
+            return payload
+        return None
+    except (requests.RequestException, ValueError):
+        return None
 
 
 def fetch_bot_meta(service: str) -> dict | None:
@@ -452,7 +499,28 @@ def scrape_bot(bot: dict) -> float | None:
 
     bot_up.labels(strategy=strategy).set(1)
 
-    closed_pnl = data.get("profit_closed_coin", 0)
+    raw_closed_pnl = data.get("profit_closed_coin", 0)
+    closed_pnl = raw_closed_pnl
+    profit_total_raw.labels(strategy=strategy).set(raw_closed_pnl)
+    if bot.get("venue") == "hyperliquid":
+        exchange_fills = fetch_hyperliquid_user_fills(bot)
+        trades_payload = fetch_json(service, "trades?limit=500")
+        trades = (trades_payload or {}).get("trades") if isinstance(trades_payload, dict) else trades_payload
+        expected = int(data.get("closed_trade_count") or 0)
+        closed = [t for t in trades or [] if t.get("close_date") is not None] if isinstance(trades, list) else []
+        if exchange_fills is not None and len(closed) == expected:
+            closed = reconcile_trades(closed, exchange_fills)
+            corrected = [t for t in closed if t.get("stop_fill_overbooked")]
+            closed_pnl = sum(float(t.get("profit_abs") or 0) for t in closed)
+            hyperliquid_fill_reconciliation_up.labels(strategy=strategy).set(1)
+            hyperliquid_overbooked_stops.labels(strategy=strategy).set(len(corrected))
+        else:
+            hyperliquid_fill_reconciliation_up.labels(strategy=strategy).set(0)
+            hyperliquid_overbooked_stops.labels(strategy=strategy).set(0)
+            log.warning(
+                "Hyperliquid fill reconciliation unavailable/incomplete for %s; exporting Freqtrade raw P&L",
+                strategy,
+            )
     profit_total.labels(strategy=strategy).set(closed_pnl)
     profit_pct.labels(strategy=strategy).set(
         data.get("profit_closed_percent_sum", 0)
@@ -477,6 +545,7 @@ def scrape_bot(bot: dict) -> float | None:
 
     # ── /status (open trades + unrealized P&L) ───────────────────
     bot_true_pnl = closed_pnl
+    raw_bot_true_pnl = raw_closed_pnl
     status_data = fetch_json(service, "status")
     if isinstance(status_data, list):
         trades_open.labels(strategy=strategy).set(len(status_data))
@@ -486,6 +555,7 @@ def scrape_bot(bot: dict) -> float | None:
             open_pnl = sum(float(t.get("profit_abs", 0)) for t in status_data)
             booked_partials = sum(float(t.get("realized_profit") or 0) for t in status_data)
             bot_true_pnl = float(closed_pnl) + booked_partials + open_pnl
+            raw_bot_true_pnl = float(raw_closed_pnl) + booked_partials + open_pnl
         except (TypeError, ValueError):
             bot_true_pnl = math.nan
         if not math.isfinite(bot_true_pnl):
@@ -504,7 +574,10 @@ def scrape_bot(bot: dict) -> float | None:
             bal_data.get("total", 0)
         )
 
-    return bot_true_pnl
+    # The returned value feeds the legacy P&L breaker fallback. Preserve its
+    # raw behavior; account-equity breaker observations are intentionally
+    # unchanged by this reporting correction.
+    return raw_bot_true_pnl
 
 
 def scrape_all() -> tuple[float | None, float | None]:
