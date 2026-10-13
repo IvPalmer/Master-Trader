@@ -41,9 +41,12 @@ The health-report line runs an installed copy of `deploy/vps/run-health-report.s
 in `runtime/`. Re-copy it after that script changes; the copy on the host was older than the repo
 version on 2026-10-02. The warden line is documented in `services/killers-receiver/warden/README.md`.
 Two systemd timers (`master-trader-retention-shadow`, `master-trader-retention-accounting`, units
-in `research/profit_retention/systemd/`) run the read-only profit-retention collectors. Nothing
-else master-trader related is scheduled on the host. `ft_userdata/automation_scheduler.sh` is not
-installed and refuses to run (#100).
+in `research/profit_retention/systemd/`) run the read-only profit-retention collectors.
+`ft_userdata/automation_scheduler.sh` is not installed and refuses to run (#100).
+Separately, root's crontab has run `deploy/vps/backup_live_dbs.py` daily at
+03:15 UTC since 2026-10-09. It was checked on 2026-10-13: the local backup had
+25 files and reported `OK`. This confirms the local schedule only; it does not
+show that the rclone/off-host version from `main` has been released or configured.
 
 Live trade DB lives in docker volume
 `compose-bypass-mobile-port-fbk1m6_ft_user_data` (NOT in `runtime/`).
@@ -92,9 +95,10 @@ All bulk research data lives only on VPS; backtests run on VPS.
 
 `backup_live_dbs.py` (#99) backs up every `tradesv3.live.*.sqlite` in the
 `ft_user_data` volume and every `*.sqlite` in `killers_receiver_state` and
-`insiders_receiver_state`. The receiver databases tie each open position to
-its source signal, posted stop and targets and cannot be rebuilt from the
-exchange. Dry-run databases and unrelated state are intentionally excluded.
+`insiders_receiver_state`, plus `/home/ubuntu/killers-bot/state.sqlite` when it
+exists. The receiver databases tie each open position to its source signal,
+posted stop and targets and cannot be rebuilt from the exchange. Dry-run
+databases and unrelated state are intentionally excluded.
 
 Each database is opened read-only and copied with SQLite's online backup API,
 which takes a consistent snapshot without stopping the bots. The copy has to
@@ -102,19 +106,18 @@ pass `PRAGMA integrity_check` and is then gzipped. One run produces
 `/home/ubuntu/backups/master-trader/<UTC stamp>/` with a `MANIFEST.json`
 (source, size, sha256 and integrity result). It then copies that run to the
 operator's Google Drive with rclone, checks the remote files against the local
-copy, and applies 30-day retention to both locations. A failure exits non-zero
-and posts a `[db-backup] WARN` line through trade-webhook.
+copy, and applies the same retention to both locations: every run for 30 days,
+the newest run of each ISO week for 8 weeks, and a floor of 7 runs. A failure
+exits non-zero and posts a `[db-backup] WARN` line through trade-webhook.
 
-What existed before (checked read-only on 2026-10-02): no scheduled backup of
-any of this. Dokploy has no backup, volume backup or destination configured.
-The host crontabs back up only another project (`rlm-db-backup.sh`).
+Before 2026-10-09 there was no scheduled backup of this state. Dokploy had no
+backup, volume backup or destination configured when checked on 2026-10-02.
 `ft_userdata/automation_scheduler.sh`'s 02:00 line reads `~/ft_userdata`, which
-holds no live database, and is not installed. The only copies are one-off
-copies taken before risky changes. A cloud-level boot-volume backup policy
-can't be seen from the host and is unverified.
+holds no live database, and is not installed. A cloud-level boot-volume backup
+policy cannot be seen from the host and remains unverified.
 
-Installation, operator-owned Google OAuth, scheduling, verification and the
-non-destructive restore drill are in
+Off-host setup, operator-owned Google OAuth, cron replacement, verification and
+the non-destructive restore drill are in
 [live-db-backups-google-drive.md](../../docs/ops/live-db-backups-google-drive.md).
-Installation/deployment and Drive authorization require separate operator
-approval; merging this code does not install or run anything on the VPS.
+Releasing the rclone version and authorizing Drive require separate operator
+approval; merging this code does not change the running VPS.

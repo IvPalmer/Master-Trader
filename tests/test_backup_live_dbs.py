@@ -61,7 +61,9 @@ def fleet(tmp_path):
     (data["ft_user_data"] / "logs").mkdir()
     (data["ft_user_data"] / "fear_greed_history.json").write_text("{}")
     (data["killers_receiver_state"] / "receiver-hyperliquid.sqlite.before-migration-x").write_text("old")
-    yield {"vols": vols, "data": data, "dest": tmp_path / "backups",
+    observer = tmp_path / "killers-bot" / "state.sqlite"
+    open_conns.append(_wal_db(observer, 4))
+    yield {"vols": vols, "data": data, "observer": observer, "dest": tmp_path / "backups",
            "conns": open_conns}
     for c in open_conns:
         c.close()
@@ -69,7 +71,7 @@ def fleet(tmp_path):
 
 def _args(f, *extra):
     return ["--dest", str(f["dest"]), "--volumes-root", str(f["vols"]), "--project", PROJECT,
-            "--no-upload", "--no-alert", *extra]
+            "--observer-db", str(f["observer"]), "--no-upload", "--no-alert", *extra]
 
 
 def _restore(gz: Path, tmp: Path) -> sqlite3.Connection:
@@ -88,10 +90,12 @@ def test_backs_up_every_volume_consistently_while_writers_are_open(bk, fleet, tm
     assert names == [
         "ft_user_data/tradesv3.live.KillersScalpV1.hyperliquid.sqlite",
         "insiders_receiver_state/receiver-hyperliquid.sqlite",
+        "killers_bot/state.sqlite",
         "killers_receiver_state/receiver-hyperliquid.sqlite",
     ]
     expected_rows = {"ft_user_data/tradesv3.live.KillersScalpV1.hyperliquid.sqlite": 5,
-                     "killers_receiver_state/receiver-hyperliquid.sqlite": 7}
+                     "killers_receiver_state/receiver-hyperliquid.sqlite": 7,
+                     "killers_bot/state.sqlite": 4}
     for entry in manifest["files"]:
         if not entry["name"].endswith(".sqlite"):
             continue
@@ -172,6 +176,7 @@ def test_list_prints_the_plan_and_writes_nothing(bk, fleet, capsys):
     assert bk.main(_args(fleet, "--list")) == 0
     out = capsys.readouterr().out
     assert "killers_receiver_state/receiver-hyperliquid.sqlite" in out
+    assert "killers_bot/state.sqlite" in out
     assert "tradesv3.live.KillersScalpV1.hyperliquid.sqlite" in out
     assert "tradesv3.dryrun" not in out
     assert "before-migration" not in out and "fear_greed" not in out
@@ -191,15 +196,36 @@ def _stamp(when):
     return when.strftime("%Y%m%dT%H%M%SZ")
 
 
-def test_retention_keeps_30_days(bk):
+def test_retention_keeps_30_days_then_one_per_week_for_eight(bk):
     now = dt.datetime(2026, 10, 3, 3, 30, tzinfo=dt.timezone.utc)
     daily = [_stamp(now - dt.timedelta(days=d)) for d in range(0, 90)]
     doomed = set(bk.runs_to_prune(daily + ["not-a-run"], now))
     kept = [s for s in daily if s not in doomed]
     assert "not-a-run" not in doomed
-    assert len(kept) == 31  # age exactly 30 days is retained
-    assert _stamp(now - dt.timedelta(days=30)) in kept
-    assert _stamp(now - dt.timedelta(days=31)) in doomed
+    assert all(_stamp(now - dt.timedelta(days=d)) in kept for d in range(31))
+    assert len(kept) > 31  # weekly tier adds older restore points
+    # Past the daily tier, retain only the newest run per ISO week through week 8.
+    older = [dt.datetime.strptime(s, "%Y%m%dT%H%M%SZ").replace(tzinfo=dt.timezone.utc)
+             for s in kept if s not in {_stamp(now - dt.timedelta(days=d)) for d in range(31)}]
+    weeks = [when.isocalendar()[:2] for when in older]
+    assert len(weeks) == len(set(weeks))
+    assert all(now - when <= dt.timedelta(weeks=8) for when in older)
+    assert older
+    assert _stamp(now - dt.timedelta(days=60)) in doomed
+
+
+def test_retention_never_drops_below_the_floor(bk):
+    now = dt.datetime(2026, 10, 3, tzinfo=dt.timezone.utc)
+    ancient = [_stamp(now - dt.timedelta(days=200 + d)) for d in range(10)]
+    doomed = bk.runs_to_prune(ancient, now)
+    assert len(ancient) - len(doomed) == 7
+
+
+def test_rclone_override_and_default_discovery(bk, tmp_path, monkeypatch):
+    explicit = tmp_path / "custom-rclone"
+    assert bk.resolve_rclone(explicit) == explicit
+    monkeypatch.setattr(bk.shutil, "which", lambda name: "/usr/local/bin/rclone")
+    assert bk.resolve_rclone(None) == Path("/usr/local/bin/rclone")
 
 
 def test_drive_upload_is_verified_before_timestamped_remote_pruning(bk, tmp_path):
@@ -214,6 +240,13 @@ def test_drive_upload_is_verified_before_timestamped_remote_pruning(bk, tmp_path
     class Result:
         stdout = json.dumps([
             {"Name": "20261003T033000Z", "IsDir": True},
+            {"Name": "20261002T033000Z", "IsDir": True},
+            {"Name": "20261001T033000Z", "IsDir": True},
+            {"Name": "20260930T033000Z", "IsDir": True},
+            {"Name": "20260929T033000Z", "IsDir": True},
+            {"Name": "20260928T033000Z", "IsDir": True},
+            {"Name": "20260927T033000Z", "IsDir": True},
+            {"Name": "20260825T033000Z", "IsDir": True},
             {"Name": "20260801T033000Z", "IsDir": True},
             {"Name": "README", "IsDir": True},
         ])

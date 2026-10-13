@@ -12,6 +12,7 @@ What it copies, from the compose project's docker volumes:
   ft_user_data             every tradesv3.live.*.sqlite
   killers_receiver_state   every *.sqlite (signal -> trade -> TP-ladder state)
   insiders_receiver_state  every *.sqlite
+  /home/ubuntu/killers-bot/state.sqlite   observer state, if present
 
 The receiver state cannot be rebuilt from the exchange: it is what ties an
 open position to its source signal, posted stop and targets.
@@ -27,7 +28,9 @@ into place only when every required file succeeded.
 
 After the local snapshot is complete, rclone copies it to an operator-owned
 Google Drive remote and checks the remote objects against the local files.
-Only then are local and remote snapshot directories older than 30 days pruned.
+Only then is the same tiered retention policy applied locally and remotely:
+every run from the last 30 days, the newest run of each ISO week for 8 weeks,
+and never fewer than the 7 newest.
 
 Runs as root (docker's volume directories are root-only), from root's
 crontab. See deploy/vps/README.md "Backups" for install and restore.
@@ -58,11 +61,13 @@ VOLUMES_ROOT = Path("/var/lib/docker/volumes")
 DEST = Path("/home/ubuntu/backups/master-trader")
 OPS_ENV_FILE = Path("/etc/lake/ops-bot.env")
 ALERT_URL = "http://127.0.0.1:8088/freqtrade/event"
-RCLONE = Path("/usr/bin/rclone")
 RCLONE_CONFIG = Path("/etc/master-trader-backup/rclone.conf")
 DRIVE_REMOTE = "operator-drive:Master-Trader/backups"
+OBSERVER_DB = Path("/home/ubuntu/killers-bot/state.sqlite")
 
 KEEP_DAYS = 30
+KEEP_WEEKS = 8
+MIN_KEEP = 7
 MIN_FREE_MB = 1024
 STAMP_FORMAT = "%Y%m%dT%H%M%SZ"
 
@@ -80,7 +85,8 @@ class BackupError(RuntimeError):
     pass
 
 
-def plan(volumes_root: Path, project: str) -> list[tuple[str, Path, str]]:
+def plan(volumes_root: Path, project: str,
+         observer_db: Path | None) -> list[tuple[str, Path, str]]:
     """[(name inside the snapshot, source path, kind)] for this run."""
     items: list[tuple[str, Path, str]] = []
     for volume, pattern, kind, required in SOURCES:
@@ -89,6 +95,8 @@ def plan(volumes_root: Path, project: str) -> list[tuple[str, Path, str]]:
         if required and not found:
             raise BackupError(f"no {pattern} in {data}")
         items += [(f"{volume}/{p.name}", p, kind) for p in found]
+    if observer_db is not None and observer_db.is_file():
+        items.append((f"killers_bot/{observer_db.name}", observer_db, "sqlite"))
     return items
 
 
@@ -155,15 +163,27 @@ def run_backup(items: list[tuple[str, Path, str]], dest: Path, now: dt.datetime)
     return final
 
 
-def runs_to_prune(stamps: list[str], now: dt.datetime, keep_days: int = KEEP_DAYS) -> list[str]:
-    """Run directories older than the retention window; ignore other names."""
+def runs_to_prune(stamps: list[str], now: dt.datetime, keep_days: int = KEEP_DAYS,
+                  keep_weeks: int = KEEP_WEEKS,
+                  min_keep: int = MIN_KEEP) -> list[str]:
+    """Stamps outside tiered retention. Unparseable names are left alone."""
     dated = []
     for s in stamps:
         try:
             dated.append((dt.datetime.strptime(s, STAMP_FORMAT).replace(tzinfo=dt.timezone.utc), s))
         except ValueError:
             continue
-    return sorted(s for when, s in dated if now - when > dt.timedelta(days=keep_days))
+    dated.sort(reverse=True)
+    keep = {stamp for _, stamp in dated[:min_keep]}
+    newest_in_week: dict[tuple[int, int], str] = {}
+    for when, stamp in dated:
+        age = now - when
+        if age <= dt.timedelta(days=keep_days):
+            keep.add(stamp)
+        if age <= dt.timedelta(weeks=keep_weeks):
+            newest_in_week.setdefault(when.isocalendar()[:2], stamp)
+    keep.update(newest_in_week.values())
+    return sorted(stamp for _, stamp in dated if stamp not in keep)
 
 
 def prune(dest: Path, now: dt.datetime) -> list[str]:
@@ -181,9 +201,22 @@ def _remote_child(remote: str, name: str) -> str:
     return f"{remote.rstrip('/')}/{name}"
 
 
+def resolve_rclone(requested: Path | None) -> Path:
+    """Resolve an override or discover rclone, including the VPS install path."""
+    if requested is not None:
+        return requested
+    found = shutil.which("rclone")
+    if found:
+        return Path(found)
+    for candidate in (Path("/usr/local/bin/rclone"), Path("/usr/bin/rclone")):
+        if candidate.is_file():
+            return candidate
+    raise BackupError("rclone binary not found; install it or pass --rclone PATH")
+
+
 def upload_and_prune(run: Path, remote: str, config: Path, rclone: Path,
                      now: dt.datetime, runner=subprocess.run) -> list[str]:
-    """Upload, verify, then prune timestamped remote runs older than 30 days."""
+    """Upload, verify, then apply tiered retention to timestamped remote runs."""
     if not config.is_file():
         raise BackupError(f"rclone config missing: {config}")
     if not rclone.is_file():
@@ -241,7 +274,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--dest", type=Path, default=DEST)
     ap.add_argument("--volumes-root", type=Path, default=VOLUMES_ROOT)
     ap.add_argument("--project", default=PROJECT)
-    ap.add_argument("--rclone", type=Path, default=RCLONE)
+    ap.add_argument("--observer-db", type=Path, default=OBSERVER_DB)
+    ap.add_argument("--rclone", type=Path,
+                    help="rclone executable (default: discover it from PATH/system locations)")
     ap.add_argument("--rclone-config", type=Path, default=RCLONE_CONFIG)
     ap.add_argument("--drive-remote", default=DRIVE_REMOTE)
     ap.add_argument("--no-upload", action="store_true",
@@ -252,7 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     if args.list:
-        for name, src, kind in plan(args.volumes_root, args.project):
+        for name, src, kind in plan(args.volumes_root, args.project, args.observer_db):
             print(f"{kind:6} {src.stat().st_size:>10} {name}")
         return 0
 
@@ -269,12 +304,13 @@ def main(argv: list[str] | None = None) -> int:
             except BlockingIOError:
                 print(f"{now.isoformat()} SKIP: another backup run holds the lock")
                 return 0
-            items = plan(args.volumes_root, args.project)
+            items = plan(args.volumes_root, args.project, args.observer_db)
             final = run_backup(items, args.dest, now)
             remote_pruned = []
             if not args.no_upload:
                 remote_pruned = upload_and_prune(
-                    final, args.drive_remote, args.rclone_config, args.rclone, now)
+                    final, args.drive_remote, args.rclone_config,
+                    resolve_rclone(args.rclone), now)
             pruned = prune(args.dest, now)
         print(f"{now.isoformat()} OK {final} ({len(items)} files; "
               f"pruned local={len(pruned)} remote={len(remote_pruned)})")
