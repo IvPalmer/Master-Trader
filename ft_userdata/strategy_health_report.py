@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+import requests
 from requests.auth import HTTPBasicAuth
 
 
@@ -47,6 +48,7 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 from api_utils import api_get as _api_get_with_retry
+from ft_dashboard.hyperliquid_reconciliation import reconcile_trades
 from webhook_notify import send_status
 
 # ---------------------------------------------------------------------------
@@ -78,6 +80,28 @@ def _load_bots_config() -> dict:
 BOTS = _load_bots_config()
 
 
+def _load_reporting_bots() -> dict:
+    """All deployed/monitored bots whose attribution belongs in the report.
+
+    ``BOTS`` remains the narrower autonomous-strategy capital scope.  Receiver
+    and monitor bots are added here for P&L/health attribution without
+    pretending their accounts are covered by this report's capital headline.
+    """
+    try:
+        with open(Path(__file__).parent / "bots_config.json") as f:
+            data = json.load(f)
+        return {
+            name: {k: v for k, v in info.items() if k != "active"}
+            for name, info in data["bots"].items()
+            if info.get("active", True) or info.get("production_live") or info.get("monitor")
+        }
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return dict(BOTS)
+
+
+REPORTING_BOTS = _load_reporting_bots()
+
+
 def _load_uncovered_bots() -> list[str]:
     """Bots outside BOTS (not `active`) that still run on real or monitored
     accounts: receiver-managed copiers (`production_live`) and `monitor` bots.
@@ -105,6 +129,7 @@ FT_DIR = Path(os.environ.get("FT_DIR", str(Path.home() / "ft_userdata")))
 DB_DIR = FT_DIR / "user_data"
 STATE_FILE = FT_DIR / "health_report_state.json"
 LOGS_DIR = FT_DIR / "logs"
+HL_INFO_URL = os.environ.get("HL_INFO_URL", "http://127.0.0.1:8104/accounting/info")
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -189,6 +214,25 @@ def get_bot_config(port: int) -> Optional[dict]:
     return fetch_json(port, "show_config")
 
 
+def get_hyperliquid_user_fills(info: dict) -> Optional[list[dict]]:
+    """Fetch read-only fills for reporting; None means keep raw Freqtrade data."""
+    if info.get("venue") != "hyperliquid":
+        return []
+    env_name = info.get("wallet_env")
+    wallet = os.environ.get(env_name, "").strip() if env_name else ""
+    if not wallet:
+        return None
+    try:
+        response = requests.post(
+            HL_INFO_URL, json={"type": "userFills", "user": wallet}, timeout=30
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, list) else None
+    except (requests.RequestException, ValueError):
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Metrics Computation
 # ---------------------------------------------------------------------------
@@ -221,6 +265,24 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
     # Separate closed vs open
     closed = [t for t in trades if t.get("close_date") is not None]
     open_list = open_trades if isinstance(open_trades, list) else []
+    if info.get("venue") == "hyperliquid":
+        exchange_fills = get_hyperliquid_user_fills(info)
+        if exchange_fills is None:
+            metrics["fill_reconciliation"] = {"status": "unavailable", "overbooked_trades": 0}
+            metrics["flags"].append("Hyperliquid fill reconciliation unavailable; P&L is Freqtrade raw")
+        else:
+            closed = reconcile_trades(closed, exchange_fills)
+            open_list = reconcile_trades(open_list, exchange_fills)
+            corrected = [t for t in closed + open_list if t.get("stop_fill_overbooked")]
+            metrics["fill_reconciliation"] = {
+                "status": "ok", "overbooked_trades": len(corrected),
+                "freqtrade_raw_pnl": round(sum(float(t["freqtrade_profit_abs"]) for t in corrected), 4),
+                "corrected_pnl": round(sum(float(t["profit_abs"]) for t in corrected), 4),
+            }
+            if corrected:
+                metrics["flags"].append(
+                    f"{len(corrected)} Hyperliquid stop fill(s) overbooked by Freqtrade; reporting uses exchange fills"
+                )
     # A failed /status read must not look like "no open positions": the live
     # return in compute_capital_basis() refuses to treat missing marks as zero.
     metrics["open_marks_ok"] = isinstance(open_trades, list)
@@ -1281,7 +1343,7 @@ def main():
 
     # Collect metrics from all bots
     bot_metrics = []
-    for strategy, info in BOTS.items():
+    for strategy, info in REPORTING_BOTS.items():
         log.info("Analyzing %s...", strategy)
         metrics = compute_bot_metrics(strategy, info)
         bot_metrics.append(metrics)

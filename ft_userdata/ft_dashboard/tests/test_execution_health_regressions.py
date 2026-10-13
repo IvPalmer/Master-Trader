@@ -128,6 +128,21 @@ def test_dry_failures_and_execution_uncertainty_warn(monkeypatch, dry, status, e
     assert app._fleet_status()["level"] == expected
 
 
+def test_missing_live_fill_reconciliation_warns_that_pnl_is_raw(monkeypatch):
+    monkeypatch.delenv("ACCOUNT_HEALTH_FILE", raising=False)
+    monkeypatch.setattr(app, "BOTS", [{"key": "killers-ft"}])
+    monkeypatch.setattr(app, "_cache", {
+        "bots": {"killers-ft": {
+            "reachable": True, "dry_run": False,
+            "fill_reconciliation": {"status": "unavailable"},
+        }},
+        "last_reachable_at": {"killers-ft": time.time()},
+    })
+    status = app._fleet_status()
+    assert status["level"] == "yellow"
+    assert "P&L is Freqtrade raw" in status["summary"]
+
+
 def test_cancelled_exit_on_open_trade_warns_without_rearming(tmp_path):
     path = tmp_path / 'receiver.sqlite'
     receiver_db(path, ['cancelled', 'cancelled'])
