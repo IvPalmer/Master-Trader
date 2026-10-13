@@ -1,0 +1,40 @@
+{
+  "hyperliquid_order_status": {
+    "status": "filled",
+    "order": {
+      "oid": "avax-stop-16",
+      "origSz": "8.33",
+      "sz": "0.0",
+      "reduceOnly": true
+    }
+  },
+  "stop_order": {
+    "id": "avax-stop-16",
+    "status": "closed",
+    "amount": 8.33,
+    "filled": 8.33,
+    "remaining": 0.0,
+    "average": null
+  },
+  "exchange_fills": [
+    {
+      "order_id": "avax-stop-16",
+      "amount": 7.29,
+      "price": 9.9851,
+      "timestamp": 1791472980000
+    }
+  ],
+  "accounting": {
+    "open_rate": 11.24,
+    "fee_open": 0.0004,
+    "fee_close": 0.00015,
+    "is_short": false,
+    "prior_exits": [
+      {
+        "amount": 1.04,
+        "price": 11.70,
+        "funding_fee": -0.0094
+      }
+    ]
+  }
+}
