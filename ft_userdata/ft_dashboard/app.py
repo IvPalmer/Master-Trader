@@ -1623,22 +1623,30 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     # the closed record is the newer one.
     closed_ids = {t.get("trade_id") for t in closed_trades if t.get("trade_id") is not None}
     open_trades = [t for t in open_trades if t.get("trade_id") not in closed_ids]
-    fill_reconciliation = {"status": "not_applicable", "overbooked_trades": 0}
+    fill_reconciliation = {
+        "status": "not_applicable", "mismatched_trades": 0,
+        "overbooked_trades": 0,
+    }
     if bot.get("venue") == "hyperliquid":
         exchange_fills, fill_error = await _hyperliquid_user_fills(client, bot)
         if exchange_fills is None:
             fill_reconciliation = {
                 "status": "unavailable",
                 "detail": fill_error or "Hyperliquid fills unavailable",
+                "mismatched_trades": 0,
                 "overbooked_trades": 0,
             }
         else:
             closed_trades = reconcile_trades(closed_trades, exchange_fills)
             open_trades = reconcile_trades(open_trades, exchange_fills)
+            reconciled_trades = closed_trades + open_trades
             fill_reconciliation = {
                 "status": "ok",
+                "mismatched_trades": sum(
+                    bool(t.get("hyperliquid_fill_mismatch")) for t in reconciled_trades
+                ),
                 "overbooked_trades": sum(
-                    bool(t.get("stop_fill_overbooked")) for t in closed_trades + open_trades
+                    bool(t.get("stop_fill_overbooked")) for t in reconciled_trades
                 ),
             }
     all_trades = closed_trades + open_trades
@@ -1787,7 +1795,9 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
                 "profit_pct": t.get("profit_pct"),
                 "profit_abs": t.get("profit_abs"),
                 "freqtrade_profit_abs": t.get("freqtrade_profit_abs"),
+                "hyperliquid_fill_mismatch": bool(t.get("hyperliquid_fill_mismatch")),
                 "stop_fill_overbooked": bool(t.get("stop_fill_overbooked")),
+                "hyperliquid_fill_reconciliation": t.get("hyperliquid_fill_reconciliation"),
                 "hyperliquid_stop_reconciliation": t.get("hyperliquid_stop_reconciliation"),
                 "exit_reason": t.get("exit_reason"),
                 "trade_duration": t.get("trade_duration"),

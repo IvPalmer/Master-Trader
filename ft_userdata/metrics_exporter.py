@@ -253,6 +253,11 @@ hyperliquid_overbooked_stops = Gauge(
     "Closed trades whose stop quantity was corrected from Hyperliquid userFills",
     ["strategy"],
 )
+hyperliquid_fill_mismatches = Gauge(
+    "freqtrade_hyperliquid_fill_mismatches",
+    "Closed trades with terminal exit quantities differing from Hyperliquid userFills",
+    ["strategy"],
+)
 hyperliquid_fill_reconciliation_up = Gauge(
     "freqtrade_hyperliquid_fill_reconciliation_up",
     "Whether Hyperliquid userFills were available for reporting reconciliation",
@@ -510,12 +515,15 @@ def scrape_bot(bot: dict) -> float | None:
         closed = [t for t in trades or [] if t.get("close_date") is not None] if isinstance(trades, list) else []
         if exchange_fills is not None and len(closed) == expected:
             closed = reconcile_trades(closed, exchange_fills)
-            corrected = [t for t in closed if t.get("stop_fill_overbooked")]
+            corrected = [t for t in closed if t.get("hyperliquid_fill_mismatch")]
+            overbooked = [t for t in corrected if t.get("stop_fill_overbooked")]
             closed_pnl = sum(float(t.get("profit_abs") or 0) for t in closed)
             hyperliquid_fill_reconciliation_up.labels(strategy=strategy).set(1)
-            hyperliquid_overbooked_stops.labels(strategy=strategy).set(len(corrected))
+            hyperliquid_fill_mismatches.labels(strategy=strategy).set(len(corrected))
+            hyperliquid_overbooked_stops.labels(strategy=strategy).set(len(overbooked))
         else:
             hyperliquid_fill_reconciliation_up.labels(strategy=strategy).set(0)
+            hyperliquid_fill_mismatches.labels(strategy=strategy).set(0)
             hyperliquid_overbooked_stops.labels(strategy=strategy).set(0)
             log.warning(
                 "Hyperliquid fill reconciliation unavailable/incomplete for %s; exporting Freqtrade raw P&L",

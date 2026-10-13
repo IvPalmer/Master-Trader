@@ -391,7 +391,7 @@
                   <td class="right" x-text="fmtRate(t.open_rate)"></td>
                   <td class="right" x-text="fmtRate(t.close_rate)"></td>
                   <td class="right" :class="t.profit_pct >= 0 ? 'pos' : 'neg'" x-text="fmtPctSigned(t.profit_pct)"></td>
-                  <td class="right" :class="t.profit_abs >= 0 ? 'pos' : 'neg'"><span x-text="fmtUsdSigned(t.profit_abs)"></span><small class="pnl-audit" x-show="t.stop_fill_overbooked" x-text="'exchange fills · FT raw ' + fmtUsdSigned(t.freqtrade_profit_abs)"></small></td>
+                  <td class="right" :class="t.profit_abs >= 0 ? 'pos' : 'neg'"><span x-text="fmtUsdSigned(t.profit_abs)"></span><small class="pnl-audit" x-show="t.hyperliquid_fill_mismatch" x-text="'userFills · FT raw ' + fmtUsdSigned(t.freqtrade_profit_abs)"></small></td>
                   <td><span class="reason-pill" :class="t.exit_reason" x-text="t.exit_reason"></span></td>
                 </tr>
               </template>
@@ -451,7 +451,7 @@
       <section class="card col-6"><div class="card-head"><div><h2 class="card-title">By market</h2><p class="card-sub">Largest contributions by absolute impact</p></div></div><div class="chart comparison" id="chart-portfolio-pair"></div></section>
     </div>
     <section class="card"><div class="card-head"><div><h2 class="card-title">Recent closes</h2><p class="card-sub">Last 30 closed trades across live strategies</p></div></div>
-      <div class="portfolio-ledger-wrap"><table class="ledger" x-show="recentLiveTrades.length" x-cloak><thead><tr><th>Closed</th><th>Strategy</th><th>Market</th><th class="right">Return</th><th class="right">P&amp;L</th><th>Exit</th></tr></thead><tbody><template x-for="trade in recentLiveTrades" :key="trade._bot+':'+trade.close_timestamp+':'+trade.pair"><tr><td x-text="fmtDate(trade.close_date)"></td><td style="white-space:nowrap" x-text="trade._botLabel"></td><td x-text="trade.pair"></td><td class="right" :class="trade.profit_pct>=0?'pos':'neg'" x-text="fmtPctSigned(trade.profit_pct)"></td><td class="right" :class="trade.profit_abs>=0?'pos':'neg'"><span x-text="fmtUsdSigned(trade.profit_abs)"></span><small class="pnl-audit" x-show="trade.stop_fill_overbooked" x-text="'exchange fills · FT raw ' + fmtUsdSigned(trade.freqtrade_profit_abs)"></small></td><td><span class="reason-pill" x-text="trade.exit_reason"></span></td></tr></template></tbody></table><div class="empty" x-show="!recentLiveTrades.length">No closed trades in the current live history.</div></div>
+      <div class="portfolio-ledger-wrap"><table class="ledger" x-show="recentLiveTrades.length" x-cloak><thead><tr><th>Closed</th><th>Strategy</th><th>Market</th><th class="right">Return</th><th class="right">P&amp;L</th><th>Exit</th></tr></thead><tbody><template x-for="trade in recentLiveTrades" :key="trade._bot+':'+trade.close_timestamp+':'+trade.pair"><tr><td x-text="fmtDate(trade.close_date)"></td><td style="white-space:nowrap" x-text="trade._botLabel"></td><td x-text="trade.pair"></td><td class="right" :class="trade.profit_pct>=0?'pos':'neg'" x-text="fmtPctSigned(trade.profit_pct)"></td><td class="right" :class="trade.profit_abs>=0?'pos':'neg'"><span x-text="fmtUsdSigned(trade.profit_abs)"></span><small class="pnl-audit" x-show="trade.hyperliquid_fill_mismatch" x-text="'userFills · FT raw ' + fmtUsdSigned(trade.freqtrade_profit_abs)"></small></td><td><span class="reason-pill" x-text="trade.exit_reason"></span></td></tr></template></tbody></table><div class="empty" x-show="!recentLiveTrades.length">No closed trades in the current live history.</div></div>
     </section>
   </main>
 
@@ -1154,7 +1154,7 @@
                   <td class="right" x-text="fmtRate(t.open_rate)"></td>
                   <td class="right" x-text="fmtRate(t.close_rate)"></td>
                   <td class="right" :class="t.profit_pct>=0?'pos':'neg'" x-text="fmtPctSigned(t.profit_pct)"></td>
-                  <td class="right" :class="t.profit_abs>=0?'pos':'neg'"><span x-text="fmtUsdSigned(t.profit_abs)"></span><small class="pnl-audit" x-show="t.stop_fill_overbooked" x-text="'exchange fills · FT raw ' + fmtUsdSigned(t.freqtrade_profit_abs)"></small></td>
+                  <td class="right" :class="t.profit_abs>=0?'pos':'neg'"><span x-text="fmtUsdSigned(t.profit_abs)"></span><small class="pnl-audit" x-show="t.hyperliquid_fill_mismatch" x-text="'userFills · FT raw ' + fmtUsdSigned(t.freqtrade_profit_abs)"></small></td>
                   <td><span class="reason-pill" :class="t.exit_reason" x-text="t.exit_reason"></span></td>
                   <td class="right" x-text="fmtMin(t.trade_duration)"></td>
                 </tr>
