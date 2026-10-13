@@ -1,0 +1,11 @@
+{
+  "_doc": "Frozen epoch boundaries for the Insiders (Dennis) fresh-sample study, GH #28. Every timestamp is recorded in ft_userdata/preregistrations.json; none is chosen from outcomes. Changing the executor contract requires a new epoch appended here AND an amendment in the preregistration; existing boundaries are never edited.",
+  "epochs": [
+    ["pre-remediation-5x-weex-hl", "1970-01-01T00:00:00Z"],
+    ["round3-risk-sized", "2026-08-24T16:32:41.684Z"],
+    ["bounded-3x-posted-sl", "2026-08-27T18:19:12.005Z"],
+    ["grouped-target-executor", "2026-09-12T00:46:00Z"]
+  ],
+  "fresh_epoch": "grouped-target-executor",
+  "fresh_epoch_note": "Latest executor-contract boundary recorded in the repo. The demotion's reversal bar also needs the synthetic per-symbol correlation key and market-entry-with-SL support; if those landed later, append a later epoch and point fresh_epoch at it (amendment required)."
+}
