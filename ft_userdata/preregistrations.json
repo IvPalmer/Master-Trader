@@ -767,6 +767,33 @@
       "triggers": [],
       "amendments": [],
       "resolution": null
+    },
+    {
+      "id": "killers-entry-policy-replay-2026-10-13",
+      "bot": "KillersScalpV1 (research only; no config change)",
+      "status": "open",
+      "registered": "2026-10-13",
+      "review_by": "2026-11-13",
+      "issue": "GROA-309",
+      "min_closed_trades": 30,
+      "context": "Operator-approved replay of the full Killers channel history (~230 fillable signals of the 278 usable) to compare ENTRY policies. Lead measurement: signal-to-fill latency avg 23s, cost ~0.02%, price already ~1.4% above zone top at message time. Live policy (PR #162) is marketable entry up to 5% past the zone, skip beyond; the June 24h limit-in-zone design missed fills (1 of 13).",
+      "frozen_spec": {
+        "policies": "chase<=5% (live), chase<=2%, chase<=1%; limit at zone top (long: entry_hi, short: entry_lo) waiting W in {1h,4h,12h,24h} then cancel; wait W then chase<=2% at the first 1m open after the deadline. 11 variants = the multiple-testing trial count.",
+        "entry_fill": "chase: open of first 1m candle at/after signal time + 23s; skip if deviation past the zone edge > cap, if price already at/through the posted stop or all targets. limit: filled when 1m low<=bound (long) / high>=bound (short), at min(open,bound); skipped if the stop level trades before the fill. Slippage 0% and 0.5% applied adversely to marketable entries and to stop exits; resting limits/ladder legs get none.",
+        "held_fixed": "posted stop, first 8 posted targets as equal slices with the live $10-leg collapse (tp_plan.executable_targets logic), risk $12, margin $5-40, integer leverage<=3, stop-limit ratio 0.98, entry min notional $11.3, one position per signal (no max-open cap), horizon 14d, residual closed at channel close_full else last candle, same-candle stop before target, HL base fees 4.5 bps taker / 1.5 bps maker.",
+        "metrics": "fill rate; missed-signal outcome (counterfactual uncapped market entry at signal time on the skipped signals: mean R, win rate); expectancy in R (1R = loss at posted stop trigger) and $; PF; max drawdown $ (chronological); all at slippage 0% and 0.5%; split earliest 70% / latest 30% of signals by time.",
+        "multiple_testing": "Deflated Sharpe Ratio (Bailey & Lopez de Prado) on per-trade R with N=11 trials and cross-policy SR variance; a policy is only called better than the live chase<=5% if DSR>=0.95 AND the sign/direction holds in both the 70% and 30% splits at 0.5% slippage."
+      },
+      "implementation": "research/copier-validation/killers/entry_policy_replay.py; tests/test_killers_entry_policy_replay.py",
+      "rules": [
+        "Research only: no deploy, config, sizing or live-policy change follows automatically from any result.",
+        "All 11 variants are reported, including failures. No cap, window, slippage or exit is tuned after seeing results; a change is a new entry or an amendment.",
+        "Candle source is 1m Binance USDT-M (HL 1m where available); the source used must be stated in the result.",
+        "The 278-signal corpus and prior replays (#162/#182) are already seen; they give no credit to any variant."
+      ],
+      "triggers": [],
+      "amendments": [],
+      "resolution": null
     }
   ]
 }
