@@ -96,7 +96,8 @@ def test_exporter_attribution_corrects_hl_stop_but_breaker_return_stays_raw(expo
     for name in (
         "profit_total", "profit_total_raw", "profit_pct", "trades_total", "drawdown",
         "win_rate", "trades_open", "unrealized_pnl", "true_pnl", "balance", "bot_up",
-        "hyperliquid_overbooked_stops", "hyperliquid_fill_reconciliation_up",
+        "hyperliquid_fill_mismatches", "hyperliquid_overbooked_stops",
+        "hyperliquid_fill_reconciliation_up",
     ):
         monkeypatch.setattr(exporter, name, Sink())
     bot = {"service": "ft-killers-scalp", "strategy": "KillersScalpV1",
@@ -130,6 +131,7 @@ def test_exporter_attribution_corrects_hl_stop_but_breaker_return_stays_raw(expo
     assert exporter.profit_total.value == pytest.approx(-8.72941658685)
     assert exporter.profit_total_raw.value == pytest.approx(-10.04074610245)
     assert exporter.true_pnl.value == pytest.approx(-8.73)
+    assert exporter.hyperliquid_fill_mismatches.value == 1
     assert exporter.hyperliquid_overbooked_stops.value == 1
     assert breaker_pnl == pytest.approx(-10.04074610245)
 

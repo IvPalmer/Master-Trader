@@ -11,7 +11,7 @@ const fs=require('fs');const luminance=([r,g,b])=>{const [x,y,z]=[r,g,b].map(v=>
  assert.equal((await recentLive.locator('thead th').nth(1).textContent()).trim(),'strategy','Merged live-bot ledger must name the bot');
  const recentBots=await recentLive.locator('tbody tr').evaluateAll(rows=>rows.map(row=>row.cells[1].textContent.trim()));
  assert.equal(recentBots.length,6);assert.deepEqual([...new Set(recentBots)].sort(),['funding-fade','keltner-bounce','killers-scalp']);
- assert.equal((await recentLive.locator('.pnl-audit:visible').textContent()).trim(),'exchange fills · FT raw −$10.04');
+ assert.equal((await recentLive.locator('.pnl-audit:visible').textContent()).trim(),'userFills · FT raw −$10.04');
  if(process.env.SCREENSHOTS){fs.mkdirSync(process.env.SCREENSHOTS,{recursive:true});await recentLive.screenshot({path:process.env.SCREENSHOTS+'/reconciled-pnl-ledger.png'});}
  await page.evaluate(()=>Alpine.$data(document.body).setTab('portfolio'));await page.waitForTimeout(500);
  assert.equal(await page.locator('#chart-portfolio-equity .analytics-plot').count(),1);
