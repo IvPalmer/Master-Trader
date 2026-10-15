@@ -1,5 +1,9 @@
 """The reviewed production env must fund the equal source ladder (#106).
 
+Since 2026-10-14 (operator) the risk is $6 per posted stop: the ladder
+halves, and under the $10 per-order minimum it collapses to about every
+other posted target (TP1 is not placed).
+
 Reads the killers-receiver environment from docker-compose.prod.yml and runs
 it through the real sizing and legacy planner, using posted levels from live
 signals whose stop distances cover the channel's range (9-14.5%).
@@ -76,7 +80,7 @@ def test_production_size_funds_a_ladder_leg_per_target(monkeypatch, symbol, fill
     assert stake <= cfg.max_margin_usd
     # Planned loss at the adverse stop-limit edge stays within the budget.
     assert notional * distance <= cfg.risk_usd + 1e-6
-    assert notional >= 80
+    assert notional >= 40
 
     step_d = Decimal(str(step))
     amount = float((Decimal(str(notional / fill)) / step_d).to_integral_value(rounding="ROUND_FLOOR") * step_d)
@@ -97,7 +101,6 @@ def test_production_size_funds_a_ladder_leg_per_target(monkeypatch, symbol, fill
     assert all(qty * price >= 10 for _, price, qty in plan)
     assert sum(Decimal(str(q)) for _, _, q in plan) == Decimal(str(amount))
     assert indices[-1] == len(targets) - 1
-    # The ladder starts at TP1 (no roll-forward of the first slice) and uses
-    # at least all but one posted target; at $2 risk it was a single exit.
-    assert indices[0] == 0
-    assert len(plan) >= len(targets) - 1
+    # At $6 risk the first slice rolls forward under the $10 minimum; the
+    # ladder still keeps several legs (at $2 risk it was a single exit).
+    assert len(plan) >= 3
