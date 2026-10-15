@@ -5,8 +5,10 @@ __pycache__/
 *.so
 .Python
 env/
-venv/
-.venv/
+# No trailing slash: a symlinked venv is a file to git, and `.venv/` would not
+# ignore it (GROA-321).
+venv
+.venv
 *.egg-info/
 dist/
 build/
