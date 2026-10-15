@@ -205,7 +205,11 @@ services:
       # $10 the first slice fell under the minimum on 5 of 8 sampled signals
       # and rolled into TP2. One stop ~= 4% of the equity the 10% portfolio
       # circuit breaker watches.
-      KILLERS_RISK_USD: "12"
+      # $6 risk (2026-10-14, operator): two correlated stop clusters (Oct 8
+      # -$22.91, Oct 15 ARB+ALGO -$20.1) took the account 298 -> 274. Halves
+      # loss and gain per trade (2026-10-08 replay); at $6 the 8-rung ladder
+      # collapses to ~TP2/4/6/8 under HL's $10 per-order minimum.
+      KILLERS_RISK_USD: "6"
       KILLERS_MIN_MARGIN_USD: "5"
       KILLERS_MAX_MARGIN_USD: "40"
       KILLERS_MAX_LEVERAGE: "3"
@@ -228,7 +232,9 @@ services:
       # 2026-10-01, operator (#105): 5 again. At $12 per posted stop this
       # bounds open capital at risk to ~$60; the open-risk monitor
       # (warden/risk_warden.py, alerts only) checks the book against it.
-      KILLERS_MAX_OPEN: "5"
+      # 2026-10-14, operator: 3. Signals are correlated alt longs that stop
+      # out together; 3 x $6 bounds open planned risk to ~$18.
+      KILLERS_MAX_OPEN: "3"
       # 2026-09-23, operador: nao perder sinal por posicao abaixo do minimo da
       # venue. So as entradas pequenas demais sobem ate o minimo ($11,30); as
       # normais seguem no risco de KILLERS_RISK_USD. KILLERS_MAX_BUMP_RISK_USD
