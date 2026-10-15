@@ -218,6 +218,7 @@ def test_uncovered_live_accounts_are_named_not_implied(monkeypatch):
     uncovered = shr._load_uncovered_bots()
     assert {"KillersScalpV1", "InsidersScalpV1"} <= set(uncovered)
     assert not set(uncovered) & set(shr.BOTS)
+    assert {"KillersScalpV1", "InsidersScalpV1"} <= set(shr.REPORTING_BOTS)
     lines = shr._format_capital_lines({
         "portfolio_value": 224.0, "return_pct": 2.5, "live_starting_capital": 200.0,
         "live_true_pnl": 5.0, "capital_basis_errors": [],
@@ -243,3 +244,40 @@ def test_booked_partial_exits_count_as_realized_pnl(monkeypatch):
     assert m["closed_pnl"] == pytest.approx(-1.0 + 3.0)
     assert m["open_pnl"] == pytest.approx(1.5)
     assert m["true_pnl"] == pytest.approx(3.5)
+
+
+def test_health_report_uses_exchange_stop_fill_and_keeps_raw_audit(monkeypatch):
+    info = {
+        "port": 8201, "timeframe": "5m", "type": "copy-trader",
+        "venue": "hyperliquid", "wallet_env": "TEST_HL_WALLET",
+    }
+    trade = {
+        "trade_id": 16, "pair": "AVAX/USDC:USDC", "close_date": "2026-10-08 15:23:00",
+        "open_rate": 11.24, "fee_open": 0.0004, "fee_close": 0.00015,
+        "profit_abs": -10.04074610245, "profit_ratio": -0.1, "exit_reason": "stop_loss",
+        "orders": [{"order_id": "avax-stop-16", "ft_order_side": "stoploss",
+                    "is_open": False, "filled": 8.33}],
+    }
+
+    def fetch(_port, endpoint, timeout=10):
+        if endpoint.startswith("trades"):
+            return {"trades": [trade]}
+        if endpoint == "status":
+            return []
+        if endpoint == "profit":
+            return {"max_drawdown": 0, "profit_closed_percent_sum": -10}
+        raise AssertionError(endpoint)
+
+    monkeypatch.setattr(shr, "fetch_json", fetch)
+    monkeypatch.setattr(shr, "get_hyperliquid_user_fills", lambda _info: [
+        {"oid": "avax-stop-16", "sz": "7.29", "px": "9.9851"}
+    ])
+    metrics = shr.compute_bot_metrics("KillersScalpV1", info)
+
+    assert metrics["closed_pnl"] == pytest.approx(-8.73)
+    assert metrics["fill_reconciliation"] == {
+        "status": "ok", "mismatched_trades": 1, "overbooked_trades": 1,
+        "freqtrade_raw_pnl": -10.0407,
+        "corrected_pnl": -8.7294,
+    }
+    assert any("terminal exit fill mismatch" in flag for flag in metrics["flags"])

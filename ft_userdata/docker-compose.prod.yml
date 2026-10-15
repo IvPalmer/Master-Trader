@@ -62,6 +62,8 @@ services:
     container_name: ft-hl-gateway
     environment:
       KILLERS_WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
+    ports:
+      - 127.0.0.1:8104:8080
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz', timeout=3)"]
       interval: 30s
@@ -574,10 +576,14 @@ services:
       # Sent as X-Notify-Token with the circuit-breaker alert (#97). Same
       # value as trade-webhook and the receivers; empty sends no header.
       TRADE_WEBHOOK_NOTIFY_TOKEN: ${TRADE_WEBHOOK_NOTIFY_TOKEN:-}
+      HYPERLIQUID_KILLERS_WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
+      HYPERLIQUID_INSIDERS_WALLET_ADDRESS: ${HYPERLIQUID_INSIDERS_WALLET_ADDRESS:-}
+      HYPERLIQUID_SHORT_KELTNER_WALLET_ADDRESS: ${HYPERLIQUID_SHORT_KELTNER_WALLET_ADDRESS:-}
     volumes:
       - ./metrics_exporter.py:/app/metrics_exporter.py:ro
       - ./account_transfers.json:/app/account_transfers.json:ro
       - ./api_utils.py:/app/api_utils.py:ro
+      - ./ft_dashboard/hyperliquid_reconciliation.py:/app/hyperliquid_reconciliation.py:ro
       - ./bots_config.json:/app/bots_config.json:ro
       - ft_exporter_state:/state
     ports:
@@ -628,6 +634,9 @@ services:
       WIDGETS_TOKEN: ${WIDGETS_TOKEN:-}
       FREQTRADE__API_SERVER__USERNAME: ${FREQTRADE__API_SERVER__USERNAME}
       FREQTRADE__API_SERVER__PASSWORD: ${FREQTRADE__API_SERVER__PASSWORD}
+      HYPERLIQUID_KILLERS_WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
+      HYPERLIQUID_INSIDERS_WALLET_ADDRESS: ${HYPERLIQUID_INSIDERS_WALLET_ADDRESS:-}
+      HYPERLIQUID_SHORT_KELTNER_WALLET_ADDRESS: ${HYPERLIQUID_SHORT_KELTNER_WALLET_ADDRESS:-}
       POLL_INTERVAL: "30"
       OVERLAYS_DIR: /overlays
       KILLERS_DB: /var/lib/killers/state.sqlite

@@ -5,7 +5,8 @@ const channels=color=>color.startsWith('#')?[1,3,5].map(i=>parseInt(color.slice(
 const luminance=color=>{const [r,g,b]=channels(color).map(v=>v/255).map(v=>v<=0.03928?v/12.92:((v+0.055)/1.055)**2.4);return 0.2126*r+0.7152*g+0.0722*b;};
 const contrast=(a,b)=>{const [x,y]=[luminance(a),luminance(b)].sort((p,q)=>q-p);return (x+0.05)/(y+0.05);};
 (async()=>{
- const browser=await chromium.launch(process.env.CHROME_CHANNEL?{channel:process.env.CHROME_CHANNEL}:{});
+ const launchOptions=process.env.CHROME?{executablePath:process.env.CHROME}:process.env.CHROME_CHANNEL?{channel:process.env.CHROME_CHANNEL}:{};
+ const browser=await chromium.launch(launchOptions);
  try{
  const page=await browser.newPage();await page.setContent('<div id="chart" style="width:800px;height:400px"></div>');for(const sheet of ['styles.css','workspace.css'])await page.addStyleTag({path:require('path').join(__dirname,'../../static',sheet)});
  await page.addScriptTag({path:require('path').join(__dirname,'../../static/price-chart.js')});

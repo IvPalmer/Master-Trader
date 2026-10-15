@@ -50,7 +50,7 @@ def _wal_db(path: Path, rows: int) -> sqlite3.Connection:
 def fleet(tmp_path):
     vols = tmp_path / "volumes"
     data = {v: vols / f"{PROJECT}_{v}" / "_data" for v in
-            ("ft_user_data", "killers_receiver_state", "insiders_receiver_state", "ft_exporter_state")}
+            ("ft_user_data", "killers_receiver_state", "insiders_receiver_state")}
     open_conns = [
         _wal_db(data["ft_user_data"] / "tradesv3.live.KillersScalpV1.hyperliquid.sqlite", 5),
         _wal_db(data["ft_user_data"] / "tradesv3.dryrun.OITrendPullbackV1.sqlite", 3),
@@ -61,8 +61,6 @@ def fleet(tmp_path):
     (data["ft_user_data"] / "logs").mkdir()
     (data["ft_user_data"] / "fear_greed_history.json").write_text("{}")
     (data["killers_receiver_state"] / "receiver-hyperliquid.sqlite.before-migration-x").write_text("old")
-    data["ft_exporter_state"].mkdir(parents=True)
-    (data["ft_exporter_state"] / "portfolio_peak.json").write_text('{"peak": 180.0}')
     observer = tmp_path / "killers-bot" / "state.sqlite"
     open_conns.append(_wal_db(observer, 4))
     yield {"vols": vols, "data": data, "observer": observer, "dest": tmp_path / "backups",
@@ -73,7 +71,7 @@ def fleet(tmp_path):
 
 def _args(f, *extra):
     return ["--dest", str(f["dest"]), "--volumes-root", str(f["vols"]), "--project", PROJECT,
-            "--observer-db", str(f["observer"]), "--no-alert", *extra]
+            "--observer-db", str(f["observer"]), "--no-upload", "--no-alert", *extra]
 
 
 def _restore(gz: Path, tmp: Path) -> sqlite3.Connection:
@@ -90,8 +88,6 @@ def test_backs_up_every_volume_consistently_while_writers_are_open(bk, fleet, tm
     manifest = json.loads((run / "MANIFEST.json").read_text())
     names = sorted(e["name"] for e in manifest["files"])
     assert names == [
-        "ft_exporter_state/portfolio_peak.json",
-        "ft_user_data/tradesv3.dryrun.OITrendPullbackV1.sqlite",
         "ft_user_data/tradesv3.live.KillersScalpV1.hyperliquid.sqlite",
         "insiders_receiver_state/receiver-hyperliquid.sqlite",
         "killers_bot/state.sqlite",
@@ -112,8 +108,8 @@ def test_backs_up_every_volume_consistently_while_writers_are_open(bk, fleet, tm
             assert conn.execute("SELECT count(*) FROM trades").fetchone()[0] == expected_rows[entry["name"]]
         assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "delete"
         assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert entry["integrity_check"] == "ok"
         conn.close()
-    assert (run / "ft_exporter_state" / "portfolio_peak.json").read_text() == '{"peak": 180.0}'
 
 
 def test_writers_keep_working_and_sources_are_untouched(bk, fleet):
@@ -180,7 +176,9 @@ def test_list_prints_the_plan_and_writes_nothing(bk, fleet, capsys):
     assert bk.main(_args(fleet, "--list")) == 0
     out = capsys.readouterr().out
     assert "killers_receiver_state/receiver-hyperliquid.sqlite" in out
-    assert "ft_exporter_state/portfolio_peak.json" in out
+    assert "killers_bot/state.sqlite" in out
+    assert "tradesv3.live.KillersScalpV1.hyperliquid.sqlite" in out
+    assert "tradesv3.dryrun" not in out
     assert "before-migration" not in out and "fear_greed" not in out
     assert not fleet["dest"].exists()
 
@@ -198,21 +196,22 @@ def _stamp(when):
     return when.strftime("%Y%m%dT%H%M%SZ")
 
 
-def test_retention_keeps_two_weeks_then_one_per_week_for_eight(bk):
+def test_retention_keeps_30_days_then_one_per_week_for_eight(bk):
     now = dt.datetime(2026, 10, 3, 3, 30, tzinfo=dt.timezone.utc)
     daily = [_stamp(now - dt.timedelta(days=d)) for d in range(0, 90)]
     doomed = set(bk.runs_to_prune(daily + ["not-a-run"], now))
     kept = [s for s in daily if s not in doomed]
     assert "not-a-run" not in doomed
-    # Every run of the last 14 days.
-    assert all(_stamp(now - dt.timedelta(days=d)) in kept for d in range(0, 15))
-    # Beyond that, one per ISO week, nothing older than 8 weeks.
+    assert all(_stamp(now - dt.timedelta(days=d)) in kept for d in range(31))
+    assert len(kept) > 31  # weekly tier adds older restore points
+    # Past the daily tier, retain only the newest run per ISO week through week 8.
     older = [dt.datetime.strptime(s, "%Y%m%dT%H%M%SZ").replace(tzinfo=dt.timezone.utc)
-             for s in kept if s not in {_stamp(now - dt.timedelta(days=d)) for d in range(0, 15)}]
-    weeks = [w.isocalendar()[:2] for w in older]
+             for s in kept if s not in {_stamp(now - dt.timedelta(days=d)) for d in range(31)}]
+    weeks = [when.isocalendar()[:2] for when in older]
     assert len(weeks) == len(set(weeks))
-    assert all(now - w <= dt.timedelta(weeks=8) for w in older)
-    assert len(older) >= 5
+    assert all(now - when <= dt.timedelta(weeks=8) for when in older)
+    assert older
+    assert _stamp(now - dt.timedelta(days=60)) in doomed
 
 
 def test_retention_never_drops_below_the_floor(bk):
@@ -220,6 +219,87 @@ def test_retention_never_drops_below_the_floor(bk):
     ancient = [_stamp(now - dt.timedelta(days=200 + d)) for d in range(10)]
     doomed = bk.runs_to_prune(ancient, now)
     assert len(ancient) - len(doomed) == 7
+
+
+def test_rclone_override_and_default_discovery(bk, tmp_path, monkeypatch):
+    explicit = tmp_path / "custom-rclone"
+    assert bk.resolve_rclone(explicit) == explicit
+    monkeypatch.setattr(bk.shutil, "which", lambda name: "/usr/local/bin/rclone")
+    assert bk.resolve_rclone(None) == Path("/usr/local/bin/rclone")
+
+
+def test_drive_upload_is_verified_before_timestamped_remote_pruning(bk, tmp_path):
+    run = tmp_path / "20261003T033000Z"
+    run.mkdir()
+    config = tmp_path / "rclone.conf"
+    config.write_text("[operator-drive]\ntype = drive\n")
+    binary = tmp_path / "rclone"
+    binary.write_text("")
+    calls = []
+
+    class Result:
+        stdout = json.dumps([
+            {"Name": "20261003T033000Z", "IsDir": True},
+            {"Name": "20261002T033000Z", "IsDir": True},
+            {"Name": "20261001T033000Z", "IsDir": True},
+            {"Name": "20260930T033000Z", "IsDir": True},
+            {"Name": "20260929T033000Z", "IsDir": True},
+            {"Name": "20260928T033000Z", "IsDir": True},
+            {"Name": "20260927T033000Z", "IsDir": True},
+            {"Name": "20260825T033000Z", "IsDir": True},
+            {"Name": "20260801T033000Z", "IsDir": True},
+            {"Name": "README", "IsDir": True},
+        ])
+
+    def runner(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return Result()
+
+    now = dt.datetime(2026, 10, 3, 3, 30, tzinfo=dt.timezone.utc)
+    pruned = bk.upload_and_prune(run, "operator-drive:Master-Trader/backups", config,
+                                 binary, now, runner=runner)
+    assert pruned == ["20260801T033000Z"]
+    assert [call[0][1] for call in calls] == ["copy", "check", "lsjson", "purge"]
+    assert calls[0][0][-2:] == ["--checksum", "--immutable"]
+    assert calls[1][0][-2:] == ["--one-way", "--download"]
+    assert calls[-1][0][2].endswith("/20260801T033000Z")
+
+
+def test_drive_listing_failure_never_prunes(bk, tmp_path):
+    run = tmp_path / "20261003T033000Z"
+    run.mkdir()
+    config = tmp_path / "rclone.conf"
+    config.write_text("configured")
+    binary = tmp_path / "rclone"
+    binary.write_text("")
+    commands = []
+
+    class Result:
+        stdout = "not json"
+
+    def runner(argv, **kwargs):
+        commands.append(argv[1])
+        return Result()
+
+    now = dt.datetime(2026, 10, 3, tzinfo=dt.timezone.utc)
+    with pytest.raises(bk.BackupError, match="invalid rclone directory listing"):
+        bk.upload_and_prune(run, "operator-drive:backups", config, binary, now, runner=runner)
+    assert commands == ["copy", "check", "lsjson"]
+
+
+def test_upload_failure_keeps_local_snapshot_and_skips_local_retention(bk, fleet, monkeypatch):
+    old = fleet["dest"] / "20000101T000000Z"
+    old.mkdir(parents=True)
+
+    def fail_upload(*args, **kwargs):
+        raise RuntimeError("Drive unavailable")
+
+    monkeypatch.setattr(bk, "upload_and_prune", fail_upload)
+    args = [arg for arg in _args(fleet) if arg != "--no-upload"]
+    assert bk.main(args) == 1
+    runs = sorted(p.name for p in fleet["dest"].iterdir() if p.is_dir())
+    assert "20000101T000000Z" in runs
+    assert len(runs) == 2
 
 
 def test_prune_clears_staging_from_a_killed_run(bk, tmp_path):
