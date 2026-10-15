@@ -636,7 +636,8 @@
         },
         {"date": "2026-10-02", "reason": "Activation record. Release 9fc1f9d (PR #121) deployed; killers-receiver recreated, verified env KILLERS_RISK_USD=12, KILLERS_MAX_MARGIN_USD=40, KILLERS_TP_MODE=legacy, KILLERS_TP_ALLOCATIONS empty, KILLERS_MAX_OPEN=5. Account funded to 318.23 USDC perps beforehand (ledger PR #119). The 4 positions open at activation (TRX, HYPE, XRP, ICP) keep their frozen nearest_source policy and belong to the previous epoch.", "effective_at": "2026-10-02T22:26:01Z"},
         {"date": "2026-10-03", "reason": "Operator decision (#162): entry contract change. When the mark is past the posted zone, enter at market up to 5% past the zone edge (was 3%), and skip beyond that instead of resting a 24h limit at the zone edge. Evidence: limit-in-zone filled 1 of 13 times since 2026-06-04 (AERO, +$0.82); the 5 live expiries all reached TP1 at market in the 09-30 audit counterfactual (n=5, rally, $15 notional: a hint, not proof). Sizing ($12 at the posted stop from the actual fill), exits and review rules unchanged. Effective at the killers-receiver recreate recorded in #162; entries before it keep the old rule. ENA (#2240) rests under the old rule until its own timeout.", "effective_at": null},
-        {"date": "2026-10-04", "reason": "Activation record for the #162 entry rule. Release 9ce489a (PR #166) deployed; killers-receiver recreated, startup log verified max_slippage=5.0% limit_in_zone=False. TRX, HYPE and XRP stayed open with their stop and TP orders intact. The ENA (#2240) zone limit expired unfilled under the old rule before activation.", "effective_at": "2026-10-04T20:49:57Z"}
+        {"date": "2026-10-04", "reason": "Activation record for the #162 entry rule. Release 9ce489a (PR #166) deployed; killers-receiver recreated, startup log verified max_slippage=5.0% limit_in_zone=False. TRX, HYPE and XRP stayed open with their stop and TP orders intact. The ENA (#2240) zone limit expired unfilled under the old rule before activation.", "effective_at": "2026-10-04T20:49:57Z"},
+        {"date": "2026-10-14", "reason": "Operator decision: sizing change. KILLERS_RISK_USD 12 -> 6 and KILLERS_MAX_OPEN 5 -> 3 after two correlated stop clusters (2026-10-08: -$22.91 across FET/AVAX/XRP; 2026-10-15: ARB -$10.56, ALGO -$9.58) took HL account equity from 298.49 to 274.48. Planned open risk is bounded to about 3 x $6. At $6 the equal ladder collapses to about TP2/4/6/8 under HL's $10 per-order minimum (2026-10-08 replay: P&L halves both ways). Exits, entry rule and review rules are unchanged. The R-multiple series continues; dollar P&L before and after effective_at must be reported separately. Positions open at activation (SUI, JUP, TRX) keep their frozen size. Effective at the killers-receiver recreate.", "effective_at": null}
       ],
       "resolution": null
     },
@@ -662,107 +663,6 @@
         "P >= 0.80 (not 0.95) is deliberate: the only data V2's design did not see (2023-01 to 2025-06) already favoured removing C (P 0.97); the forward test must confirm the direction, not re-prove it from zero.",
         "If live-calibration replay falls below 70% of live entries, pause scoring and investigate simulator drift first.",
         "No tuning of either arm during the test. Record any amendment here."
-      ],
-      "triggers": [],
-      "amendments": [],
-      "resolution": null
-    },
-    {
-      "id": "ff-causal-funding-control-2026-10-12",
-      "bot": "FundingFadeV1",
-      "status": "open",
-      "registered": "2026-10-12",
-      "review_by": "2027-01-12",
-      "issue": "#28",
-      "min_closed_trades": 30,
-      "context": "Remaining FundingFade item of #28: does the funding term add anything over price-only, with causal funding, costs and a held-out half? Complements (does not replace) the forward V2 vs V2-noC test (ff-forward-v2-vs-no-protections-2026-10-01).",
-      "arms": {
-        "gate": "FundingFadeV1 as deployed (funding_below_mean)",
-        "price_only": "FundingFadeV1PriceOnly: funding term always passes; every other term, exit, protection identical",
-        "lagged_funding": "FundingFadeV1LaggedFunding: real term on funding delayed 21 days (keeps distribution/persistence, destroys timing; causal)",
-        "placebo": "FundingFadeV1Placebo01..20: seeded coin flip per (pair, candle) at the real term's own per-pair pass rate"
-      },
-      "causality": "Funding is the last event at or before the candle open (searchsorted right-1), decision at candle close; per-pair and BTC staleness fail-closed guards unchanged. research/evidence_tracks/ff_controls.py tests prove no look-ahead and fail-closed lag start.",
-      "method": "Freqtrade backtesting, --timeframe-detail 1m, --enable-protections, fee 0.00075 (from live orders), live-matched static 19-pair config, $15 stake / 2 slots as in the 2026-09-30 calibrated study; strategies in research/evidence_tracks/FFCausalResearch.py next to the deployed FundingFadeV1.py (md5 recorded in the result). Windows: IS 2023-01-31..2025-06-30 and OOS 2025-07-01..2026-09-30 are the SAME windows as the 2026-09-30 study, so OOS is not a fresh holdout for V2; fresh evidence is only data after 2026-10-12, scored by the same files.",
-      "reading_rule": "Funding term shows discriminative power only if the deployed gate beats price_only AND the placebo 90th percentile on profit factor and net P&L in BOTH IS and OOS (research/evidence_tracks/common.py control_reading_rule). Otherwise 'not demonstrated'. Add +5 bps/fill slippage sensitivity. A pass is evidence about the funding term, not authorization to scale.",
-      "rules": [
-        "Research only: no live order, config, allocation or deployed-strategy change follows automatically from any result. No new live bot or capital increase is authorized.",
-        "Existing preregistrations, epoch labels and dry/live lineage are preserved; this entry adds a separate research epoch.",
-        "Every pre-declared variant is reported, including failures. No threshold, window or exit is tuned after seeing results; a change is a new entry or an amendment."
-      ],
-      "triggers": [],
-      "amendments": [],
-      "resolution": null
-    },
-    {
-      "id": "keltner-exit-universe-validation-2026-10-12",
-      "bot": "KeltnerBounceV1",
-      "status": "open",
-      "registered": "2026-10-12",
-      "review_by": "2027-01-12",
-      "issue": "#28",
-      "min_closed_trades": 30,
-      "context": "Remaining Keltner item of #28: validate the current exit stack and fixed universe, and measure gate-conditional setup frequency BEFORE any filter is changed.",
-      "step_1_frequency": "research/evidence_tracks/keltner_setup_frequency.py: per-pair funnel raw lower-band cross -> +volume (1.75x SMA20) -> +BTC>SMA50 gate, gate-open share, gate-blocked count, setups/month, monthly counts, on the fixed live universe. Frequency only; no P&L. No filter may be proposed from this step alone.",
-      "step_2_exit_stack": "KeltnerExitResearch.py variants, entry/universe/protections/gate inherited unchanged: KeltnerExitV2 (deployed, control), KeltnerExitV1 (-7% stop), KeltnerExitNoTrail, KeltnerExitNoStale. Freqtrade --timeframe-detail 1m, protections on, live fee. Reported per half-year with sample sizes.",
-      "universe": "Fixed live pair list at registration; pairs are not added or dropped on the basis of results. A pair-ablation is descriptive only.",
-      "rules": [
-        "Research only: no live order, config, allocation or deployed-strategy change follows automatically from any result. No new live bot or capital increase is authorized.",
-        "Existing preregistrations, epoch labels and dry/live lineage are preserved; this entry adds a separate research epoch.",
-        "Every pre-declared variant is reported, including failures. No threshold, window or exit is tuned after seeing results; a change is a new entry or an amendment.",
-        "Deployed V2 stack (stoploss -6%, 3%/5% trailing, 120h stale exit) stays live regardless of result; V2 was set after seeing the forward sample, so only post-2026-08-23 live data is clean for it."
-      ],
-      "triggers": [],
-      "amendments": [],
-      "resolution": null
-    },
-    {
-      "id": "insiders-fresh-sample-2026-10-12",
-      "bot": "InsidersScalpV1",
-      "status": "open",
-      "registered": "2026-10-12",
-      "review_by": "2027-01-12",
-      "issue": "#28",
-      "min_closed_trades": 30,
-      "context": "Remaining Insiders item of #28: a fresh sample under the current bounded executor, separate from prior 5x/venue regimes. Applies the corrected bar of insiders-demotion-2026-08-30 (>=30 admitted signals at PF >= 1.3, judged on the fresh epoch alone; never re-judge the pre-remediation seven).",
-      "epochs": "research/evidence_tracks/insiders_epochs.json (boundaries copied from micro-live-fleet-v2 amendments and executable-exits-and-request-budget-2026-09-13). Trades are labelled by ENTRY time; fresh_epoch = grouped-target-executor (2026-09-12T00:46:00Z), the latest executor-contract boundary recorded in the repo. If the synthetic correlation key or market-entry-with-SL support landed later, a later epoch is appended by amendment BEFORE counting.",
-      "tool": "research/evidence_tracks/insiders_fresh_sample.py: per-epoch metrics, exclusions (open/live), bar status in {insufficient_evidence, bar_met, bar_not_met}.",
-      "rules": [
-        "Research only: no live order, config, allocation or deployed-strategy change follows automatically from any result. No new live bot or capital increase is authorized.",
-        "Existing preregistrations, epoch labels and dry/live lineage are preserved; this entry adds a separate research epoch.",
-        "Every pre-declared variant is reported, including failures. No threshold, window or exit is tuned after seeing results; a change is a new entry or an amendment.",
-        "The bot stays dry-run throughout. bar_met only permits a separate operator decision about a bounded live epoch; it changes nothing by itself.",
-        "The 90-day review may conclude insufficient_evidence."
-      ],
-      "triggers": [],
-      "amendments": [],
-      "resolution": null
-    },
-    {
-      "id": "shortkeltner-breakdown-eval-2026-10-12",
-      "bot": "ShortKeltnerBreakdown (research only; not a bot)",
-      "status": "open",
-      "registered": "2026-10-12",
-      "review_by": "2027-04-12",
-      "issue": "#28",
-      "min_closed_trades": 30,
-      "context": "Remaining Short Keltner item of #28, implementing the redesign direction in shortkeltner-redesign-proposal-2026-08-30 as a SEPARATE evaluation; ShortKeltnerV2HL and its dry curve are untouched. Higher signal frequency is not evidence of profitability.",
-      "frozen_spec": {
-        "gate": "btc_bear unchanged (BTC 1h close < SMA50 and SMA200, SMA50 slope(24) < 0, close < daily SMA200)",
-        "trigger": "close crosses DOWN through lower Keltner band (SMA25 - 2.5*ATR25) with volume > 1.75*SMA20; RSI precondition dropped",
-        "entry": "next candle open",
-        "exit": "stop entry+2.0*ATR25(signal bar); target 2R; time exit after 72 bars; same-bar stop+target scored as stop; one position per pair",
-        "costs": "primary 10 bps/side, zero funding carry (carry tailwind not credited); sensitivity 5/20 bps",
-        "null": "200 seeded random masks over gate-open candles at the signal's own pass rate"
-      },
-      "implementation": "research/evidence_tracks/short_keltner_breakdown.py (signal, first-touch scorer, placebo, report). Hourly first-touch is a screen; any positive screen must be re-run with Freqtrade --timeframe-detail 1m on Hyperliquid data before a dry-run bot is proposed.",
-      "rules": [
-        "Research only: no live order, config, allocation or deployed-strategy change follows automatically from any result. No new live bot or capital increase is authorized.",
-        "Existing preregistrations, epoch labels and dry/live lineage are preserved; this entry adds a separate research epoch.",
-        "Every pre-declared variant is reported, including failures. No threshold, window or exit is tuned after seeing results; a change is a new entry or an amendment.",
-        "Evaluation windows: BTC/ETH/SOL as in the redesign proposal; the proposal's frequency count (158 signals) is already seen, so profitability gets no credit from it.",
-        "A result is 'beats placebo' only if mean net R at 10 bps exceeds the placebo 90th percentile AND n >= 30; below 30 the report states no profit claim.",
-        "Binance USDT klines are a proxy for Hyperliquid USDC volume; counts and results are labelled proxy evidence."
       ],
       "triggers": [],
       "amendments": [],

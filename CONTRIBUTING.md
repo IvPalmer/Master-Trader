@@ -28,9 +28,6 @@ python3 -m venv .venv
 .venv/bin/python -m pytest tests/ -q
 ```
 
-Create `.venv` as a real directory inside the checkout. Do not symlink it to a
-venv elsewhere: an absolute-path symlink breaks the agent sandbox sync-out step.
-
 That is the root suite alone. [Clone and run the tests](README.md#1-clone-and-run-the-tests)
 lists every Python suite in the order CI runs them. Neither block covers the
 frontend gates below, so a green local run is not a green CI run.

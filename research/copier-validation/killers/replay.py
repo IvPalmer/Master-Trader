@@ -30,10 +30,7 @@ ENTRY_WINDOW_H = 72
 FETCH_D = 45                                  # klines window (fixed → cache stable)
 HORIZON_D = int(os.environ.get("HORIZON_D", "45"))  # sim residual-hold cap (sensitivity)
 LEV = 5.0
-import sys as _sys, pathlib as _pl
-_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[3]))
-from ft_userdata.analysis.costs import fee_fraction  # noqa: E402
-FEE = fee_fraction("binance", "perp", "taker")  # shared cost model (issue #1)
+FEE = 0.0004
 TF = "15m"
 TF_MS = 15 * 60 * 1000
 LIQ_FRAC = 1.0 / LEV - 0.005   # isolated liq ~ adverse 1/lev move (minus maint.)

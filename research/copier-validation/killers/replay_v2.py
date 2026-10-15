@@ -23,10 +23,7 @@ os.makedirs(CACHE, exist_ok=True)
 ENTRY_WINDOW_H = 72
 FETCH_D = 45
 HORIZON_D = int(os.environ.get("HORIZON_D", "45"))
-import sys as _sys, pathlib as _pl
-_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[3]))
-from ft_userdata.analysis.costs import fee_fraction  # noqa: E402
-FEE = fee_fraction("binance", "perp", "taker")  # shared cost model (issue #1)
+FEE = 0.0004
 TF = "5m"
 TF_MS = 5 * 60 * 1000
 ALIAS = {"PEPE": "1000PEPE", "SHIB": "1000SHIB", "FLOKI": "1000FLOKI", "BONK": "1000BONK", "GOLD": "XAUT"}

@@ -23,10 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 os.environ.setdefault("PRICES_DIR", os.path.join(HERE, "prices_may"))
 H.PRICES = __import__("pathlib").Path(os.environ["PRICES_DIR"]); H._cache.clear()
 
-import sys as _sys, pathlib as _pl
-_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[3]))
-from ft_userdata.analysis.costs import DEFAULT_SLIPPAGE_BPS, fee_fraction  # noqa: E402
-TAKER = fee_fraction("binance", "perp", "taker"); SLIP = DEFAULT_SLIPPAGE_BPS / 1e4; RISK_PCT = 5.0; FILL_WINDOW_H = 6
+TAKER = 0.0005; SLIP = 0.0005; RISK_PCT = 5.0; FILL_WINDOW_H = 6
 GENERIC_LEGS = [0.20, 0.30, 0.50]
 
 
