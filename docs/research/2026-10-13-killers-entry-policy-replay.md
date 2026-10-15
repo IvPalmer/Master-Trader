@@ -27,3 +27,19 @@ rounding; limit fills on touch (optimistic for limit policies); Binance proxy pr
 
 ## Result
 Not yet run — see the issue thread.
+
+## Exit arm (amendment A1, 2026-10-15, frozen before any data run)
+Prior: the 2026-05-28 study found no edge; exits only changed the size of the loss.
+Expect about zero after fees; a positive arm is a hypothesis for forward confirmation.
+
+The signal is used only as the entry trigger (live chase ≤5%, so every arm shares the
+same fills). Posted levels look like a template (stop median 9.7% from zone mid, TP1
+≈0.53× stop distance, last TP ≈67%). Variants (fixed-$ risk, same metrics, plus the
+share of fills where TP1/1R traded before the stop):
+- x1: ATR(14, 4h) stop, k = 1.5 and 2.5, targets 1R/2R/3R (equal thirds)
+- x2: stop beyond the last confirmed 4h swing low/high (+0.1%), targets 1R/2R/3R
+- x3: posted stop, targets 1R/2R/3R
+- `live_posted` reference row (not a trial). DSR uses N = 15 trials.
+
+Needs 8 days of 1m before each signal (`*_pre.json`; `--fetch` downloads). The run
+prints both arms. Still NOT run: no market data in the agent sandbox.

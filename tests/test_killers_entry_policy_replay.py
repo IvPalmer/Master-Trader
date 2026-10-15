@@ -168,3 +168,86 @@ def test_evaluate_end_to_end_split_and_missed():
     lim = p["limit_4h"]["slip0.0"]
     assert lim["fill_rate"] == 1.0 and lim["early70"]["n"] + lim["late30"]["n"] == lim["all"]["n"]
     assert "chase<=5%" in epr.report(res)
+
+
+# ── exit arm (amendment 1) ──────────────────────────────────────────────────
+H4 = epr.BAR_MS
+
+
+def pre_bars(n_bars, t_end, lo_fn=lambda i: 9.0, hi_fn=lambda i: 10.0):
+    """n_bars 4h bars ending at t_end, one 1m candle per 4h bar is enough for aggregation."""
+    out = []
+    for i in range(n_bars):
+        ts = t_end - (n_bars - i) * H4
+        out.append([ts, 9.5, hi_fn(i), lo_fn(i), 9.5])
+    return out
+
+
+def test_atr_constant_range():
+    bars = [[i * H4, 9.5, 10.0, 9.0, 9.5] for i in range(20)]
+    assert abs(epr.atr(bars) - 1.0) < 1e-9
+    assert epr.atr(bars[:10]) is None
+
+
+def test_bars_4h_excludes_incomplete_bar():
+    t0 = T0 + H4 // 2                                  # mid-bar
+    pre = [[T0 - H4 + i * MIN, 1, 2, 0.5, 1] for i in range(5)] + [[T0 + 5 * MIN, 1, 99, 0.1, 1]]
+    b = epr.bars_4h(pre, t0)
+    assert len(b) == 1 and b[0][2] == 2                # the open bar (high 99) is not used
+
+
+def test_swing_stop_picks_recent_fractal_below_fill_with_buffer():
+    lows = [9.0 + i * 0.01 for i in range(20)]
+    lows[10] = 8.0                                      # confirmed fractal low
+    bars = [[i * H4, 9.5, 10.0, lows[i], 9.5] for i in range(20)]
+    sl = epr.swing_stop(bars, True, 9.6)
+    assert abs(sl - 8.0 * (1 - epr.STRUCT_BUF)) < 1e-9
+    assert epr.swing_stop(bars, True, 7.0) is None      # nothing below fill
+    highs = [10.0 - i * 0.01 for i in range(20)]; highs[12] = 11.0
+    bars = [[i * H4, 9.5, highs[i], 9.0, 9.5] for i in range(20)]
+    assert abs(epr.swing_stop(bars, False, 9.6) - 11.0 * (1 + epr.STRUCT_BUF)) < 1e-9
+
+
+def _exit_run(xs, candles, pre, **kw):
+    return epr.run_exit_signal(sig(**kw), candles, pre, xs, 0)
+
+
+def test_x3_posted_stop_with_1_2_3R_targets_hits_tp1_first():
+    # fill 10.0, posted stop 9.0 -> 1R=1.0: targets 11,12,13
+    c = series(flat(10.0, 5) + [(10.0, 11.2, 10.0, 11.1)] + flat(11.1, 20))
+    r = _exit_run(epr.exit_variants()["x3_posted_R"], c, [])
+    assert r["first"] == "tp1" and r["R"] > 0
+
+
+def test_exit_stop_first_counts_as_stop_and_same_candle_stop_wins():
+    c = series(flat(10.0, 5) + [(10.0, 11.5, 8.9, 9.0)] + flat(9.0, 20))
+    r = _exit_run(epr.exit_variants()["x3_posted_R"], c, [])
+    assert r["first"] == "stop" and r["reason"] == "stop" and r["R"] < 0
+
+
+def test_atr_stop_uses_k_times_atr_and_skips_without_pre_history():
+    xs = epr.exit_variants()["x1_atr1.5"]
+    c = series(flat(10.0, 30))
+    assert _exit_run(xs, c, [])["skip"] == "no_pre"
+    bars = [[T0 - (21 - i) * H4, 9.5, 10.0, 9.0, 9.5] for i in range(20)]   # ATR=1.0
+    pre = [b for b in bars]
+    r = _exit_run(xs, c, pre)
+    assert abs(r["stop_pct"] - 0.15) < 1e-6              # 1.5 * 1.0 / 10.0
+
+
+def test_exit_arm_shares_entry_fills_with_live_chase():
+    c = series(flat(10.6, 30))                           # 6% above zone top -> beyond live 5% cap
+    assert _exit_run(epr.exit_variants()["x3_posted_R"], c, [])["skip"] == "beyond_cap"
+
+
+def test_evaluate_exits_end_to_end_reports_tp1_vs_stop():
+    sigs = [sig(signal_id=i, open_date=f"2026-01-{i + 1:02d}T00:00:00+00:00") for i in range(10)]
+
+    def load(s):
+        t0 = epr.ms(s["open_date"])
+        return series(flat(10.0, 5) + [(10.0, 11.2, 10.0, 11.1)] + flat(11.1, 20), start=t0)
+    res = epr.evaluate_exits(sigs, load, lambda s: [], n_trials=15)
+    v = res["variants"]["x3_posted_R"]["slip0.0"]
+    assert v["tp1_vs_stop_rate"] == 1.0 and v["all"]["n"] == 10
+    assert "x1_atr1.5" in res["variants"] and res["variants"]["x1_atr1.5"]["slip0.0"]["all"].get("n", 0) == 0
+    epr.report_exits(res)

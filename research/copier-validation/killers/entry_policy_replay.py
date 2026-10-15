@@ -164,6 +164,13 @@ def find_entry(spec, is_long, bound, sl, tps, candles, t0):
 # ── trade walk ──────────────────────────────────────────────────────────────
 def walk(is_long, fill, sl, plan, candles, i0, notional, taker_entry, slip, close_ms):
     """Adverse-first within a candle. Returns net $ pnl and exit reason."""
+    pnl, reason, _ = walk_ex(is_long, fill, sl, plan, candles, i0, notional, taker_entry, slip, close_ms)
+    return pnl, reason
+
+
+def walk_ex(is_long, fill, sl, plan, candles, i0, notional, taker_entry, slip, close_ms):
+    """walk() plus `first`: which of stop / tp1 was touched first (None if neither)."""
+    first = None
     sgn = 1.0 if is_long else -1.0
     qty = notional / fill
     rem, pnl = 1.0, 0.0
@@ -175,11 +182,11 @@ def walk(is_long, fill, sl, plan, candles, i0, notional, taker_entry, slip, clos
             px = min(sl, o) if is_long else max(sl, o)
             px *= (1 - sgn * slip)                              # stop exits slip adversely
             pnl += rem * qty * sgn * (px - fill); fees += FEE_TAKER * rem * qty * px
-            rem, reason = 0.0, "stop"; break
+            rem, reason = 0.0, "stop"; first = first or "stop"; break
         while k < len(plan) and ((h >= plan[k][0]) if is_long else (l <= plan[k][0])):
             f = plan[k][1]
             pnl += f * qty * sgn * (plan[k][0] - fill); fees += FEE_MAKER * f * qty * plan[k][0]
-            rem -= f; k += 1
+            rem -= f; k += 1; first = first or "tp1"
         if rem <= 1e-9:
             reason = "all_tp"; break
         if close_ms and ts >= close_ms:
@@ -188,7 +195,7 @@ def walk(is_long, fill, sl, plan, candles, i0, notional, taker_entry, slip, clos
     if rem > 1e-9:
         c = candles[-1][4]
         pnl += rem * qty * sgn * (c - fill); fees += FEE_TAKER * rem * qty * c
-    return pnl - fees, reason
+    return pnl - fees, reason, first
 
 
 def run_signal(sig, candles, spec, slip):
@@ -220,6 +227,171 @@ def run_signal(sig, candles, spec, slip):
     risk = notional * abs(fill - sl) / fill          # 1R = loss at the posted stop trigger
     return {"pnl": pnl, "R": pnl / risk, "risk": risk, "reason": reason, "dev": e["dev"],
             "t_fill_h": (candles[e["i"]][0] - t0) / HOUR, "open": sig["open_date"]}
+
+
+# ── exit arm (GROA-309 amendment 1): signal = entry trigger only ───────────
+ATR_N, BAR_MS, PRE_D, SWING_K, STRUCT_BUF = 14, 4 * HOUR, 8, 2, 0.001
+R_MULTS = (1, 2, 3)
+EXIT_ENTRY = {"kind": "chase", "cap": 0.05}          # live entry policy, so arms share fills
+BASELINE = "live_posted"
+
+
+def exit_variants():
+    return {BASELINE: {"stop": "posted", "targets": "ladder"},
+            "x1_atr1.5": {"stop": "atr", "k": 1.5, "targets": "R"},
+            "x1_atr2.5": {"stop": "atr", "k": 2.5, "targets": "R"},
+            "x2_struct": {"stop": "struct", "targets": "R"},
+            "x3_posted_R": {"stop": "posted", "targets": "R"}}
+
+
+def bars_4h(pre, t0):
+    """Aggregate 1m candles into completed UTC-aligned 4h bars ending <= t0 -> [(ts,o,h,l,c)]."""
+    b = {}
+    for ts, o, h, l, c in pre:
+        if ts >= t0:
+            continue
+        k = ts - ts % BAR_MS
+        if k + BAR_MS > t0:
+            continue
+        if k not in b:
+            b[k] = [k, o, h, l, c]
+        else:
+            x = b[k]; x[2] = max(x[2], h); x[3] = min(x[3], l); x[4] = c
+    return [b[k] for k in sorted(b)]
+
+
+def atr(bars, n=ATR_N):
+    """Wilder ATR over the given bars; None if fewer than n+1 bars."""
+    if len(bars) < n + 1:
+        return None
+    tr = [max(bars[i][2] - bars[i][3], abs(bars[i][2] - bars[i - 1][4]), abs(bars[i][3] - bars[i - 1][4]))
+          for i in range(1, len(bars))]
+    a = statistics.fmean(tr[:n])
+    for t in tr[n:]:
+        a = (a * (n - 1) + t) / n
+    return a
+
+
+def swing_stop(bars, is_long, fill):
+    """Most recent confirmed 4h fractal (K bars each side) low (long) / high (short) beyond
+    `fill`, pushed out by STRUCT_BUF.  None if there is none."""
+    k = SWING_K
+    for i in range(len(bars) - k - 1, k - 1, -1):
+        w = bars[i - k:i + k + 1]
+        if is_long:
+            lv = bars[i][3]
+            if lv == min(x[3] for x in w) and lv < fill:
+                return lv * (1 - STRUCT_BUF)
+        else:
+            hv = bars[i][2]
+            if hv == max(x[2] for x in w) and hv > fill:
+                return hv * (1 + STRUCT_BUF)
+    return None
+
+
+def run_exit_signal(sig, candles, pre, xspec, slip):
+    p = prep(sig)
+    if not p:
+        return {"skip": "incomplete"}
+    is_long, bound, psl, tps = p
+    t0 = ms(sig["open_date"])
+    candles = [c for c in candles if t0 <= c[0] <= t0 + HORIZON_D * 24 * HOUR]
+    if len(candles) < 5:
+        return {"skip": "no_data"}
+    e = find_entry(EXIT_ENTRY, is_long, bound, psl, tps, candles, t0)
+    if "skip" in e:
+        return e
+    sgn = 1.0 if is_long else -1.0
+    fill = e["px"] * (1 + sgn * slip)
+    live_tps = [t for t in tps if (t > fill) == is_long]
+    if not live_tps:
+        return {"skip": "past_all_targets"}
+    if xspec["stop"] == "posted":
+        sl = psl
+    else:
+        bars = bars_4h(pre, t0)
+        if xspec["stop"] == "atr":
+            a = atr(bars)
+            if a is None:
+                return {"skip": "no_pre"}
+            sl = fill - sgn * xspec["k"] * a
+        else:
+            sl = swing_stop(bars, is_long, fill)
+            if sl is None:
+                return {"skip": "no_structure"}
+    if (sl >= fill) if is_long else (sl <= fill):
+        return {"skip": "bad_stop"}
+    sz = size(is_long, fill, sl)
+    if not sz:
+        return {"skip": "below_min_notional"}
+    notional, lev, d = sz
+    if xspec["targets"] == "ladder":
+        targets = live_tps
+    else:
+        dist = abs(fill - sl)
+        targets = [fill + sgn * m * dist for m in R_MULTS]
+    plan = ladder_plan(notional, fill, targets, abs(fill - sl) / fill * lev)
+    close_ms = ms(sig["channel_close_date"]) if sig.get("channel_close_date") else None
+    pnl, reason, first = walk_ex(is_long, fill, sl, plan, candles, e["i"], notional, True, slip, close_ms)
+    risk = notional * abs(fill - sl) / fill
+    return {"pnl": pnl, "R": pnl / risk, "risk": risk, "reason": reason, "first": first,
+            "stop_pct": abs(fill - sl) / fill, "open": sig["open_date"]}
+
+
+def evaluate_exits(sigs, load, load_pre, n_trials):
+    """Exit arm. n_trials = entry-arm trials + exit variants (preregistered, conservative)."""
+    sigs = sorted(sigs, key=lambda s: s["open_date"])
+    cut = int(len(sigs) * TRAIN_FRAC)
+    split_of = {s["signal_id"]: ("early70" if i < cut else "late30") for i, s in enumerate(sigs)}
+    cache = {s["signal_id"]: (load(s), load_pre(s)) for s in sigs}
+    out = {"n_signals": len(sigs), "variants": {}, "n_trials": n_trials}
+    for slip in SLIPPAGES:
+        key = f"slip{slip}"
+        for name, xs in exit_variants().items():
+            res = {s["signal_id"]: run_exit_signal(s, *cache[s["signal_id"]], xs, slip) for s in sigs}
+            elig = [i for i in res if res[i].get("skip") not in ("incomplete", "no_data")]
+            fl = [res[i] for i in elig if "pnl" in res[i]]
+            tp1 = sum(r["first"] == "tp1" for r in fl); st = sum(r["first"] == "stop" for r in fl)
+            rec = {"eligible": len(elig), "fill_rate": len(fl) / len(elig) if elig else None,
+                   "skip_reasons": _count(res[i]["skip"] for i in elig if "skip" in res[i]),
+                   "all": metrics(fl),
+                   "early70": metrics([res[i] for i in elig if "pnl" in res[i] and split_of[i] == "early70"]),
+                   "late30": metrics([res[i] for i in elig if "pnl" in res[i] and split_of[i] == "late30"]),
+                   "tp1_first": tp1, "stop_first": st,
+                   "tp1_vs_stop_rate": tp1 / (tp1 + st) if tp1 + st else None,
+                   "median_stop_pct": statistics.median([r["stop_pct"] for r in fl]) if fl else None,
+                   "_Rs": [r["R"] for r in fl]}
+            out["variants"].setdefault(name, {})[key] = rec
+        stt = {n: sharpe_stats(v[key]["_Rs"]) for n, v in out["variants"].items()}
+        var = statistics.pvariance([x["sr"] for x in stt.values() if x]) if sum(bool(x) for x in stt.values()) > 1 else 0.0
+        for n, v in out["variants"].items():
+            x = stt[n]; v[key]["dsr"] = None
+            if x:
+                prob, sr0 = deflated_sharpe(x["sr"], x["n"], x["skew"], x["kurt"], n_trials, var)
+                v[key]["dsr"] = {"sr_per_trade": x["sr"], "dsr_prob": prob, "sr_benchmark": sr0, "n_trials": n_trials}
+    for v in out["variants"].values():
+        for r in v.values():
+            r.pop("_Rs")
+    return out
+
+
+def report_exits(res):
+    lines = ["\nEXIT ARM  (prior: 2026-05-28 found no edge; exits only changed loss size; any positive arm needs forward confirmation)"]
+    for key in (f"slip{s}" for s in SLIPPAGES):
+        lines.append(f"\n=== exits {key}  (N signals={res['n_signals']}) ===")
+        lines.append(f"{'variant':<14}{'fill%':>6}{'n':>5}{'stop%':>7}{'tp1>stop':>9}{'expR':>8}{'exp$':>8}{'tot$':>9}"
+                     f"{'PF':>6}{'maxDD$':>9}{'e70':>8}{'l30':>8}{'DSR':>6}")
+        for n, v in res["variants"].items():
+            r = v[key]; a = r["all"]
+            if not a.get("n"):
+                lines.append(f"{n:<14}  no fills"); continue
+            f = lambda m: f"{m['exp_R']:+.3f}" if m.get("n") else "n/a"
+            hr = "%.0f%%" % (r["tp1_vs_stop_rate"] * 100) if r["tp1_vs_stop_rate"] is not None else "n/a"
+            dsr = "%.2f" % r["dsr"]["dsr_prob"] if r.get("dsr") else "n/a"
+            lines.append(f"{n:<14}{r['fill_rate']*100:>6.0f}{a['n']:>5}{r['median_stop_pct']*100:>7.1f}{hr:>9}"
+                         f"{a['exp_R']:>+8.3f}{a['exp_usd']:>+8.2f}{a['total_usd']:>+9.1f}{(a['pf'] or 0):>6.2f}"
+                         f"{a['maxdd_usd']:>9.1f}{f(r['early70']):>8}{f(r['late30']):>8}{dsr:>6}")
+    return "\n".join(lines)
 
 
 # ── statistics ──────────────────────────────────────────────────────────────
@@ -352,6 +524,22 @@ def make_loader(cache_dir, fetch=False):
     return load
 
 
+def make_pre_loader(cache_dir, fetch=False):
+    """8 days of 1m before the signal, for ATR / swing structure (<SYMBOL>_<open_ms>_pre.json)."""
+    os.makedirs(cache_dir, exist_ok=True)
+    def load(sig):
+        t0 = ms(sig["open_date"])
+        path = os.path.join(cache_dir, f"{sig['symbol']}_{t0}_pre.json")
+        if os.path.exists(path):
+            return json.load(open(path))
+        if not fetch:
+            return []
+        c = fetch_1m(sig["symbol"], t0 - PRE_D * 24 * HOUR, t0)
+        json.dump(c, open(path, "w"))
+        return c
+    return load
+
+
 def report(res):
     lines = []
     for key in (f"slip{s}" for s in SLIPPAGES):
@@ -381,10 +569,14 @@ def main():
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     sigs = usable(json.load(open(a.signals)))
-    res = evaluate(sigs, make_loader(a.cache, a.fetch))
+    load = make_loader(a.cache, a.fetch)
+    res = evaluate(sigs, load)
+    xres = evaluate_exits(sigs, load, make_pre_loader(a.cache, a.fetch),
+                          n_trials=len(policies()) + len(exit_variants()) - 1)
     if a.out:
-        json.dump(res, open(a.out, "w"), indent=1)
+        json.dump({"entry_arm": res, "exit_arm": xres}, open(a.out, "w"), indent=1)
     print(report(res))
+    print(report_exits(xres))
 
 
 if __name__ == "__main__":

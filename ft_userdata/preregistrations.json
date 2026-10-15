@@ -792,7 +792,29 @@
         "The 278-signal corpus and prior replays (#162/#182) are already seen; they give no credit to any variant."
       ],
       "triggers": [],
-      "amendments": [],
+      "amendments": [
+        {
+          "id": "A1-exit-arm",
+          "date": "2026-10-15",
+          "by": "operator via master-trader-lead (GROA-309 comment)",
+          "frozen_before_results": true,
+          "note": "Added before any data run (no result existed). Exit arm: signal used only as entry trigger; posted stop and ladder replaced by own levels.",
+          "prior": "The 2026-05-28 study found no edge and exits only changed the size of the loss. Expect ~0 expectancy after fees; any positive arm is a hypothesis needing forward confirmation, not a finding.",
+          "motivation": "Across 33 open signals the posted levels look like a template: stop median 9.7% from zone mid (p10 9.1, p90 11.6), TP1 median 5.1% (~0.53x stop distance), last TP ~67%.",
+          "variants": {
+            "entry": "live chase<=5% for every exit variant, so all arms share identical fills and skips (posted-level eligibility filters kept).",
+            "live_posted": "reference: posted stop + posted 8-rung ladder (not a new trial).",
+            "x1_atr1.5": "stop = fill -/+ 1.5 x ATR(14) on completed UTC-aligned 4h bars built from the 8 days of 1m before signal time (Wilder); needs >=15 bars else skip no_pre; targets 1R/2R/3R.",
+            "x1_atr2.5": "same with k=2.5.",
+            "x2_struct": "stop = most recent confirmed 4h fractal low (long) / high (short), 2 bars each side, within the 8d lookback and beyond the fill, pushed out 0.1%; none -> skip no_structure; targets 1R/2R/3R.",
+            "x3_posted_R": "posted stop; targets at 1R/2R/3R where 1R = fill-to-posted-stop distance."
+          },
+          "held_fixed": "R-targets: equal thirds at 1R/2R/3R through the live $10-leg collapse; stop never moved; fixed-$ risk sizing ($12 at stop-limit trigger, margin $5-40, lev<=3; risk falls below $12 only where the leverage/margin cap binds, and R is always computed on realised notional); fees, slippage 0/0.5%, horizon, 70/30 split, same-candle stop-first as the entry arm.",
+          "extra_metric": "TP1-vs-stop hit rate = share of fills where the first target (1R or posted TP1) traded before the stop, among fills where either did; plus median stop distance.",
+          "multiple_testing": "4 new trials; DSR trial count N=15 (11 entry + 4 exit) for the exit arm, cross-variant SR variance over the 5 exit rows incl. reference. A variant is only called better than live_posted if DSR>=0.95 AND same-sign expectancy in both splits at 0.5% slippage; even then it needs forward confirmation before any use.",
+          "implementation": "run_exit_signal / evaluate_exits in entry_policy_replay.py; pre-history cache files <SYMBOL>_<open_ms>_pre.json (--fetch downloads them)."
+        }
+      ],
       "resolution": null
     }
   ]
