@@ -4,7 +4,7 @@
     "trading_mode": "spot",
     "margin_mode": "",
     "stake_currency": "USDT",
-    "stake_amount": 40,
+    "stake_amount": 15,
     "tradable_balance_ratio": 0.99,
     "fiat_display_currency": "",
     "max_open_trades": 2,
