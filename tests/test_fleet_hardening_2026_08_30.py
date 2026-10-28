@@ -677,14 +677,22 @@ def test_breaker_peak_rebases_when_the_live_set_changes(monkeypatch, tmp_path):
     stopped = []
     monkeypatch.setattr(me, "stop_bot", lambda bot: stopped.append(bot["strategy"]) or True)
     monkeypatch.setattr(me, "send_circuit_breaker_alert", lambda *a, **k: None)
+    monkeypatch.setattr(me, "send_ops_alert", lambda *a, **k: True)
+    # enforce_halts() reads each bot's current mode; C is demoted below.
+    dry = {"c"}
+    monkeypatch.setattr(me, "fetch_json", lambda service, endpoint: {
+        "dry_run": service in dry, "state": "running"})
 
     # Three live bots, flat P&L: the peak seeds at the base.
     me._live_bots = [{"strategy": s, "service": s.lower()} for s in ("A", "B", "C")]
+    me.BOTS = list(me._live_bots)
+    me._pending_halts = set()
     me._live_initial_capital = 254.96
     me._portfolio_peak = 0.0
     me._peak_basis = 0.0
     me._circuit_breaker_triggered = False
     me.check_circuit_breaker(0.0)
+    me.enforce_halts()
     assert me._portfolio_peak == pytest.approx(254.96)
     assert not stopped
 
@@ -692,6 +700,7 @@ def test_breaker_peak_rebases_when_the_live_set_changes(monkeypatch, tmp_path):
     me._live_bots = me._live_bots[:2]
     me._live_initial_capital = 165.53
     me.check_circuit_breaker(-0.11)
+    me.enforce_halts()
 
     assert not stopped, (
         f"a composition change must not trip the breaker; stopped={stopped}"
@@ -700,7 +709,8 @@ def test_breaker_peak_rebases_when_the_live_set_changes(monkeypatch, tmp_path):
 
     # A REAL drawdown on the new base must still trip it.
     me.check_circuit_breaker(-20.0)
-    assert stopped, "a genuine 12% drawdown must still stop the live bots"
+    me.enforce_halts()
+    assert stopped == ["A", "B"], "a genuine 12% drawdown must still stop the live bots, not the demoted one"
 
 
 @pytest.mark.parametrize("name", LIVE_CONFIGS)
