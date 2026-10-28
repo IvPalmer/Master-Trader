@@ -41,9 +41,12 @@ The health-report line runs an installed copy of `deploy/vps/run-health-report.s
 in `runtime/`. Re-copy it after that script changes; the copy on the host was older than the repo
 version on 2026-10-02. The warden line is documented in `services/killers-receiver/warden/README.md`.
 Two systemd timers (`master-trader-retention-shadow`, `master-trader-retention-accounting`, units
-in `research/profit_retention/systemd/`) run the read-only profit-retention collectors. Nothing
-else master-trader related is scheduled on the host. `ft_userdata/automation_scheduler.sh` is not
-installed and refuses to run (#100).
+in `research/profit_retention/systemd/`) run the read-only profit-retention collectors.
+`ft_userdata/automation_scheduler.sh` is not installed and refuses to run (#100).
+Separately, root's crontab has run `deploy/vps/backup_live_dbs.py` daily at
+03:15 UTC since 2026-10-09. It was checked on 2026-10-13: the local backup had
+25 files and reported `OK`. This confirms the local schedule only; it does not
+show that the rclone/off-host version from `main` has been released or configured.
 
 Live trade DB lives in docker volume
 `compose-bypass-mobile-port-fbk1m6_ft_user_data` (NOT in `runtime/`).
@@ -90,64 +93,31 @@ All bulk research data lives only on VPS; backtests run on VPS.
 
 ## Backups
 
-`backup_live_dbs.py` (#99) backs up the state that exists only on this host:
-every `tradesv3.*.sqlite` in the `ft_user_data` volume (live and dry-run bots),
-every `*.sqlite` in `killers_receiver_state` and `insiders_receiver_state`, the
-exporter's `*.json` (circuit-breaker peak) and the observer's
-`/home/ubuntu/killers-bot/state.sqlite`. The receiver databases matter most:
-they tie each open position to its source signal, posted stop and targets, and
-cannot be rebuilt from the exchange.
+`backup_live_dbs.py` (#99) backs up every `tradesv3.live.*.sqlite` in the
+`ft_user_data` volume and every `*.sqlite` in `killers_receiver_state` and
+`insiders_receiver_state`, plus `/home/ubuntu/killers-bot/state.sqlite` when it
+exists. The receiver databases tie each open position to its source signal,
+posted stop and targets and cannot be rebuilt from the exchange. Dry-run
+databases and unrelated state are intentionally excluded.
 
 Each database is opened read-only and copied with SQLite's online backup API,
 which takes a consistent snapshot without stopping the bots. The copy has to
 pass `PRAGMA integrity_check` and is then gzipped. One run produces
 `/home/ubuntu/backups/master-trader/<UTC stamp>/` with a `MANIFEST.json`
-(source, size, sha256). Retention: every run from 14 days, the newest per ISO
-week for 8 weeks, never fewer than 7. A failure exits non-zero and posts a
-`[db-backup] WARN` line through trade-webhook.
+(source, size, sha256 and integrity result). It then copies that run to the
+operator's Google Drive with rclone, checks the remote files against the local
+copy, and applies the same retention to both locations: every run for 30 days,
+the newest run of each ISO week for 8 weeks, and a floor of 7 runs. A failure
+exits non-zero and posts a `[db-backup] WARN` line through trade-webhook.
 
-What existed before (checked read-only on 2026-10-02): no scheduled backup of
-any of this. Dokploy has no backup, volume backup or destination configured.
-The host crontabs back up only another project (`rlm-db-backup.sh`).
+Before 2026-10-09 there was no scheduled backup of this state. Dokploy had no
+backup, volume backup or destination configured when checked on 2026-10-02.
 `ft_userdata/automation_scheduler.sh`'s 02:00 line reads `~/ft_userdata`, which
-holds no live database, and is not installed. The only copies are one-off
-copies taken before risky changes. A cloud-level boot-volume backup policy
-can't be seen from the host and is unverified.
+holds no live database, and is not installed. A cloud-level boot-volume backup
+policy cannot be seen from the host and remains unverified.
 
-Install, as root, because docker's volume directories are root-only:
-
-```bash
-# Check what it will copy (reads nothing but directory listings):
-sudo /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_live_dbs.py --list
-# First run by hand, then confirm the directory:
-sudo /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_live_dbs.py
-sudo ls /home/ubuntu/backups/master-trader/
-# Daily at 03:15 UTC, clear of rlm's 02:30 and the 23:00 health report:
-( sudo crontab -l 2>/dev/null | grep -v backup_live_dbs.py
-  echo '15 3 * * * /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_live_dbs.py >> /var/log/master-trader-backup.log 2>&1'
-) | sudo crontab -
-```
-
-Point root's cron at the real, root-owned Dokploy path, not at
-`/home/ubuntu/master-trader/runtime`. That symlink lives in a directory
-`ubuntu` owns, so re-pointing it would make root run something else.
-
-Restore a file (a Tier 5 change in
-[UPDATING-WITHOUT-BREAKING-BOTS](../../docs/ops/UPDATING-WITHOUT-BREAKING-BOTS.md):
-stop the owning container first, and never touch a live bot's database with
-open positions without draining):
-
-```bash
-sudo -i
-cd /home/ubuntu/backups/master-trader/<stamp>
-gunzip -c killers_receiver_state/receiver-hyperliquid.sqlite.gz > /tmp/restore.sqlite
-sha256sum /tmp/restore.sqlite      # compare with MANIFEST.json
-sqlite3 /tmp/restore.sqlite 'PRAGMA integrity_check'
-# with the container stopped: remove the target's -wal/-shm, copy the file in,
-# chown 1000:1000 (the volume's owner), start the container.
-```
-
-These copies sit on the same disk as the data. They cover corruption, a bad
-migration or an accidental delete, but not losing the host or its volume. An
-off-host copy (a pull over the tailnet, or object storage) is still to be
-decided.
+Off-host setup, operator-owned Google OAuth, cron replacement, verification and
+the non-destructive restore drill are in
+[live-db-backups-google-drive.md](../../docs/ops/live-db-backups-google-drive.md).
+Releasing the rclone version and authorizing Drive require separate operator
+approval; merging this code does not change the running VPS.
