@@ -184,6 +184,17 @@ def test_circuit_breaker_alert_sends_the_token_header(exporter, monkeypatch, tok
     assert captured[0]["headers"] == expected
 
 
+@pytest.mark.parametrize("token, expected", [(TOKEN, {"X-Notify-Token": TOKEN}), ("", {})])
+def test_ops_alerts_send_the_token_header(exporter, monkeypatch, token, expected):
+    """Breaker halt pages (#205) and the other ops alerts share the route."""
+    captured = []
+    monkeypatch.setattr(exporter.requests, "post", lambda url, **kw: captured.append(kw) or
+                        types.SimpleNamespace(status_code=200, json=lambda: {"telegram_sent": True}))
+    monkeypatch.setenv("TRADE_WEBHOOK_NOTIFY_TOKEN", token)
+    assert exporter.send_ops_alert("fleet-breaker-halt", "message")
+    assert captured[0]["headers"] == expected
+
+
 def _token_block():
     text = HEALTH_WRAPPER.read_text()
     start = text.index('OPS_ENV_FILE="/etc/lake/ops-bot.env"')

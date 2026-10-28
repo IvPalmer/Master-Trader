@@ -133,9 +133,13 @@ _portfolio_peak = 0.0
 _peak_basis = 0.0
 _circuit_breaker_triggered = False
 _last_trigger_time = 0.0
-# Services whose /stopentry failed during the current breach. Only these are
-# retried each cycle; the alert stays on the hourly cooldown.
+# Services whose /stopentry failed while the breaker is triggered. Written only
+# by enforce_halts() and cleared when the latch resets. A pending service is
+# re-halted even when its mode cannot be read; the alert keeps its hourly cooldown.
 _pending_halts: set[str] = set()
+# Open per-bot enforcement episodes (#205): service -> page still to deliver,
+# or None once delivered. In memory; one page per episode.
+_halt_pages: dict[str, str | None] = {}
 _equity_basis = "legacy"
 _account_transfer_total = 0.0
 _account_scope: dict[str, dict] | None = None
@@ -641,6 +645,12 @@ def stop_bot(bot: dict) -> bool:
         return False
 
 
+def _notify_headers() -> dict[str, str]:
+    """trade-webhook's shared secret (#97); unset sends no header."""
+    token = os.environ.get("TRADE_WEBHOOK_NOTIFY_TOKEN", "").strip()
+    return {"X-Notify-Token": token} if token else {}
+
+
 def send_circuit_breaker_alert(portfolio_value: float, drawdown_pct: float) -> None:
     """Send emergency alert via webhook to Telegram."""
     message = (
@@ -652,10 +662,7 @@ def send_circuit_breaker_alert(portfolio_value: float, drawdown_pct: float) -> N
     )
     try:
         payload = {"type": "status", "bot_name": "fleet-circuit-breaker", "status": message}
-        # trade-webhook's shared secret (#97); unset sends no header.
-        token = os.environ.get("TRADE_WEBHOOK_NOTIFY_TOKEN", "").strip()
-        headers = {"X-Notify-Token": token} if token else {}
-        resp = requests.post(WEBHOOK_URL, json=payload, headers=headers, timeout=10)
+        resp = requests.post(WEBHOOK_URL, json=payload, headers=_notify_headers(), timeout=10)
         if resp.status_code in (200, 201, 204):
             log.info("Circuit breaker alert sent to Telegram")
         else:
@@ -683,7 +690,7 @@ def send_ops_alert(bot_name: str, message: str, kind: str = "warning") -> bool:
     try:
         resp = requests.post(WEBHOOK_URL, json={"type": kind, "bot_name": bot_name,
                                                 "status": message[:OPS_ALERT_MAX_CHARS]},
-                             timeout=10)
+                             headers=_notify_headers(), timeout=10)
     except requests.RequestException as exc:
         log.error("Failed to send %s alert: %s", bot_name, exc)
         return False
@@ -799,10 +806,11 @@ def _rebase_account_scope(accounts: dict[str, dict]) -> None:
 
 
 def check_circuit_breaker(live_pnl: float, accounts: dict[str, dict] | None = None) -> None:
-    """Check if LIVE portfolio drawdown exceeds threshold and stop LIVE bots if so.
+    """Check if LIVE portfolio drawdown exceeds threshold and latch the breaker if so.
 
     Inputs are scoped to live (non-dry-run) bots only. The dry-run sleeve has
-    no real money and must not influence the breaker.
+    no real money and must not influence the breaker. This only sets, alerts
+    and resets the latch; enforce_halts() pauses the bots.
     """
     global _portfolio_peak, _peak_basis, _circuit_breaker_triggered, _last_trigger_time, _equity_basis, _pending_halts, _account_scope
 
@@ -877,24 +885,90 @@ def check_circuit_breaker(live_pnl: float, accounts: dict[str, dict] | None = No
                 drawdown_pct, CIRCUIT_BREAKER_PCT, portfolio_value,
                 _portfolio_peak, _live_initial_capital,
             )
-            _pending_halts = {bot["service"] for bot in _live_bots if not stop_bot(bot)}
+            # First breach, then an hourly reminder while still breached. The
+            # halt itself is enforce_halts(), which main() runs right after
+            # this call in the same cycle.
             send_circuit_breaker_alert(portfolio_value, drawdown_pct)
             _circuit_breaker_triggered = True
             _last_trigger_time = now
             _save_peak_state()
-        elif _pending_halts:
-            # Retry only the halts that failed. Re-stopping every bot and
-            # re-sending the alert each 60s cycle would page indefinitely
-            # whenever one bot was unreachable.
-            retry = [bot for bot in _live_bots if bot["service"] in _pending_halts]
-            _pending_halts = {bot["service"] for bot in retry if not stop_bot(bot)}
-            if _pending_halts:
-                log.warning("Entry halt still failing for %s", ", ".join(sorted(_pending_halts)))
-            _save_peak_state()
     elif _circuit_breaker_triggered and drawdown_pct < CIRCUIT_BREAKER_PCT * 0.5:
         _circuit_breaker_triggered = False
         _pending_halts = set()
+        _halt_pages.clear()
         log.info("Circuit breaker reset: drawdown recovered to %.1f%%", drawdown_pct)
+        _save_peak_state()
+
+
+HALT_PAGE_BOT = "fleet-breaker-halt"
+
+
+def enforce_halts() -> None:
+    """While the breaker is triggered, keep every live bot's entries halted (#205).
+
+    The only caller of stop_bot(). Freqtrade's pause is runtime state: a live
+    bot restarted after a successful halt comes back `running`, so each cycle
+    re-reads every bot's current mode instead of trusting an earlier POST. Runs
+    whether or not the breaker evaluated this cycle. At most one POST per
+    service per cycle:
+
+      dry_run true                        -> never touched
+      dry_run false, paused or stopped    -> no POST; drops from pending
+      dry_run false, any other state      -> POST /stopentry
+      mode unreadable, live or pending    -> POST (a failed GET is not a failed halt)
+      mode unreadable, otherwise          -> skipped
+    """
+    global _pending_halts
+    if not _circuit_breaker_triggered:
+        return
+    pending = set(_pending_halts)
+    known_live = {bot["service"] for bot in _live_bots}
+    # Current registry first; a pending or cached live service that left it
+    # can still be holding entries open.
+    targets = {bot["service"]: bot for bot in BOTS}
+    for bot in _live_bots:
+        targets.setdefault(bot["service"], bot)
+    for service in _pending_halts:
+        targets.setdefault(service, {"service": service, "strategy": service})
+
+    for service, bot in targets.items():
+        cfg = fetch_json(service, "show_config")
+        cfg = cfg if isinstance(cfg, dict) else {}
+        dry_run, state = cfg.get("dry_run"), cfg.get("state")
+        if dry_run is True:
+            pending.discard(service)
+            _halt_pages.pop(service, None)
+            continue
+        halted = dry_run is False and state in ("paused", "stopped")
+        if halted:
+            pending.discard(service)
+        elif dry_run is False or service in known_live or service in pending:
+            if dry_run is False:
+                log.warning("%s is %s while the circuit breaker is armed; halting entries",
+                            bot["strategy"], state)
+            if stop_bot(bot):
+                pending.discard(service)
+            else:
+                pending.add(service)
+            # Found not paused, or the halt failed: open an episode. Until its
+            # page is delivered, the page says what is true this cycle.
+            if (dry_run is False or service in pending) and _halt_pages.get(service, "") is not None:
+                _halt_pages[service] = (
+                    f"Circuit breaker armed: entry halt FAILED for {bot['strategy']}; "
+                    "retrying every cycle. Verify the bot is paused."
+                    if service in pending else
+                    f"Circuit breaker armed: {bot['strategy']} was {state or 'not paused'}; "
+                    "entry halt sent. Exits remain managed.")
+        if _halt_pages.get(service) and send_ops_alert(HALT_PAGE_BOT, _halt_pages[service]):
+            _halt_pages[service] = None
+        # The episode ends once the bot is seen halted and its page went out.
+        if halted and service in _halt_pages and _halt_pages[service] is None:
+            del _halt_pages[service]
+
+    if pending:
+        log.warning("Entry halt still failing for %s", ", ".join(sorted(pending)))
+    if pending != _pending_halts:
+        _pending_halts = pending
         _save_peak_state()
 
 
@@ -927,6 +1001,9 @@ def main() -> None:
         evaluated = observation["breaker_complete"] and (live_pnl is not None or _equity_basis == "accounts-v1")
         if evaluated:
             check_circuit_breaker(live_pnl or 0.0, observation["breaker_accounts"])
+        # Every cycle, evaluated or not: a live bot restarted while the latch
+        # is set comes back running and is paused again here (#205).
+        enforce_halts()
         watch_breaker(observation, evaluated, time.time())
         save_account_health(observation)
         if total_pnl is None:
