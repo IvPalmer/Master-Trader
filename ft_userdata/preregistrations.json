@@ -769,6 +769,55 @@
       "triggers": [],
       "amendments": [],
       "resolution": null
+    },
+    {
+      "id": "killers-entry-policy-replay-2026-10-13",
+      "bot": "KillersScalpV1 (research only; no config change)",
+      "status": "open",
+      "registered": "2026-10-13",
+      "review_by": "2026-11-13",
+      "issue": "GROA-309",
+      "min_closed_trades": 30,
+      "context": "Operator-approved replay of the full Killers channel history (~230 fillable signals of the 278 usable) to compare ENTRY policies. Lead measurement: signal-to-fill latency avg 23s, cost ~0.02%, price already ~1.4% above zone top at message time. Live policy (PR #162) is marketable entry up to 5% past the zone, skip beyond; the June 24h limit-in-zone design missed fills (1 of 13).",
+      "frozen_spec": {
+        "policies": "chase<=5% (live), chase<=2%, chase<=1%; limit at zone top (long: entry_hi, short: entry_lo) waiting W in {1h,4h,12h,24h} then cancel; wait W then chase<=2% at the first 1m open after the deadline. 11 variants = the multiple-testing trial count.",
+        "entry_fill": "chase: open of first 1m candle at/after signal time + 23s; skip if deviation past the zone edge > cap, if price already at/through the posted stop or all targets. limit: filled when 1m low<=bound (long) / high>=bound (short), at min(open,bound); skipped if the stop level trades before the fill. Slippage 0% and 0.5% applied adversely to marketable entries and to stop exits; resting limits/ladder legs get none.",
+        "held_fixed": "posted stop, first 8 posted targets as equal slices with the live $10-leg collapse (tp_plan.executable_targets logic), risk $12, margin $5-40, integer leverage<=3, stop-limit ratio 0.98, entry min notional $11.3, one position per signal (no max-open cap), horizon 14d, residual closed at channel close_full else last candle, same-candle stop before target, HL base fees 4.5 bps taker / 1.5 bps maker.",
+        "metrics": "fill rate; missed-signal outcome (counterfactual uncapped market entry at signal time on the skipped signals: mean R, win rate); expectancy in R (1R = loss at posted stop trigger) and $; PF; max drawdown $ (chronological); all at slippage 0% and 0.5%; split earliest 70% / latest 30% of signals by time.",
+        "multiple_testing": "Deflated Sharpe Ratio (Bailey & Lopez de Prado) on per-trade R with N=11 trials and cross-policy SR variance; a policy is only called better than the live chase<=5% if DSR>=0.95 AND the sign/direction holds in both the 70% and 30% splits at 0.5% slippage."
+      },
+      "implementation": "research/copier-validation/killers/entry_policy_replay.py; tests/test_killers_entry_policy_replay.py",
+      "rules": [
+        "Research only: no deploy, config, sizing or live-policy change follows automatically from any result.",
+        "All 11 variants are reported, including failures. No cap, window, slippage or exit is tuned after seeing results; a change is a new entry or an amendment.",
+        "Candle source is 1m Binance USDT-M (HL 1m where available); the source used must be stated in the result.",
+        "The 278-signal corpus and prior replays (#162/#182) are already seen; they give no credit to any variant."
+      ],
+      "triggers": [],
+      "amendments": [
+        {
+          "id": "A1-exit-arm",
+          "date": "2026-10-15",
+          "by": "operator via master-trader-lead (GROA-309 comment)",
+          "frozen_before_results": true,
+          "note": "Added before any data run (no result existed). Exit arm: signal used only as entry trigger; posted stop and ladder replaced by own levels.",
+          "prior": "The 2026-05-28 study found no edge and exits only changed the size of the loss. Expect ~0 expectancy after fees; any positive arm is a hypothesis needing forward confirmation, not a finding.",
+          "motivation": "Across 33 open signals the posted levels look like a template: stop median 9.7% from zone mid (p10 9.1, p90 11.6), TP1 median 5.1% (~0.53x stop distance), last TP ~67%.",
+          "variants": {
+            "entry": "live chase<=5% for every exit variant, so all arms share identical fills and skips (posted-level eligibility filters kept).",
+            "live_posted": "reference: posted stop + posted 8-rung ladder (not a new trial).",
+            "x1_atr1.5": "stop = fill -/+ 1.5 x ATR(14) on completed UTC-aligned 4h bars built from the 8 days of 1m before signal time (Wilder); needs >=15 bars else skip no_pre; targets 1R/2R/3R.",
+            "x1_atr2.5": "same with k=2.5.",
+            "x2_struct": "stop = most recent confirmed 4h fractal low (long) / high (short), 2 bars each side, within the 8d lookback and beyond the fill, pushed out 0.1%; none -> skip no_structure; targets 1R/2R/3R.",
+            "x3_posted_R": "posted stop; targets at 1R/2R/3R where 1R = fill-to-posted-stop distance."
+          },
+          "held_fixed": "R-targets: equal thirds at 1R/2R/3R through the live $10-leg collapse; stop never moved; fixed-$ risk sizing ($12 at stop-limit trigger, margin $5-40, lev<=3; risk falls below $12 only where the leverage/margin cap binds, and R is always computed on realised notional); fees, slippage 0/0.5%, horizon, 70/30 split, same-candle stop-first as the entry arm.",
+          "extra_metric": "TP1-vs-stop hit rate = share of fills where the first target (1R or posted TP1) traded before the stop, among fills where either did; plus median stop distance.",
+          "multiple_testing": "4 new trials; DSR trial count N=15 (11 entry + 4 exit) for the exit arm, cross-variant SR variance over the 5 exit rows incl. reference. A variant is only called better than live_posted if DSR>=0.95 AND same-sign expectancy in both splits at 0.5% slippage; even then it needs forward confirmation before any use.",
+          "implementation": "run_exit_signal / evaluate_exits in entry_policy_replay.py; pre-history cache files <SYMBOL>_<open_ms>_pre.json (--fetch downloads them)."
+        }
+      ],
+      "resolution": null
     }
   ]
 }
