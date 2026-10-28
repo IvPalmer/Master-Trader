@@ -2,7 +2,9 @@
 
 import importlib.util
 import json
+import subprocess
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -435,7 +437,38 @@ def _registry_bot(exporter, strategy):
     return next(dict(bot) for bot in exporter.BOTS if bot["strategy"] == strategy)
 
 
-def _venues(exporter, monkeypatch, killers_ok=True):
+class _Fleet:
+    """Fake Freqtrade mode endpoints for enforce_halts().
+
+    `modes` maps service -> (dry_run, state), or None while /show_config is
+    unreadable. A successful stop moves the bot to `paused`, as /stopentry
+    does; `failing` scripts per-service stop results (True = the POST fails).
+    """
+
+    def __init__(self, exporter, monkeypatch, bots, failing=None, serve_fetch=True):
+        exporter.BOTS = [dict(bot) for bot in bots]
+        self.modes = {bot["service"]: (False, "running") for bot in bots}
+        self.failing = failing or {}
+        self.stops = []
+        monkeypatch.setattr(exporter, "stop_bot", self.stop)
+        if serve_fetch:
+            monkeypatch.setattr(exporter, "fetch_json", lambda service, endpoint: (
+                self.show_config(service) if endpoint == "show_config" else None))
+
+    def show_config(self, service):
+        mode = self.modes.get(service)
+        return None if mode is None else {"dry_run": mode[0], "state": mode[1]}
+
+    def stop(self, bot):
+        self.stops.append(bot["strategy"])
+        script = self.failing.get(bot["service"])
+        ok = not (script and script.pop(0))
+        if ok and self.modes.get(bot["service"]):
+            self.modes[bot["service"]] = (self.modes[bot["service"]][0], "paused")
+        return ok
+
+
+def _venues(exporter, monkeypatch, killers_ok=True, fleet=None):
     """Binance wallet 300 + Hyperliquid Killers account 100, HTTP mocked."""
     requested = []
 
@@ -461,6 +494,8 @@ def _venues(exporter, monkeypatch, killers_ok=True):
         raise AssertionError(f"unexpected valuation request {url}")
 
     def fetch(service, endpoint):
+        if fleet is not None and endpoint == "show_config":
+            return fleet.show_config(service)
         assert (service, endpoint) == ("fundingfadev1", "balance")
         return {"total": 300.0, "stake": "USDC", "currencies": [{"currency": "USDC", "free": 250.0}]}
 
@@ -586,9 +621,9 @@ def test_breach_on_valued_accounts_halts_entries_with_an_unvalued_bot_live(expor
     exporter._membership_complete = True
     exporter._live_bots = [FUNDING, KELTNER, KILLERS, insiders]
     exporter._live_initial_capital = 400.0
-    _venues(exporter, monkeypatch)
-    stopped, alerts = [], []
-    monkeypatch.setattr(exporter, "stop_bot", lambda bot: stopped.append(bot["strategy"]) or True)
+    fleet = _Fleet(exporter, monkeypatch, exporter._live_bots, serve_fetch=False)
+    _venues(exporter, monkeypatch, fleet=fleet)
+    stopped, alerts = fleet.stops, []
     monkeypatch.setattr(exporter, "send_circuit_breaker_alert", lambda *a: alerts.append(a))
     webhook = _Webhook()
     monkeypatch.setattr(exporter.requests, "post", webhook)
@@ -599,6 +634,7 @@ def test_breach_on_valued_accounts_halts_entries_with_an_unvalued_bot_live(expor
     assert alerts and alerts[0][0] == 400.0 and alerts[0][1] == pytest.approx(20.0)
     assert stopped == ["FundingFadeV1", "KeltnerBounceV1", "KillersScalpV1", "InsidersScalpV1"], \
         "the halt still covers every live bot, including the unvalued one"
+    assert set(fleet.modes.values()) == {(False, "paused")}
     assert ("warning", "fleet-breaker-coverage") in [(m[0], m[1]) for m in webhook.messages()]
     health = json.loads((tmp_path / "account_health.json").read_text())
     assert health["drawdown_pct"] == pytest.approx(20.0)
@@ -675,49 +711,56 @@ def _breached_fleet(exporter, monkeypatch, failing):
     exporter._live_initial_capital = 400.0
     exporter._equity_basis = "accounts-v1"
     exporter._portfolio_peak = 500.0
-    stops, alerts = [], []
-
-    def stop(bot):
-        stops.append(bot["strategy"])
-        return not failing.get(bot["service"]) or not failing[bot["service"]].pop(0)
-
-    monkeypatch.setattr(exporter, "stop_bot", stop)
+    fleet = _Fleet(exporter, monkeypatch, exporter._live_bots, failing=failing)
+    alerts = []
     monkeypatch.setattr(exporter, "send_circuit_breaker_alert", lambda *a: alerts.append(a))
-    return clock, stops, alerts
+    monkeypatch.setattr(exporter.requests, "post", _Webhook())
+    return clock, fleet, alerts
+
+
+def _cycle(exporter, accounts):
+    """One exporter cycle's breaker work: check (when evaluated), then enforce."""
+    exporter.check_circuit_breaker(0.0, accounts)
+    exporter.enforce_halts()
 
 
 def test_failed_halt_is_retried_alone_without_repeating_the_alert(exporter, monkeypatch):
     """Codex review of #141: one failed halt re-stopped every bot and re-sent
     the global alert on every 60-second scrape."""
-    clock, stops, alerts = _breached_fleet(
+    clock, fleet, alerts = _breached_fleet(
         exporter, monkeypatch, failing={"ft-insiders-scalp": [True, True, False]})
-    exporter.check_circuit_breaker(0.0, _binance(400.0))
+    stops = fleet.stops
+    _cycle(exporter, _binance(400.0))
     assert stops == ["FundingFadeV1", "InsidersScalpV1"] and len(alerts) == 1
+    assert exporter._pending_halts == {"ft-insiders-scalp"}
 
     for _ in range(3):  # Insiders fails once more, then succeeds
         clock.now += 60
-        exporter.check_circuit_breaker(0.0, _binance(400.0))
-    assert stops[2:] == ["InsidersScalpV1", "InsidersScalpV1"], "only the failed halt is retried"
+        _cycle(exporter, _binance(400.0))
+    assert stops[2:] == ["InsidersScalpV1", "InsidersScalpV1"], "only the unresolved halt is retried"
     assert len(alerts) == 1, "a retry is not a new breach"
+    assert exporter._pending_halts == set()
 
     clock.now += 60
-    exporter.check_circuit_breaker(0.0, _binance(400.0))
+    _cycle(exporter, _binance(400.0))
     assert len(stops) == 4 and len(alerts) == 1, "nothing left to retry"
 
     clock.now += exporter.CIRCUIT_BREAKER_COOLDOWN
-    exporter.check_circuit_breaker(0.0, _binance(400.0))
-    assert len(alerts) == 2, "the hourly re-halt and reminder while still breached is unchanged"
-    assert stops[4:] == ["FundingFadeV1", "InsidersScalpV1"]
+    _cycle(exporter, _binance(400.0))
+    assert len(alerts) == 2, "the hourly reminder while still breached is unchanged"
+    assert len(stops) == 4, "paused bots are not re-stopped blindly every hour"
 
 
 def test_pending_halts_clear_when_the_breach_recovers(exporter, monkeypatch):
-    clock, stops, alerts = _breached_fleet(exporter, monkeypatch, failing={"ft-insiders-scalp": [True]})
-    exporter.check_circuit_breaker(0.0, _binance(400.0))
+    clock, fleet, alerts = _breached_fleet(exporter, monkeypatch, failing={"ft-insiders-scalp": [True]})
+    _cycle(exporter, _binance(400.0))
     assert exporter._pending_halts == {"ft-insiders-scalp"}
     clock.now += 60
-    exporter.check_circuit_breaker(0.0, _binance(495.0))  # 1% drawdown: the breaker resets
+    _cycle(exporter, _binance(495.0))  # 1% drawdown: the breaker resets
     assert exporter._circuit_breaker_triggered is False
     assert exporter._pending_halts == set(), "no halt is retried once the breach has cleared"
+    assert exporter._halt_pages == {}
+    assert fleet.stops == ["FundingFadeV1", "InsidersScalpV1"]
 
 
 def test_pending_halts_survive_an_exporter_restart(exporter, monkeypatch, tmp_path):
@@ -730,6 +773,316 @@ def test_pending_halts_survive_an_exporter_restart(exporter, monkeypatch, tmp_pa
     assert exporter._pending_halts == {"ft-insiders-scalp"}
 
 
+# ── #205: a live bot restarted while the breaker is armed ─────────────────
+DRY = {"service": "dry-observer", "strategy": "DryObserverV1"}
+TOKEN = "synthetic-notify-token-0123456789abcdef"
+
+
+class _Venue:
+    """Fake HTTP for whole-loop tests: each bot's /show_config, /balance and
+    /stopentry, the Hyperliquid gateway, and trade-webhook. stop_bot, the
+    alerts and refresh_live_capital stay real. Binance 300 + Killers 100."""
+
+    def __init__(self, exporter, monkeypatch, bots):
+        exporter.BOTS = [dict(bot) for bot in bots]
+        self.modes = {bot["service"]: (False, "running") for bot in bots}
+        self.balance_down = set()
+        self.cycle = 0
+        self.stopentry = []  # (cycle, service)
+        self.webhook = _Webhook()
+        self.exporter = exporter
+        monkeypatch.setattr(exporter, "fetch_json", self.fetch)
+        monkeypatch.setattr(exporter.requests, "get", self.get)
+        monkeypatch.setattr(exporter.requests, "post", self.post)
+
+    def fetch(self, service, endpoint):
+        if endpoint == "show_config":
+            mode = self.modes.get(service)
+            return None if mode is None else {"dry_run": mode[0], "state": mode[1]}
+        if endpoint == "balance" and service not in self.balance_down:
+            return {"starting_capital": 100.0, "total": 300.0, "stake": "USDC",
+                    "currencies": [{"currency": "USDC", "free": 250.0}]}
+        return None  # /profit and /status: P&L is not needed on the account basis
+
+    def get(self, url, **kwargs):
+        now = self.exporter.time.time()
+        body = ({"status": "ok", "faults": 0, "observed_at": now} if url.endswith("/healthz") else
+                {"equity": 100.0, "free": 80.0, "margin": 20.0, "notional": 40.0, "observed_at": now})
+        return types.SimpleNamespace(raise_for_status=lambda: None, json=lambda: body)
+
+    def post(self, url, **kwargs):
+        if not url.endswith("/stopentry"):
+            return self.webhook(url, **kwargs)
+        service = url.split("//")[1].split(":")[0]
+        self.stopentry.append((self.cycle, service))
+        dry_run, _ = self.modes[service]
+        self.modes[service] = (dry_run, "paused")
+        return types.SimpleNamespace(status_code=200)
+
+    def pages(self):
+        return [m for m in self.webhook.messages() if m[1] == "fleet-breaker-halt"]
+
+
+def _loop(exporter, monkeypatch, tmp_path, venue, peak_state, between=()):
+    """Real main() for len(between) + 1 cycles; between[i] runs in the i-th sleep."""
+    class Clock:
+        now = 1_800_000_000.0
+
+        def time(self):
+            return self.now
+
+        def sleep(self, seconds):
+            self.now += seconds
+            if venue.cycle >= len(between):
+                raise KeyboardInterrupt
+            between[venue.cycle]()
+            venue.cycle += 1
+
+    monkeypatch.setattr(exporter, "time", Clock())
+    (tmp_path / "portfolio_peak.json").write_text(json.dumps(peak_state))
+    monkeypatch.setattr(exporter, "PEAK_STATE_FILE", tmp_path / "portfolio_peak.json")
+    monkeypatch.setattr(exporter, "ACCOUNT_STATE_FILE", tmp_path / "account_health.json")
+    with pytest.raises(KeyboardInterrupt):
+        exporter.main()
+    return json.loads((tmp_path / "portfolio_peak.json").read_text())
+
+
+BREACHED = {"peak": 500.0, "equity_basis": "accounts-v1", "account_transfer_total": LEDGER_TOTAL}
+
+
+def test_live_bot_restarted_while_armed_is_paused_again_next_cycle(exporter, monkeypatch, tmp_path):
+    """#205: a bot restarted after a SUCCESSFUL halt came back running for up to an hour."""
+    monkeypatch.setenv("TRADE_WEBHOOK_NOTIFY_TOKEN", TOKEN)
+    venue = _Venue(exporter, monkeypatch, [FUNDING, KILLERS, DRY])
+    venue.modes[DRY["service"]] = (True, "running")
+
+    def restart_killers():
+        venue.modes[KILLERS["service"]] = (False, "running")  # initial_state: running
+
+    state = _loop(exporter, monkeypatch, tmp_path, venue, BREACHED,
+                  between=[lambda: None, restart_killers, lambda: None, lambda: None])
+
+    assert venue.stopentry == [(0, "fundingfadev1"), (0, "ft-killers-scalp"),
+                               (2, "ft-killers-scalp")], \
+        "halted in the breach cycle, re-halted the cycle after the restart, nothing else"
+    assert venue.modes[KILLERS["service"]] == (False, "paused")
+    assert venue.modes[DRY["service"]] == (True, "running"), "a dry-run bot is never touched"
+    assert [m[1] for m in venue.webhook.messages()].count("fleet-circuit-breaker") == 1
+    pages = venue.pages()
+    assert len(pages) == 3, "one page per bot at the breach, one for the restart, none after"
+    assert "KillersScalpV1 was running; entry halt sent" in pages[-1][2]
+    assert all(len("WARN " + m[2]) <= 200 for m in pages)
+    assert all(k["headers"] == {"X-Notify-Token": TOKEN} for _, k in venue.webhook.posts)
+    assert state["triggered"] is True and state["pending_halts"] == []
+
+
+def test_armed_breaker_repauses_on_the_first_cycle_after_an_exporter_restart(
+        exporter, monkeypatch, tmp_path):
+    """Host reboot: membership is not observed yet (/balance down), the breaker
+    cannot evaluate, and the bots came back running. Enforcement does not wait."""
+    venue = _Venue(exporter, monkeypatch, [FUNDING, KILLERS])
+    venue.balance_down = {"fundingfadev1", "ft-killers-scalp"}
+    _loop(exporter, monkeypatch, tmp_path, venue,
+          {**BREACHED, "triggered": True, "last_trigger_time": 1_800_000_000.0 - 60,
+           "pending_halts": []})
+    assert exporter._live_bots == [] and exporter._membership_complete is False
+    assert venue.stopentry == [(0, "fundingfadev1"), (0, "ft-killers-scalp")]
+
+
+def test_halt_targets_follow_current_mode_not_cached_membership(exporter, monkeypatch):
+    exporter._circuit_breaker_triggered = True
+    oitrend = _registry_bot(exporter, "OITrendPullbackV1")
+    exporter._live_bots = [FUNDING, KELTNER, KILLERS]
+    exporter._pending_halts = {"ft-killers-scalp"}
+    monkeypatch.setattr(exporter, "_save_peak_state", lambda: None)
+    webhook = _Webhook()
+    monkeypatch.setattr(exporter.requests, "post", webhook)
+    other = {"service": "unknown-bot", "strategy": "UnknownV1"}
+    fleet = _Fleet(exporter, monkeypatch, [FUNDING, KELTNER, KILLERS, oitrend, other])
+    fleet.modes.update({
+        "fundingfadev1": (True, "running"),        # cached live, now dry-run
+        "keltnerbouncev1": None,                   # unreadable, known live
+        "ft-killers-scalp": (False, "stopped"),    # pending, now observed halted
+        oitrend["service"]: (False, None),         # live, state missing
+        "unknown-bot": None,                       # unreadable, never seen live
+    })
+    exporter.enforce_halts()
+    assert fleet.stops == ["KeltnerBounceV1", "OITrendPullbackV1"]
+    assert exporter._pending_halts == set()
+    assert [m[2] for m in webhook.messages()] == [
+        "Circuit breaker armed: OITrendPullbackV1 was not paused; "
+        "entry halt sent. Exits remain managed."], "an unreadable bot is not paged as found live"
+
+
+def test_promoted_bot_failing_halt_stays_pending_through_cooldown_and_unreadable_config(
+        exporter, monkeypatch):
+    clock, fleet, alerts = _breached_fleet(
+        exporter, monkeypatch, failing={"ft-insiders-scalp": [True, True, True]})
+    exporter._live_bots = [FUNDING]  # Insiders promoted; membership not refreshed yet
+    webhook = _Webhook()
+    monkeypatch.setattr(exporter.requests, "post", webhook)
+    _cycle(exporter, _binance(400.0))
+    assert fleet.stops == ["FundingFadeV1", "InsidersScalpV1"]
+    assert exporter._pending_halts == {"ft-insiders-scalp"}
+
+    fleet.modes["ft-insiders-scalp"] = None  # its API stops answering
+    for _ in range(2):  # each past the cooldown: the hourly reminder fires
+        clock.now += exporter.CIRCUIT_BREAKER_COOLDOWN + 60
+        _cycle(exporter, _binance(400.0))
+    assert fleet.stops[2:] == ["InsidersScalpV1", "InsidersScalpV1"], "one attempt per cycle"
+    assert exporter._pending_halts == {"ft-insiders-scalp"}
+    assert len(alerts) == 3, "first breach plus the hourly reminders"
+    halt_pages = [m[2] for m in webhook.messages() if m[1] == "fleet-breaker-halt"]
+    assert len(halt_pages) == 2, "one page per bot episode, not one per failed cycle"
+    assert any("entry halt FAILED for InsidersScalpV1" in m for m in halt_pages)
+
+
+def test_enforcement_runs_in_the_hysteresis_band_and_without_an_evaluation(exporter, monkeypatch):
+    clock, fleet, alerts = _breached_fleet(exporter, monkeypatch, failing={})
+    _cycle(exporter, _binance(400.0))
+    assert len(fleet.stops) == 2
+
+    fleet.modes["fundingfadev1"] = (False, "running")
+    clock.now += 60
+    _cycle(exporter, _binance(465.0))  # 7% drawdown: below the trip, above the reset
+    assert exporter._circuit_breaker_triggered is True
+    assert fleet.stops[2:] == ["FundingFadeV1"]
+
+    fleet.modes["fundingfadev1"] = (False, "running")
+    exporter.enforce_halts()  # main() runs it even when the breaker could not evaluate
+    assert fleet.stops[3:] == ["FundingFadeV1"]
+
+    exporter._circuit_breaker_triggered = False
+    fleet.modes["fundingfadev1"] = (False, "running")
+    exporter.enforce_halts()
+    assert len(fleet.stops) == 4, "nothing is halted while the breaker is not triggered"
+
+
+def test_halt_page_is_one_per_episode_retried_until_delivered(exporter, monkeypatch):
+    monkeypatch.setenv("TRADE_WEBHOOK_NOTIFY_TOKEN", TOKEN)
+    exporter._circuit_breaker_triggered = True
+    monkeypatch.setattr(exporter, "_save_peak_state", lambda: None)
+    fleet = _Fleet(exporter, monkeypatch, [FUNDING])
+    webhook = _Webhook(replies=[(500, None), (200, False)])
+    monkeypatch.setattr(exporter.requests, "post", webhook)
+
+    exporter.enforce_halts()  # found running, halted; HTTP 500 on the page
+    exporter.enforce_halts()  # observed paused; Telegram send failed: retry again
+    assert exporter._halt_pages == {"fundingfadev1": (
+        "Circuit breaker armed: FundingFadeV1 was running; entry halt sent. Exits remain managed.")}
+    exporter.enforce_halts()  # delivered, episode closes
+    exporter.enforce_halts()
+    assert len(webhook.posts) == 3 and exporter._halt_pages == {}
+    assert fleet.stops == ["FundingFadeV1"]
+
+    fleet.modes["fundingfadev1"] = (False, "running")  # restarted: a new episode
+    exporter.enforce_halts()
+    exporter.enforce_halts()
+    assert len(webhook.posts) == 4
+    assert {m[:2] for m in webhook.messages()} == {("warning", "fleet-breaker-halt")}
+    assert all(k["headers"] == {"X-Notify-Token": TOKEN} for _, k in webhook.posts)
+
+
+RUNBOOK = ROOT / "docs" / "ops" / "UPDATING-WITHOUT-BREAKING-BOTS.md"
+
+
+_FAKE_DOCKER = r"""#!/usr/bin/env bash
+echo "$*" >> "$DOCKER_LOG"
+case "$1:$2" in
+  stop:*) [[ " $DOCKER_FAIL " == *" stop "* ]] && exit 1 ;;
+  cp:*rebaselined*) [[ " $DOCKER_FAIL " == *" install "* ]] && exit 1 ;;
+  cp:*.bak.json) [[ " $DOCKER_FAIL " == *" restore "* ]] && exit 1 ;;
+esac
+if [ "$1" = cp ]; then cp "${2/ft-metrics-exporter:\/state/$VOLUME}" "${3/ft-metrics-exporter:\/state/$VOLUME}"; fi
+"""
+
+
+def _rebaseline(tmp_path, snapshot, state, ts, fail=""):
+    """Run the runbook's steps 1-3 as written. `docker` stands in for the
+    exporter container (cp maps ft-metrics-exporter:/state to a directory;
+    `fail` names copies that fail) and `date` returns `ts`."""
+    text = RUNBOOK.read_text()
+    block = text[text.index("ts=$(date -u"):text.index("# 4. After one cycle")]
+    volume, work, bin_dir = tmp_path / "state", tmp_path / "work", tmp_path / "bin"
+    for d in (volume, work, bin_dir):
+        d.mkdir(exist_ok=True)
+    (volume / "account_health.json").write_text(json.dumps(snapshot))
+    (volume / "portfolio_peak.json").write_text(json.dumps(state))
+    (bin_dir / "docker").write_text(_FAKE_DOCKER)
+    (bin_dir / "date").write_text('#!/usr/bin/env bash\necho "$TS"\n')
+    (bin_dir / "python3").write_text(f'#!/usr/bin/env bash\nexec "{sys.executable}" "$@"\n')
+    for tool in bin_dir.iterdir():
+        tool.chmod(0o755)
+    log = tmp_path / "docker.log"
+    log.write_text("")
+    env = {"PATH": f"{bin_dir}:/usr/bin:/bin", "VOLUME": str(volume), "DOCKER_LOG": str(log),
+           "DOCKER_FAIL": fail, "TS": ts}
+    run = subprocess.run(["bash", "-c", block], cwd=work, env=env, check=True,
+                         capture_output=True, text=True)
+    installs = [c for c in log.read_text().splitlines()
+                if c.startswith("cp portfolio_peak.") and c.endswith(":/state/portfolio_peak.json")]
+    return (json.loads((volume / "portfolio_peak.json").read_text()), installs,
+            "start ft-metrics-exporter" in log.read_text(), run.stdout + run.stderr)
+
+
+ARMED = {"peak": 500.0, "peak_basis": 400.0, "triggered": True, "last_trigger_time": 1.0,
+         "equity_basis": "accounts-v1", "account_transfer_total": LEDGER_TOTAL,
+         "pending_halts": ["ft-killers-scalp"],
+         "accounts": {"binance-spot": {"equity": 360.0, "transfers": BINANCE_T}}}
+
+
+def _snapshot(**changes):
+    return {"observed_at": time.time(), "breaker_complete": True, "breaker_equity": 400.0,
+            "breaker_accounts": _both(300.0, 100.0), **changes}
+
+
+@pytest.mark.parametrize("ts, changes, fail, reason", [
+    ("T2", {"breaker_complete": False, "breaker_accounts": None}, "", "not a complete breaker observation"),
+    ("T3", {"observed_at": time.time() - 3600}, "", "older than 10 min"),
+    ("T1", {}, "", "already exists"),  # same timestamp as the earlier run's output
+    ("T4", {}, "stop", None),  # exporter still running: never edit under a live writer
+])
+def test_runbook_rebaseline_refusals_keep_the_armed_state(tmp_path, ts, changes, fail, reason):
+    _rebaseline(tmp_path, _snapshot(), ARMED, "T1")  # an earlier successful run's output stays
+    state, installs, started, output = _rebaseline(tmp_path, _snapshot(**changes), ARMED, ts, fail)
+    assert state == ARMED and installs == []
+    assert started, "the exporter comes back still triggered, so the bots stay paused"
+    if reason:
+        assert "refused: " in output and reason in output
+    else:
+        assert "refused" not in output and "new peak" not in output, "step 2 never ran"
+
+
+def test_runbook_rebaseline_failed_install_restores_the_backup_or_stays_stopped(tmp_path):
+    state, installs, started, _ = _rebaseline(tmp_path, _snapshot(), ARMED, "T1", "install")
+    assert state == ARMED and len(installs) == 2 and started, "backup put back, then started"
+    state, installs, started, output = _rebaseline(tmp_path, _snapshot(), ARMED, "T2", "install restore")
+    assert not started and "exporter NOT started" in output
+
+
+def test_runbook_rebaseline_clears_the_latch_without_retripping(exporter, monkeypatch, tmp_path):
+    state, installs, started, output = _rebaseline(tmp_path, _snapshot(), ARMED, "T1")
+    assert len(installs) == 1 and started and "breaker state: new" in output
+    assert state["triggered"] is False and state["peak"] == pytest.approx(400.0)
+
+    monkeypatch.setattr(exporter, "PEAK_STATE_FILE", tmp_path / "state" / "portfolio_peak.json")
+    exporter._load_peak_state()
+    assert exporter._circuit_breaker_triggered is False and exporter._pending_halts == set()
+
+    fleet = _Fleet(exporter, monkeypatch, [FUNDING, KILLERS])
+    exporter._live_bots = [FUNDING, KILLERS]
+    monkeypatch.setattr(exporter, "send_circuit_breaker_alert", lambda *a: None)
+    monkeypatch.setattr(exporter.requests, "post", _Webhook())
+    _cycle(exporter, _both(299.0, 100.0))  # one evaluation a minute later
+    assert exporter._circuit_breaker_triggered is False
+    assert exporter._portfolio_peak == pytest.approx(400.0), "the scope rebase shifted nothing"
+    assert fleet.stops == []
+
+    _cycle(exporter, _both(260.0, 100.0))  # a new 10% loss from the new peak still trips
+    assert exporter._circuit_breaker_triggered is True
+    assert fleet.stops == ["FundingFadeV1", "KillersScalpV1"]
+
+
 # ── #142: an account entering or leaving the breaker's scope ──────────────
 def _scoped_breaker(exporter, monkeypatch):
     exporter._live_bots = [FUNDING, KILLERS]
@@ -738,11 +1091,16 @@ def _scoped_breaker(exporter, monkeypatch):
     exporter._portfolio_peak = 0.0
     exporter._circuit_breaker_triggered = False
     exporter._pending_halts = set()
-    stopped = []
     monkeypatch.setattr(exporter, "_save_peak_state", lambda: None)
-    monkeypatch.setattr(exporter, "stop_bot", lambda bot: stopped.append(bot["strategy"]) or True)
+    fleet = _Fleet(exporter, monkeypatch, [FUNDING, KILLERS])
     monkeypatch.setattr(exporter, "send_circuit_breaker_alert", lambda *a: None)
-    return stopped
+    monkeypatch.setattr(exporter.requests, "post", _Webhook())
+    return fleet
+
+
+def _demote_killers(exporter, fleet):
+    exporter._live_bots = [FUNDING]
+    fleet.modes["ft-killers-scalp"] = (True, "running")
 
 
 def _both(binance, killers):
@@ -756,77 +1114,84 @@ def _dollar_drawdown(exporter, value):
 
 def test_demoting_the_only_bot_on_an_account_halts_nothing(exporter, monkeypatch):
     """Issue #142 repro: Killers demoted, Binance keeps its real $15 drawdown."""
-    stopped = _scoped_breaker(exporter, monkeypatch)
-    exporter.check_circuit_breaker(0, _both(221.0, 309.0))
-    exporter.check_circuit_breaker(0, _both(206.0, 309.0))
+    fleet = _scoped_breaker(exporter, monkeypatch)
+    stopped = fleet.stops
+    _cycle(exporter, _both(221.0, 309.0))
+    _cycle(exporter, _both(206.0, 309.0))
     assert _dollar_drawdown(exporter, 515.0) == pytest.approx(15.0)
 
-    exporter._live_bots = [FUNDING]
-    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
+    _demote_killers(exporter, fleet)
+    _cycle(exporter, _binance(206.0, transfers=BINANCE_T))
     assert stopped == []
     assert _dollar_drawdown(exporter, 206.0) == pytest.approx(15.0), "the Binance drawdown is unchanged"
 
 
 def test_promoting_an_account_keeps_an_existing_drawdown(exporter, monkeypatch):
     """Killers enters holding more than its ledger total; Binance's loss must survive."""
-    stopped = _scoped_breaker(exporter, monkeypatch)
-    exporter.check_circuit_breaker(0, _binance(221.0, transfers=BINANCE_T))
-    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
-    exporter.check_circuit_breaker(0, _both(206.0, 300.0))
+    fleet = _scoped_breaker(exporter, monkeypatch)
+    stopped = fleet.stops
+    _cycle(exporter, _binance(221.0, transfers=BINANCE_T))
+    _cycle(exporter, _binance(206.0, transfers=BINANCE_T))
+    _cycle(exporter, _both(206.0, 300.0))
     assert stopped == []
     assert _dollar_drawdown(exporter, 506.0) == pytest.approx(15.0)
 
 
 def test_promoting_an_account_below_its_ledger_total_trips_nothing(exporter, monkeypatch):
     """Killers enters holding less than its ledger total; that loss predates its scope."""
-    stopped = _scoped_breaker(exporter, monkeypatch)
-    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
-    exporter.check_circuit_breaker(0, _both(206.0, 150.0))
+    fleet = _scoped_breaker(exporter, monkeypatch)
+    stopped = fleet.stops
+    _cycle(exporter, _binance(206.0, transfers=BINANCE_T))
+    _cycle(exporter, _both(206.0, 150.0))
     assert stopped == []
     assert _dollar_drawdown(exporter, 356.0) == pytest.approx(0.0)
 
 
 def test_real_loss_after_a_scope_change_still_trips(exporter, monkeypatch):
-    stopped = _scoped_breaker(exporter, monkeypatch)
-    exporter.check_circuit_breaker(0, _both(206.0, 324.0))
-    exporter._live_bots = [FUNDING]
-    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
-    exporter.check_circuit_breaker(0, _binance(180.0, transfers=BINANCE_T))
+    fleet = _scoped_breaker(exporter, monkeypatch)
+    stopped = fleet.stops
+    _cycle(exporter, _both(206.0, 324.0))
+    _demote_killers(exporter, fleet)
+    _cycle(exporter, _binance(206.0, transfers=BINANCE_T))
+    _cycle(exporter, _binance(180.0, transfers=BINANCE_T))
     assert stopped == ["FundingFadeV1"]
 
 
 def test_departure_keeps_the_dollar_drawdown_on_a_smaller_peak(exporter, monkeypatch):
     """Approved trade-off: a $40 loss is 7.5% of $530 but 18% of the $221 left."""
-    stopped = _scoped_breaker(exporter, monkeypatch)
-    exporter.check_circuit_breaker(0, _both(221.0, 309.0))
-    exporter.check_circuit_breaker(0, _both(181.0, 309.0))
+    fleet = _scoped_breaker(exporter, monkeypatch)
+    stopped = fleet.stops
+    _cycle(exporter, _both(221.0, 309.0))
+    _cycle(exporter, _both(181.0, 309.0))
     assert stopped == []
-    exporter._live_bots = [FUNDING]
-    exporter.check_circuit_breaker(0, _binance(181.0, transfers=BINANCE_T))
+    _demote_killers(exporter, fleet)
+    _cycle(exporter, _binance(181.0, transfers=BINANCE_T))
     assert _dollar_drawdown(exporter, 181.0) == pytest.approx(40.0)
     assert stopped == ["FundingFadeV1"]
 
 def test_cash_flow_and_departure_in_one_cycle_both_apply(exporter, monkeypatch):
-    stopped = _scoped_breaker(exporter, monkeypatch)
-    exporter.check_circuit_breaker(0, _both(206.0, 324.0))
-    exporter._live_bots = [FUNDING]
-    exporter.check_circuit_breaker(0, _binance(256.0, transfers=BINANCE_T + 50.0))
+    fleet = _scoped_breaker(exporter, monkeypatch)
+    stopped = fleet.stops
+    _cycle(exporter, _both(206.0, 324.0))
+    _demote_killers(exporter, fleet)
+    _cycle(exporter, _binance(256.0, transfers=BINANCE_T + 50.0))
     assert stopped == []
     assert exporter._portfolio_peak == pytest.approx(256.0)
 
 
 def test_account_scope_survives_an_exporter_restart(exporter, monkeypatch, tmp_path):
     save = exporter._save_peak_state
-    stopped = _scoped_breaker(exporter, monkeypatch)
+    fleet = _scoped_breaker(exporter, monkeypatch)
+    stopped = fleet.stops
     monkeypatch.setattr(exporter, "_save_peak_state", save)
     monkeypatch.setattr(exporter, "PEAK_STATE_FILE", tmp_path / "portfolio_peak.json")
-    exporter.check_circuit_breaker(0, _both(206.0, 324.0))
+    _cycle(exporter, _both(206.0, 324.0))
 
     exporter._account_scope = None
     exporter._portfolio_peak = 0.0
     exporter._load_peak_state()
-    exporter._live_bots = [FUNDING]
-    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
+    _demote_killers(exporter, fleet)
+    _cycle(exporter, _binance(206.0, transfers=BINANCE_T))
     assert stopped == []
     assert exporter._portfolio_peak == pytest.approx(206.0)
 
@@ -842,15 +1207,16 @@ def test_malformed_saved_scope_is_reseeded_instead_of_crashing(exporter, monkeyp
 
 def test_state_without_account_scope_seeds_it_without_a_shift(exporter, monkeypatch):
     """The deployed peak file predates per-account scope: it holds one transfer total."""
-    stopped = _scoped_breaker(exporter, monkeypatch)
+    fleet = _scoped_breaker(exporter, monkeypatch)
+    stopped = fleet.stops
     exporter._portfolio_peak = 530.0
     exporter._account_scope = None
     exporter._account_transfer_total = LEDGER_TOTAL
-    exporter.check_circuit_breaker(0, _both(206.0, 324.0))
+    _cycle(exporter, _both(206.0, 324.0))
     assert exporter._portfolio_peak == pytest.approx(530.0)
 
-    exporter._live_bots = [FUNDING]
-    exporter.check_circuit_breaker(0, _binance(206.0, transfers=BINANCE_T))
+    _demote_killers(exporter, fleet)
+    _cycle(exporter, _binance(206.0, transfers=BINANCE_T))
     assert stopped == []
     assert exporter._portfolio_peak == pytest.approx(206.0)
 

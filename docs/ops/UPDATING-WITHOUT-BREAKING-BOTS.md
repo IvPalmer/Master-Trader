@@ -62,7 +62,10 @@ time. Avoid during high-volatility windows.
 `stopped` state on some restart paths (depends on Freqtrade version + how
 the container exit was signaled). After recreate, ALWAYS verify
 `/api/v1/status` returns trades AND `/api/v1/show_config` shows `state: running`.
-If `stopped`, send POST `/api/v1/start` to resume.
+If `stopped`, send POST `/api/v1/start` to resume — **only when the circuit
+breaker is not triggered**. While it is triggered, the metrics exporter pauses
+every live bot it finds running, so a `/start` lasts one exporter cycle at most;
+resuming is the procedure in [Circuit breaker armed](#circuit-breaker-armed-restarts-and-resuming-entries).
 
 ### Tier 4 — image rebuild (code change)
 `docker compose build SERVICE` then Tier 3 recreate. Old image stays until
@@ -156,7 +159,9 @@ docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate ft-ke
 
 # Verify it came back in the correct state
 curl -sf -u $CREDS http://localhost:8095/api/v1/show_config | jq .state
-# If "stopped", restart manually:
+# If "stopped", restart manually, but only if the breaker is NOT triggered
+# (see "Circuit breaker armed" below):
+docker exec ft-metrics-exporter cat /state/portfolio_peak.json | jq .triggered
 curl -sf -X POST -u $CREDS http://localhost:8095/api/v1/start
 
 # Verify trades are tracked
@@ -193,7 +198,8 @@ docker compose -f docker-compose.prod.yml up -d --no-deps NEW_SERVICE
 ### "STATUS process died" alert fired and you didn't expect it
 1. `docker ps --filter name=ft-` — confirm container is running again
 2. `curl /api/v1/status` for each bot port — confirm open trades preserved
-3. `curl /api/v1/show_config | jq .state` — if "stopped", `/start` it
+3. `curl /api/v1/show_config | jq .state` — if "stopped", `/start` it, unless
+   the circuit breaker is triggered (see below)
 4. Verify equity curve in the dashboard didn't show a phantom gap
 
 ### Bot won't start after recreate
@@ -217,6 +223,106 @@ git -C /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code checkout <PRE
 docker compose -f docker-compose.prod.yml build ft-<service>
 docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate ft-<service>
 ```
+
+### Circuit breaker armed: restarts and resuming entries
+
+The breaker (`ft_userdata/metrics_exporter.py`) latches `triggered: true` in
+`/state/portfolio_peak.json` (exporter volume) when live account equity falls
+10% below its peak. Check it with
+`docker exec ft-metrics-exporter cat /state/portfolio_peak.json | jq .triggered`.
+
+While it is triggered, every exporter cycle reads each bot's `/show_config`
+and POSTs `/stopentry` to any live (`dry_run: false`) bot that is not `paused`
+or `stopped`. A pause is runtime-only and live configs start `running`, so this
+is what re-pauses a bot after a host reboot, a container restart or recreate,
+or an operator `/start`. Exits stay managed. Limits:
+
+- The bot can open entries for up to one exporter cycle (60 s sleep plus scrape
+  time) after it comes back.
+- Nothing re-pauses while `ft-metrics-exporter` itself is down. Do not restart
+  live bots while it is stopped.
+- A bot found running, or whose halt fails, pages once per episode
+  (`fleet-breaker-halt`). A failing halt is retried every cycle and kept in
+  `pending_halts`.
+
+Entries resume only by an explicit operator `/start`, and only after the latch
+is clear. There are two ways it clears:
+
+**a. Natural recovery.** When equity recovers to less than 5% below the peak,
+the exporter clears the latch by itself (log line `Circuit breaker reset`). It
+never sends `/start`.
+
+**b. Rebaseline (operator-authorized only).** Accepts the current loss: the
+peak becomes the equity of ONE complete breaker observation, so the next
+evaluation reads a drawdown near zero instead of re-tripping. Run on the VPS:
+
+```bash
+ts=$(date -u +%Y%m%dT%H%M%SZ)
+out="portfolio_peak.$ts.rebaselined.json"
+rc=1
+# 1. Stop the exporter so it cannot rewrite the state mid-edit, back up the
+#    state and take the last observation it wrote. A failure skips step 2.
+if docker stop ft-metrics-exporter &&
+   docker cp ft-metrics-exporter:/state/portfolio_peak.json "portfolio_peak.$ts.bak.json" &&
+   docker cp ft-metrics-exporter:/state/account_health.json "account_health.$ts.json"; then
+# 2. Write a coherent state from that one snapshot: peak, per-account scope and
+#    transfer total all come from it, so the next scope rebase shifts nothing.
+python3 - "account_health.$ts.json" "portfolio_peak.$ts.bak.json" "$out" <<'REBASELINE'
+import json, os, sys, time
+snapshot_path, state_path, out_path = sys.argv[1:4]
+if os.path.exists(out_path):
+    sys.exit("refused: %s already exists" % out_path)
+snapshot = json.load(open(snapshot_path))
+accounts = snapshot.get("breaker_accounts")
+if not snapshot.get("breaker_complete") or not accounts:
+    sys.exit("refused: not a complete breaker observation; start the exporter, wait a cycle, retry")
+if time.time() - snapshot["observed_at"] > 600:
+    sys.exit("refused: observation older than 10 min; start the exporter, wait a cycle, retry")
+state = json.load(open(state_path))
+state.update({
+    "peak": sum(a["equity"] for a in accounts.values()),
+    "accounts": {name: {"equity": a["equity"], "transfers": a["transfers"]}
+                 for name, a in accounts.items()},
+    "account_transfer_total": sum(a["transfers"] for a in accounts.values()),
+    "equity_basis": "accounts-v1",
+    "triggered": False,
+    "pending_halts": [],
+})
+with open(out_path, "w") as f:
+    json.dump(state, f)
+print("new peak %.2f over %s" % (state["peak"], ", ".join(sorted(accounts))))
+REBASELINE
+rc=$?
+fi
+# 3. Install only what step 2 wrote in this run; if that copy fails, put the
+#    backup back. Without a new state the exporter restarts still triggered and
+#    the bots stay paused. Start it only on a state file known to be intact.
+installed=old
+if [ "$rc" -eq 0 ]; then
+  if docker cp "$out" ft-metrics-exporter:/state/portfolio_peak.json; then
+    installed=new
+  elif ! docker cp "portfolio_peak.$ts.bak.json" ft-metrics-exporter:/state/portfolio_peak.json; then
+    installed=unknown
+  fi
+fi
+echo "breaker state: $installed"
+if [ "$installed" = unknown ]; then
+  echo "exporter NOT started: restore portfolio_peak.$ts.bak.json into /state first"
+else
+  docker start ft-metrics-exporter
+fi
+# 4. After one cycle (~90 s), confirm a complete evaluation on the new baseline:
+#    breaker_complete true, breaker_triggered false, drawdown_pct near 0.
+docker exec ft-metrics-exporter cat /state/account_health.json \
+  | jq '{breaker_complete, breaker_triggered, drawdown_pct, peak}'
+# 5. Only then /start the live bots, one at a time, checking each.
+```
+
+If step 4 shows `breaker_triggered: true` or an incomplete evaluation, stop:
+the bots stay paused. Restore the backup with the same stop / `docker cp` /
+start sequence. `tests/test_exporter_reliability.py` runs steps 1-3 as written
+against a synthetic state, with stand-ins for `docker` and `date`, including
+refusals and failed copies.
 
 ---
 
