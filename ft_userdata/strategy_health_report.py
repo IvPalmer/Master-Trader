@@ -268,20 +268,26 @@ def compute_bot_metrics(strategy: str, info: dict) -> dict:
     if info.get("venue") == "hyperliquid":
         exchange_fills = get_hyperliquid_user_fills(info)
         if exchange_fills is None:
-            metrics["fill_reconciliation"] = {"status": "unavailable", "overbooked_trades": 0}
+            metrics["fill_reconciliation"] = {
+                "status": "unavailable", "mismatched_trades": 0,
+                "overbooked_trades": 0,
+            }
             metrics["flags"].append("Hyperliquid fill reconciliation unavailable; P&L is Freqtrade raw")
         else:
             closed = reconcile_trades(closed, exchange_fills)
             open_list = reconcile_trades(open_list, exchange_fills)
-            corrected = [t for t in closed + open_list if t.get("stop_fill_overbooked")]
+            corrected = [t for t in closed + open_list if t.get("hyperliquid_fill_mismatch")]
+            overbooked = [t for t in corrected if t.get("stop_fill_overbooked")]
             metrics["fill_reconciliation"] = {
-                "status": "ok", "overbooked_trades": len(corrected),
+                "status": "ok", "mismatched_trades": len(corrected),
+                "overbooked_trades": len(overbooked),
                 "freqtrade_raw_pnl": round(sum(float(t["freqtrade_profit_abs"]) for t in corrected), 4),
                 "corrected_pnl": round(sum(float(t["profit_abs"]) for t in corrected), 4),
             }
             if corrected:
                 metrics["flags"].append(
-                    f"{len(corrected)} Hyperliquid stop fill(s) overbooked by Freqtrade; reporting uses exchange fills"
+                    f"{len(corrected)} Hyperliquid terminal exit fill mismatch(es); "
+                    "reporting uses order-specific exchange fills"
                 )
     # A failed /status read must not look like "no open positions": the live
     # return in compute_capital_basis() refuses to treat missing marks as zero.

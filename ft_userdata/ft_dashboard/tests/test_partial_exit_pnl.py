@@ -328,7 +328,10 @@ def test_poll_uses_hyperliquid_stop_fills_and_exposes_freqtrade_raw(monkeypatch)
     async def fake_history(*args, **kwargs):
         return [trade], True, None
     async def fake_fills(*args, **kwargs):
-        return [{"oid": "avax-stop-16", "sz": "7.29", "px": "9.9851"}], None
+        return [
+            {"oid": "avax-stop-16", "sz": "7.29", "px": "9.9851"},
+            {"oid": "tp-16", "sz": "1.04", "px": "11.7"},
+        ], None
 
     bot = app._bot_meta("killers-ft")
     monkeypatch.setattr(app, "_get", fake_get)
@@ -343,8 +346,11 @@ def test_poll_uses_hyperliquid_stop_fills_and_exposes_freqtrade_raw(monkeypatch)
     row = snapshot["recent_trades"][0]
     assert row["profit_abs"] == pytest.approx(tp + _ft_exit_pnl(7.29, 9.9851, 11.24))
     assert row["freqtrade_profit_abs"] == pytest.approx(tp + stop)
+    assert row["hyperliquid_fill_mismatch"] is True
     assert row["stop_fill_overbooked"] is True
-    assert snapshot["fill_reconciliation"] == {"status": "ok", "overbooked_trades": 1}
+    assert snapshot["fill_reconciliation"] == {
+        "status": "ok", "mismatched_trades": 1, "overbooked_trades": 1,
+    }
 
 
 def test_an_exit_without_a_fill_time_keeps_the_other_fill_times():

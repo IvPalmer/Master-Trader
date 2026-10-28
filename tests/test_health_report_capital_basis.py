@@ -276,8 +276,8 @@ def test_health_report_uses_exchange_stop_fill_and_keeps_raw_audit(monkeypatch):
 
     assert metrics["closed_pnl"] == pytest.approx(-8.73)
     assert metrics["fill_reconciliation"] == {
-        "status": "ok", "overbooked_trades": 1,
+        "status": "ok", "mismatched_trades": 1, "overbooked_trades": 1,
         "freqtrade_raw_pnl": -10.0407,
         "corrected_pnl": -8.7294,
     }
-    assert any("overbooked by Freqtrade" in flag for flag in metrics["flags"])
+    assert any("terminal exit fill mismatch" in flag for flag in metrics["flags"])
