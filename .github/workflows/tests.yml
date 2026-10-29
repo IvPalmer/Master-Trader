@@ -29,9 +29,6 @@ jobs:
       - name: Killers receiver
         working-directory: services/killers-receiver
         run: python -m pytest tests/ -q
-      - name: Insiders receiver
-        working-directory: services/insiders-receiver
-        run: python -m pytest tests/ -q
       - name: Dashboard
         working-directory: ft_userdata/ft_dashboard
         run: python -m pytest tests/ -q

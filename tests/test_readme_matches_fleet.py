@@ -52,7 +52,7 @@ def _readme_suites():
 
 def test_readme_test_block_runs_every_ci_suite_in_order():
     ci = _ci_suites()
-    assert len(ci) >= 7  # root, 2 receivers, dashboard, gateway, trade-webhook, killers_bot
+    assert len(ci) >= 6  # root, receiver, dashboard, gateway, trade-webhook, killers_bot
     assert _readme_suites() == ci
 
 

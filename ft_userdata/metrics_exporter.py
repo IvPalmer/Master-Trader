@@ -69,7 +69,6 @@ def _load_bots_config() -> list[dict]:
                 "KeltnerBounceV1": "keltnerbouncev1",
                 "FundingFadeV1": "fundingfadev1",
                 "KillersScalpV1": "ft-killers-scalp",
-                "InsidersScalpV1": "ft-insiders-scalp",
                 "FundingShortV1": "fundingshortv1",
                 # Compose names this service oi-trend-pullback, not
                 # oitrendpullback. Without the mapping the exporter resolved a

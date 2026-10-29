@@ -5,7 +5,7 @@ Tiny VPS-side service that closes the gap Anthropic Channels can't fill: real-ti
 ## What it does
 
 - `POST /freqtrade/event` — accepts freqtrade webhook JSON. Appends a JSONL event to `/srv/lake/raw/trades/<bot>.jsonl` (atomic). Forwards a one-line summary to Telegram via the `elder-brain-ops` bot. Checks the shared token per `TRADE_WEBHOOK_EVENT_AUTH` (see below). The record's `ts` and `received_from` are always the server's; a payload cannot set them.
-- `POST /test/notify` — relays `{"text": ...}` to Telegram. Used by killers-receiver / insiders-receiver alerts (and the Killers risk warden, which runs inside killers-receiver) and as a manual smoke test. Requires the `X-Notify-Token` header when `TRADE_WEBHOOK_NOTIFY_TOKEN` is set.
+- `POST /test/notify` — relays `{"text": ...}` to Telegram. Used by killers-receiver alerts (and the Killers risk warden, which runs inside killers-receiver) and as a manual smoke test. Requires the `X-Notify-Token` header when `TRADE_WEBHOOK_NOTIFY_TOKEN` is set.
 - `GET /healthz` — readiness probe, unauthenticated.
 
 ## Network
@@ -38,7 +38,7 @@ One value, `TRADE_WEBHOOK_NOTIFY_TOKEN`, generated with `openssl rand -hex 24` (
 
 | Caller | Route | Carries the token as | Configured in |
 |---|---|---|---|
-| killers-receiver, insiders-receiver, Killers risk warden | `/test/notify` | `X-Notify-Token` header | Dokploy env of the master-trader compose |
+| killers-receiver, Killers risk warden | `/test/notify` | `X-Notify-Token` header | Dokploy env of the master-trader compose |
 | metrics-exporter circuit breaker | `/freqtrade/event` | `X-Notify-Token` header | Dokploy env |
 | the six Freqtrade bots | `/freqtrade/event` | `webhook_token` field in the JSON body | Dokploy env, via `FREQTRADE__WEBHOOK__*` (below) |
 | health report and other `ft_userdata` report scripts | `/freqtrade/event` | `X-Notify-Token` header (`ft_userdata/webhook_notify.py`, #101) | `run-health-report.sh` reads it from `/etc/lake/ops-bot.env` |
@@ -55,7 +55,7 @@ Freqtrade's webhook cannot send headers (2026.7 reads only `url`, `format`, `ret
 ### Rollout order
 
 1. **trade-webhook first, with no token yet.** Merge and release this change and #101 (PR #139), `git pull` the host checkout and `docker compose up -d --build` here. This drops `dokploy-network` and starts stripping `webhook_token`. An older trade-webhook would write a bot's token straight into the lake JSONL, so this step must come before any bot carries the token. Check: the next receiver notify and the next bot event still return 200 (`docker logs trade-webhook`).
-2. **Callers.** Set `TRADE_WEBHOOK_NOTIFY_TOKEN` in the Dokploy env of the master-trader compose. Recreate `killers-receiver`, `insiders-receiver`, `metrics-exporter` and the six bot containers with `--no-deps`. Recreating a bot restarts it, so schedule it under the runbook's rules (`docs/ops/UPDATING-WITHOUT-BREAKING-BOTS.md`). A bot that has not been recreated yet keeps posting without the token, which `monitor` accepts. Copy `deploy/vps/run-health-report.sh` over `/home/ubuntu/master-trader/run-health-report.sh`. The installed copy predates the per-bot credential export and the token read.
+2. **Callers.** Set `TRADE_WEBHOOK_NOTIFY_TOKEN` in the Dokploy env of the master-trader compose. Recreate `killers-receiver`, `metrics-exporter` and the bot containers with `--no-deps`. Recreating a bot restarts it, so schedule it under the runbook's rules (`docs/ops/UPDATING-WITHOUT-BREAKING-BOTS.md`). A bot that has not been recreated yet keeps posting without the token, which `monitor` accepts. Copy `deploy/vps/run-health-report.sh` over `/home/ubuntu/master-trader/run-health-report.sh`. The installed copy predates the per-bot credential export and the token read.
 3. **Token on trade-webhook.** Add `TRADE_WEBHOOK_NOTIFY_TOKEN` (same value) to `/etc/lake/ops-bot.env` and `docker compose up -d`. `/test/notify` is now enforced and `/freqtrade/event` monitored.
 4. **Check.** Each bot posts a startup status on (re)start, so step 2 already produced one event per bot. `docker logs trade-webhook 2>&1 | grep 'unauthenticated POST'` must show nothing newer than step 3, across at least one 23:00 health report.
 5. **Enforce.** Add `TRADE_WEBHOOK_EVENT_AUTH=enforce` to `/etc/lake/ops-bot.env` and `docker compose up -d`.

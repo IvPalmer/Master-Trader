@@ -59,7 +59,7 @@ class Config:
         )
         self.channel_id_override = os.getenv("KILLERS_TG_CHANNEL_ID")
         # Shadow do classificador de regras (#62). Como o `use_fast_path`, e
-        # especifico do formato Killers — o fan-out Insiders desliga abaixo.
+        # especifico do formato Killers.
         self.shadow_rules = True
         # Regras DECIDEM chat / close_partial / close_full por stop (#74), com o
         # Claude em shadow. Rollback sem deploy: KILLERS_RULES_PRIMARY=0 no
@@ -77,13 +77,9 @@ class Config:
         # Receiver translates to Freqtrade Futures REST. Leave unset to run
         # in pure observe-mode (Phase 1).
         self.receiver_url = os.getenv("KILLERS_RECEIVER_URL", "")
-        # Bearer token the receiver requires on every route. Per-receiver:
-        # the insiders fan-out overrides it below so a leak of one token
-        # cannot drive the other funded account. Deliberately NO fallback to
-        # the killers token — a missing insiders token must fail loudly (401,
-        # logged, not retried) rather than silently cross-authenticate.
+        # Bearer token the receiver requires on every route.
         self.receiver_token = os.getenv("KILLERS_RECEIVER_TOKEN", "")
-        # Rotulo do feed nos logs e alertas; o fan-out insiders sobrescreve.
+        # Rotulo do feed nos logs e alertas.
         self.feed_label = "killers"
         # Alerta de falha de classificacao (#95). O observer roda no host, onde
         # o trade-webhook publica 127.0.0.1:8088; mesma rota /test/notify dos
@@ -92,10 +88,8 @@ class Config:
         self.notify_url = os.getenv("KILLERS_NOTIFY_URL",
                                     "http://127.0.0.1:8088/test/notify")
         self.notify_token = os.getenv("TRADE_WEBHOOK_NOTIFY_TOKEN", "").strip()
-        # Channel-specific classifier prompt + fast-path. Defaults are the
-        # Killers VIP settings; the insiders fan-out overrides both (Dennis's
-        # "Market Mastery" format is different and the strict-open rule parser
-        # is Killers-only, so it's disabled for insiders).
+        # Channel-specific classifier prompt + fast-path: the Killers VIP
+        # settings (the strict-open rule parser is Killers-only).
         self.classifier_template = classifier.PROMPT_TEMPLATE
         self.use_fast_path = True
         # Gate de confianca em SHADOW (#65): so grava o veredito, nunca
@@ -1014,10 +1008,10 @@ async def _setup_channel(client, events, conn: sqlite3.Connection,
                          config: "Config", label: str, backfill: bool = True) -> None:
     """Resolve one channel, (optionally) backfill missed msgs, register new/edit
     handlers — each routed to its OWN conn/config (DB + receiver). Extracted so a
-    single client/session can drive multiple channels (killers + insiders
-    fan-out). Each call's handlers close over their own channel/conn/config (no
-    leak). Handler bodies are wrapped so a per-message error is logged and never
-    propagates — the feed always continues."""
+    single client/session can drive multiple channels. Each call's handlers
+    close over their own channel/conn/config (no leak). Handler bodies are
+    wrapped so a per-message error is logged and never propagates — the feed
+    always continues."""
     if config.channel_id_override:
         channel = int(config.channel_id_override)
         logger.info("[%s] channel id=%d (override) receiver=%s db=%s",
@@ -1064,34 +1058,6 @@ async def _setup_channel(client, events, conn: sqlite3.Connection,
         name=f"classify-retry-{label}")
 
 
-def _insiders_config() -> "Optional[Config]":
-    """Config for the INSIDERS fan-out, built from INSIDERS_* env and reusing the
-    shared killers api/session/claude settings. None (disabled) unless
-    INSIDERS_TG_CHANNEL_ID is set."""
-    cid = os.getenv("INSIDERS_TG_CHANNEL_ID")
-    if not cid:
-        return None
-    ins = Config()                       # re-reads shared api/session/claude env
-    ins.channel_id_override = cid
-    ins.channel_username = None
-    ins.receiver_url = os.getenv("INSIDERS_RECEIVER_URL", "http://127.0.0.1:8090/event")
-    ins.receiver_token = os.getenv("INSIDERS_RECEIVER_TOKEN", "")
-    ins.feed_label = "insiders"
-    ins.db_path = os.getenv("INSIDERS_OBSERVER_DB", "/home/ubuntu/insiders-bot/state.sqlite")
-    # Dennis / Market Mastery format ≠ Killers VIP. Use the insiders-tuned prompt
-    # and disable the Killers-only strict-open rule parser (it would never match
-    # Dennis's terse "$SYM LONG" calls anyway, and bypassing the tuned prompt on
-    # a false match would mis-classify).
-    ins.classifier_template = classifier.INSIDERS_PROMPT_TEMPLATE
-    ins.use_fast_path = False
-    # Mesma razao: as regras sao do formato Killers. Um sinal do Dennis nao tem
-    # cabecalho `SIGNAL ID:`/`COIN:`, entao a regra o chamaria `chat` e cada
-    # mensagem viraria uma divergencia falsa, poluindo a medicao.
-    ins.shadow_rules = False
-    ins.rules_primary = False
-    return ins
-
-
 async def run(config: Config, conn: sqlite3.Connection) -> None:
     from telethon import TelegramClient, events
 
@@ -1102,20 +1068,6 @@ async def run(config: Config, conn: sqlite3.Connection) -> None:
 
     # Primary channel (killers).
     await _setup_channel(client, events, conn, config, "killers")
-
-    # Optional INSIDERS fan-out on the SAME session/client (one account, two
-    # channels — avoids a second session). Fully fault-isolated: any failure
-    # resolving/backfilling the insiders channel is logged and CANNOT affect the
-    # killers feed. Enabled only when INSIDERS_TG_CHANNEL_ID is set.
-    try:
-        ins = _insiders_config()
-        if ins is not None:
-            ins_conn = init_db(ins.db_path)
-            # No backfill: the forward measurement starts from NOW, and skipping
-            # the free-channel history keeps insiders load off the killers path.
-            await _setup_channel(client, events, ins_conn, ins, "insiders", backfill=False)
-    except Exception:
-        logger.exception("[insiders] fan-out setup FAILED — killers feed unaffected")
 
     # Heartbeat
     async def heartbeat():

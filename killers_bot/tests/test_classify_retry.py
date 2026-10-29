@@ -31,7 +31,7 @@ FAR = time.time() + 10 * 86400       # depois de qualquer backoff
 
 
 class _Cfg:
-    """Como o fan-out insiders: sem fast-path nem regras, tudo vai ao Claude."""
+    """Sem fast-path nem regras: tudo vai ao Claude."""
     use_fast_path = False
     shadow_rules = False
     rules_primary = False

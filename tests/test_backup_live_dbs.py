@@ -12,6 +12,7 @@ import gzip
 import hashlib
 import importlib.util
 import json
+import shutil
 import sqlite3
 from pathlib import Path
 
@@ -55,6 +56,8 @@ def fleet(tmp_path):
         _wal_db(data["ft_user_data"] / "tradesv3.live.KillersScalpV1.hyperliquid.sqlite", 5),
         _wal_db(data["ft_user_data"] / "tradesv3.dryrun.OITrendPullbackV1.sqlite", 3),
         _wal_db(data["killers_receiver_state"] / "receiver-hyperliquid.sqlite", 7),
+        # Retired with the Insiders stack (#216). The volume is still on the
+        # host, but the run must no longer pick it up or require it.
         _wal_db(data["insiders_receiver_state"] / "receiver-hyperliquid.sqlite", 2),
     ]
     # Not databases the run should pick up.
@@ -89,7 +92,6 @@ def test_backs_up_every_volume_consistently_while_writers_are_open(bk, fleet, tm
     names = sorted(e["name"] for e in manifest["files"])
     assert names == [
         "ft_user_data/tradesv3.live.KillersScalpV1.hyperliquid.sqlite",
-        "insiders_receiver_state/receiver-hyperliquid.sqlite",
         "killers_bot/state.sqlite",
         "killers_receiver_state/receiver-hyperliquid.sqlite",
     ]
@@ -124,17 +126,25 @@ def test_writers_keep_working_and_sources_are_untouched(bk, fleet):
 
 
 def test_missing_required_volume_fails_and_leaves_no_partial_run(bk, fleet):
-    for p in fleet["data"]["insiders_receiver_state"].glob("*.sqlite*"):
+    for p in fleet["data"]["killers_receiver_state"].glob("*.sqlite*"):
         p.unlink()
     assert bk.main(_args(fleet)) == 1
     assert [p for p in fleet["dest"].iterdir() if p.is_dir()] == []
 
 
+def test_removing_the_retired_insiders_volume_does_not_fail_the_run(bk, fleet):
+    """#216: the operator may delete insiders_receiver_state later. That must not
+    stop the nightly backup of the live databases."""
+    fleet["conns"][3].close()
+    shutil.rmtree(fleet["data"]["insiders_receiver_state"].parent)
+    assert bk.main(_args(fleet)) == 0
+
+
 def test_corrupt_database_fails_the_run(bk, fleet):
-    conn = fleet["conns"][3]
+    conn = fleet["conns"][2]
     conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     conn.close()
-    db = fleet["data"]["insiders_receiver_state"] / "receiver-hyperliquid.sqlite"
+    db = fleet["data"]["killers_receiver_state"] / "receiver-hyperliquid.sqlite"
     raw = bytearray(db.read_bytes())
     raw[4096:8192] = b"\xff" * 4096  # trash the table's page
     db.write_bytes(bytes(raw))
