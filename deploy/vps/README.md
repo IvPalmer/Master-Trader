@@ -22,11 +22,10 @@ Single canonical project root: `/home/ubuntu/master-trader/`.
 ```
 
 Live runtime is owned by Dokploy (UI: `compose-bypass-mobile-port-fbk1m6`).
-The 13 services of `ft_userdata/docker-compose.prod.yml`: bots `ft-keltner-bounce` (8095),
+The 11 services of `ft_userdata/docker-compose.prod.yml`: bots `ft-keltner-bounce` (8095),
 `ft-funding-fade` (8096), `ft-oi-trend-pullback` (8102), `ft-killers-scalp` (8099),
-`ft-insiders-scalp` (8098), `ft-short-keltner-hl-live` (8103); receivers `killers-receiver`
-(8089) and `insiders-receiver` (8090); `ft-hl-gateway`, `ft-funding-refresh`,
-`ft-metrics-exporter` (9090), `ft-prometheus` (9091), and `ft-dashboard`. The dashboard is
+`ft-short-keltner-hl-live` (8103); receiver `killers-receiver` (8089); `ft-hl-gateway`,
+`ft-funding-refresh`, `ft-metrics-exporter` (9090), `ft-prometheus` (9091), and `ft-dashboard`. The dashboard is
 served by Traefik at the public URL; every published port binds `127.0.0.1`. trade-webhook
 (`127.0.0.1:8088`) runs from its own compose file, `services/trade-webhook/`.
 
@@ -94,9 +93,10 @@ All bulk research data lives only on VPS; backtests run on VPS.
 ## Backups
 
 `backup_live_dbs.py` (#99) backs up every `tradesv3.live.*.sqlite` in the
-`ft_user_data` volume and every `*.sqlite` in `killers_receiver_state` and
-`insiders_receiver_state`, plus `/home/ubuntu/killers-bot/state.sqlite` when it
-exists. The receiver databases tie each open position to its source signal,
+`ft_user_data` volume and every `*.sqlite` in `killers_receiver_state`, plus
+`/home/ubuntu/killers-bot/state.sqlite` when it exists. The retired
+`insiders_receiver_state` volume (#216) is no longer backed up; its last
+snapshots stay in the backup history. The receiver databases tie each open position to its source signal,
 posted stop and targets and cannot be rebuilt from the exchange. Dry-run
 databases and unrelated state are intentionally excluded.
 

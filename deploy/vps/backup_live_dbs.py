@@ -11,7 +11,6 @@ What it copies, from the compose project's docker volumes:
 
   ft_user_data             every tradesv3.live.*.sqlite
   killers_receiver_state   every *.sqlite (signal -> trade -> TP-ladder state)
-  insiders_receiver_state  every *.sqlite
   /home/ubuntu/killers-bot/state.sqlite   observer state, if present
 
 The receiver state cannot be rebuilt from the exchange: it is what ties an
@@ -77,7 +76,6 @@ STAMP_FORMAT = "%Y%m%dT%H%M%SZ"
 SOURCES = [
     ("ft_user_data", "tradesv3.live.*.sqlite", "sqlite", True),
     ("killers_receiver_state", "*.sqlite", "sqlite", True),
-    ("insiders_receiver_state", "*.sqlite", "sqlite", True),
 ]
 
 
