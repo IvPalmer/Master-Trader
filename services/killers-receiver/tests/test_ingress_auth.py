@@ -160,6 +160,23 @@ def test_event_rejects_missing_wrong_and_malformed_tokens():
         ).status_code == 200
 
 
+@pytest.mark.parametrize("host", ["x/healthz?", "x/healthz#", "testserver/healthz?q="])
+def test_a_crafted_host_header_cannot_borrow_the_healthz_exemption(host):
+    """#213, GHSA-86qp-5c8j-p5mr: the exemption is matched on request.url.path.
+
+    Starlette before 1.0.1 rebuilt request.url from the raw Host header, so
+    `Host: x/healthz?` made request.url.path read /healthz while the router
+    still dispatched the real path, and the token check was skipped. Fixed by
+    the starlette pin in requirements.txt; this keeps a downgrade from
+    reopening it.
+    """
+    payload = {"msg": {"id": 3, "text": "x"}, "classification": {"kind": "chat"}}
+    with _client() as (client, _m):
+        assert client.get("/positions", headers={"Host": host}).status_code == 401
+        assert client.post("/event", json=payload,
+                           headers={"Host": host}).status_code == 401
+
+
 def test_two_receivers_do_not_share_a_token():
     """The insiders instance must not accept the killers token.
 
