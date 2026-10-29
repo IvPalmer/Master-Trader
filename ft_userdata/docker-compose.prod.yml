@@ -184,7 +184,7 @@ services:
       # ~25 unrelated applications. Generate with `openssl rand -hex 24`.
       KILLERS_INGRESS_TOKEN: ${KILLERS_INGRESS_TOKEN:-}
       # Sent as X-Notify-Token to trade-webhook /test/notify (#59). Must equal
-      # the value on trade-webhook and insiders-receiver. Empty = legacy
+      # the value on trade-webhook. Empty = legacy
       # unauthenticated notify (accepted until trade-webhook sets its token).
       TRADE_WEBHOOK_NOTIFY_TOKEN: ${TRADE_WEBHOOK_NOTIFY_TOKEN:-}
       # Read from the shared anchor — sibling Freqtrade containers inherit
@@ -343,121 +343,6 @@ services:
         python /freqtrade/user_data/configs/guard_db_mode.py --config /freqtrade/user_data/configs/KillersScalpV1.json
         exec freqtrade trade --logfile /freqtrade/user_data/logs/KillersScalpV1.log --config /freqtrade/user_data/configs/KillersScalpV1.json --strategy KillersScalpV1
 
-  ft-insiders-scalp:
-    # Insiders Scalp V2 forward executor on Hyperliquid. Uses a separate API
-    # wallet from Killers so the two signing streams cannot collide.
-    image: freqtradeorg/freqtrade@sha256:50720a4af314a812be2cfbf5cc6331c63e9332b06f3f4372241f54bc61a35486
-    restart: always
-    container_name: ft-insiders-scalp
-    environment:
-      <<: *webhook_token_env
-      # All REST clients share an IP budget; websocket reconnect storms cannot bypass it.
-      FREQTRADE__EXCHANGE__ENABLE_WS: "false"
-      # REST entry validation uses tradable markets, not this subscription list.
-      # Freqtrade automatically adds every open position to active candle feeds.
-      FREQTRADE__EXCHANGE__PAIR_WHITELIST: '["BTC/USDC:USDC"]'
-      # Pass-through strategy needs only 10 candles. Cap its 5m bootstrap feed;
-      # Hyperliquid funding marks/rates use 1h and retain their native limits.
-      FREQTRADE__EXCHANGE___FT_HAS_PARAMS__ohlcv_candle_limit_per_timeframe__5m: "100"
-      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/insiders"
-      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/insiders"
-      FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "90000"
-      FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
-      # Preserve resting reduce-only exits through planned restarts.
-      FREQTRADE__CANCEL_OPEN_ORDERS_ON_EXIT: "false"
-      FREQTRADE__API_SERVER__USERNAME: ${FT_API_USER_INSIDERS:-${FREQTRADE__API_SERVER__USERNAME}}
-      FREQTRADE__API_SERVER__PASSWORD: ${FT_API_PASS_INSIDERS:-${FREQTRADE__API_SERVER__PASSWORD}}
-      FREQTRADE__API_SERVER__JWT_SECRET_KEY: ${FT_API_JWT_INSIDERS:-${FREQTRADE__API_SERVER__JWT_SECRET_KEY}}
-      FREQTRADE__EXCHANGE__WALLET_ADDRESS: ${HYPERLIQUID_INSIDERS_WALLET_ADDRESS:-}
-      FREQTRADE__EXCHANGE__PRIVATE_KEY: ${HYPERLIQUID_INSIDERS_PRIVATE_KEY:-}
-      FREQTRADE__DRY_RUN: ${HYPERLIQUID_INSIDERS_DRY_RUN:-true}
-      SIGNAL_RECEIVER_URL: http://insiders-receiver:8089
-      SIGNAL_RECEIVER_TOKEN: ${INSIDERS_INGRESS_TOKEN:-}
-    volumes:
-      - ft_user_data:/freqtrade/user_data
-      - ./user_data/configs:/freqtrade/user_data/configs:ro
-      - ./user_data/strategies:/freqtrade/user_data/strategies
-    ports:
-      - 127.0.0.1:8098:8080
-    # #11: CCXT urls point at hl-gateway; wait for it to be healthy.
-    depends_on:
-      hl-gateway:
-        condition: service_healthy
-    healthcheck: *a2
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        set -e
-        case "$${FREQTRADE__DRY_RUN}" in
-          true|1|yes)
-            export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.dryrun.InsidersScalpV2.hyperliquid.sqlite
-            export FREQTRADE__ORDER_TYPES__STOPLOSS_ON_EXCHANGE=false
-            ;;
-          false|0|no)
-            export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.live.InsidersScalpV2.hyperliquid.sqlite
-            ;;
-          *) echo "invalid HYPERLIQUID_INSIDERS_DRY_RUN value" >&2; exit 64 ;;
-        esac
-        python /freqtrade/user_data/configs/guard_db_mode.py --config /freqtrade/user_data/configs/InsidersScalpV2.json
-        sleep 60
-        exec freqtrade trade --logfile /freqtrade/user_data/logs/InsidersScalpV2.log --config /freqtrade/user_data/configs/InsidersScalpV2.json --strategy KillersScalpV1
-
-  insiders-receiver:
-    # FastAPI executor for the Insiders forward measurement — SAME validated
-    # image as killers-receiver, pointed at ft-insiders-scalp. limit-in-zone +
-    # posted-SL ON (the exit policies the killers replay validated). Fed by the
-    # observer fan-out (Dennis's free channel 3501314840).
-    build: ../services/killers-receiver
-    image: killers-receiver:latest
-    restart: unless-stopped
-    container_name: insiders-receiver
-    networks:
-      - default
-      - dokploy-network
-    environment:
-      HYPERLIQUID_INFO_URL: http://hl-gateway:8080/insiders/info
-      KILLERS_FT_BASE_URL: http://ft-insiders-scalp:8080
-      # REQUIRED, and deliberately a DIFFERENT value from the killers token:
-      # the two receivers drive two separately funded accounts.
-      KILLERS_INGRESS_TOKEN: ${INSIDERS_INGRESS_TOKEN:-}
-      # Tag logs + Telegram alerts as insiders-scalp (not the killers default)
-      # so Dennis-channel skips don't masquerade as the live Killers bot.
-      KILLERS_BOT_LABEL: insiders-scalp
-      KILLERS_FT_USERNAME: ${FT_API_USER_INSIDERS:-${FREQTRADE__API_SERVER__USERNAME}}
-      KILLERS_FT_PASSWORD: ${FT_API_PASS_INSIDERS:-${FREQTRADE__API_SERVER__PASSWORD}}
-      KILLERS_DB: /var/lib/killers/receiver-hyperliquid.sqlite
-      # $1.50 risk (2026-08-27): same wide-stop admission logic as killers
-      # (admits stops up to 13.3%), scaled to the smaller 50 USDC account
-      # (~3% of bot equity per trade).
-      KILLERS_RISK_USD: "1.5"
-      KILLERS_MIN_MARGIN_USD: "5"
-      KILLERS_MAX_MARGIN_USD: "10"
-      KILLERS_MAX_LEVERAGE: "3"
-      KILLERS_STOP_LIMIT_RATIO: "0.98"
-      KILLERS_MIN_NOTIONAL_USD: "11.3"
-      KILLERS_REQUIRE_POSTED_SL: "true"
-      KILLERS_MAX_OPEN: "5"
-      KILLERS_POSTED_SL: "true"
-      KILLERS_EXECUTION_VENUE: hyperliquid
-      KILLERS_NOTIFY_URL: http://trade-webhook:8088/test/notify
-      # Same shared value as killers-receiver and trade-webhook (#59).
-      TRADE_WEBHOOK_NOTIFY_TOKEN: ${TRADE_WEBHOOK_NOTIFY_TOKEN:-}
-    volumes:
-      - insiders_receiver_state:/var/lib/killers
-    ports:
-      - 127.0.0.1:8090:8089
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    depends_on:
-      - ft-insiders-scalp
-
   ft-short-keltner-hl-live:
     # Autonomous Hyperliquid strategy on its own funded master account.  The
     # account separation is intentional: HL sub-accounts require $100k volume,
@@ -525,7 +410,7 @@ services:
       # download_funding_rates.py (#113). trade-webhook already joins this
       # project's default network, so no extra network is needed.
       FUNDING_NOTIFY_URL: http://trade-webhook:8088/test/notify
-      # Same shared value as killers-/insiders-receiver and trade-webhook (#59).
+      # Same shared value as killers-receiver and trade-webhook (#59).
       TRADE_WEBHOOK_NOTIFY_TOKEN: ${TRADE_WEBHOOK_NOTIFY_TOKEN:-}
     volumes:
       - ft_user_data:/app/user_data
@@ -577,7 +462,6 @@ services:
       # value as trade-webhook and the receivers; empty sends no header.
       TRADE_WEBHOOK_NOTIFY_TOKEN: ${TRADE_WEBHOOK_NOTIFY_TOKEN:-}
       HYPERLIQUID_KILLERS_WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
-      HYPERLIQUID_INSIDERS_WALLET_ADDRESS: ${HYPERLIQUID_INSIDERS_WALLET_ADDRESS:-}
       HYPERLIQUID_SHORT_KELTNER_WALLET_ADDRESS: ${HYPERLIQUID_SHORT_KELTNER_WALLET_ADDRESS:-}
     volumes:
       - ./metrics_exporter.py:/app/metrics_exporter.py:ro
@@ -685,9 +569,7 @@ volumes:
   prometheus_data: null
   ft_user_data: null
   ft_exporter_state: null
-  insiders_state: null
   killers_receiver_state: null
-  insiders_receiver_state: null
   claude_auth:
     external: true
     name: claude-assistant_claude_auth

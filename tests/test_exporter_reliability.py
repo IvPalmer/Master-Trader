@@ -58,6 +58,20 @@ def test_exporter_covers_every_deployed_trading_service(exporter):
     assert short["port"] == 8103
 
 
+def test_stopped_retired_insiders_bot_does_not_freeze_breaker_membership(exporter, monkeypatch):
+    """#216: ft-insiders-scalp is stopped. While the registry still listed it as
+    production_live, its unanswered /show_config made refresh_live_capital mark
+    membership incomplete, which freezes the breaker for every account."""
+    assert "ft-insiders-scalp" not in {bot["service"] for bot in exporter.BOTS}
+
+    def meta(service):
+        return None if service == "ft-insiders-scalp" else {"dry_run": True, "starting_capital": 0.0}
+
+    monkeypatch.setattr(exporter, "fetch_bot_meta", meta)
+    exporter.refresh_live_capital()
+    assert exporter._membership_complete is True
+
+
 @pytest.mark.parametrize("dry_run", [True, False])
 def test_short_keltner_breaker_membership_uses_runtime_mode(exporter, monkeypatch, dry_run):
     bot = next(bot for bot in exporter.BOTS if bot["strategy"] == "ShortKeltnerV2HL")
@@ -523,11 +537,13 @@ def test_todays_valued_accounts_observe_exactly_as_before(exporter, monkeypatch)
 
 
 def test_live_bot_on_unvalued_account_leaves_breaker_running_on_the_rest(exporter, monkeypatch):
-    """Issue #104 repro: FundingFade + Killers live, plus Insiders promoted."""
-    insiders = _registry_bot(exporter, "InsidersScalpV1")
-    assert insiders["capital_account"] == "ft-insiders-scalp", "registry default the issue describes"
+    """Issue #104 repro: FundingFade + Killers live, plus a Hyperliquid bot with no
+    valuation adapter promoted (Insiders in the issue, retired in #216;
+    ShortKeltnerV2HL has the same registry shape)."""
+    unvalued = _registry_bot(exporter, "ShortKeltnerV2HL")
+    assert unvalued["capital_account"] == "ft-short-keltner-hl-live", "registry default the issue describes"
     exporter._membership_complete = True
-    exporter._live_bots = [FUNDING, KELTNER, KILLERS, insiders]
+    exporter._live_bots = [FUNDING, KELTNER, KILLERS, unvalued]
     requested = _venues(exporter, monkeypatch)
     result = exporter.observe_accounts()
 
@@ -535,11 +551,11 @@ def test_live_bot_on_unvalued_account_leaves_breaker_running_on_the_rest(exporte
     assert result["breaker_equity"] == 400.0
     assert result["net_transfers"] == pytest.approx(LEDGER_TOTAL)
     assert set(result["breaker_accounts"]) == {"binance-spot", "hyperliquid-killers"}
-    # The whole-portfolio total is still not claimed: the Insiders wallet is unobserved.
+    # The whole-portfolio total is still not claimed: that wallet is unobserved.
     assert result["complete"] is False
     assert result["equity"] is None
-    assert result["unvalued_accounts"] == {"ft-insiders-scalp": ["InsidersScalpV1"]}
-    assert any("ft-insiders-scalp (InsidersScalpV1)" in e and "excluded from the circuit breaker" in e
+    assert result["unvalued_accounts"] == {"ft-short-keltner-hl-live": ["ShortKeltnerV2HL"]}
+    assert any("ft-short-keltner-hl-live (ShortKeltnerV2HL)" in e and "excluded from the circuit breaker" in e
                for e in result["errors"])
     assert not any("Account equity unavailable" in e for e in result["errors"]), \
         "a configuration error is not reported as a transient fetch failure"
@@ -548,7 +564,7 @@ def test_live_bot_on_unvalued_account_leaves_breaker_running_on_the_rest(exporte
 
 def test_transient_failure_on_a_valued_account_still_freezes_the_breaker(exporter, monkeypatch):
     exporter._membership_complete = True
-    exporter._live_bots = [FUNDING, KILLERS, _registry_bot(exporter, "InsidersScalpV1")]
+    exporter._live_bots = [FUNDING, KILLERS, _registry_bot(exporter, "ShortKeltnerV2HL")]
     _venues(exporter, monkeypatch, killers_ok=False)
     result = exporter.observe_accounts()
     assert result["breaker_complete"] is False, "a partial total would fake a drawdown"
@@ -568,15 +584,15 @@ def test_only_unvalued_accounts_live_never_values_the_breaker_at_zero(exporter, 
 
 
 def test_capital_refresh_reports_unvalued_live_account_as_configuration_error(exporter, monkeypatch, caplog):
-    exporter.BOTS = [FUNDING, _registry_bot(exporter, "InsidersScalpV1")]
+    exporter.BOTS = [FUNDING, _registry_bot(exporter, "ShortKeltnerV2HL")]
     monkeypatch.setattr(exporter, "fetch_json", lambda service, endpoint:
                         {"dry_run": False} if endpoint == "show_config" else {"starting_capital": 50.0})
     with caplog.at_level("ERROR", logger="ft-exporter"):
         exporter.refresh_live_capital()
     errors = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
     assert len(errors) == 1
-    assert "CONFIGURATION ERROR" in errors[0] and "InsidersScalpV1" in errors[0]
-    assert "ft-insiders-scalp" in errors[0]
+    assert "CONFIGURATION ERROR" in errors[0] and "ShortKeltnerV2HL" in errors[0]
+    assert "ft-short-keltner-hl-live" in errors[0]
 
 
 def test_drawdown_on_health_file_follows_the_breaker_scope(exporter, monkeypatch, tmp_path):
@@ -617,9 +633,9 @@ def _run_cycles(exporter, monkeypatch, tmp_path, cycles, peak_state):
 
 def test_breach_on_valued_accounts_halts_entries_with_an_unvalued_bot_live(exporter, monkeypatch, tmp_path):
     """End to end through main(): before #104 the breaker never ran here."""
-    insiders = _registry_bot(exporter, "InsidersScalpV1")
+    unvalued = _registry_bot(exporter, "ShortKeltnerV2HL")
     exporter._membership_complete = True
-    exporter._live_bots = [FUNDING, KELTNER, KILLERS, insiders]
+    exporter._live_bots = [FUNDING, KELTNER, KILLERS, unvalued]
     exporter._live_initial_capital = 400.0
     fleet = _Fleet(exporter, monkeypatch, exporter._live_bots, serve_fetch=False)
     _venues(exporter, monkeypatch, fleet=fleet)
@@ -632,7 +648,7 @@ def test_breach_on_valued_accounts_halts_entries_with_an_unvalued_bot_live(expor
         "peak": 500.0, "equity_basis": "accounts-v1", "account_transfer_total": LEDGER_TOTAL})
 
     assert alerts and alerts[0][0] == 400.0 and alerts[0][1] == pytest.approx(20.0)
-    assert stopped == ["FundingFadeV1", "KeltnerBounceV1", "KillersScalpV1", "InsidersScalpV1"], \
+    assert stopped == ["FundingFadeV1", "KeltnerBounceV1", "KillersScalpV1", "ShortKeltnerV2HL"], \
         "the halt still covers every live bot, including the unvalued one"
     assert set(fleet.modes.values()) == {(False, "paused")}
     assert ("warning", "fleet-breaker-coverage") in [(m[0], m[1]) for m in webhook.messages()]
@@ -642,7 +658,7 @@ def test_breach_on_valued_accounts_halts_entries_with_an_unvalued_bot_live(expor
 
 def test_valued_accounts_within_threshold_do_not_halt(exporter, monkeypatch, tmp_path):
     exporter._membership_complete = True
-    exporter._live_bots = [FUNDING, KELTNER, KILLERS, _registry_bot(exporter, "InsidersScalpV1")]
+    exporter._live_bots = [FUNDING, KELTNER, KILLERS, _registry_bot(exporter, "ShortKeltnerV2HL")]
     _venues(exporter, monkeypatch)
     stopped = []
     monkeypatch.setattr(exporter, "stop_bot", lambda bot: stopped.append(bot) or True)
@@ -658,13 +674,13 @@ def test_unvalued_account_pages_once_and_reports_when_cleared(exporter, monkeypa
     monkeypatch.setattr(exporter.requests, "post", webhook)
     exporter._membership_complete = True
     exporter._live_bots = [FUNDING]
-    observation = {"unvalued_accounts": {"ft-insiders-scalp": ["InsidersScalpV1"]}, "errors": []}
+    observation = {"unvalued_accounts": {"ft-short-keltner-hl-live": ["ShortKeltnerV2HL"]}, "errors": []}
     exporter.watch_breaker(observation, True, 0)
     exporter.watch_breaker(observation, True, 60)
     assert len(webhook.posts) == 1, "page on the first cycle, not every cycle"
     kind, bot, message = webhook.messages()[0]
     assert (kind, bot) == ("warning", "fleet-breaker-coverage")
-    assert "ft-insiders-scalp (InsidersScalpV1)" in message
+    assert "ft-short-keltner-hl-live (ShortKeltnerV2HL)" in message
     assert len("WARN " + message) <= 200
     exporter.watch_breaker({"errors": []}, True, 120)
     assert webhook.messages()[1][:2] == ("status", "fleet-breaker-coverage")
@@ -707,7 +723,7 @@ def _breached_fleet(exporter, monkeypatch, failing):
     clock = types.SimpleNamespace(now=1_800_000_000.0)
     monkeypatch.setattr(exporter, "time", types.SimpleNamespace(time=lambda: clock.now))
     monkeypatch.setattr(exporter, "_save_peak_state", lambda: None)
-    exporter._live_bots = [FUNDING, _registry_bot(exporter, "InsidersScalpV1")]
+    exporter._live_bots = [FUNDING, _registry_bot(exporter, "ShortKeltnerV2HL")]
     exporter._live_initial_capital = 400.0
     exporter._equity_basis = "accounts-v1"
     exporter._portfolio_peak = 500.0
@@ -728,16 +744,16 @@ def test_failed_halt_is_retried_alone_without_repeating_the_alert(exporter, monk
     """Codex review of #141: one failed halt re-stopped every bot and re-sent
     the global alert on every 60-second scrape."""
     clock, fleet, alerts = _breached_fleet(
-        exporter, monkeypatch, failing={"ft-insiders-scalp": [True, True, False]})
+        exporter, monkeypatch, failing={"ft-short-keltner-hl-live": [True, True, False]})
     stops = fleet.stops
     _cycle(exporter, _binance(400.0))
-    assert stops == ["FundingFadeV1", "InsidersScalpV1"] and len(alerts) == 1
-    assert exporter._pending_halts == {"ft-insiders-scalp"}
+    assert stops == ["FundingFadeV1", "ShortKeltnerV2HL"] and len(alerts) == 1
+    assert exporter._pending_halts == {"ft-short-keltner-hl-live"}
 
-    for _ in range(3):  # Insiders fails once more, then succeeds
+    for _ in range(3):  # it fails once more, then succeeds
         clock.now += 60
         _cycle(exporter, _binance(400.0))
-    assert stops[2:] == ["InsidersScalpV1", "InsidersScalpV1"], "only the unresolved halt is retried"
+    assert stops[2:] == ["ShortKeltnerV2HL", "ShortKeltnerV2HL"], "only the unresolved halt is retried"
     assert len(alerts) == 1, "a retry is not a new breach"
     assert exporter._pending_halts == set()
 
@@ -752,25 +768,25 @@ def test_failed_halt_is_retried_alone_without_repeating_the_alert(exporter, monk
 
 
 def test_pending_halts_clear_when_the_breach_recovers(exporter, monkeypatch):
-    clock, fleet, alerts = _breached_fleet(exporter, monkeypatch, failing={"ft-insiders-scalp": [True]})
+    clock, fleet, alerts = _breached_fleet(exporter, monkeypatch, failing={"ft-short-keltner-hl-live": [True]})
     _cycle(exporter, _binance(400.0))
-    assert exporter._pending_halts == {"ft-insiders-scalp"}
+    assert exporter._pending_halts == {"ft-short-keltner-hl-live"}
     clock.now += 60
     _cycle(exporter, _binance(495.0))  # 1% drawdown: the breaker resets
     assert exporter._circuit_breaker_triggered is False
     assert exporter._pending_halts == set(), "no halt is retried once the breach has cleared"
     assert exporter._halt_pages == {}
-    assert fleet.stops == ["FundingFadeV1", "InsidersScalpV1"]
+    assert fleet.stops == ["FundingFadeV1", "ShortKeltnerV2HL"]
 
 
 def test_pending_halts_survive_an_exporter_restart(exporter, monkeypatch, tmp_path):
     monkeypatch.setattr(exporter, "PEAK_STATE_FILE", tmp_path / "portfolio_peak.json")
     exporter._circuit_breaker_triggered = True
-    exporter._pending_halts = {"ft-insiders-scalp"}
+    exporter._pending_halts = {"ft-short-keltner-hl-live"}
     exporter._save_peak_state()
     exporter._pending_halts = set()
     exporter._load_peak_state()
-    assert exporter._pending_halts == {"ft-insiders-scalp"}
+    assert exporter._pending_halts == {"ft-short-keltner-hl-live"}
 
 
 # ── #205: a live bot restarted while the breaker is armed ─────────────────
@@ -917,24 +933,24 @@ def test_halt_targets_follow_current_mode_not_cached_membership(exporter, monkey
 def test_promoted_bot_failing_halt_stays_pending_through_cooldown_and_unreadable_config(
         exporter, monkeypatch):
     clock, fleet, alerts = _breached_fleet(
-        exporter, monkeypatch, failing={"ft-insiders-scalp": [True, True, True]})
-    exporter._live_bots = [FUNDING]  # Insiders promoted; membership not refreshed yet
+        exporter, monkeypatch, failing={"ft-short-keltner-hl-live": [True, True, True]})
+    exporter._live_bots = [FUNDING]  # bot promoted; membership not refreshed yet
     webhook = _Webhook()
     monkeypatch.setattr(exporter.requests, "post", webhook)
     _cycle(exporter, _binance(400.0))
-    assert fleet.stops == ["FundingFadeV1", "InsidersScalpV1"]
-    assert exporter._pending_halts == {"ft-insiders-scalp"}
+    assert fleet.stops == ["FundingFadeV1", "ShortKeltnerV2HL"]
+    assert exporter._pending_halts == {"ft-short-keltner-hl-live"}
 
-    fleet.modes["ft-insiders-scalp"] = None  # its API stops answering
+    fleet.modes["ft-short-keltner-hl-live"] = None  # its API stops answering
     for _ in range(2):  # each past the cooldown: the hourly reminder fires
         clock.now += exporter.CIRCUIT_BREAKER_COOLDOWN + 60
         _cycle(exporter, _binance(400.0))
-    assert fleet.stops[2:] == ["InsidersScalpV1", "InsidersScalpV1"], "one attempt per cycle"
-    assert exporter._pending_halts == {"ft-insiders-scalp"}
+    assert fleet.stops[2:] == ["ShortKeltnerV2HL", "ShortKeltnerV2HL"], "one attempt per cycle"
+    assert exporter._pending_halts == {"ft-short-keltner-hl-live"}
     assert len(alerts) == 3, "first breach plus the hourly reminders"
     halt_pages = [m[2] for m in webhook.messages() if m[1] == "fleet-breaker-halt"]
     assert len(halt_pages) == 2, "one page per bot episode, not one per failed cycle"
-    assert any("entry halt FAILED for InsidersScalpV1" in m for m in halt_pages)
+    assert any("entry halt FAILED for ShortKeltnerV2HL" in m for m in halt_pages)
 
 
 def test_enforcement_runs_in_the_hysteresis_band_and_without_an_evaluation(exporter, monkeypatch):
