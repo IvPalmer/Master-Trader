@@ -36,7 +36,6 @@ export_bot_creds KELTNER      ft-keltner-bounce
 export_bot_creds FUNDINGFADE  ft-funding-fade
 export_bot_creds OITREND      ft-oi-trend-pullback
 export_bot_creds KILLERS      ft-killers-scalp
-export_bot_creds INSIDERS     ft-insiders-scalp
 export_bot_creds SHORTKELTNER ft-short-keltner-hl-live
 
 # Shared pair as the fallback for anything not covered above.

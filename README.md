@@ -9,7 +9,7 @@ Current production fleet:
 | Binance spot | FundingFadeV1, KeltnerBounceV1 | Live; shared wallet |
 | Hyperliquid futures | KillersScalpV1 | Live; native stop-limit orders verified |
 | Binance spot | OITrendPullbackV1 | Dry-run |
-| Hyperliquid futures | InsidersScalpV2, ShortKeltnerV2HLlive | Dry-run |
+| Hyperliquid futures | ShortKeltnerV2HLlive | Dry-run |
 
 The [September 11 paper and fleet review](docs/audits/2026-09-11-order-flow-and-fleet-review.md)
 records execution faults, local remediation, unresolved accounting issues,
@@ -22,7 +22,7 @@ review are recorded in
 
 ## Architecture
 
-Production stack, `ft_userdata/docker-compose.prod.yml`, 13 services:
+Production stack, `ft_userdata/docker-compose.prod.yml`, 11 services:
 
 ```mermaid
 ---
@@ -30,8 +30,8 @@ title: Signal to execution path
 ---
 flowchart LR
     tg(["Telegram"]) --> kbot["killers_bot observer"]
-    kbot -->|POST /event| rcv["signal copiers<br/>killers + insiders"]
-    rcv -->|places orders| hlb["Hyperliquid bots<br/>3 containers"]
+    kbot -->|POST /event| rcv["signal copier<br/>killers-receiver"]
+    rcv -->|places orders| hlb["Hyperliquid bots<br/>2 containers"]
     rcv -->|price reads| gw["hl-gateway<br/>shared REST budget"]
     hlb -->|CCXT| gw
     gw --> hlapi(["api.hyperliquid.xyz"])
@@ -45,9 +45,9 @@ Arrows show request initiation, not data flow. `metrics-exporter` and `prometheu
 those edges the data travels the other way.
 
 The diagram covers the signal-to-execution path only. Left out for legibility: `funding-refresh`,
-which writes Binance funding rates into the shared `ft_user_data` volume that all six bots and the
+which writes Binance funding rates into the shared `ft_user_data` volume that all five bots and the
 dashboard mount; `ft-dashboard`, which reads four read-only state volumes rather than Prometheus; and
-per-service ports. `ft_userdata/docker-compose.prod.yml` holds all 13 services, and every published
+per-service ports. `ft_userdata/docker-compose.prod.yml` holds all 11 services, and every published
 port binds to `127.0.0.1`.
 
 `metrics-exporter` takes its bot list from `ft_userdata/bots_config.json`
@@ -85,7 +85,6 @@ python3 -m venv .venv
 V=$PWD/.venv/bin/python
 $V -m pytest tests/ -q
 (cd services/killers-receiver  && $V -m pytest tests/ -q)
-(cd services/insiders-receiver && $V -m pytest tests/ -q)
 (cd ft_userdata/ft_dashboard   && $V -m pytest tests/ -q)
 (cd services/hl-gateway        && $V -m pytest tests/ -q)
 (cd services/trade-webhook     && $V -m pytest tests/ -q)
