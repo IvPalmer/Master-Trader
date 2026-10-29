@@ -107,7 +107,7 @@ def test_copier_candle_cap_is_scoped_away_from_funding_history():
     key = 'FREQTRADE__EXCHANGE___FT_HAS_PARAMS__ohlcv_candle_limit_per_timeframe__5m'
     for name, service in prod['services'].items():
         env = service.get('environment', {})
-        if name in {'ft-killers-scalp', 'ft-insiders-scalp'}:
+        if name == 'ft-killers-scalp':
             assert env[key] == '100'
             assert env['FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS'] == '30'
             assert not any('mark_ohlcv' in k or 'funding_fee' in k for k in env)
@@ -118,7 +118,6 @@ def test_copier_candle_cap_is_scoped_away_from_funding_history():
 def test_hyperliquid_market_discovery_matches_native_perp_configs():
     prod = yaml.safe_load((FT_DIR / 'docker-compose.prod.yml').read_text())
     cases = {'ft-killers-scalp': 'KillersScalpV1.json',
-             'ft-insiders-scalp': 'InsidersScalpV2.json',
              'ft-short-keltner-hl-live': 'ShortKeltnerV2HL-live.json'}
     import json
     for service, filename in cases.items():
@@ -147,7 +146,7 @@ def test_hyperliquid_bots_wait_for_healthy_gateway():
         'service_healthy needs hl-gateway to define a healthcheck'
     bots = {name for name, svc in services.items() if _ccxt_via_hl_gateway(svc)}
     # Guard against the detector silently matching nothing.
-    assert bots == {'ft-killers-scalp', 'ft-insiders-scalp', 'ft-short-keltner-hl-live'}
+    assert bots == {'ft-killers-scalp', 'ft-short-keltner-hl-live'}
     for name in bots:
         depends = services[name].get('depends_on')
         assert isinstance(depends, dict), f'{name}: depends_on must be map form'
@@ -155,15 +154,24 @@ def test_hyperliquid_bots_wait_for_healthy_gateway():
 
 
 def test_receivers_reach_the_gateway_only_through_their_bot():
-    """Receivers declare no direct gateway dependency, but they depend on their
+    """The receiver declares no direct gateway dependency, but it depends on its
     Freqtrade bot, which waits for a healthy gateway. So a fresh `compose up`
-    does not start a receiver while the gateway is unhealthy; already-running
+    does not start the receiver while the gateway is unhealthy; already-running
     containers and restart-policy restarts are unaffected (depends_on only
     orders `up`). Pinned here so the transitive edge stays visible."""
     services = _prod_services()
-    for name, bot in (('killers-receiver', 'ft-killers-scalp'),
-                      ('insiders-receiver', 'ft-insiders-scalp')):
+    for name, bot in (('killers-receiver', 'ft-killers-scalp'),):
         depends = services[name].get('depends_on') or []
         assert 'hl-gateway' not in depends, name
         assert bot in depends, name
         assert services[bot]['depends_on']['hl-gateway']['condition'] == 'service_healthy'
+
+
+def test_retired_insiders_stack_is_not_deployed():
+    """#216: the Insiders forward measurement is retired. A full deploy must not
+    bring its bot or receiver back, and nothing may route to its gateway client."""
+    text = (FT_DIR / 'docker-compose.prod.yml').read_text()
+    assert not {'ft-insiders-scalp', 'insiders-receiver'} & set(_prod_services())
+    for marker in ('ft-insiders-scalp', 'insiders-receiver', 'hl-gateway:8080/insiders',
+                   'insiders_receiver_state', 'InsidersScalpV2.json'):
+        assert marker not in text, marker

@@ -450,7 +450,7 @@ def test_hyperliquid_live_configs_have_native_limit_stops(filename):
 def test_production_compose_isolates_dry_and_live_databases_and_serializes_opens():
     compose = (ROOT / "ft_userdata" / "docker-compose.prod.yml").read_text()
     receiver = (ROOT / "services" / "killers-receiver" / "app" / "main.py").read_text()
-    for bot in ("KillersScalpV1", "InsidersScalpV2", "ShortKeltnerV2HLlive"):
+    for bot in ("KillersScalpV1", "ShortKeltnerV2HLlive"):
         assert f"tradesv3.dryrun.{bot}" in compose
         assert f"tradesv3.live.{bot}" in compose
     assert "tradesv3.snapshot.ShortKeltnerV2HL.pre-live.sqlite" in compose
@@ -467,5 +467,5 @@ def test_production_freqtrade_image_is_digest_pinned_and_funding_v2_isolated():
     )
 
     assert "freqtradeorg/freqtrade:stable" not in compose
-    assert compose.count(digest) == 7
+    assert compose.count(digest) == 6
     assert funding["db_url"].endswith("tradesv3.live.FundingFadeV1.v2.sqlite")

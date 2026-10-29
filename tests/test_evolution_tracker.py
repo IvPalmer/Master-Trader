@@ -372,7 +372,8 @@ def deployed_configs():
     """strategy -> config filenames, from the prod compose `freqtrade trade` commands.
 
     A set per strategy: one strategy can run under several configs
-    (InsidersScalpV2.json runs --strategy KillersScalpV1). Commented lines are ignored.
+    (the retired InsidersScalpV2.json ran --strategy KillersScalpV1). Commented lines
+    are ignored.
     """
     pattern = re.compile(
         r"exec freqtrade trade .*?--config /freqtrade/user_data/configs/(\S+) --strategy (\S+)"

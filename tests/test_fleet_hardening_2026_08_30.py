@@ -78,20 +78,17 @@ def test_receiver_refuses_to_start_without_an_ingress_token():
     )
 
 
-def test_both_receivers_get_a_token_and_they_are_different_variables(compose):
-    """One token per funded account, so a leak of one cannot drive the other."""
+def test_the_receiver_gets_its_ingress_token(compose):
+    """The receiver's token comes from its own variable (insiders-receiver, which
+    held the second one, was retired in #216)."""
     killers = compose["services"]["killers-receiver"]["environment"]
-    insiders = compose["services"]["insiders-receiver"]["environment"]
     assert "KILLERS_INGRESS_TOKEN" in killers["KILLERS_INGRESS_TOKEN"]
-    assert "INSIDERS_INGRESS_TOKEN" in insiders["KILLERS_INGRESS_TOKEN"]
-    assert killers["KILLERS_INGRESS_TOKEN"] != insiders["KILLERS_INGRESS_TOKEN"]
 
 
 @pytest.mark.parametrize(
     "service,token_var",
     [
         ("ft-killers-scalp", "KILLERS_INGRESS_TOKEN"),
-        ("ft-insiders-scalp", "INSIDERS_INGRESS_TOKEN"),
     ],
 )
 def test_strategy_containers_carry_the_matching_receiver_token(
@@ -477,7 +474,6 @@ def test_per_bot_credential_slugs_agree_across_compose_api_utils_dashboard(compo
         ("fundingfadev1", "FUNDINGFADE"),
         ("oi-trend-pullback", "OITREND"),
         ("ft-killers-scalp", "KILLERS"),
-        ("ft-insiders-scalp", "INSIDERS"),
         ("ft-short-keltner-hl-live", "SHORTKELTNER"),
     ],
 )
@@ -503,7 +499,7 @@ def test_each_bot_prefers_its_own_credentials_and_falls_back_to_the_fleet(
 
 @pytest.mark.parametrize(
     "service,slug",
-    [("killers-receiver", "KILLERS"), ("insiders-receiver", "INSIDERS")],
+    [("killers-receiver", "KILLERS")],
 )
 def test_receivers_authenticate_to_their_own_bot(compose, service, slug):
     """A receiver must hold the credentials of the bot it drives, not another."""

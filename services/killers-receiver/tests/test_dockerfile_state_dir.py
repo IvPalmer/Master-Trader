@@ -56,10 +56,10 @@ def test_container_runs_as_the_user_that_owns_the_state_dir():
     assert users and users[-1] in ("receiver", "1000")
 
 
-def test_both_receivers_keep_their_db_inside_the_seeded_volume():
+def test_the_receiver_keeps_its_db_inside_the_seeded_volume():
     services = yaml.safe_load(
         (REPO / "ft_userdata" / "docker-compose.prod.yml").read_text())["services"]
-    for name in ("killers-receiver", "insiders-receiver"):
+    for name in ("killers-receiver",):
         svc = services[name]
         assert svc["build"] == "../services/killers-receiver"
         mounts = [v for v in svc["volumes"] if v.endswith(f":{STATE_DIR}")]

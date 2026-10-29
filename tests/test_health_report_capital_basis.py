@@ -216,9 +216,11 @@ def test_uncovered_live_accounts_are_named_not_implied(monkeypatch):
     """Review finding: the headline read as fleet-wide equity while the
     receiver-managed Hyperliquid accounts were never valued."""
     uncovered = shr._load_uncovered_bots()
-    assert {"KillersScalpV1", "InsidersScalpV1"} <= set(uncovered)
+    assert {"KillersScalpV1", "ShortKeltnerV2HL"} <= set(uncovered)
     assert not set(uncovered) & set(shr.BOTS)
-    assert {"KillersScalpV1", "InsidersScalpV1"} <= set(shr.REPORTING_BOTS)
+    assert {"KillersScalpV1", "ShortKeltnerV2HL"} <= set(shr.REPORTING_BOTS)
+    # Retired 2026-10-29 (#216): no longer deployed, so neither reported nor uncovered.
+    assert "InsidersScalpV1" not in set(uncovered) | set(shr.REPORTING_BOTS)
     lines = shr._format_capital_lines({
         "portfolio_value": 224.0, "return_pct": 2.5, "live_starting_capital": 200.0,
         "live_true_pnl": 5.0, "capital_basis_errors": [],
