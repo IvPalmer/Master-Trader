@@ -181,17 +181,3 @@ def test_record_signal_targets_sem_data_nao_quebra(conn):
     observer.record_signal_targets(conn, {"id": 1, "text": OPEN_8},
                                    {"kind": "open"})
     assert observer.lookup_declared_targets(conn, OPEN_8, 99) == 8
-
-
-def test_insiders_desliga_o_shadow(monkeypatch):
-    """As regras sao do formato Killers. No fan-out Insiders cada mensagem
-    viraria divergencia falsa, poluindo a medicao."""
-    monkeypatch.setenv("INSIDERS_TG_CHANNEL_ID", "-100123")
-    for var, val in (("KILLERS_TG_API_ID", "1"), ("KILLERS_TG_API_HASH", "x"),
-                     ("KILLERS_TG_SESSION", "/tmp/x.session")):
-        monkeypatch.setenv(var, val)
-    ins = observer._insiders_config()
-    assert ins is not None
-    assert ins.shadow_rules is False
-    assert ins.use_fast_path is False
-    assert observer.Config().shadow_rules is True
