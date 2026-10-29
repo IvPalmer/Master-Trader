@@ -43,7 +43,7 @@ TELEGRAM_TIMEOUT = float(os.environ.get("TELEGRAM_TIMEOUT", "10"))
 
 # Shared secret for POST /test/notify (#59) and POST /freqtrade/event (#97).
 # Both routes put caller-chosen text in the ops Telegram chat. Callers send it
-# as the X-Notify-Token header: killers-receiver, insiders-receiver and its
+# as the X-Notify-Token header: killers-receiver and its
 # risk warden (/test/notify), the metrics-exporter circuit breaker and the
 # ft_userdata report scripts (/freqtrade/event).
 #
@@ -83,8 +83,8 @@ def _load_notify_token() -> str:
         log.warning(
             "TRADE_WEBHOOK_NOTIFY_TOKEN is not set — POST /test/notify is "
             "UNAUTHENTICATED and relays any caller's text to the ops Telegram "
-            "chat. Set the same value here and on killers-receiver / "
-            "insiders-receiver (generate with `openssl rand -hex 24`)."
+            "chat. Set the same value here and on killers-receiver "
+            "(generate with `openssl rand -hex 24`)."
         )
     elif len(token) < _MIN_NOTIFY_TOKEN_LEN:
         # Never log the token itself, only its length.
@@ -382,7 +382,7 @@ async def freqtrade_event(request: Request) -> dict[str, Any]:
 async def test_notify(request: Request) -> dict[str, Any]:
     """Relay a caller-supplied message to the ops Telegram chat.
 
-    Used by killers-receiver / insiders-receiver alerts and as a manual smoke
+    Used by killers-receiver alerts and as a manual smoke
     test. Requires the X-Notify-Token header when TRADE_WEBHOOK_NOTIFY_TOKEN is
     configured (see NOTIFY_TOKEN above).
     """
