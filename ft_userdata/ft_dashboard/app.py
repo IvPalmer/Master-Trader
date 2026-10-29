@@ -2614,4 +2614,4 @@ async def api_candles(bot_key: str, pair: str, timeframe: str = "1h", limit: int
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")

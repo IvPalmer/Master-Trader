@@ -2,11 +2,8 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir \
-    fastapi==0.115.5 \
-    "uvicorn[standard]"==0.32.1 \
-    aiohttp==3.11.10 \
-    pydantic==2.10.3
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY app /app/app
 # Open-risk monitor (#105); host cron runs it in this container.
