@@ -43,7 +43,7 @@ LIVE_CONFIGS = [
 # Bot services that expose a Freqtrade API and therefore may be issued their
 # own credentials. Keep in sync with api_utils.SERVICE_API_SLUGS.
 EXPECTED_SLUGS = {
-    "KELTNER", "FUNDINGFADE", "OITREND", "KILLERS", "INSIDERS", "SHORTKELTNER",
+    "KELTNER", "FUNDINGFADE", "OITREND", "KILLERS", "SHORTKELTNER",
 }
 
 
@@ -103,11 +103,11 @@ def test_strategy_containers_carry_the_matching_receiver_token(
     assert token_var in env["SIGNAL_RECEIVER_TOKEN"]
 
 
-def test_dashboard_carries_both_receiver_tokens(compose):
+def test_dashboard_carries_the_receiver_token(compose):
     """The dashboard reads /ingress, which is now authenticated."""
     env = compose["services"]["ft-dashboard"]["environment"]
     assert "KILLERS_INGRESS_TOKEN" in env["KILLERS_RECEIVER_TOKEN"]
-    assert "INSIDERS_INGRESS_TOKEN" in env["INSIDERS_RECEIVER_TOKEN"]
+    assert "INSIDERS_RECEIVER_TOKEN" not in env  # retired with insiders-receiver (#216)
 
 
 def test_every_receiver_client_sends_a_bearer_header():

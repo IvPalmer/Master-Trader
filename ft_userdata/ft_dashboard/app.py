@@ -49,12 +49,10 @@ log = logging.getLogger("ft-dashboard")
 # OI uses the final strategy process startup after its custom-exit correction.
 # Every affected live DB was empty at its cutover.
 KILLERS_ROUND3_EPOCH_TS_MS = 1787589161248  # 2026-08-24T16:32:41.248Z
-INSIDERS_ROUND3_EPOCH_TS_MS = 1787589161684  # 2026-08-24T16:32:41.684Z
 # Round-5 epochs (2026-08-27): risk contract widened to admit the channel's
 # wide stops ($2/$1.50 stop-risk) and entry limits now wait 24h in the zone
 # instead of 4h. Both copy-trader DBs had zero trades at this cutover.
 KILLERS_ROUND5_EPOCH_TS_MS = 1787854748304  # 2026-08-27T18:19:08.304Z
-INSIDERS_ROUND5_EPOCH_TS_MS = 1787854752005  # 2026-08-27T18:19:12.005Z
 OI_ROUND4_EPOCH_TS_MS = 1787619881124  # 2026-08-25T01:04:41.124Z
 
 BOTS: list[dict[str, Any]] = [
@@ -203,50 +201,15 @@ BOTS: list[dict[str, Any]] = [
         "no_baseline": True,
         "baseline": None,
     },
-    # insiders-scalp RETIRED 2026-05-29: copier edge negative (−8.7%/−13%,
-    # Dennis path defunct). REVIVED 2026-06-06 as a forward measurement using
-    # the same copy-trader plumbing as killers, fed by the observer fan-out of
-    # Dennis's free "Market Mastery" channel. The earlier −8.7%/−13% verdict was
-    # a backtest of his PAID path; this is a live, falsifiable re-test on real
-    # prices. Observational + no_baseline for the same reason as killers-ft: a
-    # pass-through copy-trader of an external signaler, not a quant strategy with
-    # a validated backtest baseline. Execution venue is Hyperliquid.
-    {
-        "key": "insiders-ft",
-        "name": "InsidersScalp",
-        "label": "insiders-scalp",
-        "url": "http://ft-insiders-scalp:8080",
-        "account_group": "hyperliquid-insiders",
-        "strategy_kind": "copy-trader",
-        "venue": "hyperliquid",
-        "wallet_env": "HYPERLIQUID_INSIDERS_WALLET_ADDRESS",
-        "epoch_start_ts_ms": INSIDERS_ROUND5_EPOCH_TS_MS,
-        "epoch_label": "round 5 · wide-stop admission · 24h zone patience",
-        "strategy_version": "InsidersScalp · r5",
-        "entry_gate_label": "external signal + valid zone + posted stop",
-        "receiver_url": "http://insiders-receiver:8089",
-        "receiver_token_env": "INSIDERS_RECEIVER_TOKEN",
-        "lineage": {
-            "legacy_db": "tradesv3.dryrun.InsidersScalpV2.sqlite",
-            "legacy_starting_capital": 200.0,
-            "transition_ts_ms": INSIDERS_ROUND5_EPOCH_TS_MS,
-            "transition_label": "live + wide-stop admission",
-            "legacy_label": "Binance futures dry-run",
-            "live_label": "Hyperliquid live",
-        },
-        "observational": True,
-        "no_baseline": True,
-        "baseline": None,
-    },
 ]
 
 # Exits that Freqtrade's API does not report: each strategy's custom_exit()
 # time rules and dataframe exit signals. The ROI table, stoploss and trailing
 # settings come from the running bot's /show_config instead. Keyed by bot key;
-# "strategy" names the class the container runs (insiders-ft runs
-# KillersScalpV1). tests/test_exit_policy.py parses the strategy source and
-# fails if a threshold or exit reason here drifts from it. These describe the
-# strategy's own rules: they are not exchange orders or observed exits.
+# "strategy" names the class the container runs. tests/test_exit_policy.py
+# parses the strategy source and fails if a threshold or exit reason here
+# drifts from it. These describe the strategy's own rules: they are not
+# exchange orders or observed exits.
 STRATEGY_EXIT_RULES: dict[str, dict[str, Any]] = {
     "fundingfade": {"strategy": "FundingFadeV1", "rules": [
         {"kind": "time", "after_hours": 96, "profit_below": 0.0, "reason": "v2_failed_reversion"},
@@ -265,7 +228,6 @@ STRATEGY_EXIT_RULES: dict[str, dict[str, Any]] = {
          "text": "BTC's 1h close is above its 1h SMA50, or RSI(14) is below 30"},
     ]},
     "killers-ft": {"strategy": "KillersScalpV1", "rules": [], "receiver_driven": True},
-    "insiders-ft": {"strategy": "KillersScalpV1", "rules": [], "receiver_driven": True},
 }
 
 
@@ -643,7 +605,6 @@ SERVICE_API_SLUGS = {
     "ft-oi-trend-pullback": "OITREND",
     "oi-trend-pullback": "OITREND",
     "ft-killers-scalp": "KILLERS",
-    "ft-insiders-scalp": "INSIDERS",
     "ft-short-keltner-hl-live": "SHORTKELTNER",
 }
 
