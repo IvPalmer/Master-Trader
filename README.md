@@ -287,7 +287,6 @@ ft_userdata/                     # Freqtrade working dir and Compose context
 
 services/
   killers-receiver/              # Telegram signal copier
-  insiders-receiver/
   hl-gateway/                    # shared Hyperliquid REST proxy
   trade-webhook/
 
