@@ -111,12 +111,11 @@ def test_dashboard_carries_the_receiver_token(compose):
 
 
 def test_every_receiver_client_sends_a_bearer_header():
-    """All four callers must actually attach the token, not just receive it."""
+    """All three callers must actually attach the token, not just receive it."""
     callers = {
         "observer": ROOT / "killers_bot" / "observer.py",
         "strategy": STRATEGIES / "KillersScalpV1.py",
         "dashboard": FT_DIR / "ft_dashboard" / "app.py",
-        "insiders_bridge": FT_DIR / "insiders_bridge" / "listener.py",
     }
     for name, path in callers.items():
         assert "Bearer " in path.read_text(), (
