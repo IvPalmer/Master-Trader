@@ -173,5 +173,6 @@ def test_retired_insiders_stack_is_not_deployed():
     text = (FT_DIR / 'docker-compose.prod.yml').read_text()
     assert not {'ft-insiders-scalp', 'insiders-receiver'} & set(_prod_services())
     for marker in ('ft-insiders-scalp', 'insiders-receiver', 'hl-gateway:8080/insiders',
-                   'insiders_receiver_state', 'InsidersScalpV2.json'):
+                   'insiders_receiver_state', 'InsidersScalpV2.json', 'INSIDERS_INGRESS_TOKEN',
+                   'INSIDERS_RECEIVER_TOKEN', 'HYPERLIQUID_INSIDERS_', '_INSIDERS:'):
         assert marker not in text, marker

@@ -54,7 +54,6 @@ SERVICE_API_SLUGS = {
     "oi-trend-pullback": "OITREND",
     "ft-oi-trend-pullback": "OITREND",
     "ft-killers-scalp": "KILLERS",
-    "ft-insiders-scalp": "INSIDERS",
     "ft-short-keltner-hl-live": "SHORTKELTNER",
 }
 
@@ -67,7 +66,6 @@ PORT_API_SLUGS = {
     8096: "FUNDINGFADE",
     8102: "OITREND",
     8099: "KILLERS",
-    8098: "INSIDERS",
     8103: "SHORTKELTNER",
 }
 
