@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 
 UPSTREAM = 'https://api.hyperliquid.xyz'
-CLIENTS = {'killers', 'insiders', 'short', 'accounting'}
+CLIENTS = {'killers', 'short', 'accounting'}
 LOW_COST = {'l2Book', 'allMids', 'clearinghouseState', 'orderStatus',
             'spotClearinghouseState', 'exchangeStatus'}
 VARIABLE = {'recentTrades', 'historicalOrders', 'userFills', 'userFillsByTime',
