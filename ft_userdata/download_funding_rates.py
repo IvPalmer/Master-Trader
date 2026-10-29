@@ -183,7 +183,7 @@ def save_pair(pair: str, records: list, quarantined: list | None = None):
 
 
 # Telegram alert for quarantined rows, through trade-webhook's /test/notify
-# (the path killers-/insiders-receiver use). FUNDING_NOTIFY_URL unset = no alert.
+# (the path killers-receiver uses). FUNDING_NOTIFY_URL unset = no alert.
 # TRADE_WEBHOOK_NOTIFY_TOKEN is sent as X-Notify-Token only when set (#59).
 #
 # --incremental rewinds 24h, so a quarantined row is re-fetched by every run for

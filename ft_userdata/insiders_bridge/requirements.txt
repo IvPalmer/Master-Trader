@@ -1,4 +1,0 @@
-# Runtime pins for the ft-insiders-listener image (./Dockerfile). Not in the
-# compose stack today. A requirements file so Dependabot sees them (#210).
-telethon==1.36.0
-aiohttp==3.14.4

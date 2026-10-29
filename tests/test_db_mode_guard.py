@@ -91,12 +91,12 @@ def test_environment_overrides_are_the_effective_mode_and_database(tmp_path, mon
 
 def test_every_active_bot_entrypoint_runs_the_guard():
     compose = (ROOT / "ft_userdata/docker-compose.prod.yml").read_text()
-    assert compose.count("guard_db_mode.py --config") == 6
+    assert compose.count("guard_db_mode.py --config") == 5
 
 
 @pytest.mark.parametrize(
     "service",
-    ["ft-killers-scalp", "ft-insiders-scalp", "ft-short-keltner-hl-live"],
+    ["ft-killers-scalp", "ft-short-keltner-hl-live"],
 )
 @pytest.mark.parametrize("dry_run", ["true", "false"])
 @pytest.mark.parametrize("guard_status", [0, 78])

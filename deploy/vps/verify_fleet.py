@@ -12,7 +12,6 @@ BOTS = [('ft-keltner-bounce', 8095, 'KeltnerBounceV1'),
         ('ft-funding-fade', 8096, 'FundingFadeV1'),
         ('ft-oi-trend-pullback', 8102, 'OITrendPullbackV1'),
         ('ft-killers-scalp', 8099, 'KillersScalpV1'),
-        ('ft-insiders-scalp', 8098, 'KillersScalpV1'),
         ('ft-short-keltner-hl-live', 8103, 'ShortKeltnerV2HL')]
 
 
@@ -50,18 +49,18 @@ j=json.load(urllib.request.urlopen('http://localhost:8000/api/state'))
 print(json.dumps({k:j.get(k) for k in ['status','poll_age_s','account_health']}))''')
     result['gateway'] = exec_json('ft-hl-gateway', "import json,urllib.request; print(urllib.request.urlopen('http://localhost:8080/healthz').read().decode())")
     result['routing'] = {}
-    for name, client in [('ft-killers-scalp', 'killers'), ('ft-insiders-scalp', 'insiders'), ('ft-short-keltner-hl-live', 'short')]:
+    for name, client in [('ft-killers-scalp', 'killers'), ('ft-short-keltner-hl-live', 'short')]:
         effective = exec_json(name, '''import json
 from freqtrade.configuration.environment_vars import environment_vars_to_dict
 from freqtrade.misc import deep_merge_dicts
-files={'killers':'KillersScalpV1.json','insiders':'InsidersScalpV2.json','short':'ShortKeltnerV2HL-live.json'}
+files={'killers':'KillersScalpV1.json','short':'ShortKeltnerV2HL-live.json'}
 env=environment_vars_to_dict()
 client=env['exchange']['ccxt_config']['urls']['api']['public'].rsplit('/',1)[-1]
 c=deep_merge_dicts(env,json.load(open('/freqtrade/user_data/configs/'+files[client])))
 print(json.dumps({'urls':c['exchange'].get('ccxt_config',{}).get('urls'), 'market_types':c['exchange'].get('ccxt_config',{}).get('options',{}).get('fetchMarkets',{}).get('types'), 'cancel_on_exit':c.get('cancel_open_orders_on_exit'), 'candle_limits':c['exchange'].get('_ft_has_params',{}).get('ohlcv_candle_limit_per_timeframe',{}), 'subscriptions':c['exchange'].get('pair_whitelist')}))''')
         expected = 'http://hl-gateway:8080/' + client
         result['routing'][name] = effective['urls'] == {'api': {'public': expected, 'private': expected}} and effective['cancel_on_exit'] is False and effective['market_types'] == ['swap']
-        if client in {'killers', 'insiders'}:
+        if client == 'killers':
             result['routing'][name] = result['routing'][name] and effective['candle_limits'] == {'5m': 100} and effective['subscriptions'] == ['BTC/USDC:USDC']
     # Exercise only validation/subscription functions against in-memory fakes.
     # Never invoke order submission, an exchange client, or a real RPC sender.
@@ -114,7 +113,6 @@ exchange.fetch_tickers()
 print(json.dumps(calls==['swap','swap']))''')
     result['runtime_source_matches'] = {}
     for name, deployed, source in [('killers-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),
-            ('insiders-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),
             ('ft-hl-gateway','/app/app/main.py','services/hl-gateway/app/main.py'),
             ('ft-dashboard','/app/app.py','ft_userdata/ft_dashboard/app.py'),
             ('ft-metrics-exporter','/app/metrics_exporter.py','ft_userdata/metrics_exporter.py')]:

@@ -25,8 +25,8 @@ services:
       # `${TRADE_WEBHOOK_NOTIFY_TOKEN:-}` takes precedence over env_file and
       # would silently blank the value unless the deploying shell also
       # exported it. When the token is set, POST /test/notify requires a
-      # matching X-Notify-Token header (same value as on killers-receiver /
-      # insiders-receiver); unset keeps the legacy open route and logs a
+      # matching X-Notify-Token header (same value as on killers-receiver);
+      # unset keeps the legacy open route and logs a
       # startup WARNING. POST /freqtrade/event checks the same token per
       # TRADE_WEBHOOK_EVENT_AUTH (monitor by default, or enforce); see README.
     # Bind to host loopback so VPS host-side scripts (e.g. run-health-report.sh

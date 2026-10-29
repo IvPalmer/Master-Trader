@@ -15,9 +15,9 @@ def test_dashboard_tracks_every_current_live_executor():
         "oi-trend",
         "short-keltner-hl",
         "killers-ft",
-        "insiders-ft",
     }
     assert "cascade" not in bots
+    assert "insiders-ft" not in bots  # retired 2026-10-29 (#216)
 
 
 def test_short_keltner_points_to_fresh_live_epoch():
@@ -37,13 +37,11 @@ def test_shared_binance_wallet_has_one_account_group():
         assert bots[key]["account_group"] == "binance-spot"
 
     assert bots["killers-ft"]["account_group"] != "binance-spot"
-    assert bots["insiders-ft"]["account_group"] != "binance-spot"
     assert bots["short-keltner-hl"]["account_group"] != "binance-spot"
 
 
 def test_strategy_kinds_distinguish_copiers_from_autonomous_bots():
     bots = _by_key()
     assert bots["killers-ft"]["strategy_kind"] == "copy-trader"
-    assert bots["insiders-ft"]["strategy_kind"] == "copy-trader"
     assert bots["short-keltner-hl"]["strategy_kind"] == "autonomous-quant"
     assert bots["oi-trend"]["strategy_kind"] == "autonomous-quant"

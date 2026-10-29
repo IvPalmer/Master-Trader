@@ -55,13 +55,10 @@ ft_userdata/analysis/vpin_keltner_results/
 # Backtest expected-equity overlays consumed by ft-dashboard
 !ft_userdata/overlays/*.csv
 
-# Insiders Scalp prototype: data + secrets live under _local/ (never commit).
-# Code files (parser.py, simulator.py, weex.py) ARE tracked — they hold the
-# parser/simulator/price-walker that runs the offline replay.
+# Insiders Scalp prototype (code removed in #216, git history keeps it). Its
+# data + secrets may still sit on a host checkout under _local/, out/, .env,
+# *.session and secrets/: keep ignoring them so they are never committed.
 ft_userdata/insiders_bridge/_local/*
-!ft_userdata/insiders_bridge/_local/parser.py
-!ft_userdata/insiders_bridge/_local/simulator.py
-!ft_userdata/insiders_bridge/_local/weex.py
 ft_userdata/insiders_bridge/out/
 
 # Insiders listener env + secrets (.env.example is the template, .env is per-deployment)

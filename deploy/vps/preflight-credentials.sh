@@ -25,27 +25,17 @@ fi
 # Read without sourcing: the file holds secrets and arbitrary shell would run.
 get() { sed -n "s/^$1=//p" "$ENV_FILE" | tail -n1; }
 
-SLUGS="KELTNER FUNDINGFADE OITREND KILLERS INSIDERS SHORTKELTNER"
+SLUGS="KELTNER FUNDINGFADE OITREND KILLERS SHORTKELTNER"
 
-echo "== receiver ingress tokens =="
+echo "== receiver ingress token =="
 K_TOKEN="$(get KILLERS_INGRESS_TOKEN)"
-I_TOKEN="$(get INSIDERS_INGRESS_TOKEN)"
 
-for pair in "KILLERS_INGRESS_TOKEN:$K_TOKEN" "INSIDERS_INGRESS_TOKEN:$I_TOKEN"; do
-  name="${pair%%:*}"; value="${pair#*:}"
-  if [ -z "$value" ]; then
-    err "$name is unset — the receiver will refuse to start"
-  elif [ "${#value}" -lt 24 ]; then
-    err "$name is ${#value} chars, minimum 24 (openssl rand -hex 24)"
-  else
-    ok "$name set (${#value} chars)"
-  fi
-done
-
-if [ -n "$K_TOKEN" ] && [ "$K_TOKEN" = "$I_TOKEN" ]; then
-  err "both receivers share one token — they drive separately funded accounts"
-elif [ -n "$K_TOKEN" ] && [ -n "$I_TOKEN" ]; then
-  ok "the two receiver tokens differ"
+if [ -z "$K_TOKEN" ]; then
+  err "KILLERS_INGRESS_TOKEN is unset — the receiver will refuse to start"
+elif [ "${#K_TOKEN}" -lt 24 ]; then
+  err "KILLERS_INGRESS_TOKEN is ${#K_TOKEN} chars, minimum 24 (openssl rand -hex 24)"
+else
+  ok "KILLERS_INGRESS_TOKEN set (${#K_TOKEN} chars)"
 fi
 
 echo
@@ -81,17 +71,15 @@ OBS_ENV="${OBSERVER_ENV:-/home/ubuntu/killers-bot/.env}"
 if [ ! -f "$OBS_ENV" ]; then
   warn "no observer env at $OBS_ENV — set OBSERVER_ENV to check it"
 else
-  for pair in "KILLERS_RECEIVER_TOKEN:$K_TOKEN" "INSIDERS_RECEIVER_TOKEN:$I_TOKEN"; do
-    name="${pair%%:*}"; expected="${pair#*:}"
-    actual="$(sed -n "s/^$name=//p" "$OBS_ENV" | tail -n1 | tr -d '"'"'"'')"
-    if [ -z "$actual" ]; then
-      err "$name missing from $OBS_ENV — every signal it posts will 401"
-    elif [ "$actual" != "$expected" ]; then
-      err "$name in $OBS_ENV does not match the stack value"
-    else
-      ok "$name matches the receiver"
-    fi
-  done
+  name=KILLERS_RECEIVER_TOKEN
+  actual="$(sed -n "s/^$name=//p" "$OBS_ENV" | tail -n1 | tr -d '"'"'"'')"
+  if [ -z "$actual" ]; then
+    err "$name missing from $OBS_ENV — every signal it posts will 401"
+  elif [ "$actual" != "$K_TOKEN" ]; then
+    err "$name in $OBS_ENV does not match the stack value"
+  else
+    ok "$name matches the receiver"
+  fi
 fi
 
 echo
