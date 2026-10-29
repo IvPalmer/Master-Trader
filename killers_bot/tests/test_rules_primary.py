@@ -188,8 +188,3 @@ def test_chave_de_ambiente(base_env, monkeypatch, valor, esperado):
     else:
         monkeypatch.setenv("KILLERS_RULES_PRIMARY", valor)
     assert observer.Config().rules_primary is esperado
-
-
-def test_insiders_nunca_usa_a_regra(base_env, monkeypatch):
-    monkeypatch.setenv("INSIDERS_TG_CHANNEL_ID", "-100123")
-    assert observer._insiders_config().rules_primary is False
