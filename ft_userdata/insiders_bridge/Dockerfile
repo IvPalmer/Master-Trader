@@ -12,7 +12,8 @@ FROM python:3.13-slim
 
 # Minimal deps — Telethon, aiohttp for receiver POSTs, no scientific stack
 # (the classifier runs separately in the receiver container).
-RUN pip install --no-cache-dir telethon==1.36.0 aiohttp==3.11.10
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 WORKDIR /app
 

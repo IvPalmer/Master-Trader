@@ -8,11 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     npm install -g @anthropic-ai/claude-code && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir \
-    fastapi==0.115.0 \
-    uvicorn[standard]==0.32.0 \
-    aiohttp==3.11.10 \
-    pydantic==2.10.0
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 WORKDIR /app
 
