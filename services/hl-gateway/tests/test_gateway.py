@@ -86,7 +86,7 @@ def test_market_cache_is_shared_without_exposing_payloads():
     async def check():
         session = Session(b'{"BTC":"100"}')
         gateway = g.Gateway(session)
-        for client in ('killers', 'insiders', 'short'):
+        for client in ('killers', 'short', 'accounting'):
             assert (await gateway.forward(client, 'info', {'type': 'allMids'}))[0] == 200
         assert session.calls == 1
         assert 'BTC' not in str(gateway.health())
@@ -149,3 +149,18 @@ def test_expired_market_data_is_evicted_on_next_request():
         await gateway.forward('killers', 'info', {'type':'allMids'})
         assert 'expired' not in gateway.cache
     asyncio.run(check())
+
+
+def test_retired_insiders_client_has_no_route():
+    """#216: the Insiders bot and receiver are retired; /insiders/* is a 404 and
+    the client no longer appears in health telemetry."""
+    async def check():
+        for path in ('info', 'exchange'):
+            try:
+                await g.proxy('insiders', path, None)
+            except g.HTTPException as exc:
+                assert exc.status_code == 404
+            else:
+                raise AssertionError('insiders route still served')
+    asyncio.run(check())
+    assert 'insiders' not in g.Gateway(Session()).health()['clients']
