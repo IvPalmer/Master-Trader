@@ -13,6 +13,8 @@ Two Freqtrade bots are reachable on the docker network from your container:
 
 `note: "Simulated balances"` in the `/balance` payload tells you it's dry-run; empty `note` means real exchange.
 
+Each bot has its own API pair: `FT_KELTNER_USER`/`FT_KELTNER_PASS` and `FT_FUNDING_FADE_USER`/`FT_FUNDING_FADE_PASS`. A pair only works on its own bot; any other bot answers 401.
+
 ## How to answer "how is X doing"
 
 1. Source creds: `set -a; . /home/ubuntu/master-trader/.bot-secrets/freqtrade.env; set +a`
@@ -28,8 +30,8 @@ Example (FundingFade live status):
 
 ```bash
 set -a; . /home/ubuntu/master-trader/.bot-secrets/freqtrade.env; set +a
-curl -s -u "$FT_API_USER:$FT_API_PASS" "$FT_FUNDING_FADE_URL/api/v1/profit"
-curl -s -u "$FT_API_USER:$FT_API_PASS" "$FT_FUNDING_FADE_URL/api/v1/status"
+curl -s -u "$FT_FUNDING_FADE_USER:$FT_FUNDING_FADE_PASS" "$FT_FUNDING_FADE_URL/api/v1/profit"
+curl -s -u "$FT_FUNDING_FADE_USER:$FT_FUNDING_FADE_PASS" "$FT_FUNDING_FADE_URL/api/v1/status"
 ```
 
 ## Reporting style
