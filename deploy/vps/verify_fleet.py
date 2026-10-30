@@ -24,7 +24,8 @@ def exec_json(name, script):
 
 
 def verify():
-    result = {'commit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(), 'bots': []}
+    result = {'commit': subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', 'HEAD'], text=True).strip(), 'bots': [],
+              'killers_exit_timeout': False}
     for name, port, expected in BOTS:
         try:
             meta = container(name)
@@ -39,6 +40,9 @@ def verify():
                 'expected_strategy': expected, 'dry_run': config['dry_run'],
                 'restarts': meta['RestartCount'], 'open_trades': [{k: t.get(k) for k in ['trade_id', 'pair', 'amount', 'current_rate', 'stop_loss_abs']} for t in trades]})
             if name == 'ft-killers-scalp':
+                # #220: an exit timeout cancels the receiver's resting take-profits.
+                timeout = config.get('unfilledtimeout') or {}
+                result['killers_exit_timeout'] = timeout.get('exit') is None and timeout.get('entry') == 1440
                 req = urllib.request.Request('https://api.hyperliquid.xyz/info', data=json.dumps({'type': 'frontendOpenOrders', 'user': env['FREQTRADE__EXCHANGE__WALLET_ADDRESS']}).encode(), headers={'Content-Type': 'application/json'})
                 orders = json.load(urllib.request.urlopen(req, timeout=20))
                 result['exchange_orders'] = [{k: o.get(k) for k in ['coin', 'oid', 'sz', 'limitPx', 'triggerPx', 'orderType', 'reduceOnly']} for o in orders]
@@ -111,6 +115,30 @@ exchange.set_markets([{'id':'BTC','symbol':'BTC/USDC:USDC','base':'BTC','quote':
 ccxt.hyperliquid().set_markets_from_exchange(exchange)
 exchange.fetch_tickers()
 print(json.dumps(calls==['swap','swap']))''')
+    # #220: run Freqtrade's own timeout check on in-memory orders. Old exits
+    # must never time out, entries still do, and stops are never managed.
+    # The stub carries only the timeout block so no config secret can reach
+    # an error message.
+    result['exit_timeout_contract'] = exec_json('ft-killers-scalp', '''import json,sys
+from datetime import datetime,timedelta,UTC
+from types import SimpleNamespace as NS, MethodType
+from freqtrade.configuration.environment_vars import environment_vars_to_dict
+from freqtrade.misc import deep_merge_dicts
+from freqtrade.persistence.trade_model import LocalTrade
+from freqtrade.strategy import IStrategy
+sys.path.insert(0,'/freqtrade/user_data/strategies')
+from KillersScalpV1 import KillersScalpV1
+c=deep_merge_dicts(environment_vars_to_dict(),json.load(open('/freqtrade/user_data/configs/KillersScalpV1.json')))
+s=NS(config={'unfilledtimeout':dict(c.get('unfilledtimeout') or {})})
+for m in ['check_entry_timeout','check_exit_timeout','check_buy_timeout','check_sell_timeout']:
+    setattr(s,m,MethodType(getattr(KillersScalpV1,m),s))
+now=datetime.now(UTC)
+out=lambda trade,side,age: IStrategy.ft_check_timed_out(s,trade,NS(ft_order_side=side,status='open',order_date_utc=now-age),now)
+long_,short=(NS(pair='BTC/USDC:USDC',entry_side=e,exit_side=x) for e,x in [('buy','sell'),('sell','buy')])
+trade=NS(orders=[NS(ft_is_open=True,ft_order_side='stoploss'),NS(ft_is_open=True,ft_order_side='sell')])
+print(json.dumps(not out(long_,'sell',timedelta(days=400)) and not out(short,'buy',timedelta(days=400))
+    and out(long_,'buy',timedelta(minutes=1441)) and out(short,'sell',timedelta(minutes=1441))
+    and [o.ft_order_side for o in LocalTrade.open_orders.fget(trade)]==['sell']))''')
     result['runtime_source_matches'] = {}
     for name, deployed, source in [('killers-receiver','/app/app/main.py','services/killers-receiver/app/main.py'),
             ('ft-hl-gateway','/app/app/main.py','services/hl-gateway/app/main.py'),
