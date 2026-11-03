@@ -1,7 +1,7 @@
 # News/Sentiment Layer, Steps 0–1 — Design Spec
 
 **Date:** 2026-11-03
-**Status:** Draft for operator review. Adversarial review by GPT-6 Astra (high): 6 rounds, 28 findings handled, 26 accepted and 2 partly rejected (§11). VERDICT: APPROVED on 2026-11-03.
+**Status:** Draft for operator review. Adversarial review by GPT-6 Astra (high): 6 rounds, 28 findings handled, 26 accepted and 2 partly rejected (§11). VERDICT: APPROVED on 2026-11-03. **Amended 2026-11-03**, before any Part C work: a third study, the Upbit fade (§6.1, §11 call 13). GPT-6.1 Sol (high) reviewed the amendment over 2 rounds; both findings were fixed and it returned APPROVED.
 **Author:** Claude (with Palmer)
 **Issue:** [#229](https://github.com/IvPalmer/Master-Trader/issues/229)
 **Research:** [report](../../research/2026-11-03-news-sentiment/report.md) and [notes](../../research/2026-11-03-news-sentiment/notes/)
@@ -34,7 +34,7 @@ Neither step changes what any bot does.
 
 1. Every item from the v1 sources is stored with our own receive time, the source's claimed publish time, and the raw payload, without duplicates. Later edits are kept as revisions.
 2. A stale or broken source is visible within a day without anyone reading logs.
-3. Two preregistered retrospective event studies produce a mechanical pass/fail. They cover news categories the closed listing study did not.
+3. Three preregistered retrospective event studies produce a mechanical pass/fail. They cover news categories the closed listing study did not.
 
 **Non-goals (later issues)**
 
@@ -238,16 +238,28 @@ The archive is irreplaceable by design: no vendor sells the same PIT history. A 
 
 ## 6. Part C — preregistered event studies
 
-### 6.1 Why these two
+### 6.1 Why these three
 
 The closed `listing-reaction-study-2026-07` measured Binance listing announcements for tokens already on spot, going long. It failed all three criteria, and its long lane is closed. Its short inverse is being validated forward and stays untouched.
 
-The two categories here are different events with their own direction:
+The studies here cover different events, each with its own direction:
 
 | id | event | direction | why it is a distinct hypothesis |
 |---|---|---|---|
 | `binance-delisting-reaction-2026-11` | Binance delisting and monitoring-tag announcements | short | Negative, forced-selling event. The research's per-coin "hard event" class. |
 | `upbit-krw-listing-reaction-2026-11` | Upbit "KRW market addition" notices for tokens already trading on Binance | long | The Korean demand shock, an event source separate from Binance's own announcements. |
+| `upbit-krw-listing-fade-2026-11` | The same Upbit notices, Hyperliquid-perp tokens only | short | The demand shock overshoots and fades after the pump. Generated on data from before this window (below). |
+
+**Why the fade was added (2026-11-03, before any Phase 1 work).** An exploratory check on 2018–2022 data, all of it before this window, covered 42 token events in 33 Upbit KRW-addition notices, all for tokens already on Binance spot ([#229 comment](https://github.com/IvPalmer/Master-Trader/issues/229#issuecomment-6617239337)).
+
+- The median Binance price was already +11% by t+5 min.
+- A long from t+5 min lost. These are token-level medians net of costs, BTC-hedged: −4.5% at +4 h and −6.3% at +24 h, with 19% of events positive at +24 h. Unhedged, they were −3.7% and −7.4%.
+- This study does not use those statistics. Its decision metric stays the registered one: unadjusted, announcement-level net returns.
+- The operator asked for the inverse to be preregistered.
+
+The 2018–2022 sample is the hypothesis source. It never counts as validation and is never mixed with this window.
+
+The long study stays registered exactly as written. The fade reuses its Phase 1 manifest and every Phase 2 rule: entry, horizons, primary horizon, costs, leak flag, unit of analysis and pass criteria. Only two things differ: the direction, and the venue rule (Hyperliquid only).
 
 ### 6.2 Protocol (frozen in each preregistration entry before any computation)
 
@@ -269,7 +281,7 @@ Each study runs in two phases. Phase 1 builds an **outcome-blind event manifest*
   - **Classification:** from the notice text as harvested. The CMS returns current versions, so later edits cannot be ruled out; this is recorded as a limitation.
   - **Overlap:** if the same token has a second qualifying notice within 24 h of the first, only the first counts. Notices more than 24 h apart are separate events.
   - **One test:** both kinds share one pass/fail. Per-kind results are reported as descriptive only.
-- **Events, Upbit study:** one event per (notice, token) for Upbit `category=trade` notices whose title matches the KRW-market-addition pattern.
+- **Events, both Upbit studies (one shared manifest):** one event per (notice, token) for Upbit `category=trade` notices whose title matches the KRW-market-addition pattern.
   - Tokens already on Upbit KRW are excluded.
   - So are tokens with a Binance catalog-48 listing announcement within ±24 h. That keeps the closed listing lane out of this sample.
   - Events whose Upbit KRW trading began before the notice are excluded too.
@@ -279,6 +291,7 @@ Each study runs in two phases. Phase 1 builds an **outcome-blind event manifest*
 - **Execution venues (Claude's call):** Binance futures is CVM-blocked for the operator (see the `listing-reaction-study-2026-07` notes), so only these count:
   - **Delisting study (short):** Hyperliquid perp only. Binance spot cannot short.
   - **Upbit study (long):** a Hyperliquid perp, else Binance spot. Tokens that trade only on Binance futures are excluded.
+  - **Upbit fade (short):** Hyperliquid perp only, under the same eligibility rule below. Spot-only tokens are excluded and counted, because Binance spot cannot short.
 - **Hyperliquid eligibility needs positive pre-entry evidence (changed after both rounds).** A token qualifies only if Hyperliquid candles exist for it in the 24 h before t0, including at least one in the last hour before t0. Nothing after t0 is used for eligibility; using it would exclude exactly the tokens that become untradeable right after the event. Tokens no longer in today's `meta` are looked up by name through `candleSnapshot`. The builder confirms in Phase 1 that this works for delisted coins and documents it.
   - Eligibility that cannot be verified is `unknown`. Unknown events are excluded and counted. An earliest daily candle alone is not enough.
 - **Completeness evidence (changed after round 2).**
@@ -286,6 +299,7 @@ Each study runs in two phases. Phase 1 builds an **outcome-blind event manifest*
     - Any shortfall is added to the `missing` count, conservatively assumed to fall inside the window.
     - If no total is reported, the study is **INCONCLUSIVE-by-data**.
     - This also covers the catalog-48 overlap exclusion.
+    - Observed 2026-11-03: Upbit's Cloudflare answered error 1015 to page requests 1.5 s apart, so the full Upbit harvest runs at least 8 s per page. Binance catalog 161 reported `total` 446, and its oldest article is dated 2022-02-17.
   - **Candles (changed after round 3):** the exact 1m candles each calculation uses must exist. These are t0−10 min and t0−2 min for the leak test, the entry candle, and each horizon's exit candle. No interpolation and no forward-fill. If any is missing, and the halt rule does not resolve it, the event is `missing`.
   - **Halts after entry (changed after rounds 3–4):** if an exit candle is missing because trading halted, the exit is the first candle after trading resumes, within 72 h **of that scheduled exit time**.
     - Costs are always subtracted from the net return, whatever the side, never applied to a price.
@@ -322,10 +336,13 @@ Each study runs in two phases. Phase 1 builds an **outcome-blind event manifest*
 - **Also reported, not criteria:**
   - a bootstrap 95% CI of the announcement-level median (10,000 resamples);
   - BTC-adjusted returns;
+  - for the two short studies, the per-event maximum adverse excursion from entry to each exit, from 1m highs. A short's risk sits in the squeeze tail, which the median does not show. This is descriptive only: a missing candle inside the path makes that event's MAE unavailable. It never changes return eligibility, the coverage gate, aggregation or pass/fail;
   - all three horizons, both halves, per venue and per notice kind;
   - leak and slippage sensitivities;
   - excluded, unknown and missing counts.
-- **Two separate hypotheses.** The two studies are never pooled, and a pass in one is not evidence for the other.
+- **Separate hypotheses.** The studies are never pooled, and a pass in one is not evidence for another.
+  - The Upbit long and fade share their Hyperliquid events. On that subset the fade's net return is the long's gross return with the sign flipped, minus costs.
+  - So a failed long plus a passed fade is one finding, not two confirmations.
 - **Kill:** with at least 20 announcements, any failed criterion closes that lane for this config. A pass authorizes only a paper forward monitor, preregistered separately, in the `listing-short-forward` style.
 - **Too few announcements (Claude's call):** fewer than 20 is **INCONCLUSIVE-by-data**, the precedent from the listing study's Hyperliquid venue. The lane stays open, but nothing is authorized: no monitor and no bot. The archive keeps recording these events. Any re-test is a new, forward-only preregistration; retrospective and forward events are never mixed.
 - **Code and data:**
@@ -357,7 +374,7 @@ The gate work (step 2) will replace the in-strategy HTTP fetch with a local snap
 |---|---|
 | A | Unit tests with sanitized fixtures for every adapter, covering: parsing; timestamp normalization (KST, ms, RFC-822); Hyperliquid snapshot diff, including a relisting getting a new id; idempotent insert; version transitions against the latest version (A→B→B→A); `after_gap` and `gaps` rows after start, after a simulated outage, on page overflow with bounded backfill, on Binance block suspension, on the disk guard and on a clock jump; backoff and `Retry-After`; the Binance rotation of one request per 3 min; the response-size cap; `status` output. Then the VPS `once` check, the unit's resource limits confirmed with `systemctl --user show`, and 7 days of `status`. |
 | B | Unit tests for the report section (missing DB, all fresh, one stale, corrupt DB, local-only backup) and for the archive backup job: its own retention, and a failure that leaves the live-DB run untouched. Then one manual `--stdout` report run on the VPS after release, with the cron state backed up and restored as in the #219 deploy, and one local snapshot plus restore drill. The off-host leg is verified only once the remote is configured. |
-| C | The prereg diff merged before Phase 1. The manifest SHA amendment merged before Phase 2. Unit tests for event extraction and classification, Hyperliquid eligibility (including `unknown`), announcement-level aggregation, the leak flag, the cost model and the concentration rule when the sum is ≤ 0. All checked against hand-computed klines fixtures. |
+| C | The prereg diff merged before Phase 1. The manifest SHA amendment merged before Phase 2. Unit tests for event extraction and classification, Hyperliquid eligibility (including `unknown`), announcement-level aggregation, the leak flag, the cost model and the short-side sign, and the concentration rule when the sum is ≤ 0. All checked against hand-computed klines fixtures. |
 
 ## 10. Left to the builder
 
@@ -393,3 +410,9 @@ These were decided without the operator; each can be overridden before the plan 
    - Telegram: the only Telegram user session is the live Killers observer's. A second client on it, or a restart to add channels, puts the live pipeline at risk.
    - X APIs: they cost money and the third-party ones break X's terms.
    - Tree of Alpha already relays posts from more than 2,300 X accounts (§2).
+13. **Upbit fade added as its own study (2026-11-03).** This is the operator's decision. Claude made three calls in writing it up:
+    - the fade reuses the long study's manifest and Phase 2 rules unchanged, including the +4 h primary horizon, even though the exploratory fade looked stronger at +72 h. Tuning the horizon to that sample would be a forking path;
+    - Hyperliquid only;
+    - maximum adverse excursion reported, not a criterion.
+
+    With fewer than 20 Hyperliquid-eligible announcements, the fade is INCONCLUSIVE-by-data under the existing rule.
