@@ -4,7 +4,8 @@
 # pulls REST creds from a running Freqtrade container, posts to the
 # VPS-side trade-webhook service (which forwards to Telegram).
 #
-# Installed at /home/ubuntu/master-trader/run-health-report.sh on Elder Brain.
+# Installed on Elder Brain as /home/ubuntu/master-trader/run-health-report.sh, a
+# symlink to runtime/deploy/vps/run-health-report.sh (deploy/vps/README.md).
 # Cron: 0 23 * * * (daily 23:00 UTC = 20:00 São Paulo).
 set -euo pipefail
 
