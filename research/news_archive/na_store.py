@@ -123,11 +123,12 @@ def upsert_items(conn, source, items, received_at, after_gap):
     """Insert new items and record revisions against each item's latest version.
 
     Returns (n_new, n_revised). Ids repeated within the batch keep their first
-    occurrence. All writes happen in one transaction.
+    occurrence. All writes happen in one transaction. Items and revisions get
+    after_gap = 1 when the caller says so or an ongoing gap is open for the source.
     """
     n_new = n_rev = 0
     with transaction(conn):
-        flag = 1 if after_gap else 0
+        flag = 1 if (after_gap or has_open_ongoing_gap(conn, source)) else 0
         for it in _dedupe(items):
             h = content_hash(it.raw)
             raw_json = canonical_json(it.raw)
@@ -193,3 +194,70 @@ def prune_polls(conn, now, keep_days=180):
     cutoff = iso(parse_iso(now) - timedelta(days=keep_days))
     with transaction(conn):
         return conn.execute("DELETE FROM polls WHERE started_at < ?", (cutoff,)).rowcount
+
+
+# ---- gaps and the PIT rule (spec §4.3) -------------------------------------------------
+
+ONGOING = ("clock", "disk", "suspended", "outage")
+
+
+def open_gap(conn, source, reason, start, detail=""):
+    """Open an ongoing gap; returns the existing open row for (source, reason) if any."""
+    with transaction(conn):
+        row = conn.execute(
+            "SELECT gap_pk FROM gaps WHERE source=? AND reason=? AND gap_end IS NULL"
+            " ORDER BY gap_pk LIMIT 1", (source, reason)).fetchone()
+        if row:
+            return row[0]
+        return conn.execute(
+            "INSERT INTO gaps (source, gap_start, gap_end, reason, detail) VALUES (?,?,NULL,?,?)",
+            (source, start, reason, detail)).lastrowid
+
+
+def close_gap(conn, source, reason, end):
+    with transaction(conn):
+        return conn.execute(
+            "UPDATE gaps SET gap_end=? WHERE source=? AND reason=? AND gap_end IS NULL",
+            (end, source, reason)).rowcount > 0
+
+
+def record_closed_gap(conn, source, reason, start, end, detail):
+    """A gap known only after the fact (restart, overflow); never stays open."""
+    with transaction(conn):
+        return conn.execute(
+            "INSERT INTO gaps (source, gap_start, gap_end, reason, detail) VALUES (?,?,?,?,?)",
+            (source, start, end, reason, detail)).lastrowid
+
+
+def has_open_ongoing_gap(conn, source):
+    q = "SELECT 1 FROM gaps WHERE source=? AND gap_end IS NULL AND reason IN (%s) LIMIT 1" % (
+        ",".join("?" * len(ONGOING)))
+    return conn.execute(q, (source, *ONGOING)).fetchone() is not None
+
+
+def open_gaps(conn):
+    cur = conn.cursor()
+    cur.row_factory = sqlite3.Row
+    return cur.execute(
+        "SELECT * FROM gaps WHERE gap_end IS NULL ORDER BY gap_start, gap_pk").fetchall()
+
+
+def pit_valid(conn, source, received_at):
+    """PIT rule: a record is valid only if its after_gap is 0 and its received_at lies
+    outside every gap interval of its source (bounds inclusive; open gaps extend to now).
+
+    The record is looked up by (source, received_at): every item and revision written
+    by one poll shares both, so they share the flag too.
+    """
+    flagged = conn.execute(
+        "SELECT 1 FROM items WHERE source=? AND received_at=? AND after_gap=1"
+        " UNION ALL SELECT 1 FROM item_revisions r JOIN items i ON i.item_pk = r.item_pk"
+        " WHERE i.source=? AND r.received_at=? AND r.after_gap=1 LIMIT 1",
+        (source, received_at, source, received_at)).fetchone()
+    if flagged:
+        return False
+    inside = conn.execute(
+        "SELECT 1 FROM gaps WHERE source=? AND gap_start <= ?"
+        " AND (gap_end IS NULL OR gap_end >= ?) LIMIT 1",
+        (source, received_at, received_at)).fetchone()
+    return inside is None

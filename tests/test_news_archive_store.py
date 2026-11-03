@@ -87,3 +87,53 @@ def test_prune_polls_keeps_180_days(tmp_path):
         na_store.record_poll(conn, "tree", ts(days=d), ts(days=d), True, 200, 1, 0, 0, None)
     assert na_store.prune_polls(conn, ts(0)) == 1
     assert [r[0] for r in conn.execute("SELECT started_at FROM polls")] == [ts(days=-179)]
+
+
+# ---- Task 2: gaps and the PIT rule ----------------------------------------------------
+
+def test_open_gap_is_idempotent(tmp_path):
+    conn = db(tmp_path)
+    g1 = na_store.open_gap(conn, "tree", "disk", ts(0), "low disk")
+    g2 = na_store.open_gap(conn, "tree", "disk", ts(5))
+    assert g1 == g2
+    assert conn.execute("SELECT COUNT(*) FROM gaps").fetchone()[0] == 1
+    assert [r["reason"] for r in na_store.open_gaps(conn)] == ["disk"]
+    assert na_store.close_gap(conn, "tree", "disk", ts(10)) is True
+    assert na_store.close_gap(conn, "tree", "disk", ts(11)) is False
+    assert na_store.open_gaps(conn) == []
+
+
+def test_items_during_open_ongoing_gap_are_tainted(tmp_path):
+    conn = db(tmp_path)
+    na_store.upsert_items(conn, "tree", [item("old")], ts(0), False)
+    na_store.open_gap(conn, "tree", "clock", ts(1))
+    assert na_store.has_open_ongoing_gap(conn, "tree")
+    assert not na_store.has_open_ongoing_gap(conn, "upbit")
+    na_store.upsert_items(conn, "tree", [item("new"), item("old", "edited")], ts(2), False)
+    flags = dict(conn.execute("SELECT source_item_id, after_gap FROM items"))
+    assert flags == {"old": 0, "new": 1}
+    assert conn.execute("SELECT after_gap FROM item_revisions").fetchone()[0] == 1
+
+
+def test_closed_overflow_gap_does_not_taint_later_items(tmp_path):
+    conn = db(tmp_path)
+    na_store.record_closed_gap(conn, "tree", "overflow", ts(1), ts(2), "unrecovered")
+    assert not na_store.has_open_ongoing_gap(conn, "tree")
+    na_store.upsert_items(conn, "tree", [item("x")], ts(3), False)
+    assert conn.execute("SELECT after_gap FROM items").fetchone()[0] == 0
+
+
+def test_pit_valid_rejects_inside_gap_and_flagged(tmp_path):
+    conn = db(tmp_path)
+    na_store.record_closed_gap(conn, "tree", "outage", ts(10), ts(20), "")
+    na_store.upsert_items(conn, "tree", [item("inside")], ts(15), False)
+    na_store.upsert_items(conn, "tree", [item("clean")], ts(30), False)
+    na_store.upsert_items(conn, "tree", [item("flagged")], ts(40), True)
+    assert na_store.pit_valid(conn, "tree", ts(15)) is False
+    assert na_store.pit_valid(conn, "tree", ts(30)) is True
+    assert na_store.pit_valid(conn, "tree", ts(40)) is False
+    # a gap on another source does not affect this one
+    assert na_store.pit_valid(conn, "upbit", ts(15)) is True
+    # an open gap extends to now
+    na_store.open_gap(conn, "tree", "suspended", ts(50))
+    assert na_store.pit_valid(conn, "tree", ts(60)) is False
