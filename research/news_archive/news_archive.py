@@ -8,16 +8,27 @@ across one carry after_gap = 1, so readers can apply the PIT rule (na_store.pit_
 
 The archive never trades and nothing in the fleet imports it. Stdlib only.
 """
+import argparse
+import fcntl
+import gzip
 import json
 import logging
+import logging.handlers
+import os
+import shutil
+import signal
+import sqlite3
+import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from datetime import timedelta
 from email.utils import parsedate_to_datetime
 
 import na_store
-from na_fetch import is_block_signal
-from na_sources import diff_universe, universe_names
+from na_fetch import BinanceLimiter, fetch, is_block_signal
+from na_sources import SOURCES, diff_universe, universe_names
 
 MAX_BACKOFF_S = 1800
 DEADLINE_S = 20.0
@@ -255,6 +266,11 @@ class Archive:
         return pages, recovered
 
     def poll(self, key):
+        return self.poll_status(key) == "ok"
+
+    def poll_status(self, key):
+        """One poll of one source: "ok", "failed" (recorded), or "denied" (Binance limiter
+        said no; nothing was requested or recorded)."""
         spec, st = self.sources[key], self.state[key]
         started_m, started_w = self.mono(), self.wall()
         started = na_store.iso_from_epoch(started_w)
@@ -265,7 +281,7 @@ class Archive:
                     if s.binance:
                         na_store.open_gap(self.conn, k, "suspended", started,
                                           "suspended by a shared-limiter caller")
-            return False
+            return "denied"
         status, retry_after = None, None
         try:
             resp = self.fetcher(spec)
@@ -317,7 +333,7 @@ class Archive:
                                      len(items), n_new, n_rev, None)
         except Exception as e:  # noqa: BLE001 - every failure is a recorded failed poll
             self._failed(key, spec, st, started_m, started, status, retry_after, e)
-            return False
+            return "failed"
         st.failures, st.last_ok, st.ok_since_start = 0, received_w, True
         st.next_due = started_m + spec.interval_s
         if n_new or n_rev or overflow:
@@ -325,7 +341,7 @@ class Archive:
                 key, len(items), n_new, n_rev,
                 ", overflow %s" % ("recovered" if recovered else "unrecovered")
                 if overflow else ""))
-        return True
+        return "ok"
 
     def _failed(self, key, spec, st, started_m, started, status, retry_after, err):
         st.failures += 1
@@ -349,5 +365,221 @@ class Archive:
             self.log("%s: could not record failed poll: %s: %s" % (key, type(e).__name__, e))
 
 
+# ---- status (Part B reuses these queries) -----------------------------------------------
+
+def _age(now_dt, ts):
+    s = max(0.0, (now_dt - na_store.parse_iso(ts)).total_seconds())
+    if s < 120:
+        return "%d s" % s
+    if s < 7200:
+        return "%.0f min" % (s / 60)
+    if s < 172800:
+        return "%.1f h" % (s / 3600)
+    return "%.1f d" % (s / 86400)
+
+
+def status_lines(conn, now):
+    """One line per source plus one per open gap."""
+    now_dt = na_store.parse_iso(now)
+    d1 = na_store.iso(now_dt - timedelta(days=1))
+    d7 = na_store.iso(now_dt - timedelta(days=7))
+    q1 = lambda sql, *a: conn.execute(sql, a).fetchone()[0]  # noqa: E731
+    sources = conn.execute(
+        "SELECT source, interval_s, enabled FROM sources ORDER BY source").fetchall()
+    gaps = conn.execute("SELECT source, reason, gap_start, detail FROM gaps"
+                        " WHERE gap_end IS NULL ORDER BY gap_start, gap_pk").fetchall()
+    lines = ["news-archive status at %s: %d sources, %d open gaps" % (
+        now, len(sources), len(gaps))]
+    for src, interval_s, enabled in sources:
+        last_ok = q1("SELECT MAX(finished_at) FROM polls WHERE source=? AND ok=1", src)
+        fails = q1("SELECT COUNT(*) FROM polls WHERE source=? AND ok=0 AND poll_pk >"
+                   " COALESCE((SELECT MAX(poll_pk) FROM polls WHERE source=? AND ok=1), 0)",
+                   src, src)
+        n_ok, n_all = conn.execute(
+            "SELECT COALESCE(SUM(ok), 0), COUNT(*) FROM polls WHERE source=? AND started_at >= ?",
+            (src, d1)).fetchone()
+        i24 = q1("SELECT COUNT(*) FROM items WHERE source=? AND received_at >= ?", src, d1)
+        i7 = q1("SELECT COUNT(*) FROM items WHERE source=? AND received_at >= ?", src, d7)
+        itot = q1("SELECT COUNT(*) FROM items WHERE source=?", src)
+        newest = q1("SELECT MAX(published_at) FROM items WHERE source=?", src)
+        lines.append("%-20s %slast_ok %s  fails %d  ok24h %d/%d  items 24h %d / 7d %d / total %d"
+                     "  newest_pub %s" % (
+                         src, "" if enabled else "(disabled) ",
+                         "%s (%s ago)" % (last_ok, _age(now_dt, last_ok)) if last_ok else "never",
+                         fails, n_ok, n_all, i24, i7, itot, newest or "-"))
+    for src, reason, start, detail in gaps:
+        lines.append("gap open  %-20s %-9s since %s (%s)  %s" % (
+            src, reason, start, _age(now_dt, start), detail or ""))
+    return lines
+
+
+# ---- CLI ---------------------------------------------------------------------------------
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+TICK_S = 5.0
+ONCE_MAX_WAIT_S = 600.0
+
+
+class WriterLockHeld(Exception):
+    pass
+
+
+@contextmanager
+def writer_lock(data_dir):
+    """One writer per database: `run` and `once` exclude each other."""
+    with open(os.path.join(data_dir, "archive.lock"), "a") as f:
+        try:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise WriterLockHeld(data_dir) from None
+        try:
+            yield
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
+
+def _runtime():
+    return time.time, time.monotonic, time.sleep
+
+
+def ntp_synchronized():
+    try:
+        out = subprocess.run(["timedatectl", "show", "-p", "NTPSynchronized", "--value"],
+                             capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    v = out.stdout.strip().lower()
+    return True if v == "yes" else False if v == "no" else None
+
+
+def _gzip_rotator(source, dest):
+    with open(source, "rb") as fi, gzip.open(dest, "wb") as fo:
+        shutil.copyfileobj(fi, fo)
+    os.remove(source)
+
+
+def setup_logging(log_file):
+    LOG.setLevel(logging.INFO)
+    LOG.propagate = False
+    for h in list(LOG.handlers):
+        LOG.removeHandler(h)
+        h.close()
+    fmt = logging.Formatter("%(asctime)s [news-archive] %(message)s", "%Y-%m-%dT%H:%M:%SZ")
+    fmt.converter = time.gmtime
+    fh = logging.handlers.TimedRotatingFileHandler(log_file, when="midnight", backupCount=14,
+                                                   utc=True)
+    fh.namer = lambda name: name + ".gz"
+    fh.rotator = _gzip_rotator
+    sh = logging.StreamHandler(sys.stdout)
+    for h in (fh, sh):
+        h.setFormatter(fmt)
+        LOG.addHandler(h)
+
+
+def enabled_sources():
+    """SOURCES minus NEWS_ARCHIVE_DISABLE (comma-separated keys)."""
+    disabled = {k.strip() for k in os.environ.get("NEWS_ARCHIVE_DISABLE", "").split(",")
+                if k.strip()}
+    return {k: v for k, v in SOURCES.items() if k not in disabled}
+
+
+def build_archive(data_dir, sources):
+    wall, mono, sleep = _runtime()
+    conn = na_store.connect(os.path.join(data_dir, "archive.sqlite"))
+    limiter = BinanceLimiter(os.path.join(data_dir, "binance_cms_state.json"))
+    return Archive(conn, sources, limiter, lambda spec: fetch(spec), wall, mono,
+                   lambda: shutil.disk_usage(data_dir).free, ntp_synchronized, sleep=sleep)
+
+
+def _once(arc, keys):
+    wall, mono, sleep = _runtime()
+    failed = 0
+    for key in keys:
+        waited = 0.0
+        outcome = arc.poll_status(key)
+        while outcome == "denied" and waited < ONCE_MAX_WAIT_S:
+            if arc.limiter.suspended_until(wall()) is not None:
+                break
+            sleep(5.0)
+            waited += 5.0
+            outcome = arc.poll_status(key)
+        if outcome == "ok":
+            row = arc.conn.execute("SELECT n_items, n_new, n_revised FROM polls WHERE source=?"
+                                   " ORDER BY poll_pk DESC LIMIT 1", (key,)).fetchone()
+            print("OK %s: %d items, %d new, %d revised" % (key, *row))
+            continue
+        failed += 1
+        if outcome == "denied":
+            until = arc.limiter.suspended_until(wall())
+            print("FAILED %s: %s" % (key, "Binance suspended until %s" % (
+                na_store.iso_from_epoch(until)) if until else "limiter wait exceeded"))
+        else:
+            err = arc.conn.execute("SELECT error FROM polls WHERE source=? ORDER BY poll_pk DESC"
+                                   " LIMIT 1", (key,)).fetchone()[0]
+            print("FAILED %s: %s" % (key, err))
+    return 1 if failed else 0
+
+
+def _status(data_dir):
+    path = os.path.join(data_dir, "archive.sqlite")
+    if not os.path.exists(path):
+        print("news-archive: no database at %s" % path)
+        return 1
+    from pathlib import Path
+    conn = sqlite3.connect(Path(path).absolute().as_uri() + "?mode=ro", uri=True)
+    try:
+        print("\n".join(status_lines(conn, na_store.iso_from_epoch(time.time()))))
+    finally:
+        conn.close()
+    return 0
+
+
+def _term(signum, frame):
+    raise SystemExit(0)
+
+
+def main(argv=None):
+    p = argparse.ArgumentParser(prog="news_archive.py",
+                                description="PIT news archive (#229 Part A)")
+    p.add_argument("--data-dir", default=os.path.join(HERE, "data"))
+    p.add_argument("--log-file", default=os.path.join(HERE, "monitor.log"))
+    sub = p.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("run", help="the service (systemd)")
+    once = sub.add_parser("once", help="one poll per source, then exit")
+    once.add_argument("--source", action="append", metavar="KEY")
+    sub.add_parser("status", help="per-source health and open gaps")
+    args = p.parse_args(argv)
+    if args.cmd == "status":
+        return _status(args.data_dir)
+    sources = enabled_sources()
+    keys = list(sources)
+    if args.cmd == "once" and args.source:
+        bad = [k for k in args.source if k not in sources]
+        if bad:
+            print("unknown or disabled source(s): %s" % ", ".join(bad))
+            return 2
+        keys = args.source
+    os.makedirs(args.data_dir, exist_ok=True)
+    setup_logging(args.log_file)
+    try:
+        with writer_lock(args.data_dir):
+            arc = build_archive(args.data_dir, sources)
+            arc.startup()
+            if args.cmd == "once":
+                return _once(arc, keys)
+            signal.signal(signal.SIGTERM, _term)
+            _, _, sleep = _runtime()
+            try:
+                while True:
+                    arc.tick()
+                    sleep(TICK_S)
+            finally:
+                LOG.info("stopping")
+                arc.conn.close()
+    except WriterLockHeld:
+        print("news-archive: another writer (run or once) holds %s/archive.lock" % args.data_dir)
+        return 3
+
+
 if __name__ == "__main__":
-    sys.exit("CLI arrives in Task 6")
+    sys.exit(main())

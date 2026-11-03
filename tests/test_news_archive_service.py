@@ -368,3 +368,116 @@ def test_restart_closes_cleared_gaps_and_records_downtime(tmp_path):
     env.arc = env.new_archive()
     env.arc.startup()
     assert na_store.open_gaps(env.conn) == []
+
+
+# ---- Task 6: CLI, status, unit file ---------------------------------------------------
+
+import news_archive  # noqa: E402
+
+UNIT = ROOT / "research" / "news_archive" / "news-archive.service"
+
+
+def test_status_lines_report_each_source_and_open_gaps(tmp_path):
+    conn = na_store.connect(str(tmp_path / "a.sqlite"))
+    now = iso(WALL0)
+    na_store.write_sources(conn, [("tree", 60, True), ("upbit", 120, True)], now)
+    na_store.record_poll(conn, "tree", iso(WALL0 - 70), iso(WALL0 - 69), True, 200, 2, 2, 0, None)
+    na_store.record_poll(conn, "upbit", iso(WALL0 - 400), iso(WALL0 - 399), True, 200, 1, 1, 0, None)
+    for k in (300, 200):
+        na_store.record_poll(conn, "upbit", iso(WALL0 - k), iso(WALL0 - k + 1), False, 403,
+                             None, None, None, "HTTP 403")
+    item = na_store.Item("1", iso(WALL0 - 3600), "t", None, None, None, {"id": "1"})
+    na_store.upsert_items(conn, "tree", [item], iso(WALL0 - 69), False)
+    old = na_store.Item("0", None, "t", None, None, None, {"id": "0"})
+    na_store.upsert_items(conn, "tree", [old], iso(WALL0 - 3 * 86400), False)
+    na_store.open_gap(conn, "upbit", "suspended", iso(WALL0 - 7200), "test")
+    lines = news_archive.status_lines(conn, now)
+    tree_line = next(l for l in lines if l.split()[0] == "tree")
+    upbit_line = next(l for l in lines if l.split()[0] == "upbit")
+    assert "fails 0" in tree_line and "ok24h 1/1" in tree_line
+    assert "items 24h 1 / 7d 2 / total 2" in tree_line
+    assert iso(WALL0 - 3600) in tree_line
+    assert "fails 2" in upbit_line and "ok24h 1/3" in upbit_line
+    assert any("gap" in l and "upbit" in l and "suspended" in l and "2.0 h" in l for l in lines)
+
+
+def test_unit_file_has_resource_limits():
+    text = UNIT.read_text()
+    sections, cur = {}, None
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("[") and line.endswith("]"):
+            cur = sections.setdefault(line[1:-1], {})
+        elif line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            cur[k] = v
+    svc, unit = sections["Service"], sections["Unit"]
+    for k, v in {"MemoryMax": "256M", "CPUQuota": "25%", "Nice": "10",
+                 "IOSchedulingClass": "idle", "Restart": "always", "RestartSec": "30"}.items():
+        assert svc[k] == v, k
+    assert unit["StartLimitIntervalSec"] == "600" and unit["StartLimitBurst"] == "5"
+    assert svc["WorkingDirectory"] == "/home/ubuntu/master-trader/research/news_archive"
+    assert svc["ExecStart"] == ("/usr/bin/python3 /home/ubuntu/master-trader/research/"
+                                "news_archive/news_archive.py run")
+    assert "/etc/dokploy" not in text
+
+
+def _cli(tmp_path, *args):
+    return ["--data-dir", str(tmp_path / "data"), "--log-file", str(tmp_path / "monitor.log"),
+            *args]
+
+
+def test_once_single_source_exits_zero(tmp_path, monkeypatch, capsys):
+    calls = []
+
+    def fake_fetch(spec):
+        calls.append(spec.url)
+        if spec.key == "fear_greed":
+            return ok((FIX / "fear_greed.json").read_bytes())
+        return ok(b"<html>blocked</html>", 403)
+    monkeypatch.setattr(news_archive, "fetch", fake_fetch)
+    assert news_archive.main(_cli(tmp_path, "once", "--source", "fear_greed")) == 0
+    assert calls == [SOURCES["fear_greed"].url]
+    conn = na_store.connect(str(tmp_path / "data" / "archive.sqlite"))
+    assert conn.execute("SELECT source FROM items").fetchall() == [("fear_greed",)]
+    assert news_archive.main(_cli(tmp_path, "once", "--source", "upbit")) == 1
+    out = capsys.readouterr().out
+    assert "OK fear_greed" in out and "FAILED upbit" in out
+    assert news_archive.main(_cli(tmp_path, "status")) == 0
+    assert "fear_greed" in capsys.readouterr().out
+    assert (tmp_path / "monitor.log").read_text().count("[news-archive]") >= 2
+
+
+def test_once_waits_for_the_shared_binance_limiter(tmp_path, monkeypatch):
+    clock = {"w": WALL0, "m": 100.0}
+
+    def sleep(s):
+        clock["w"] += s
+        clock["m"] += s
+    monkeypatch.setattr(news_archive, "_runtime",
+                        lambda: (lambda: clock["w"], lambda: clock["m"], sleep))
+    monkeypatch.setattr(news_archive, "fetch",
+                        lambda spec: ok((FIX / "binance_cms_48.json").read_bytes()))
+    (tmp_path / "data").mkdir()
+    BinanceLimiter(str(tmp_path / "data" / "binance_cms_state.json")).try_acquire(WALL0 - 10)
+    assert news_archive.main(_cli(tmp_path, "once", "--source", "binance_listing")) == 0
+    assert clock["w"] >= WALL0 + 170
+
+
+def test_disabled_sources_are_excluded_and_marked(tmp_path, monkeypatch):
+    monkeypatch.setenv("NEWS_ARCHIVE_DISABLE", "upbit, tree")
+    monkeypatch.setattr(news_archive, "fetch",
+                        lambda spec: ok((FIX / "fear_greed.json").read_bytes()))
+    assert news_archive.main(_cli(tmp_path, "once", "--source", "fear_greed")) == 0
+    conn = na_store.connect(str(tmp_path / "data" / "archive.sqlite"))
+    enabled = dict(conn.execute("SELECT source, enabled FROM sources"))
+    assert "upbit" not in enabled and "tree" not in enabled and enabled["fear_greed"] == 1
+    assert news_archive.main(_cli(tmp_path, "once", "--source", "upbit")) == 2
+
+
+def test_second_writer_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr(news_archive, "fetch",
+                        lambda spec: ok((FIX / "fear_greed.json").read_bytes()))
+    (tmp_path / "data").mkdir()
+    with news_archive.writer_lock(str(tmp_path / "data")):
+        assert news_archive.main(_cli(tmp_path, "once", "--source", "fear_greed")) == 3
