@@ -36,9 +36,11 @@ Host scheduled jobs (`crontab -l` as `ubuntu`, checked 2026-10-02):
 */5 * * * * docker exec killers-receiver python3 /app/warden/risk_warden.py >> /home/ubuntu/killers-warden.log 2>&1
 ```
 
-The health-report line runs an installed copy of `deploy/vps/run-health-report.sh`, not the file
-in `runtime/`. Re-copy it after that script changes; the copy on the host was older than the repo
-version on 2026-10-02. The warden line is documented in `services/killers-receiver/warden/README.md`.
+The health-report line runs `/home/ubuntu/master-trader/run-health-report.sh`, a symlink to
+`runtime/deploy/vps/run-health-report.sh`, so the wrapper ships with each `vps-deploy` release.
+It used to be a copied file: the copy was older than the repo on 2026-10-02, and again by
+2026-11-03, when it still sent one bot's API pair to every bot and all but one answered 401 (#219). The warden line is documented in
+`services/killers-receiver/warden/README.md`.
 Two systemd timers (`master-trader-retention-shadow`, `master-trader-retention-accounting`, units
 in `research/profit_retention/systemd/`) run the read-only profit-retention collectors.
 `ft_userdata/automation_scheduler.sh` is not installed and refuses to run (#100).
@@ -60,9 +62,8 @@ mkdir -p /home/ubuntu/master-trader/{research,state}
 ln -sfn /etc/dokploy/compose/<compose-id>/code /home/ubuntu/master-trader/runtime
 
 # Drop wrapper + cron
-cp ~/Work/Dev/master-trader/deploy/vps/run-health-report.sh \
+ln -sfn /home/ubuntu/master-trader/runtime/deploy/vps/run-health-report.sh \
    /home/ubuntu/master-trader/run-health-report.sh
-chmod +x /home/ubuntu/master-trader/run-health-report.sh
 ( crontab -l 2>/dev/null | grep -v master-trader/run-health-report
   echo '0 23 * * * /home/ubuntu/master-trader/run-health-report.sh'
 ) | crontab -
@@ -74,9 +75,10 @@ chmod +x /home/ubuntu/master-trader/run-health-report.sh
 ## Health report
 
 `run-health-report.sh` runs `strategy_health_report.py` from `runtime/ft_userdata/`
-(Dokploy-managed code, auto-updates on git push). It pulls rotated REST creds
-from `ft-keltner-bounce` via `docker exec`. It posts to trade-webhook on the host
-loopback, `WEBHOOK_URL=http://localhost:8088/freqtrade/event`. That is also the
+(Dokploy-managed code, auto-updates on git push). It reads each bot's own REST
+pair from that bot's container via `docker exec` and exports it as `FT_API_USER_<SLUG>` /
+`FT_API_PASS_<SLUG>`, which `api_utils` picks by loopback port. It posts to trade-webhook on
+the host loopback, `WEBHOOK_URL=http://localhost:8088/freqtrade/event`. That is also the
 default of every report script that posts to Telegram: they all go through
 `ft_userdata/webhook_notify.py`, which reads `WEBHOOK_URL` and sends JSON.
 
