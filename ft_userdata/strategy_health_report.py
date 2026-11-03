@@ -843,7 +843,9 @@ def compute_portfolio_metrics(bot_metrics: list[dict]) -> dict:
     pair_exposure = defaultdict(list)
     for m in online:
         # Check open trades for pair overlap
-        port = BOTS[m["strategy"]]["port"]
+        # REPORTING_BOTS, not BOTS: monitor and production_live bots are
+        # polled too, and a BOTS lookup raised on them (#219).
+        port = REPORTING_BOTS[m["strategy"]]["port"]
         open_trades = get_open_trades(port)
         if isinstance(open_trades, list):
             for t in open_trades:
@@ -882,7 +884,7 @@ def compute_portfolio_metrics(bot_metrics: list[dict]) -> dict:
         "total_trades": total_trades,
         "open_positions": total_open,
         "bots_online": bots_online,
-        "bots_total": len(BOTS),
+        "bots_total": len(REPORTING_BOTS),
         "best_bot": best["strategy"],
         "best_pnl": best.get("true_pnl", 0),
         "worst_bot": worst["strategy"],
@@ -1131,7 +1133,9 @@ def check_preregistrations() -> list[str]:
 
             closed_since = None
             trades = None
-            port = BOTS.get(entry.get("bot"), {}).get("port")
+            # Registrations also cover production_live bots (KillersScalpV1),
+            # which are in REPORTING_BOTS only (#219).
+            port = REPORTING_BOTS.get(entry.get("bot"), {}).get("port")
             if port:
                 trades = get_trades_from_api(port)
                 reg_dt = _parse_date(f"{registered} 00:00:00")

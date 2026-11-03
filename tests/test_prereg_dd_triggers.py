@@ -229,7 +229,7 @@ def test_check_preregistrations_actually_evaluates_triggers(monkeypatch, tmp_pat
     reg_file.write_text(json.dumps(registry))
 
     monkeypatch.setattr(shr, "PREREG_FILE", reg_file)
-    monkeypatch.setattr(shr, "BOTS", {"FundingFadeV1": {"port": 8096}})
+    monkeypatch.setattr(shr, "REPORTING_BOTS", {"FundingFadeV1": {"port": 8096}})
     monkeypatch.setattr(shr, "get_trades_from_api", lambda port, **kw: _trades())
     monkeypatch.setattr(
         shr, "fetch_json",
@@ -263,7 +263,7 @@ def test_triggers_report_when_bot_is_unreachable(monkeypatch, tmp_path):
     reg_file.write_text(json.dumps(registry))
 
     monkeypatch.setattr(shr, "PREREG_FILE", reg_file)
-    monkeypatch.setattr(shr, "BOTS", {"FundingFadeV1": {"port": 8096}})
+    monkeypatch.setattr(shr, "REPORTING_BOTS", {"FundingFadeV1": {"port": 8096}})
     monkeypatch.setattr(shr, "get_trades_from_api", lambda port, **kw: None)
 
     blob = "\n".join(shr.check_preregistrations())
