@@ -80,7 +80,9 @@ def make_fetch(balances=None, dry_run=None, down=()):
 
 
 def run_report(monkeypatch, **kw):
+    # Every fixture bot is `active`, so the report polls exactly BOTS.
     monkeypatch.setattr(shr, "BOTS", BOTS)
+    monkeypatch.setattr(shr, "REPORTING_BOTS", BOTS)
     monkeypatch.setattr(shr, "fetch_json", make_fetch(**kw))
     metrics = [shr.compute_bot_metrics(s, i) for s, i in BOTS.items()]
     portfolio = shr.compute_portfolio_metrics(metrics)
@@ -149,6 +151,7 @@ def test_shared_account_without_live_owner_is_unavailable(monkeypatch):
     CLOSED[8102], OPEN[8102] = [1.0], []
     try:
         monkeypatch.setattr(shr, "BOTS", bots)
+        monkeypatch.setattr(shr, "REPORTING_BOTS", bots)
         monkeypatch.setattr(shr, "fetch_json", make_fetch(dry_run=dry))
         metrics = [shr.compute_bot_metrics(s, i) for s, i in bots.items()]
         p = shr.compute_portfolio_metrics(metrics)
@@ -174,6 +177,7 @@ def test_missing_open_marks_block_live_return(monkeypatch):
         return base(port, endpoint, timeout)
 
     monkeypatch.setattr(shr, "BOTS", BOTS)
+    monkeypatch.setattr(shr, "REPORTING_BOTS", BOTS)
     monkeypatch.setattr(shr, "fetch_json", fetch)
     metrics = [shr.compute_bot_metrics(s, i) for s, i in BOTS.items()]
     p = shr.compute_portfolio_metrics(metrics)
