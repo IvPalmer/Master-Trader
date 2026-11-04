@@ -61,6 +61,20 @@ _TABLE = ("<table><tr><th>디지털 자산</th><th>마켓</th><th>네트워크</
     # A sell-limit line names the market a price comes from, not the token's markets.
     ("KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)",
      "<p>- KRW 마켓 : AAA</p><p>- BBB : 업비트 BTC 마켓 전일 종가 기준</p>", {"AAA": True, "BBB": None}),
+    # PR #245 review: a declaration is the whole line, never a prefix of price prose.
+    ("KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)",
+     "<p>- AAA : KRW 마켓</p><p>- BBB : BTC 마켓</p><p>- BBB : KRW 마켓 전일 종가 기준</p>",
+     {"AAA": True, "BBB": False}),
+    ("KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)", "<p>- BBB : KRW 마켓 전일 종가 기준</p>",
+     {"AAA": None, "BBB": None}),
+    # ... and the whole market list, never a suffix of it.
+    ("KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)", "<p>- KRW, BTC 마켓 : AAA</p><p>- BTC 마켓 : BBB</p>",
+     {"AAA": True, "BBB": False}),
+    ("KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)", "<p>- AAA : BTC 마켓, KRW 마켓</p>",
+     {"AAA": True, "BBB": None}),
+    # A market line whose right side is not a ticker list (a price) says nothing.
+    ("KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)", "<p>- BTC 마켓 : 0.00001 BTC (AAA)</p>",
+     {"AAA": None, "BBB": None}),
     ("BTC 마켓 디지털 자산 추가 (AAA)", None, {}),                                # not an O8 addition
 ])
 def test_upbit_krw_membership(title, body, expected):

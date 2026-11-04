@@ -379,10 +379,13 @@ def upbit_trading_start_ms(body, token, t0_ms, title=""):
 _MARKETS = ("KRW", "BTC", "USDT")
 _TITLE_TOKEN_MARKETS = re.compile(r"\(([A-Z0-9]{1,15})\)\s*\(([^()]*?)\s*마켓\)")
 _MARKET_WORD = r"(?:KRW|BTC|USDT|원화)"
-_LINE_MARKET_TOKENS = re.compile(r"(%s)\s*마켓\s*[:：]\s*(.+)" % _MARKET_WORD)
-# Only market words before 마켓: `- ALT : BTC 마켓`, never `- ALT : 업비트 BTC 마켓 전일 종가`.
-_LINE_TOKEN_MARKETS = re.compile(r"^[\s\-•·*]*([A-Z0-9]{1,15})\s*[:：]\s*(%s(?:\s*[,/]\s*%s)*)\s*마켓"
-                                 % (_MARKET_WORD, _MARKET_WORD))
+_MARKET_LIST = r"%s(?:\s*[,/]\s*%s)*" % (_MARKET_WORD, _MARKET_WORD)
+_BULLET = r"^[\s\-•·*]*"
+# A declaration is the whole line, with the whole market list: `- KRW, BTC 마켓 : ARB`,
+# `- ALT : BTC 마켓` or `- ALT : BTC 마켓, KRW 마켓`; never `- ALT : KRW 마켓 전일 종가`.
+_LINE_MARKET_TOKENS = re.compile(r"%s(%s)\s*마켓\s*[:：]\s*(.+?)\s*$" % (_BULLET, _MARKET_LIST))
+_LINE_TOKEN_MARKETS = re.compile(r"%s([A-Z0-9]{1,15})\s*[:：]\s*((?:%s)\s*마켓(?:\s*[,/]\s*(?:%s)\s*마켓)*)\s*$"
+                                 % (_BULLET, _MARKET_LIST, _MARKET_LIST))
 
 
 def _markets(text):
@@ -411,8 +414,8 @@ def _body_markets(body, token):
         m = _LINE_TOKEN_MARKETS.match(line)
         if m and m.group(1) == token:
             found |= _markets(m.group(2))
-        m = _LINE_MARKET_TOKENS.search(line)
-        if m and _token_in(m.group(2), token):
+        m = _LINE_MARKET_TOKENS.match(line)
+        if m and token in (_tickers(m.group(2)) or ()):     # a price on the right says nothing
             found |= _markets(m.group(1))
     return found
 
