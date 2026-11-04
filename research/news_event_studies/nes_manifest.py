@@ -8,7 +8,6 @@ build-report.txt, and prints both SHA-256s. Exit 5: titles need an operator deci
 """
 import argparse
 import json
-import math
 import sys
 import time
 from pathlib import Path
@@ -73,22 +72,6 @@ def _page_no(rel):
     return int(rel.rsplit("page-", 1)[1][:-len(".json")])
 
 
-def _scan_complete(pages):
-    """Pages 1..k reach before the window, or the last page by total (else a short page)."""
-    total = pages[1].total if 1 in pages else None
-    n = 0
-    while n + 1 in pages:
-        n += 1
-        page = pages[n]
-        if any(_release(a) is not None and _release(a) < nu.WINDOW_START_MS for a in page.articles):
-            return True
-        if total is not None and n >= math.ceil(total / nh.CMS_PAGE_SIZE):
-            return True
-        if total is None and len(page.articles) < nh.CMS_PAGE_SIZE:
-            return True
-    return False
-
-
 def load_cms(raw_dir):
     raw_dir = Path(raw_dir)
     meta = _meta(raw_dir)
@@ -104,8 +87,7 @@ def load_cms(raw_dir):
         catalogs[int(cid)] = {
             "name": cat.get("catalog_name"), "aborted": cat.get("aborted"),
             "articles": sorted(merged.values(), key=lambda a: (_release(a) or 0, str(a["id"]))),
-            "completeness": nh.completeness(merged, closings[0]) if closings else None,
-            "scan_complete": _scan_complete(numbered)}
+            "completeness": nh.completeness(merged, closings[0]) if closings else None}
     return {"catalogs": catalogs, "aborted": meta.get("aborted"), "files": files}
 
 
@@ -156,10 +138,14 @@ def _sorted(events):
     return sorted(events, key=lambda e: (e["t0_ms"], e["announcement_id"], e["token"]))
 
 
-def delisting_events(articles161, scan49):
-    """Catalog-161 events: classify, O12 overlap over the full harvest, then the window."""
+def delisting_events(articles161, articles49):
+    """Catalog-161 events and catalog-49 monitoring-tag titles (O17 option A, operator
+    2026-11-04); an article in both catalogs is one notice. Classify, O12 overlap over the
+    full harvest, then the window."""
+    notices = {str(a["id"]): a for a in articles49 if "Monitoring Tag" in (a.get("title") or "")}
+    notices.update((str(a["id"]), a) for a in articles161)
     review, rows = [], []
-    for a in sorted(articles161, key=lambda a: (_release(a) or 0, int(a["id"]))):
+    for a in sorted(notices.values(), key=lambda a: (_release(a) or 0, int(a["id"]))):
         t0, title, aid = _release(a), a.get("title") or "", "binance:%s" % a["id"]
         if t0 is None:
             review.append(_review(aid, None, title, "no_release_date"))
@@ -182,12 +168,6 @@ def delisting_events(articles161, scan49):
             ev = _event(aid, t0, title, kind, tok)
         if _in_window(t0):
             events.append(ev)
-    in161 = {str(a["id"]) for a in articles161}
-    for a in scan49:                                                      # O17
-        t0, title = _release(a), a.get("title") or ""
-        if t0 is not None and _in_window(t0) and "Monitoring Tag" in title:
-            review.append(_review("binance:%s" % a["id"], t0, title, "monitoring_tag_in_catalog_49",
-                                  also_in_catalog_161=str(a["id"]) in in161))
     if review:
         raise NeedsReview(review)
     return _sorted(events)
@@ -222,7 +202,12 @@ def upbit_events(notices, details, cms48):
             continue
         detail = details.get(str(nid))
         body = detail.get("body") if detail else None
+        krw = nc.upbit_krw_membership(title, body)
         for tok in adds:
+            if krw.get(tok) is not True:       # O8 per token: not shown to join KRW
+                if krw.get(tok) is None and _in_window(t0):
+                    review.append(_review(aid, t0, title, "upbit_market_unstated", token=tok))
+                continue
             prior = on_krw.get(tok)
             if prior is None:
                 on_krw[tok] = aid
@@ -334,13 +319,12 @@ def build(cms_dir, upbit_dir, hl_client, probe, code_commit):
     full = lambda cid: bool(comp(cid) and comp(cid)["total_reported"])     # noqa: E731
     shortfall = lambda cid: comp(cid)["shortfall"] if comp(cid) else 0     # noqa: E731
     cms_ok = not cms["aborted"] and not any(c.get("aborted") for c in cats.values())
-    completeness = {"binance:%d" % cid: comp(cid) for cid in (161, 48) if cid in cats}
+    completeness = {"binance:%d" % cid: comp(cid) for cid in (161, 48, 49) if cid in cats}
     common = {"binance_cms_files": cms["files"], "hl_meta_sha256": nu.sha256_bytes(meta_body),
               "completeness": completeness}
-    scanned49 = 49 in cats and cats[49]["scan_complete"]
-    completeness["binance:49_scanned"] = scanned49
-    dm = _manifest([DELISTING], dev, common, cms_ok and full(161) and scanned49,
-                   shortfall(161), code_commit)
+    # O17 option A: catalog 49 is a full catalog of the delisting study (O13, O16)
+    dm = _manifest([DELISTING], dev, common, cms_ok and full(161) and full(49),
+                   shortfall(161) + shortfall(49), code_commit)
     up_inputs = {**common, "upbit_files": up["files"], "upbit_host_label": up["host_label"],
                  "completeness": {**completeness, "upbit:list": up["completeness"]}}
     um = _manifest([LONG, FADE], uev, up_inputs, cms_ok and full(48) and up["complete"],

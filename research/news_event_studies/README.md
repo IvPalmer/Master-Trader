@@ -35,6 +35,16 @@ Modules: `nes_util` (constants, hashing), `nes_classify` (titles and bodies),
 - Binance catalog 161 reports a `total`. Upbit's Cloudflare blocks the VPS IP (HTTP 403) and rate-limits fast page requests (error 1015 at 1.5 s), so the Upbit harvest runs from the operator's Mac at 10 s per page.
 - data.binance.vision answers a missing daily file with 404. A 403 is a denial and stops the run; it never counts as absence.
 
+## O17 decision (2026-11-04)
+
+The first build (main 3c77081) stopped on O17: catalog 49 ("Latest Binance News")
+held 27 monitoring-tag titles in the window, none of them in catalog 161. The operator
+chose option A (amendment `A1-o17-catalog-49` on the delisting entry). Catalog 49 is now
+harvested in full like 161 and 48, and its titles that contain "Monitoring Tag" are
+delisting-study notices. The delisting harvest is complete only when 161 and 49 both
+are, and their shortfalls add up (O13). Title rulings made before the freeze are
+amendments `A2-phase1-title-rules` (delisting) and `A1-phase1-title-rules` (Upbit).
+
 ## Quarantine
 
 The 2018–2022 exploratory results on the VPS (`research/news_exploratory_2026-11/`)
@@ -53,8 +63,11 @@ Binance harvest (VPS, shared Binance CMS limiter of the running archive):
 cd /home/ubuntu/master-trader/research/news_event_studies
 systemd-run --user --unit=nes-harvest --collect -p MemoryMax=1G -p CPUQuota=50% -p Nice=10 \
   -p IOSchedulingClass=idle --working-directory="$PWD" \
-  /usr/bin/python3 nes_harvest.py binance --harvest 161,48 --scan 49 --out data/binance_raw
+  /usr/bin/python3 nes_harvest.py binance --harvest 161,48,49 --out data/binance_raw
 ```
+
+The 2026-11-04 run harvested 161 and 48 and scanned 49 (`nes-harvest`); catalog 49 was
+then harvested in full into the same directory (`nes-harvest-49`, `--harvest 49`).
 
 Upbit harvest (operator's Mac, from a detached worktree at the merged commit), then copy:
 
@@ -91,3 +104,4 @@ Raw harvests, manifests' inputs, klines and results stay on the VPS under `data/
 | date | commit | by |
 |---|---|---|
 | 2026-11-04 | 0f29d85 (harvesters) | Claude (Part C session) |
+| 2026-11-04 | 3c77081 (main: first build, stopped by O17) | Claude (Part C session) |
