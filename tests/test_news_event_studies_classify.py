@@ -223,6 +223,56 @@ def test_upbit_single_token_notice_reads_every_start_line():
     assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, "에이(AAA) KRW 마켓 디지털 자산 추가") == AT_20
 
 
+def test_upbit_tbd_sentence_blocks_shared_fallback():
+    body = ("<h3>AAA</h3><p>거래지원 개시 시점: 2024-03-01 20:00</p>"
+            "<h3>BBB</h3><p>거래지원 개시 시점은 추후 공지 예정입니다.</p>")
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) is None
+
+
+def test_upbit_named_tbd_declaration_fails_closed():
+    body = ("AAA 거래지원 개시 시점: 2024-03-01 20:00\nAAA 거래 오픈: 추후 공지\n"
+            "BBB 거래지원 개시 시점: 추후 공지")
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) is None
+    body = "AAA 거래지원 개시 시점: 2024-03-01 20:00\nAAA 거래지원 개시 시점은 추후 안내 예정입니다."
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, AB_TITLE) is None
+
+
+CAVEATS = ("* 입출금 서비스 개시 이후, 일정 수준의 유동성을 확보하지 못하는 경우 거래지원 개시 시점이 연기될 수 있습니다.",
+           "- 최저 매도가 제한 : … 거래지원 개시 시점 전에 본 공지사항을 통해 안내드리겠습니다.",
+           "…거래지원 개시 시점까지…")
+
+
+def test_upbit_caveats_are_not_tbd():
+    body = "\n".join(("거래지원 개시 시점: 2024-03-01 21:30",) + CAVEATS)
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) == AT_2130
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, "에이(AAA) KRW 마켓 디지털 자산 추가") == AT_2130
+
+
+@pytest.mark.parametrize("line,tbd", [
+    ("9) **거래지원 개시 시점은 추후 본 공지사항을 통해 추가 안내드릴 예정입니다.**", True),
+    ("*AAA 거래지원 개시 시점은 투자자 보호를 위해 … 별도 공지사항을 통해 추가 안내드리도록 하겠습니다.", True),
+    ("거래지원 개시 일정은 추후 본 공지사항을 통해 추가로 안내드릴 예정입니다.", True),
+    ("- 연기된 거래지원 개시 시점 : 추후 안내 예정", True),
+    ("거래지원 개시 시점은 추후 공지 예정입니다.", True),
+    (CAVEATS[0], False), (CAVEATS[1], False), (CAVEATS[2], False),
+    ("거래지원 개시 시점 : 2024년 03월 01일 21:30", False),
+])
+def test_upbit_tbd_regex_on_corpus_forms(line, tbd):
+    assert (nc.TBD.search(line) is not None) is tbd
+
+
+def test_upbit_single_token_tbd_without_dated_label_is_none():
+    title = "에이(AAA) KRW 마켓 디지털 자산 추가"
+    body = "거래지원 개시 시점은 추후 안내 예정입니다.\n2024-03-01 20:00 이후 거래 오픈 예정"
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, title) is None
+    # Otherwise as on main: a dated label line beside a TBD sentence still gives its time.
+    body = "거래지원 개시 시점: 2024-03-01 20:00\n거래지원 개시 시점은 추후 안내 예정입니다."
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, title) == AT_20
+
+
 def test_upbit_shared_start_line_applies_to_every_token():
     body = ("에이(AAA), 비(BBB) KRW 마켓 추가\n거래지원 개시 시점: 2024-03-01 21:30 KST\n"
             "* 거래지원 개시 시점이 연기될 수 있습니다.")
