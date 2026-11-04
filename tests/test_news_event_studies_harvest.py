@@ -690,3 +690,73 @@ def test_completion_after_deadline_aborts(tmp_path):
     with pytest.raises(nes_harvest.HarvestAborted):
         h.harvest(161)
     assert json.loads((out / "harvest_meta.json").read_text())["aborted"] == "72 h without completing"
+
+
+# ---- Codex review of #238 (round 3) -------------------------------------------------
+
+def test_wall_correction_during_suspension_still_counts_resuspension(tmp_path):
+    clock = SteppingClock()
+    clock.t += 4 * 3600                            # wall runs 4 h ahead
+    limiter = BinanceLimiter(str(tmp_path / "state.json"), boot_id="b1", mono=clock.mono)
+    limiter.suspend(clock.wall())                  # the archive was blocked
+    long_sleeps = []
+
+    def sleep(s):
+        clock.sleep(s)
+        if s > 3600:
+            long_sleeps.append(s)
+            if len(long_sleeps) == 1:
+                clock.t -= 4 * 3600                # NTP corrects the wall clock
+            elif len(long_sleeps) == 2:
+                limiter.suspend(clock.wall())      # the archive is blocked again
+    fake = FakeCms(clock, {161: arts(120)})
+    h = nes_harvest.CmsHarvester(limiter, fake, clock.wall, sleep, tmp_path / "raw",
+                                 mono=clock.mono, boot_id="b1")
+    with pytest.raises(nes_harvest.HarvestAborted):
+        h.harvest(161)
+    assert fake.calls == []
+    meta = json.loads((tmp_path / "raw" / "harvest_meta.json").read_text())
+    assert len(meta["suspensions"]) == 2
+
+
+def test_upbit_resume_waits_full_gap_even_after_wall_step(tmp_path):
+    clock = SteppingClock()
+    notices = [upbit_notice(50 + i, "2024-03-01T21:00:00+09:00") for i in range(2)]
+    fake = FakeUpbit(clock, notices)
+    fake.overrides[1] = Response(500, b'{"success":false}', {})
+    h = nes_harvest.UpbitHarvester(fake, clock.wall, clock.sleep, tmp_path / "u", "t",
+                                   mono=clock.mono)
+    with pytest.raises(nes_harvest.HarvestBlocked):
+        h.run(*WIN)
+    stopped_at = clock.mono()
+    clock.t += 60                                  # wall steps forward before the rerun
+    monos = []
+
+    def fetcher(req):
+        monos.append(clock.mono())
+        return fake(req)
+    h2 = nes_harvest.UpbitHarvester(fetcher, clock.wall, clock.sleep, tmp_path / "u", "t",
+                                    mono=clock.mono)
+    h2.run(*WIN)
+    assert monos[0] - stopped_at >= nes_harvest.UPBIT_GAP_S
+
+
+def test_large_forward_wall_step_during_suspension_counts_once(tmp_path):
+    clock = SteppingClock()
+    limiter = BinanceLimiter(str(tmp_path / "state.json"), boot_id="b1", mono=clock.mono)
+    limiter.suspend(clock.wall())                  # the archive was blocked
+    stepped = []
+
+    def sleep(s):
+        if s > 3600 and not stepped:
+            stepped.append(1)
+            clock.sleep(s / 2)
+            clock.t += 4 * 3600                    # wall jumps 4 h forward mid-suspension
+            return
+        clock.sleep(s)
+    fake = FakeCms(clock, {161: arts(120)})
+    h = nes_harvest.CmsHarvester(limiter, fake, clock.wall, sleep, tmp_path / "raw",
+                                 mono=clock.mono, boot_id="b1")
+    h.harvest(161)
+    meta = json.loads((tmp_path / "raw" / "harvest_meta.json").read_text())
+    assert len(meta["suspensions"]) == 1 and meta["aborted"] is None

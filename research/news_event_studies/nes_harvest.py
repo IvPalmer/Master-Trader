@@ -139,13 +139,34 @@ class CmsHarvester:
         if self.meta.get("aborted"):
             raise HarvestAborted("already aborted: %s" % self.meta["aborted"])
 
+    def _generation(self, until):
+        """A suspension's identity: the `suspended_until` value stored in the limiter's
+        state file. Only BinanceLimiter.suspend (or a fail-closed reload) rewrites it, so
+        wall-clock steps and restarts do not change it. If the file cannot be read, fall
+        back to the projected end, new when more than 3 h after the last one."""
+        try:
+            with open(self.limiter.path) as f:
+                stored = json.load(f).get("suspended_until")
+            if isinstance(stored, (int, float)) and not isinstance(stored, bool):
+                return ("stored", stored)
+        except (OSError, ValueError, AttributeError):
+            pass
+        return ("projected", until)
+
     def _count_suspension(self, cid, until):
-        """Counts a suspension once, identified by its projected end. Persisted, so a
-        restart or a wall-clock step during it does not count it twice; the second count
-        and the abort are saved together."""
+        """Counts each suspension once (persisted); the second count and the abort are
+        saved together."""
+        gens = self.meta.setdefault("suspension_generations", [])
+        kind, value = self._generation(until)
+        if gens:
+            last_kind, last_value = gens[-1]
+            if kind == last_kind == "stored" and value == last_value:
+                return
+            if kind == "projected" and last_kind == "projected" and (
+                    value <= last_value + NEW_SUSPENSION_AFTER_S):
+                return
+        gens.append([kind, value])
         untils = self.meta["suspension_untils"]
-        if untils and until <= untils[-1] + NEW_SUSPENSION_AFTER_S:
-            return
         untils.append(until)
         self.meta["suspensions"].append(_iso_s(until))
         self._cat(cid)["suspensions"].append(_iso_s(until))
@@ -419,9 +440,8 @@ class UpbitHarvester:
     def _get(self, url, rel, parse):
         if self.last_mono is not None:             # within a run: monotonic
             wait = UPBIT_GAP_S - (self.mono() - self.last_mono)
-        elif self.meta.get("last_request_s") is not None:   # across reruns: wall time
-            now, last = self.wall(), self.meta["last_request_s"]
-            wait = UPBIT_GAP_S if now < last else UPBIT_GAP_S - (now - last)
+        elif self.meta.get("last_request_s") is not None:
+            wait = UPBIT_GAP_S      # a rerun: a full gap, whatever the wall clock says
         else:
             wait = 0
         if wait > 0:
