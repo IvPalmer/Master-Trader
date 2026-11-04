@@ -16,6 +16,7 @@ import gzip
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
 import stat
 import sys
@@ -258,3 +259,187 @@ def test_script_is_stdlib_only():
             names.add(node.module.split(".")[0])
     assert "backup_live_dbs" in names
     assert names <= set(sys.stdlib_module_names) | {"__future__", "backup_live_dbs"}
+
+
+# ---- off-host leg and restore drill (Task 3) ---------------------------------------
+
+NOW = dt.datetime(2026, 11, 5, 4, 30, tzinfo=UTC)
+REMOTE = "remote:Master-Trader/news-archive"
+
+
+def _stamp(days):
+    return (NOW - dt.timedelta(days=days)).strftime(live.STAMP_FORMAT)
+
+
+def _rclone_files(tmp_path):
+    config = tmp_path / "rclone.conf"
+    config.write_text("[remote]\n")
+    rclone = tmp_path / "rclone"
+    rclone.write_text("")
+    return config, rclone
+
+
+def _listing(names):
+    return json.dumps([{"Name": n, "IsDir": True} for n in names])
+
+
+def test_upload_verifies_before_pruning_with_archive_retention(tmp_path):
+    names = [_stamp(d) for d in [*range(8), 9, 20, 70]] + ["README"]
+    calls = []
+
+    def runner(argv, **kw):
+        calls.append(argv)
+        return types.SimpleNamespace(stdout=_listing(names) if argv[1] == "lsjson" else "",
+                                     returncode=0)
+
+    run = tmp_path / _stamp(0)
+    run.mkdir()
+    config, rclone = _rclone_files(tmp_path)
+    pruned = bna.upload(run, REMOTE, config, rclone, NOW, runner=runner)
+
+    assert pruned == [_stamp(70), _stamp(9)]
+    assert [c[1] for c in calls] == ["copy", "check", "lsjson", "purge", "purge"]
+    assert calls[0][2:4] == [str(run), f"{REMOTE}/{run.name}"]
+    assert calls[0][-2:] == ["--checksum", "--immutable"]
+    assert calls[1][-2:] == ["--one-way", "--download"]
+    assert calls[3][2] == f"{REMOTE}/{_stamp(70)}"
+
+
+def test_listing_failure_never_purges(tmp_path):
+    calls = []
+
+    def runner(argv, **kw):
+        calls.append(argv)
+        return types.SimpleNamespace(stdout="not json", returncode=0)
+
+    run = tmp_path / _stamp(0)
+    run.mkdir()
+    config, rclone = _rclone_files(tmp_path)
+    with pytest.raises(bna.BackupError, match="invalid rclone directory listing"):
+        bna.upload(run, REMOTE, config, rclone, NOW, runner=runner)
+    assert [c[1] for c in calls] == ["copy", "check", "lsjson"]
+
+
+def test_upload_needs_its_config(tmp_path):
+    run = tmp_path / _stamp(0)
+    run.mkdir()
+    _, rclone = _rclone_files(tmp_path)
+    with pytest.raises(bna.BackupError, match="rclone config missing"):
+        bna.upload(run, REMOTE, tmp_path / "nonexistent", rclone, NOW,
+                   runner=lambda *a, **k: pytest.fail("rclone must not run"))
+
+
+def test_failed_upload_is_recorded_and_keeps_the_snapshot(archive_db, tmp_path, monkeypatch):
+    def unavailable(*args, **kwargs):
+        raise bna.BackupError("Drive unavailable")
+
+    monkeypatch.setattr(bna, "upload", unavailable)
+    dest = tmp_path / "backups"
+    _, rclone = _rclone_files(tmp_path)
+    assert bna.main(_args(archive_db, dest, "--upload", "--rclone", str(rclone))) == 1
+    runs = _runs(dest)
+    assert len(runs) == 1
+    status = bna.read_status(dest)
+    assert status["upload"]["ok"] is False
+    assert "Drive unavailable" in status["upload"]["error"]
+    assert status["upload"]["stamp"] == runs[0].name
+    assert status["last_run_result"] == "upload_failed"
+    assert status["latest_snapshot"] == runs[0].name
+
+
+def test_successful_upload_is_recorded(archive_db, tmp_path, monkeypatch):
+    seen = []
+    monkeypatch.setattr(bna, "upload", lambda run, *a, **k: seen.append(run) or [])
+    dest = tmp_path / "backups"
+    _, rclone = _rclone_files(tmp_path)
+    assert bna.main(_args(archive_db, dest, "--upload", "--rclone", str(rclone))) == 0
+    status = bna.read_status(dest)
+    assert seen == _runs(dest)
+    assert status["upload"]["ok"] is True
+    assert status["upload"]["error"] is None
+    assert status["last_run_result"] == "ok"
+
+
+def test_local_drill_passes_and_is_recorded(archive_db, tmp_path):
+    dest = tmp_path / "backups"
+    assert bna.main(_args(archive_db, dest)) == 0
+    before = bna.read_status(dest)
+    assert bna.main(_args(archive_db, dest, "--drill", "local")) == 0
+    status = bna.read_status(dest)
+    assert status["local_drill"]["ok"] is True
+    assert status["local_drill"]["stamp"] == status["latest_snapshot"]
+    assert status["local_drill"]["error"] is None
+    assert status["offhost_drill"] is None
+    assert {k: status[k] for k in ("last_run_at", "last_run_result", "latest_snapshot")} == \
+        {k: before[k] for k in ("last_run_at", "last_run_result", "latest_snapshot")}
+
+
+def test_drill_rejects_a_tampered_snapshot(archive_db, tmp_path):
+    dest = tmp_path / "backups"
+    assert bna.main(_args(archive_db, dest)) == 0
+    other = tmp_path / "other.sqlite"
+    conn = na_store.connect(str(other))
+    na_store.write_sources(conn, [("tree", 60, True)], T)
+    na_store.upsert_items(conn, "tree", _items(4), T, False)
+    conn.execute("PRAGMA journal_mode=DELETE")
+    conn.close()
+    with open(other, "rb") as fin, gzip.open(_runs(dest)[0] / "archive.sqlite.gz", "wb") as fout:
+        fout.write(fin.read())
+    assert bna.main(_args(archive_db, dest, "--drill", "local")) == 1
+    drill = bna.read_status(dest)["local_drill"]
+    assert drill["ok"] is False
+    assert "sha256" in drill["error"]
+
+
+def test_drill_rejects_a_row_count_mismatch(archive_db, tmp_path):
+    dest = tmp_path / "backups"
+    assert bna.main(_args(archive_db, dest)) == 0
+    manifest_path = _runs(dest)[0] / "MANIFEST.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["row_counts"]["items"] += 1
+    manifest_path.write_text(json.dumps(manifest))
+    assert bna.main(_args(archive_db, dest, "--drill", "local")) == 1
+    assert "row count" in bna.read_status(dest)["local_drill"]["error"]
+
+
+def test_drill_needs_free_space(archive_db, tmp_path, monkeypatch):
+    dest = tmp_path / "backups"
+    assert bna.main(_args(archive_db, dest)) == 0
+    _free(monkeypatch, bna.required_free_bytes(archive_db) - 1)
+    assert bna.main(_args(archive_db, dest, "--drill", "local")) == 1
+    assert "free" in bna.read_status(dest)["local_drill"]["error"]
+
+
+def test_drill_with_no_snapshot_fails(archive_db, tmp_path):
+    dest = tmp_path / "backups"
+    assert bna.main(_args(archive_db, dest, "--drill", "local")) == 1
+    assert "no local snapshot" in bna.read_status(dest)["local_drill"]["error"]
+
+
+def test_remote_drill_sets_the_offhost_gate(archive_db, tmp_path, monkeypatch):
+    dest = tmp_path / "backups"
+    assert bna.main(_args(archive_db, dest)) == 0
+    stamp = _runs(dest)[0].name
+    standin = tmp_path / "drive"
+    shutil.copytree(dest / stamp, standin / stamp)
+    calls = []
+
+    def fake_run(argv, **kw):
+        calls.append(argv)
+        if argv[1] == "lsjson":
+            return types.SimpleNamespace(stdout=_listing([stamp, "README"]), returncode=0)
+        if argv[1] == "copy":
+            assert argv[2] == f"{REMOTE}/{stamp}"
+            shutil.copytree(standin / stamp, argv[3])
+            return types.SimpleNamespace(stdout="", returncode=0)
+        raise AssertionError(argv)
+
+    monkeypatch.setattr(bna.subprocess, "run", fake_run)
+    config, rclone = _rclone_files(tmp_path)
+    assert bna.main(_args(archive_db, dest, "--drill", "remote", "--drive-remote", REMOTE,
+                          "--rclone", str(rclone), "--rclone-config", str(config))) == 0
+    assert [c[1] for c in calls] == ["lsjson", "copy"]
+    status = bna.read_status(dest)
+    assert status["offhost_drill"]["ok"] is True
+    assert status["offhost_drill"]["stamp"] == stamp
+    assert status["local_drill"] is None

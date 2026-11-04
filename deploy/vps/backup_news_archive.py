@@ -23,8 +23,17 @@ twice the size of archive.sqlite and its -wal file, or it skips. It holds its
 own non-blocking flock, so runs never overlap, and runs under nice 10 and
 ionice idle.
 
-Each run rewrites <dest>/STATUS.json (mode 0644), which the nightly health
-report reads as the ubuntu user. Runs are root-only (0700).
+Off-host is opt-in: with --upload the new run is copied to an rclone remote
+(default operator-drive:Master-Trader/news-archive, reusing the live backup's
+root-only config), verified with a downloading `rclone check`, and only then is
+the same retention applied remotely. A failed upload keeps the new snapshot and
+the local retention, and is recorded. --drill local|remote restores the newest
+snapshot into a temporary directory and checks its sha256, PRAGMA
+integrity_check and row counts against the manifest. The off-host copy counts
+only once the latest remote drill has passed.
+
+Each run or drill rewrites <dest>/STATUS.json (mode 0644), which the nightly
+health report reads as the ubuntu user. Runs are root-only (0700).
 
 Runs as root from root's crontab, from the root-owned Dokploy checkout. See
 docs/ops/news-archive-backup.md for the contract, install and rollback.
@@ -37,6 +46,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import fcntl
+import gzip
 import json
 import os
 import shutil
@@ -46,8 +56,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from backup_live_dbs import (STAMP_FORMAT, BackupError, _gzip, _sha256, backup_sqlite,
-                             runs_to_prune)
+from backup_live_dbs import (RCLONE_CONFIG, STAMP_FORMAT, BackupError, _gzip, _remote_child,
+                             _sha256, backup_sqlite, resolve_rclone, runs_to_prune)
 
 ARCHIVE_DB = Path("/home/ubuntu/master-trader/research/news_archive/data/archive.sqlite")
 DEST = Path("/home/ubuntu/backups/news-archive")
@@ -122,17 +132,18 @@ def snapshot(db: Path, dest: Path, now: dt.datetime) -> Path:
     return final
 
 
+def _is_stamp(name: str) -> bool:
+    try:
+        dt.datetime.strptime(name, STAMP_FORMAT)
+    except ValueError:
+        return False
+    return True
+
+
 def local_stamps(dest: Path) -> list[str]:
     """Complete local runs, oldest first."""
-    out = []
-    for p in dest.iterdir():
-        try:
-            dt.datetime.strptime(p.name, STAMP_FORMAT)
-        except ValueError:
-            continue
-        if p.is_dir() and (p / "MANIFEST.json").is_file():
-            out.append(p.name)
-    return sorted(out)
+    return sorted(p.name for p in dest.iterdir()
+                  if _is_stamp(p.name) and p.is_dir() and (p / "MANIFEST.json").is_file())
 
 
 def prune_local(dest: Path, now: dt.datetime) -> list[str]:
@@ -144,6 +155,91 @@ def prune_local(dest: Path, now: dt.datetime) -> list[str]:
     for stamp in doomed:
         shutil.rmtree(dest / stamp)
     return doomed
+
+
+def _check_rclone(config: Path, rclone: Path) -> list[str]:
+    if not config.is_file():
+        raise BackupError(f"rclone config missing: {config}")
+    if not rclone.is_file():
+        raise BackupError(f"rclone binary missing: {rclone}")
+    return ["--config", str(config)]
+
+
+def _remote_names(remote: str, common: list[str], rclone: Path, runner) -> list[str]:
+    listed = runner([str(rclone), "lsjson", remote, *common, "--dirs-only", "--max-depth", "1"],
+                    check=True, capture_output=True, text=True)
+    try:
+        entries = json.loads(listed.stdout)
+        if not isinstance(entries, list):
+            raise TypeError(f"expected a list, got {type(entries).__name__}")
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise BackupError(f"invalid rclone directory listing: {exc}") from exc
+    return [e["Name"] for e in entries if isinstance(e, dict) and isinstance(e.get("Name"), str)]
+
+
+def upload(run: Path, remote: str, config: Path, rclone: Path, now: dt.datetime,
+           runner=subprocess.run) -> list[str]:
+    """Copy `run` off-host, verify it, then apply the archive's retention remotely.
+
+    Nothing is purged unless the copy was verified and the listing parsed.
+    """
+    common = _check_rclone(config, rclone)
+    target = _remote_child(remote, run.name)
+    runner([str(rclone), "copy", str(run), target, *common, "--checksum", "--immutable"],
+           check=True)
+    runner([str(rclone), "check", str(run), target, *common, "--one-way", "--download"],
+           check=True)
+    doomed = runs_to_prune(_remote_names(remote, common, rclone, runner), now, **RETENTION)
+    for stamp in doomed:
+        runner([str(rclone), "purge", _remote_child(remote, stamp), *common], check=True)
+    return doomed
+
+
+def _verify(run: Path, restored: Path) -> None:
+    manifest = json.loads((run / "MANIFEST.json").read_text())
+    with gzip.open(run / STORED_AS, "rb") as fin, open(restored, "wb") as fout:
+        shutil.copyfileobj(fin, fout)
+    if _sha256(restored) != manifest["sha256"]:
+        raise BackupError(f"sha256 of {run.name} does not match its manifest")
+    conn = sqlite3.connect(f"{restored.resolve().as_uri()}?mode=ro", uri=True)
+    try:
+        result = conn.execute("PRAGMA integrity_check").fetchall()
+    finally:
+        conn.close()
+    if result != [("ok",)]:
+        raise BackupError(f"integrity_check failed for {run.name}: {result[:3]}")
+    counts = row_counts(restored)
+    if counts != manifest["row_counts"]:
+        raise BackupError(f"row count mismatch for {run.name}: restored {counts}, "
+                          f"manifest {manifest['row_counts']}")
+
+
+def drill(source: str, dest: Path, db: Path, remote: str, config: Path, rclone: Path | None,
+          runner=subprocess.run) -> str:
+    """Restore the newest local or remote snapshot to a temporary path and verify it.
+
+    Returns the stamp; raises BackupError naming the check that failed.
+    """
+    if source == "local":
+        stamps = local_stamps(dest)
+    else:
+        if rclone is None:
+            raise BackupError("a remote drill needs rclone")
+        common = _check_rclone(config, rclone)
+        stamps = sorted(n for n in _remote_names(remote, common, rclone, runner) if _is_stamp(n))
+    if not stamps:
+        raise BackupError(f"no {source} snapshot to drill")
+    stamp = stamps[-1]
+    check_free_space(Path(tempfile.gettempdir()), db)
+    with tempfile.TemporaryDirectory(prefix="news-archive-drill-") as tmp:
+        if source == "local":
+            run = dest / stamp
+        else:
+            run = Path(tmp) / stamp
+            runner([str(rclone), "copy", _remote_child(remote, stamp), str(run), *common],
+                   check=True)
+        _verify(run, Path(tmp) / "archive.sqlite")
+    return stamp
 
 
 def read_status(dest: Path) -> dict:
@@ -186,7 +282,12 @@ def lower_priority() -> None:
         pass
 
 
+def _err(exc: BaseException) -> str:
+    return str(exc) if isinstance(exc, BackupError) else f"{type(exc).__name__}: {exc}"
+
+
 def _run(args: argparse.Namespace, now: dt.datetime, status: dict) -> int:
+    """Snapshot, local retention, then the optional upload."""
     status.update(last_run_at=now.isoformat(), last_run_result="failed", last_run_error=None)
     try:
         lower_priority()
@@ -194,15 +295,48 @@ def _run(args: argparse.Namespace, now: dt.datetime, status: dict) -> int:
         run = snapshot(args.db, args.dest, now)
         pruned = prune_local(args.dest, now)
     except NotEnoughSpace as exc:
-        status.update(last_run_result="skipped", last_run_error=str(exc))
+        status.update(last_run_result="skipped", last_run_error=_err(exc))
         print(f"{now.isoformat()} news-archive backup SKIPPED: {exc}", file=sys.stderr)
         return 1
     except Exception as exc:  # noqa: BLE001 - every failure is recorded the same way
-        status["last_run_error"] = f"{type(exc).__name__}: {exc}"
+        status["last_run_error"] = _err(exc)
         print(f"{now.isoformat()} news-archive backup FAILED: {exc}", file=sys.stderr)
         return 1
+    summary = f"pruned local={len(pruned)}"
+    if args.upload:
+        record = {"at": now.isoformat(), "ok": False, "error": None, "stamp": run.name}
+        status["upload"] = record
+        try:
+            remote_pruned = upload(run, args.drive_remote, args.rclone_config,
+                                   resolve_rclone(args.rclone), now, runner=subprocess.run)
+        except Exception as exc:  # noqa: BLE001
+            record["error"] = _err(exc)
+            status.update(last_run_result="upload_failed", last_run_error=record["error"])
+            print(f"{now.isoformat()} news-archive backup upload FAILED (snapshot {run} kept): "
+                  f"{exc}", file=sys.stderr)
+            return 1
+        record["ok"] = True
+        summary += f" remote={len(remote_pruned)}"
     status["last_run_result"] = "ok"
-    print(f"{now.isoformat()} OK {run} (pruned local={len(pruned)})")
+    print(f"{now.isoformat()} OK {run} ({summary})")
+    return 0
+
+
+def _drill(args: argparse.Namespace, now: dt.datetime, status: dict) -> int:
+    """Writes only local_drill or offhost_drill."""
+    record = {"at": now.isoformat(), "stamp": None, "ok": False, "error": None}
+    status["local_drill" if args.drill == "local" else "offhost_drill"] = record
+    try:
+        lower_priority()
+        rclone = None if args.drill == "local" else resolve_rclone(args.rclone)
+        record["stamp"] = drill(args.drill, args.dest, args.db, args.drive_remote,
+                                args.rclone_config, rclone, runner=subprocess.run)
+    except Exception as exc:  # noqa: BLE001
+        record["error"] = _err(exc)
+        print(f"{now.isoformat()} news-archive {args.drill} drill FAILED: {exc}", file=sys.stderr)
+        return 1
+    record["ok"] = True
+    print(f"{now.isoformat()} DRILL {args.drill} OK {record['stamp']}")
     return 0
 
 
@@ -210,6 +344,15 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--db", type=Path, default=ARCHIVE_DB)
     ap.add_argument("--dest", type=Path, default=DEST)
+    ap.add_argument("--upload", action="store_true",
+                    help="copy the new run off-host and verify it (opt-in)")
+    ap.add_argument("--drive-remote", default=DRIVE_REMOTE)
+    ap.add_argument("--rclone", type=Path,
+                    help="rclone executable (default: discover it from PATH/system locations)")
+    ap.add_argument("--rclone-config", type=Path, default=RCLONE_CONFIG)
+    ap.add_argument("--drill", choices=("local", "remote"),
+                    help="restore the newest snapshot to a temporary path and verify it; "
+                         "makes no snapshot")
     args = ap.parse_args(argv)
 
     os.umask(0o077)
@@ -228,9 +371,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{now.isoformat()} SKIP: another run holds the lock")
             return 0
         status = read_status(args.dest)
-        rc = _run(args, now, status)
+        rc = _drill(args, now, status) if args.drill else _run(args, now, status)
         try:
-            status["latest_snapshot"] = (local_stamps(args.dest) or [None])[-1]
+            if not args.drill:
+                status["latest_snapshot"] = (local_stamps(args.dest) or [None])[-1]
             write_status(args.dest, status)
         except Exception as exc:  # noqa: BLE001
             print(f"{now.isoformat()} news-archive backup FAILED to write {STATUS_NAME}: {exc}",

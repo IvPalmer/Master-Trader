@@ -82,6 +82,59 @@ root crontab line, after the 03:15 live run and the 03:45 interim copy:
 sudo crontab -l | grep backup_news_archive
 ```
 
+## Off-host leg (separate operator go-ahead)
+
+`--upload` copies the new run to `operator-drive:Master-Trader/news-archive/<stamp>`
+with `rclone copy --checksum --immutable`, verifies it with
+`rclone check --one-way --download`, and only then lists the remote and purges
+the stamps outside the retention above. An unparseable listing purges nothing.
+It reuses the live backup's root-only `/etc/master-trader-backup/rclone.conf`
+and its `operator-drive` remote, so there is no second OAuth and no copied token.
+
+A failed upload exits 1, records `upload.ok = false` and
+`last_run_result = upload_failed`, and keeps the new snapshot and the local
+retention. The nightly report shows it as `off-host upload FAILED …`.
+
+**The gate.** The off-host copy counts only once the latest **remote** restore
+drill has passed. Until then the report line starts
+`news-archive backup: local only`, whatever the uploads did. In order:
+
+1. Prove a failed upload is visible:
+   `sudo /usr/bin/python3 $C/deploy/vps/backup_news_archive.py --upload --rclone-config /nonexistent`
+   must exit 1, and the report section must then show `local only; off-host upload FAILED …`.
+2. Real upload: the same command with `--upload` only prints `OK … remote=N`. Then
+   `sudo /usr/local/bin/rclone lsf operator-drive:Master-Trader/news-archive --dirs-only --config /etc/master-trader-backup/rclone.conf`
+   must list the stamp.
+3. Remote drill: `sudo /usr/bin/python3 $C/deploy/vps/backup_news_archive.py --drill remote`
+   exits 0, and the report section must then show `off-host OK`.
+4. Swap in the `--upload` cron line, the same way as the local one:
+
+```cron
+30 4 * * * /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_news_archive.py --upload >> /var/log/master-trader-news-archive-backup.log 2>&1
+```
+
+## Restore drill
+
+```bash
+sudo /usr/bin/python3 $C/deploy/vps/backup_news_archive.py --drill local
+sudo /usr/bin/python3 $C/deploy/vps/backup_news_archive.py --drill remote
+```
+
+A drill takes the same lock and the same free-space rule as a run, makes no
+snapshot, and restores the newest local run (or the newest remote stamp, fetched
+with `rclone copy`) into a temporary `news-archive-drill-*` directory. It
+gunzips the copy and requires its sha256 to match the manifest,
+`PRAGMA integrity_check` to return `ok`, and every table's row count to equal
+the manifest's. It records only `local_drill` or `offhost_drill` in
+`STATUS.json`; a failure names the check that failed and exits 1.
+
+A real restore is a manual operator step: stop the service
+(`systemctl --user stop news-archive`), keep the damaged database aside, gunzip
+the chosen `archive.sqlite.gz` to `research/news_archive/data/archive.sqlite` as
+`ubuntu`, remove any stale `-wal`/`-shm`, and start the service again. On start
+it records a `restart` gap from the restored copy's last OK poll to the restart,
+so the PIT rule still marks the hole.
+
 ## Rollback
 
 ```bash
