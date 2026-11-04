@@ -112,6 +112,13 @@ def test_status_order_unresolved_beats_missing_hole():
     assert res["status"] == "missing"
 
 
+def test_missing_leak_candle_does_not_hide_unresolved_exit():
+    res = nr.evaluate(EVENT, series(full(om10=None, last=1444)), series(full()), "short", "hyperliquid")
+    assert res["status"] == "unresolved"
+    res = nr.evaluate(EVENT, series(full(om10=None)), series(full()), "short", "hyperliquid")
+    assert res["status"] == "missing"
+
+
 def test_mae_short_from_highs_none_on_gap():
     r = rows({5: "100", 6: "100", 7: "100"}, highs={6: "101", 7: "104"})
     assert nr.mae_short(r, T0 + 300_000, BASE + 7 * MIN, "100") == pytest.approx(0.04)

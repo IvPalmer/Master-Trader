@@ -115,10 +115,11 @@ def evaluate(event, series, btc_series, direction, venue):
     leak = leaked(rows, t0)
     start = t0 + ENTRY_OFFSET_MS
     entry = price_at(rows, start)
-    if leak is None or entry is None:
+    if entry is None:
         return {**base, "status": "missing", "leaked": leak, "horizons": {}, "t60": {}}
     horizons = _horizons(rows, absent, btc_series["rows"], start, entry, direction, venue, True)
-    status = max((h["exit_status"] for h in horizons.values()), key=_STRENGTH.get)
+    statuses = [h["exit_status"] for h in horizons.values()] + (["missing"] if leak is None else [])
+    status = max(statuses, key=_STRENGTH.get)     # a missing leak candle never hides unresolved
     t60 = {}
     entry60 = price_at(rows, t0 + T60_OFFSET_MS)
     if entry60 is not None:
