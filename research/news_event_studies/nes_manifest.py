@@ -8,11 +8,13 @@ build-report.txt, and prints both SHA-256s. Exit 5: titles need an operator deci
 """
 import argparse
 import json
+import math
 import sys
 import time
 from pathlib import Path
 
 import nes_util as nu
+import na_sources
 import nes_classify as nc
 import nes_harvest as nh
 import nes_venues as nv
@@ -61,6 +63,32 @@ def _closing_order(rel):
     return 1 if name == "closing.json" else int(name[len("closing-"):-len(".json")])
 
 
+def _upbit_t0(n):
+    """O1: Upbit t0 is `first_listed_at` (KST); `listed_at` moves on edits and is not used."""
+    iso = na_sources.to_utc(n.get("first_listed_at"), "kst")
+    return nu.ms_from_iso(iso) if iso else None
+
+
+def _page_no(rel):
+    return int(rel.rsplit("page-", 1)[1][:-len(".json")])
+
+
+def _scan_complete(pages):
+    """Pages 1..k reach before the window, or the last page by total (else a short page)."""
+    total = pages[1].total if 1 in pages else None
+    n = 0
+    while n + 1 in pages:
+        n += 1
+        page = pages[n]
+        if any(_release(a) is not None and _release(a) < nu.WINDOW_START_MS for a in page.articles):
+            return True
+        if total is not None and n >= math.ceil(total / nh.CMS_PAGE_SIZE):
+            return True
+        if total is None and len(page.articles) < nh.CMS_PAGE_SIZE:
+            return True
+    return False
+
+
 def load_cms(raw_dir):
     raw_dir = Path(raw_dir)
     meta = _meta(raw_dir)
@@ -68,14 +96,16 @@ def load_cms(raw_dir):
     for cid, cat in sorted(meta.get("catalogs", {}).items()):
         bodies = _verified(raw_dir, cat.get("files", {}))
         files.update({rel: nu.sha256_bytes(b) for rel, b in bodies.items()})
-        pages = [nh.parse_cms_page(bodies[r]) for r in sorted(bodies) if "/page-" in r]
+        numbered = {_page_no(r): nh.parse_cms_page(bodies[r]) for r in bodies if "/page-" in r}
+        pages = [numbered[k] for k in sorted(numbered)]
         closing_rels = sorted((r for r in bodies if "/closing" in r), key=_closing_order)
         closings = [nh.parse_cms_page(bodies[r]) for r in closing_rels]
         merged = nh.merge_articles(pages + closings)
         catalogs[int(cid)] = {
             "name": cat.get("catalog_name"), "aborted": cat.get("aborted"),
             "articles": sorted(merged.values(), key=lambda a: (_release(a) or 0, str(a["id"]))),
-            "completeness": nh.completeness(merged, closings[0]) if closings else None}
+            "completeness": nh.completeness(merged, closings[0]) if closings else None,
+            "scan_complete": _scan_complete(numbered)}
     return {"catalogs": catalogs, "aborted": meta.get("aborted"), "files": files}
 
 
@@ -99,7 +129,7 @@ def load_upbit(raw_dir):
                     "shortfall": max(0, total - len(notices)) if total is not None else 0}
     complete = (closing is not None and total is not None and not meta.get("blocked")
                 and bool(meta.get("finished_at")))
-    return {"notices": sorted(notices.values(), key=lambda n: (nh.notice_ms(n) or 0, str(n["id"]))),
+    return {"notices": sorted(notices.values(), key=lambda n: (_upbit_t0(n) or 0, str(n["id"]))),
             "details": details, "completeness": completeness, "complete": complete,
             "host_label": meta.get("host_label"),
             "files": {rel: nu.sha256_bytes(b) for rel, b in bodies.items()}}
@@ -117,9 +147,9 @@ def _event(aid, t0, title, kind, token, exclusion=None, ref=None, start=None):
             "trading_start_ms": start, "hl": None, "binance": None}
 
 
-def _review(ref, t0, title, reason):
+def _review(ref, t0, title, reason, **extra):
     return {"ref": ref, "t0": nu.iso_ms(t0) if t0 is not None else None, "title": title,
-            "reason": reason}
+            "reason": reason, **extra}
 
 
 def _sorted(events):
@@ -155,9 +185,9 @@ def delisting_events(articles161, scan49):
     in161 = {str(a["id"]) for a in articles161}
     for a in scan49:                                                      # O17
         t0, title = _release(a), a.get("title") or ""
-        if (t0 is not None and _in_window(t0) and "Monitoring Tag" in title
-                and str(a["id"]) not in in161):
-            review.append(_review("binance:%s" % a["id"], t0, title, "monitoring_tag_in_catalog_49"))
+        if t0 is not None and _in_window(t0) and "Monitoring Tag" in title:
+            review.append(_review("binance:%s" % a["id"], t0, title, "monitoring_tag_in_catalog_49",
+                                  also_in_catalog_161=str(a["id"]) in in161))
     if review:
         raise NeedsReview(review)
     return _sorted(events)
@@ -176,7 +206,7 @@ def upbit_events(notices, details, cms48):
     review, events, on_krw = [], [], {}
     rows = []
     for n in notices:
-        t0 = nh.notice_ms(n)
+        t0 = _upbit_t0(n)
         if t0 is None:
             review.append(_review("upbit:%s" % n["id"], None, n.get("title") or "", "no_publish_time"))
             continue
@@ -305,10 +335,11 @@ def build(cms_dir, upbit_dir, hl_client, probe, code_commit):
     shortfall = lambda cid: comp(cid)["shortfall"] if comp(cid) else 0     # noqa: E731
     cms_ok = not cms["aborted"] and not any(c.get("aborted") for c in cats.values())
     completeness = {"binance:%d" % cid: comp(cid) for cid in (161, 48) if cid in cats}
-    completeness["binance:49_scanned"] = 49 in cats
     common = {"binance_cms_files": cms["files"], "hl_meta_sha256": nu.sha256_bytes(meta_body),
               "completeness": completeness}
-    dm = _manifest([DELISTING], dev, common, cms_ok and full(161) and 49 in cats,
+    scanned49 = 49 in cats and cats[49]["scan_complete"]
+    completeness["binance:49_scanned"] = scanned49
+    dm = _manifest([DELISTING], dev, common, cms_ok and full(161) and scanned49,
                    shortfall(161), code_commit)
     up_inputs = {**common, "upbit_files": up["files"], "upbit_host_label": up["host_label"],
                  "completeness": {**completeness, "upbit:list": up["completeness"]}}

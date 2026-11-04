@@ -48,6 +48,8 @@ def test_upbit_end_and_market_specific_end():
     assert nc.upbit_end("닐리온(NIL) BTC, USDT 마켓 거래지원 종료 안내") is None
     assert nc.upbit_end("닐리온(NIL) 거래지원 종료 연기 안내") is None
     assert nc.upbit_end("닐리온(NIL) 거래지원 종료 결정 철회 안내") is None
+    assert nc.upbit_end("닐리온(NIL) KRW 및 BTC 마켓 거래지원 종료 안내") == ("NIL",)
+    assert nc.upbit_end("닐리온(NIL) KRW와 BTC 마켓 거래지원 종료 안내") == ("NIL",)
     assert nc.upbit_end("닐리온(NIL) 거래지원 종료 취소 안내") is None
     assert nc.upbit_end("닐리온(NIL) KRW 마켓 디지털 자산 추가") is None
 
@@ -100,6 +102,11 @@ def test_upbit_trading_start_conflicting_lines_is_none():
     assert nc.upbit_trading_start_ms(body, "NIL", T_START) is None
 
 
+def test_upbit_trading_start_mixed_year_and_yearless_is_none():
+    body = "거래지원 개시 시점: 2026년 10월 27일 17:30 또는 10월 27일 18:00"
+    assert nc.upbit_trading_start_ms(body, "NIL", T_START) is None
+
+
 def test_upbit_trading_start_rowspan_and_weekday():
     body = ("<table><tr><th>디지털 자산</th><th>마켓</th><th>거래지원 개시 시점</th></tr>"
             "<tr><td>에이(AAA)</td><td>KRW</td><td rowspan=\"2\">2024년 3월 1일(금) 21:30</td></tr>"
@@ -148,6 +155,8 @@ def test_upbit_trading_start_invalid_date_is_none():
     ("Binance Options Will Delist ABC Options", "excluded:options", ()),
     ("Vote to Delist Results - 2026-03", "excluded:vote", ()),
     ("Binance Will Cancel the Delisting of ABC", "excluded:retraction", ()),
+    ("Binance Will Delist ABC on 2024-03-10 (Cancelled)", "full_delist", ("ABC",)),
+    ("Binance Will Delist ABC, DEF (Update)", "full_delist", ("ABC", "DEF")),
     ("Binance Simple Earn Will Delist ABC Products", "excluded:other_product", ()),
     ("Binance Updates Its Tokenomics Guidelines", "unclassified", ()),
 ])

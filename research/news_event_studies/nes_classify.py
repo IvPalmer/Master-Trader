@@ -37,6 +37,7 @@ def _dedupe(items):
 def _tickers(clause):
     """Split a token list on ',', '&' and ' and '; None if any piece is not a ticker."""
     clause = re.split(r"\s+on\s+", clause.strip(), maxsplit=1)[0]
+    clause = re.sub(r"\s*\([^()]*\)\s*$", "", clause)    # a trailing "(Cancelled)" or "(Update)"
     pieces = [p.strip() for p in re.split(r",|&|\s+and\s+", clause)]
     if not pieces or not all(_is_ticker(p) for p in pieces):
         return None
@@ -54,7 +55,9 @@ def classify_binance(title):
     t = " ".join(title.split())
     if re.search(r"\bVote\b", t):
         return _excluded("vote")
-    if re.search(r"\b(?:Cancel|Revoke|Retract)", t):
+    # Only a notice that is itself a cancellation; an edited "(Cancelled)" suffix on a
+    # delisting stays in (rules_verbatim: retractions are unknowable at entry).
+    if re.match(r"(?:Binance\s+Will\s+)?(?:Cancel|Revoke|Retract)", t):
         return _excluded("retraction")
     if "Monitoring Tag" in t:
         m = re.search(r"\bInclude\s+(.+)$", t) or \
@@ -125,8 +128,7 @@ def upbit_end(title):
         return None
     if any(w in title for w in END_NEGATIONS):
         return None
-    scopes = re.findall(r"((?:KRW|BTC|USDT|원화)(?:\s*,\s*(?:KRW|BTC|USDT|원화))*)\s*마켓", title)
-    if scopes and not any(_has_krw(s) for s in scopes):
+    if "마켓" in title and not _has_krw(title):
         return None                    # an end limited to BTC/USDT markets
     return _upbit_tokens(title)
 
@@ -237,15 +239,13 @@ def _clock(m):
 
 def _starts_in(text, t0_ms):
     """Every start time stated in one piece of text, as a set of UTC ms."""
-    found = set()
+    found, masked = set(), text
     for pattern in _WITH_YEAR:
         for m in pattern.finditer(text):
-            ms = _kst_ms(int(m.group("y")), int(m.group("mo")), int(m.group("d")), *_clock(m))
-            found.add(ms)
-    if found:
-        return found
+            found.add(_kst_ms(int(m.group("y")), int(m.group("mo")), int(m.group("d")), *_clock(m)))
+            masked = masked[:m.start()] + " " * (m.end() - m.start()) + masked[m.end():]
     year = datetime.fromtimestamp(t0_ms / 1000, KST).year
-    for m in _NO_YEAR.finditer(text):
+    for m in _NO_YEAR.finditer(masked):
         options = [ms for ms in (_kst_ms(y, int(m.group("mo")), int(m.group("d")), *_clock(m))
                                  for y in (year - 1, year, year + 1)) if ms is not None]
         if not options:

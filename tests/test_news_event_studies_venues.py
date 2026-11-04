@@ -117,14 +117,24 @@ def test_in_meta_name_is_evaluated():
 
 
 def test_not_in_meta_queries_by_name_then_never_in_meta():
-    c, fake, _ = client({("fundingHistory", "GONE"): [resp(500, b"null")]})
+    c, fake, _ = client({("fundingHistory", "GONE"): [resp(500, b"null")],
+                         ("fundingHistory", "kGONE"): [resp(500, b"null")]})
     assert nv.hl_facts("GONE", T0, index(), c) == {"status": "ineligible", "coin": "GONE",
                                                    "reason": "never_in_meta"}
-    assert [b["coin"] for _, b in fake.requests] == ["GONE"]
+    assert [b["coin"] for _, b in fake.requests] == ["GONE", "kGONE"]
+
+
+def test_not_in_meta_queries_k_prefix_too():
+    c, fake, _ = client({("fundingHistory", "GONE"): [resp(500, b"null")],
+                         ("fundingHistory", "kGONE"): [funding(T0 - 1_800_000)]})
+    assert nv.hl_facts("GONE", T0, index(), c) == {"status": "eligible", "coin": "kGONE",
+                                                   "reason": "funding_records"}
+    assert [b["coin"] for _, b in fake.requests] == ["GONE", "kGONE"]
 
 
 def test_not_in_meta_with_records_is_evaluated():
-    c, _, _ = client({("fundingHistory", "GONE"): [funding(T0 - 1_800_000)]})
+    c, _, _ = client({("fundingHistory", "GONE"): [funding(T0 - 1_800_000)],
+                      ("fundingHistory", "kGONE"): [resp(500, b"null")]})
     assert nv.hl_facts("GONE", T0, index(), c) == {"status": "eligible", "coin": "GONE",
                                                    "reason": "funding_records"}
 
@@ -219,8 +229,15 @@ def test_transient_error_is_not_absence():
     probe = nv.FileProbe(fake, Clock().sleep)
     with pytest.raises(nv.ProbeError):
         probe.exists(u)
-    fake = FakeFiles(set(), {u: [resp(503, b""), resp(403, b"")]})
+    fake = FakeFiles(set(), {u: [resp(503, b""), resp(404, b"")]})
     assert nv.FileProbe(fake, Clock().sleep).exists(u) is False
+
+
+def test_403_is_a_denial_not_absence():
+    u = url("um", "AUSDT", "2024-03-01")
+    fake = FakeFiles(set(), {u: [resp(403, b""), resp(403, b""), resp(403, b"")]})
+    with pytest.raises(nv.ProbeError):
+        nv.FileProbe(fake, Clock().sleep).exists(u)
 
 
 DATES = ("2024-02-29", "2024-03-01", "2024-03-02", "2024-03-03")

@@ -154,11 +154,12 @@ class HlClient:
 
 def hl_facts(token, t0_ms, index, client):
     names = hl_names(token, index)
-    if not names:
-        times = client.evidence(token, t0_ms, absent_from_meta=True)
-        if not times:
+    if not names:          # looked up by name, both candidates (O5)
+        found = [(c, client.evidence(c, t0_ms, absent_from_meta=True)) for c in (token, "k" + token)]
+        found = [(c, hl_status(times, t0_ms)) for c, times in found if times]
+        if not found:
             return {"status": "ineligible", "coin": token, "reason": "never_in_meta"}
-        return _facts(token, hl_status(times, t0_ms))
+        return _facts(*next((f for f in found if f[1] == "eligible"), found[0]))
     results = [(name, hl_status(client.evidence(name, t0_ms), t0_ms)) for name in names]
     for name, status in results:
         if status == "eligible":
@@ -218,7 +219,7 @@ class FileProbe:
             if resp.status == 200:
                 self.cache[url] = True
                 return True
-            if resp.status in (403, 404):
+            if resp.status == 404:         # a missing key; 403 is a denial, not absence
                 self.cache[url] = False
                 return False
             last = resp.status

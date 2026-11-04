@@ -102,7 +102,9 @@ class FakeHl:
 
     def evidence(self, coin, t0_ms, absent_from_meta=False):
         self.calls.append(coin)
-        return self.evidence_map.get(coin, [t0_ms - 60_000])
+        if coin in self.evidence_map:
+            return self.evidence_map[coin]
+        return [] if absent_from_meta else [t0_ms - 60_000]   # absent names: 500 null
 
 
 class FakeProbe:
@@ -177,8 +179,11 @@ def test_monitoring_title_in_scan49_raises_needs_review():
         nm.delisting_events([], [art(7, mon, T)])
     assert e.value.items[0]["reason"] == "monitoring_tag_in_catalog_49"
     assert nm.delisting_events([], [art(7, mon, ms("2022-06-01T00:00:00Z"))]) == []
-    # the same article already harvested from catalog 161 is not a stop
-    assert _kept(nm.delisting_events([art(7, mon, T)], [art(7, mon, T)])) == [("binance:7", "CCC")]
+    assert e.value.items[0]["also_in_catalog_161"] is False
+    # O17 is literal: a monitoring title in 49 stops even when 161 has the same article
+    with pytest.raises(nm.NeedsReview) as e:
+        nm.delisting_events([art(7, mon, T)], [art(7, mon, T)])
+    assert e.value.items[0]["also_in_catalog_161"] is True
 
 
 # --- Upbit events -------------------------------------------------------------------
@@ -247,6 +252,14 @@ def test_upbit_t0_is_first_listed_at():
     n = notice(1, ADD % ("에이", "AAA"), T, listed=T + 2 * H)
     e = _upbit([n])[0]
     assert (e["t0_ms"], e["kind"], e["announcement_id"]) == (T, "krw_addition", "upbit:1")
+
+
+def test_upbit_t0_requires_first_listed_at():
+    n = notice(1, ADD % ("에이", "AAA"), T)
+    del n["first_listed_at"]
+    with pytest.raises(nm.NeedsReview) as e:
+        _upbit([n], details={1: start_body(T + H)})
+    assert e.value.items[0]["reason"] == "no_publish_time"
 
 
 def test_upbit_needs_review_in_window():
@@ -358,6 +371,31 @@ def test_shortfall_and_missing_total_in_counts(tmp_path):
     cms, upb = _dirs(tmp_path / "e", skip=(49,))
     dm, _ = nm.build(cms, upb, FakeHl(), FakeProbe(), "x")
     assert dm["harvest_complete"] is False
+
+
+def test_interrupted_scan49_is_incomplete(tmp_path):
+    recent = [art(100 + i, "Binance News %d" % i, T + i) for i in range(120)]
+    cms = write_cms(tmp_path / "cms", [art(1, "Binance Will Delist AAA on 2024-03-10", T)], (),
+                    recent, totals={49: 120})
+    meta = json.loads((cms / "harvest_meta.json").read_text())
+    files49 = meta["catalogs"]["49"]["files"]
+    for rel in [r for r in files49 if not r.endswith("page-0001.json")]:
+        del files49[rel]
+    (cms / "harvest_meta.json").write_text(json.dumps(meta))
+    upb = write_upbit(tmp_path / "upbit", [notice(10, ADD % ("비", "BBB"), T)],
+                      {10: start_body(T + H)})
+    dm, _ = nm.build(cms, upb, FakeHl(), FakeProbe(), "x")
+    assert dm["harvest_complete"] is False
+    old = recent[:50] + [art(99, "Binance News old", ms("2022-12-01T00:00:00Z"))]
+    cms = write_cms(tmp_path / "cms2", [art(1, "Binance Will Delist AAA on 2024-03-10", T)], (),
+                    old, totals={49: 500})
+    meta = json.loads((cms / "harvest_meta.json").read_text())
+    files49 = meta["catalogs"]["49"]["files"]
+    for rel in [r for r in files49 if not r.endswith(("page-0001.json", "page-0002.json"))]:
+        del files49[rel]
+    (cms / "harvest_meta.json").write_text(json.dumps(meta))
+    dm, _ = nm.build(cms, upb, FakeHl(), FakeProbe(), "x")
+    assert dm["harvest_complete"] is True
 
 
 def test_counts_by_status(tmp_path):
