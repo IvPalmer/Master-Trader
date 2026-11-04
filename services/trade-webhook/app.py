@@ -240,8 +240,12 @@ def _safe_float(v: Any) -> float | None:
         return None
 
 
-def summarize(event: dict[str, Any]) -> str:
-    """One-line human-friendly summary of a freqtrade event for Telegram."""
+def summarize(event: dict[str, Any], full: bool = False) -> str:
+    """Human-friendly summary of a freqtrade event for Telegram.
+
+    `full` keeps a `status` message whole instead of cutting it at 200 chars
+    (the health report, #234); every other event stays one short line.
+    """
     typ = event.get("type") or "unknown"
     pair = event.get("pair") or ""
     bot = event.get("bot_name") or event.get("strategy") or "?"
@@ -265,7 +269,8 @@ def summarize(event: dict[str, Any]) -> str:
         parts.append(f"FILLED EXIT {pair} @ {rate}")
     elif typ == "status":
         msg = event.get("status") or event.get("message") or ""
-        parts.append(f"STATUS {msg}"[:200])
+        line = f"STATUS {msg}"
+        parts.append(line if full else line[:200])
     elif typ == "warning":
         msg = event.get("status") or event.get("message") or ""
         parts.append(f"WARN {msg}"[:200])
@@ -296,6 +301,67 @@ async def telegram_send(text: str) -> bool:
     except httpx.HTTPError as e:
         log.error(f"telegram send error: {e}")
         return False
+
+
+# A `status` event from these senders reaches Telegram whole (#234); any
+# other sender's status keeps the 200-char line above.
+FULL_STATUS_BOTS = frozenset({"health-report"})
+# Telegram's sendMessage limit is 4096 UTF-16 code units. Parts are cut a
+# little shorter so the "(i/n) " prefix and the cap notice always fit.
+TELEGRAM_PART_UNITS = 3900
+MAX_STATUS_PARTS = 8
+
+
+def _utf16_units(s: str) -> int:
+    return len(s.encode("utf-16-le")) // 2
+
+
+def split_for_telegram(text: str, limit: int = TELEGRAM_PART_UNITS) -> list[str]:
+    """Split on line breaks into parts of at most `limit` UTF-16 units.
+
+    A part ends at a line break, which is consumed, so joining the parts
+    with "\\n" gives the text back. A single line longer than `limit` is cut
+    mid-line without dropping or adding characters.
+    """
+    parts: list[str] = []
+    current = ""
+    for line in text.split("\n"):
+        candidate = line if not current else f"{current}\n{line}"
+        if _utf16_units(candidate) <= limit:
+            current = candidate
+            continue
+        if current:
+            parts.append(current)
+        current = ""
+        while _utf16_units(line) > limit:
+            cut, units = 0, 0
+            for ch in line:
+                units += 2 if ord(ch) > 0xFFFF else 1
+                if units > limit:
+                    break
+                cut += 1
+            parts.append(line[:cut])
+            line = line[cut:]
+        current = line
+    if current or not parts:
+        parts.append(current)
+    return parts
+
+
+async def telegram_send_parts(text: str, bot: str) -> bool:
+    """Send `text` as numbered parts; True only if every part was accepted."""
+    parts = split_for_telegram(text)
+    if len(parts) > MAX_STATUS_PARTS:
+        log.warning("%s status is %d Telegram parts; sending the first %d",
+                    bot, len(parts), MAX_STATUS_PARTS)
+        parts = parts[:MAX_STATUS_PARTS]
+        parts[-1] += f"\n… cut at {MAX_STATUS_PARTS} messages; full text in {bot}.jsonl"
+    if len(parts) > 1:
+        parts = [f"({i}/{len(parts)}) {p}" for i, p in enumerate(parts, 1)]
+    ok = True
+    for part in parts:  # in order; a failed part does not stop the rest
+        ok = await telegram_send(part) and ok
+    return ok
 
 
 @app.get("/healthz")
@@ -349,8 +415,9 @@ async def freqtrade_event(request: Request) -> dict[str, Any]:
         log.exception("append_event failed")
         raise HTTPException(status_code=500, detail=f"append failed: {e}")
 
-    summary = summarize(enriched)
-    sent = await telegram_send(summary)
+    full = enriched.get("type") == "status" and bot in FULL_STATUS_BOTS
+    summary = summarize(enriched, full=full)
+    sent = await (telegram_send_parts(summary, bot) if full else telegram_send(summary))
 
     # Real-time pair-drift detector. Fires only on losing exit_fill events.
     # Catches structural pair weakness (e.g. ARB-style "informed shorts" on
