@@ -265,13 +265,36 @@ def _token_in(text, token):
     return re.search(r"(?<![A-Z0-9])" + re.escape(token) + r"(?![A-Z0-9])", text) is not None
 
 
-def upbit_trading_start_ms(body, token, t0_ms, notice_tokens=()):
+def _upbit_names(title):
+    """Each token of an Upbit title with the Korean names it is written with:
+    `에이(AAA), 비(BBB) ...` -> {AAA: [에이], BBB: [비]}; `(이오스 EOS)` -> {EOS: [이오스]}."""
+    names = {t: [] for t in _upbit_tokens(title) or ()}
+    pairs = re.findall(r"([^\s(),\[\]][^(),\[\]]*?)\s*\(([A-Z0-9]{1,15})\)", title)
+    for group in re.findall(r"\(([^()]*)\)", title):
+        pairs += [m.groups() for m in (re.fullmatch(r"\s*(\S.*?)\s+([A-Z0-9]{1,15})\s*", item)
+                                       for item in group.split(",")) if m]
+    for name, tok in pairs:
+        if tok in names and not _is_ticker(name.strip()):
+            names[tok].append(name.strip())
+    return names
+
+
+def _names_token(text, token, names):
+    """The ticker, or a Korean name standing as a word of its own (not inside "서비스" for 비)."""
+    return _token_in(text, token) or any(
+        re.search(r"(?<![가-힣A-Za-z0-9])" + re.escape(n) + r"(?![가-힣A-Za-z0-9])", text) for n in names)
+
+
+def upbit_trading_start_ms(body, token, t0_ms, title=""):
     """The KST trading start stated for `token`, as UTC ms; None when unknown (O10).
 
-    `notice_tokens` are every token the notice adds. Outside a table, a start line naming
-    `token` is its own; a start line naming none of them is shared, and is used only when no
-    start line names any of them. A token without its own line, in a notice whose start lines
-    name other tokens, has no stated start (None)."""
+    `title` is the notice title; its tokens and their Korean names (O8) scope the lines.
+    Outside a table, a start line belongs to the tokens it names by ticker or name; a start
+    line naming none belongs to the tokens named by the nearest earlier non-start line (a
+    heading, a `디지털 자산: 에이(AAA)` label or an intro). In a multi-token notice a token's own
+    lines decide; a token with none, where other start lines are token-scoped, has no stated
+    start (None); only when no start line is scoped are the start lines shared by every token.
+    A single-token notice reads every start line."""
     body = body or ""
     parser = _TableParser()
     parser.feed(body)
@@ -290,11 +313,19 @@ def upbit_trading_start_ms(body, token, t0_ms, notice_tokens=()):
             break
     if table_seen:
         return _single(found)
-    text = re.sub(r"<br\s*/?>|</(?:p|div|li|tr|h\d|table)>", "\n", body, flags=re.I)
+    text = re.sub(r"<br\s*/?>|</(?:p|div|li|tr|h\d|table)>|<h\d\b[^>]*>", "\n", body, flags=re.I)
     text = html.unescape(re.sub(r"<[^>]+>", " ", text))
-    starts = [line for line in text.splitlines() if any(k in line for k in START_LINES)]
-    own = [line for line in starts if _token_in(line, token)]
-    named = own or [line for line in starts if any(_token_in(line, t) for t in notice_tokens)]
-    for line in own if named else starts:
+    names = _upbit_names(title)
+    names.setdefault(token, [])
+    section, starts = set(), []
+    for line in text.splitlines():
+        scope = {t for t, ns in names.items() if _names_token(line, t, ns)}
+        if any(k in line for k in START_LINES):
+            starts.append((line, scope or section))
+        elif scope:
+            section = scope
+    own = [line for line, scope in starts if token in scope or len(names) == 1]
+    scoped = own or [line for line, scope in starts if scope]
+    for line in own if scoped else [line for line, _ in starts]:
         found |= _starts_in(line, t0_ms)
     return _single(found)

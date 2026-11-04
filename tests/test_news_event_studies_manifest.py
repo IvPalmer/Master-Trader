@@ -256,6 +256,10 @@ def test_upbit_start_line_of_another_token_is_not_borrowed():
     assert (events["AAA"]["exclusion"], events["AAA"]["trading_start_ms"]) == \
         ("began_before_notice", ms("2024-03-01T11:00:00Z"))
     assert (events["BBB"]["exclusion"], events["BBB"]["trading_start_ms"]) == (None, None)   # -> unknown
+    body = "에이 거래지원 개시 시점: 2024-03-01 20:00\n비 거래지원 개시 시점: 추후 공지"      # Korean names
+    events = {e["token"]: e for e in _upbit([n], details={1: body})}
+    assert events["AAA"]["exclusion"] == "began_before_notice"
+    assert (events["BBB"]["exclusion"], events["BBB"]["trading_start_ms"]) == (None, None)
 
 
 def test_upbit_t0_is_first_listed_at():
