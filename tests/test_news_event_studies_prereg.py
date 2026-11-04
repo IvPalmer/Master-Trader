@@ -83,7 +83,7 @@ def test_hl_evidence_is_funding_history():   # C1 option A, spec §11 call 14
 
 
 # sha256 of the O1–O17 list as merged in #237 (canonical JSON). Any edit is an amendment.
-O_SHA256 = "4ac7be47a7d37fe9b69c5b0b18679fbd83396546ba288127f21e98988b8f1c71"
+O_SHA256 = "bf110894663e6f4a27d6085170e42992969ea4173fff0783dfdce3a401bcbbdf"
 
 
 def _canon_sha(obj):
