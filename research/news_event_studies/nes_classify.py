@@ -68,10 +68,16 @@ def classify_binance(title):
     if re.match(r"(?:Binance\s+Will\s+)?(?:Cancel|Revoke|Retract)", t):
         return _excluded("retraction")
     if "Monitoring Tag" in t:
+        if t.startswith("Introducing "):          # the tag's launch notice names no token
+            return _excluded("tag_introduction")
         m = re.search(r"\bInclude\s+(.+)$", t) or \
-            re.search(r"\bAdd\s+(?:the\s+)?Monitoring\s+Tags?\s+(?:to|on)\s+(.+)$", t)
+            re.search(r"\bAdd\s+(?:the\s+)?Monitoring\s+Tags?\s+(?:to|on)\s+(.+)$", t) or \
+            re.search(r"\bExtend\s+the\s+Monitoring\s+Tag\s+to\s+(.+)$", t)
         if m:
-            tokens = _tickers(re.split(r"\s+and\s+Remove\b", m.group(1), maxsplit=1)[0])
+            # The added list ends at the first removal clause: " and Remove", ", Remove"
+            # or ", and Remove".
+            added = re.split(r",?\s+(?:and\s+)?Remove\b", m.group(1), maxsplit=1)[0]
+            tokens = _tickers(added)
             return BinanceClass("monitoring_add", tokens) if tokens else UNCLASSIFIED
         if re.search(r"\bRemov", t):
             return _excluded("tag_removal")

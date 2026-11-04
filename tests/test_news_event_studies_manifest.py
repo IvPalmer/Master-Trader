@@ -49,7 +49,7 @@ def _cms_body(cid, arts, total):
         {"catalogId": cid, "catalogName": "cat%d" % cid, "total": total, "articles": arts}]}}).encode()
 
 
-def write_cms(d, c161=(), c48=(), c49=(), totals=None, aborted=None, skip=()):
+def write_cms(d, c161=(), c48=(), c49=(), totals=None, aborted=None, skip=(), no_closing=()):
     d = Path(d)
     totals = totals or {}
     meta = {"aborted": aborted, "suspensions": [], "catalogs": {}}
@@ -61,7 +61,7 @@ def write_cms(d, c161=(), c48=(), c49=(), totals=None, aborted=None, skip=()):
         chunks = [arts[i:i + 50] for i in range(0, len(arts), 50)] or [[]]
         files = {"cat%d/page-%04d.json" % (cid, i): _cms_body(cid, c, total)
                  for i, c in enumerate(chunks, 1)}
-        if cid != 49:
+        if cid not in no_closing:
             files["cat%d/closing.json" % cid] = _cms_body(cid, chunks[0], total)
         for rel, body in files.items():
             nu.write_atomic(d / rel, body)
@@ -173,17 +173,41 @@ def test_in_window_unclassified_raises_needs_review():
     assert nm.delisting_events([art(1, title, ms("2021-06-01T00:00:00Z"))], []) == []
 
 
-def test_monitoring_title_in_scan49_raises_needs_review():
-    mon = "Binance Will Extend the Monitoring Tag to Include CCC on 2024-02-20"
+MON = "Binance Will Extend the Monitoring Tag to Include CCC on 2024-02-20"
+
+
+def test_catalog49_monitoring_title_is_an_event():
+    # O17 option A (operator, 2026-11-04): catalog 49 supplies monitoring-tag titles
+    evs = nm.delisting_events([], [art(7, MON, T)])
+    assert [(e["announcement_id"], e["kind"], e["token"], e["exclusion"]) for e in evs] == [
+        ("binance:7", "monitoring_add", "CCC", None)]
+    assert nm.delisting_events([], [art(7, MON, ms("2022-06-01T00:00:00Z"))]) == []
+
+
+def test_article_in_both_catalogs_is_one_notice():
+    evs = nm.delisting_events([art(7, MON, T)], [art(7, MON, T)])
+    assert [(e["announcement_id"], e["token"], e["exclusion"]) for e in evs] == [
+        ("binance:7", "CCC", None)]
+
+
+def test_catalog49_supplies_only_monitoring_titles():
+    c49 = [art(8, "Binance Will Delist DDD on 2024-02-20", T),
+           art(9, "Binance Will List EEE with Seed Tag Applied", T)]
+    assert nm.delisting_events([], c49) == []
+
+
+def test_catalog49_unclassified_monitoring_title_needs_review():
+    title = "Binance Will Extend the Monitoring Tag to Include Foo Token on 2024-02-20"
     with pytest.raises(nm.NeedsReview) as e:
-        nm.delisting_events([], [art(7, mon, T)])
-    assert e.value.items[0]["reason"] == "monitoring_tag_in_catalog_49"
-    assert nm.delisting_events([], [art(7, mon, ms("2022-06-01T00:00:00Z"))]) == []
-    assert e.value.items[0]["also_in_catalog_161"] is False
-    # O17 is literal: a monitoring title in 49 stops even when 161 has the same article
-    with pytest.raises(nm.NeedsReview) as e:
-        nm.delisting_events([art(7, mon, T)], [art(7, mon, T)])
-    assert e.value.items[0]["also_in_catalog_161"] is True
+        nm.delisting_events([], [art(7, title, T)])
+    assert (e.value.items[0]["ref"], e.value.items[0]["reason"]) == ("binance:7", "unclassified_title")
+
+
+def test_overlap_spans_both_catalogs():
+    c161 = [art(1, "Binance Will Delist CCC on 2024-03-01", T)]
+    evs = nm.delisting_events(c161, [art(7, MON, T + H)])
+    assert [(e["announcement_id"], e["exclusion"], e["exclusion_ref"]) for e in evs] == [
+        ("binance:1", None, None), ("binance:7", "same_token_overlap", "binance:1")]
 
 
 # --- Upbit events -------------------------------------------------------------------
@@ -340,12 +364,13 @@ def test_study_status_table(facts, expected):
 # --- build ---------------------------------------------------------------------------
 
 def _dirs(tmp_path, c161=None, c48=(), up=None, details=None, totals=None, up_total=None,
-          aborted=None, skip=()):
+          aborted=None, skip=(), c49=(), no_closing=()):
     c161 = c161 if c161 is not None else [art(1, "Binance Will Delist AAA on 2024-03-10", T)]
     up = up if up is not None else [notice(10, ADD % ("비", "BBB"), T)]
     if details is None:
         details = {n["id"]: start_body(nu.ms_from_iso(n["first_listed_at"]) + 30 * 60_000) for n in up}
-    cms = write_cms(tmp_path / "cms", c161, c48, (), totals=totals, aborted=aborted, skip=skip)
+    cms = write_cms(tmp_path / "cms", c161, c48, c49, totals=totals, aborted=aborted, skip=skip,
+                    no_closing=no_closing)
     upb = write_upbit(tmp_path / "upbit", up, details, total=up_total)
     return cms, upb
 
@@ -407,30 +432,32 @@ def test_shortfall_and_missing_total_in_counts(tmp_path):
     cms, upb = _dirs(tmp_path / "e", skip=(49,))
     dm, _ = nm.build(cms, upb, FakeHl(), FakeProbe(), "x")
     assert dm["harvest_complete"] is False
+    # O17 option A: catalog 49 is a full catalog of the delisting study (O13, O16)
+    cms, upb = _dirs(tmp_path / "f", totals={161: 3, 49: 4})
+    dm, um = nm.build(cms, upb, FakeHl(), FakeProbe(), "x")
+    assert nm.manifest_counts(dm, DEL)["harvest_shortfall"] == 2 + 4
+    assert nm.manifest_counts(um, LONG)["harvest_shortfall"] == 0
+    assert dm["inputs"]["completeness"]["binance:49"] == {
+        "unique": 0, "total": 4, "total_reported": True, "shortfall": 4}
+    cms, upb = _dirs(tmp_path / "g", totals={49: None})
+    dm, um = nm.build(cms, upb, FakeHl(), FakeProbe(), "x")
+    assert dm["harvest_complete"] is False and um["harvest_complete"] is True
 
 
-def test_interrupted_scan49_is_incomplete(tmp_path):
-    recent = [art(100 + i, "Binance News %d" % i, T + i) for i in range(120)]
-    cms = write_cms(tmp_path / "cms", [art(1, "Binance Will Delist AAA on 2024-03-10", T)], (),
-                    recent, totals={49: 120})
-    meta = json.loads((cms / "harvest_meta.json").read_text())
-    files49 = meta["catalogs"]["49"]["files"]
-    for rel in [r for r in files49 if not r.endswith("page-0001.json")]:
-        del files49[rel]
-    (cms / "harvest_meta.json").write_text(json.dumps(meta))
-    upb = write_upbit(tmp_path / "upbit", [notice(10, ADD % ("비", "BBB"), T)],
-                      {10: start_body(T + H)})
-    dm, _ = nm.build(cms, upb, FakeHl(), FakeProbe(), "x")
-    assert dm["harvest_complete"] is False
-    old = recent[:50] + [art(99, "Binance News old", ms("2022-12-01T00:00:00Z"))]
-    cms = write_cms(tmp_path / "cms2", [art(1, "Binance Will Delist AAA on 2024-03-10", T)], (),
-                    old, totals={49: 500})
-    meta = json.loads((cms / "harvest_meta.json").read_text())
-    files49 = meta["catalogs"]["49"]["files"]
-    for rel in [r for r in files49 if not r.endswith(("page-0001.json", "page-0002.json"))]:
-        del files49[rel]
-    (cms / "harvest_meta.json").write_text(json.dumps(meta))
-    dm, _ = nm.build(cms, upb, FakeHl(), FakeProbe(), "x")
+def test_catalog49_scan_without_closing_is_incomplete(tmp_path):
+    # A scan (pages, no closing fetch) is not a full catalog under O16
+    old = [art(100 + i, "Binance News %d" % i, T + i) for i in range(60)]
+    cms, upb = _dirs(tmp_path, c49=old, no_closing=(49,))
+    dm, um = nm.build(cms, upb, FakeHl(), FakeProbe(), "x")
+    assert dm["harvest_complete"] is False and um["harvest_complete"] is True
+    assert dm["inputs"]["completeness"]["binance:49"] is None
+
+
+def test_build_takes_catalog49_monitoring_events(tmp_path):
+    cms, upb = _dirs(tmp_path, c49=[art(7, MON, T + H), art(8, "Binance News", T)])
+    dm, _ = nm.build(cms, upb, FakeHl(names=("AAA", "CCC")), FakeProbe(), "x")
+    assert [(e["announcement_id"], e["token"], e["kind"]) for e in dm["events"]] == [
+        ("binance:1", "AAA", "full_delist"), ("binance:7", "CCC", "monitoring_add")]
     assert dm["harvest_complete"] is True
 
 

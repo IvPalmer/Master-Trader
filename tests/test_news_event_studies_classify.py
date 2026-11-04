@@ -350,6 +350,24 @@ def test_upbit_trading_start_invalid_date_is_none():
     ("Binance Will Add Monitoring Tag to ABC, DEF on 2024-01-05", "monitoring_add",
      ("ABC", "DEF")),
     ("Binance Will Remove the Monitoring Tag on XYZ on 2026-01-02", "excluded:tag_removal", ()),
+    # Catalog-49 monitoring formats (O17 option A, 2026-11-04 harvest)
+    ("Binance Will Extend the Monitoring Tag to Include ANT, FIRO, KP3R, MDX, MOB, REEF, VAI, "
+     "XMR, ZEC & ZEN, and Remove the Seed Tag for GMX & SUSHI on 2024-01-04", "monitoring_add",
+     ("ANT", "FIRO", "KP3R", "MDX", "MOB", "REEF", "VAI", "XMR", "ZEC", "ZEN")),
+    ("Binance Will Extend the Monitoring Tag to Include STMX & TROY, Remove the Monitoring Tag "
+     "for CVX & SUN, and Remove the Seed Tag for ARKM, BLUR, JTO & TIA on 2025-01-02",
+     "monitoring_add", ("STMX", "TROY")),
+    ("Binance Will Extend the Monitoring Tag to Include FARM, HIGH, MLN, RESOLV, SYS, TRU & "
+     "VELODROME, Remove the Seed Tag for XAUT on 2026-04-14", "monitoring_add",
+     ("FARM", "HIGH", "MLN", "RESOLV", "SYS", "TRU", "VELODROME")),
+    ("Binance Will Extend the Monitoring Tag to GPS on 2025-03-07", "monitoring_add", ("GPS",)),
+    ("Binance Will Change the Monitoring Tag Inclusion Frequency to Monthly and Extend the "
+     "Monitoring Tag to Include AERGO, ALPACA & VIDT on 2025-03-04", "monitoring_add",
+     ("AERGO", "ALPACA", "VIDT")),
+    ("Binance Will Remove the Monitoring Tag for ZEC and the Seed Tag for ENA, PYTH, TAO & W "
+     "on 2025-07-09", "excluded:tag_removal", ()),
+    ("Introducing Seed Tags & Monitoring Tags for Tokens with High Volatility and Risks",
+     "excluded:tag_introduction", ()),
     ("Notice of Removal of Spot Trading Pairs - 2026-10-31", "excluded:pair_removal", ()),
     ("Binance Will Delist ABC/USDT on 2024-01-01", "excluded:pair_removal", ()),
     ("Binance Margin Will Delist ABC/USDT Cross Margin Pair", "excluded:margin", ()),

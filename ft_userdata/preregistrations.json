@@ -1007,7 +1007,29 @@
         "The 2018–2022 exploratory check (#229 comment 6617239337) is the hypothesis source only; it never counts as validation and sets no parameter."
       ],
       "triggers": [],
-      "amendments": [],
+      "amendments": [
+        {
+          "id": "A1-o17-catalog-49",
+          "date": "2026-11-04",
+          "frozen_before_results": true,
+          "stop": "O17 stopped Phase 1. The build from main 3c77081 found 27 monitoring-tag titles in catalog 49 dated inside the window (2023-07-26 to 2026-10-09), none of them in catalog 161, which holds 1 in the window. The stop and options A/B/C were posted on #229: https://github.com/IvPalmer/Master-Trader/issues/229#issuecomment-6639121740",
+          "operator_decision": "Opção A",
+          "decided": "2026-11-04, by the operator, relayed by the lead session",
+          "rule": "Monitoring-tag notices come from catalog 161 and catalog 49. From catalog 49 only titles containing 'Monitoring Tag' are taken, and an article in both catalogs is one notice. Catalog 49 is harvested in full under O16 (pages 1..ceil(total/50) plus closing fetches) on the shared limiter. The delisting harvest is complete only when catalogs 161 and 49 are both complete, and catalog 49's shortfall adds to the delisting harvest_shortfall (O13). O12 overlap runs over both catalogs together. frozen.event_catalogs stays as registered ([161]); this amendment is the record that catalog 49 also supplies monitoring-tag titles.",
+          "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A2-phase1-title-rules",
+          "date": "2026-11-04",
+          "frozen_before_results": true,
+          "rulings": [
+            "20 in-window catalog-161 titles the classifier did not cover were decided from the title alone. Binance Alpha, Binance Loans, Binance Earn / Dual Investment and Selected Stocks notices are other products. 'Binance to Cease ADAUP & ADADOWN Trading…' is a leveraged-token notice. '…Update on the Delisting Date' updates an earlier delisting and is not a new one. 'Upcoming Changes to RON/CZK Spot Trading on Binance' is not a delisting title. 'Binance Will Delist UTK and Support Rebranding…' is a full delisting of UTK, and 'Notice Regarding the Removal of AEUR and Conversion of AEUR to EUR' is a full delisting of AEUR.",
+            "Catalog-49 monitoring titles: the added list ends at the first removal clause (' and Remove', ', Remove' or ', and Remove'). 'Binance Will Extend the Monitoring Tag to GPS' adds GPS. 'Introducing Seed Tags & Monitoring Tags for Tokens with High Volatility and Risks' (2023-07-26) names no token and is excluded as the tag's launch notice.",
+            "Catalog 49 supplies monitoring-tag titles only, so the one full-delisting title found only there (184419, removal of BUSD and conversion to FDUSD) is not an event."
+          ],
+          "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        }
+      ],
       "resolution": null
     },
     {
@@ -1191,7 +1213,19 @@
         "The 2018–2022 exploratory check (#229 comment 6617239337) is the hypothesis source only; it never counts as validation and sets no parameter."
       ],
       "triggers": [],
-      "amendments": [],
+      "amendments": [
+        {
+          "id": "A1-phase1-title-rules",
+          "date": "2026-11-04",
+          "frozen_before_results": true,
+          "rulings": [
+            "upbit 3502 'KRW, BTC 마켓 디지털 자산 추가 (SUI) (매도 주문 제한 기준 가격 안내)': a parenthetical ending in 안내 or 마켓 is a note, not a token, so SUI is the token.",
+            "upbit 4273 '테더(USDT) KRW, BTC 마켓 추가 안내 (출금 개시 안내)' has none of the O8 addition markers, so it is not a KRW addition.",
+            "O8 per token: when one notice adds several tokens to several markets, a token is a KRW addition only when the notice puts that token on KRW. The evidence is, in order: the title's market group for that token; a title naming only the KRW market, or a single-token title; the notice body (a 마켓 table column, '- TOKEN : KRW 마켓' or '- KRW 마켓 : TOKEN, …'). A token added to BTC or USDT only is neither an event nor an O9 prior. A token whose market is unstated is not a prior before the window and needs review inside it. On the harvested corpus this removes 5 BTC/USDT-only tokens from the events (3266 GAL, 3362 ACS, 4070 ALT, 4192 OMNI, 5100 IO) and 7 already-on-KRW exclusions of later KRW additions (3362 MASK, 3654 IMX, 4363 GAL, 5239 ALT, 5375 OMNI, 5644 YGG, 6255 IO); the build has no review items left."
+          ],
+          "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        }
+      ],
       "resolution": null
     },
     {
@@ -1384,7 +1418,19 @@
         "The 2018–2022 exploratory check (#229 comment 6617239337) is the hypothesis source only; it never counts as validation and sets no parameter."
       ],
       "triggers": [],
-      "amendments": [],
+      "amendments": [
+        {
+          "id": "A1-phase1-title-rules",
+          "date": "2026-11-04",
+          "frozen_before_results": true,
+          "rulings": [
+            "upbit 3502 'KRW, BTC 마켓 디지털 자산 추가 (SUI) (매도 주문 제한 기준 가격 안내)': a parenthetical ending in 안내 or 마켓 is a note, not a token, so SUI is the token.",
+            "upbit 4273 '테더(USDT) KRW, BTC 마켓 추가 안내 (출금 개시 안내)' has none of the O8 addition markers, so it is not a KRW addition.",
+            "O8 per token: when one notice adds several tokens to several markets, a token is a KRW addition only when the notice puts that token on KRW. The evidence is, in order: the title's market group for that token; a title naming only the KRW market, or a single-token title; the notice body (a 마켓 table column, '- TOKEN : KRW 마켓' or '- KRW 마켓 : TOKEN, …'). A token added to BTC or USDT only is neither an event nor an O9 prior. A token whose market is unstated is not a prior before the window and needs review inside it. On the harvested corpus this removes 5 BTC/USDT-only tokens from the events (3266 GAL, 3362 ACS, 4070 ALT, 4192 OMNI, 5100 IO) and 7 already-on-KRW exclusions of later KRW additions (3362 MASK, 3654 IMX, 4363 GAL, 5239 ALT, 5375 OMNI, 5644 YGG, 6255 IO); the build has no review items left."
+          ],
+          "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        }
+      ],
       "resolution": null
     }
   ]
