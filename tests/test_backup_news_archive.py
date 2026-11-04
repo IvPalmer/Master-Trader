@@ -19,6 +19,7 @@ import os
 import shutil
 import sqlite3
 import stat
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -284,7 +285,7 @@ def _listing(names):
 
 
 def test_upload_verifies_before_pruning_with_archive_retention(tmp_path):
-    names = [_stamp(d) for d in [*range(8), 9, 20, 70]] + ["README"]
+    names = [_stamp(d) for d in [*range(8), 9, 20, 70]] + ["README", ".partial-20261020T043000Z"]
     calls = []
 
     def runner(argv, **kw):
@@ -298,11 +299,34 @@ def test_upload_verifies_before_pruning_with_archive_retention(tmp_path):
     pruned = bna.upload(run, REMOTE, config, rclone, NOW, runner=runner)
 
     assert pruned == [_stamp(70), _stamp(9)]
-    assert [c[1] for c in calls] == ["copy", "check", "lsjson", "purge", "purge"]
-    assert calls[0][2:4] == [str(run), f"{REMOTE}/{run.name}"]
+    assert [c[1] for c in calls] == ["copy", "check", "moveto", "lsjson", "purge", "purge", "purge"]
+    staged = f"{REMOTE}/.partial-{run.name}"
+    assert calls[0][2:4] == [str(run), staged]
     assert calls[0][-2:] == ["--checksum", "--immutable"]
+    assert calls[1][2:4] == [str(run), staged]
     assert calls[1][-2:] == ["--one-way", "--download"]
-    assert calls[3][2] == f"{REMOTE}/{_stamp(70)}"
+    assert calls[2][2:4] == [staged, f"{REMOTE}/{run.name}"]
+    assert [c[2] for c in calls[4:]] == [f"{REMOTE}/{_stamp(70)}", f"{REMOTE}/{_stamp(9)}",
+                                         f"{REMOTE}/.partial-20261020T043000Z"]
+
+
+def test_unverified_upload_is_never_named_as_a_run(tmp_path):
+    """A failed or killed upload stays under .partial-*, which retention and drills ignore."""
+    calls = []
+
+    def runner(argv, **kw):
+        calls.append(argv)
+        if argv[1] == "check":
+            raise subprocess.CalledProcessError(1, argv)
+        return types.SimpleNamespace(stdout="", returncode=0)
+
+    run = tmp_path / _stamp(0)
+    run.mkdir()
+    config, rclone = _rclone_files(tmp_path)
+    with pytest.raises(subprocess.CalledProcessError):
+        bna.upload(run, REMOTE, config, rclone, NOW, runner=runner)
+    assert [c[1] for c in calls] == ["copy", "check"]
+    assert calls[0][3] == f"{REMOTE}/.partial-{run.name}"
 
 
 def test_listing_failure_never_purges(tmp_path):
@@ -317,7 +341,7 @@ def test_listing_failure_never_purges(tmp_path):
     config, rclone = _rclone_files(tmp_path)
     with pytest.raises(bna.BackupError, match="invalid rclone directory listing"):
         bna.upload(run, REMOTE, config, rclone, NOW, runner=runner)
-    assert [c[1] for c in calls] == ["copy", "check", "lsjson"]
+    assert [c[1] for c in calls] == ["copy", "check", "moveto", "lsjson"]
 
 
 def test_upload_needs_its_config(tmp_path):
@@ -402,12 +426,27 @@ def test_drill_rejects_a_row_count_mismatch(archive_db, tmp_path):
     assert "row count" in bna.read_status(dest)["local_drill"]["error"]
 
 
-def test_drill_needs_free_space(archive_db, tmp_path, monkeypatch):
+def test_drill_budgets_from_the_snapshot_it_restores(archive_db, tmp_path, monkeypatch):
     dest = tmp_path / "backups"
     assert bna.main(_args(archive_db, dest)) == 0
-    _free(monkeypatch, bna.required_free_bytes(archive_db) - 1)
-    assert bna.main(_args(archive_db, dest, "--drill", "local")) == 1
+    size = json.loads((_runs(dest)[0] / "MANIFEST.json").read_text())["bytes"]
+    gone = tmp_path / "moved-away.sqlite"  # the drill must not need the live database
+    _free(monkeypatch, bna.RESERVE_BYTES + 2 * size - 1)
+    assert bna.main(_args(gone, dest, "--drill", "local")) == 1
     assert "free" in bna.read_status(dest)["local_drill"]["error"]
+    _free(monkeypatch, bna.RESERVE_BYTES + 2 * size)
+    assert bna.main(_args(gone, dest, "--drill", "local")) == 0
+
+
+def test_drill_bounds_decompression_by_the_manifest(archive_db, tmp_path):
+    dest = tmp_path / "backups"
+    assert bna.main(_args(archive_db, dest)) == 0
+    manifest_path = _runs(dest)[0] / "MANIFEST.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["bytes"] = 100
+    manifest_path.write_text(json.dumps(manifest))
+    assert bna.main(_args(archive_db, dest, "--drill", "local")) == 1
+    assert "size" in bna.read_status(dest)["local_drill"]["error"]
 
 
 def test_drill_with_no_snapshot_fails(archive_db, tmp_path):
@@ -427,10 +466,13 @@ def test_remote_drill_sets_the_offhost_gate(archive_db, tmp_path, monkeypatch):
     def fake_run(argv, **kw):
         calls.append(argv)
         if argv[1] == "lsjson":
-            return types.SimpleNamespace(stdout=_listing([stamp, "README"]), returncode=0)
-        if argv[1] == "copy":
-            assert argv[2] == f"{REMOTE}/{stamp}"
-            shutil.copytree(standin / stamp, argv[3])
+            return types.SimpleNamespace(
+                stdout=_listing([stamp, "README", ".partial-29991231T000000Z"]), returncode=0)
+        if argv[1] == "copyto":
+            name = argv[2].rsplit("/", 1)[1]
+            assert argv[2] == f"{REMOTE}/{stamp}/{name}"
+            Path(argv[3]).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(standin / stamp / name, argv[3])
             return types.SimpleNamespace(stdout="", returncode=0)
         raise AssertionError(argv)
 
@@ -438,8 +480,21 @@ def test_remote_drill_sets_the_offhost_gate(archive_db, tmp_path, monkeypatch):
     config, rclone = _rclone_files(tmp_path)
     assert bna.main(_args(archive_db, dest, "--drill", "remote", "--drive-remote", REMOTE,
                           "--rclone", str(rclone), "--rclone-config", str(config))) == 0
-    assert [c[1] for c in calls] == ["lsjson", "copy"]
+    assert [c[2].rsplit("/", 1)[-1] for c in calls[1:]] == ["MANIFEST.json", "archive.sqlite.gz"]
+    assert [c[1] for c in calls] == ["lsjson", "copyto", "copyto"]
     status = bna.read_status(dest)
     assert status["offhost_drill"]["ok"] is True
     assert status["offhost_drill"]["stamp"] == stamp
     assert status["local_drill"] is None
+
+
+def test_abandoned_staging_is_cleared_before_the_space_check(archive_db, tmp_path, monkeypatch):
+    """A killed run's .partial-* must not keep every later run skipped for space."""
+    dest = tmp_path / "backups"
+    staging = dest / ".partial-20261104T043000Z"
+    staging.mkdir(parents=True)
+    (staging / "archive.sqlite").write_bytes(b"x" * 1024)
+    _free(monkeypatch, bna.required_free_bytes(archive_db) - 1)
+    assert bna.main(_args(archive_db, dest)) == 1
+    assert bna.read_status(dest)["last_run_result"] == "skipped"
+    assert not staging.exists()

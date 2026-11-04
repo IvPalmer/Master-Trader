@@ -1224,7 +1224,7 @@ def news_archive_section() -> list[str]:
         from news_archive_report import news_archive_lines
         return news_archive_lines()
     except Exception as e:  # noqa: BLE001 — the section must never kill the report
-        return [f"  news-archive: section failed: {type(e).__name__}: {e}"]
+        return [f"  news-archive: section failed: {type(e).__name__}: {' '.join(str(e).split())}"]
 
 
 def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dict,

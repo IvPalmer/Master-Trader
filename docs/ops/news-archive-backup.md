@@ -84,10 +84,13 @@ sudo crontab -l | grep backup_news_archive
 
 ## Off-host leg (separate operator go-ahead)
 
-`--upload` copies the new run to `operator-drive:Master-Trader/news-archive/<stamp>`
+`--upload` copies the new run to `operator-drive:Master-Trader/news-archive/.partial-<stamp>`
 with `rclone copy --checksum --immutable`, verifies it with
-`rclone check --one-way --download`, and only then lists the remote and purges
-the stamps outside the retention above. An unparseable listing purges nothing.
+`rclone check --one-way --download`, and only then renames it to `<stamp>` with
+`rclone moveto`. So a failed or killed upload never looks like a run: retention
+and the remote drill see complete runs only. It then lists the remote, purges
+the stamps outside the retention above, and removes `.partial-*` left by earlier
+failed uploads. An unparseable listing purges nothing.
 It reuses the live backup's root-only `/etc/master-trader-backup/rclone.conf`
 and its `operator-drive` remote, so there is no second OAuth and no copied token.
 
@@ -120,10 +123,13 @@ sudo /usr/bin/python3 $C/deploy/vps/backup_news_archive.py --drill local
 sudo /usr/bin/python3 $C/deploy/vps/backup_news_archive.py --drill remote
 ```
 
-A drill takes the same lock and the same free-space rule as a run, makes no
-snapshot, and restores the newest local run (or the newest remote stamp, fetched
-with `rclone copy`) into a temporary `news-archive-drill-*` directory. It
-gunzips the copy and requires its sha256 to match the manifest,
+A drill takes the same lock as a run and makes no snapshot. It restores the
+newest local run (or the newest remote stamp: its `MANIFEST.json` first, then
+`archive.sqlite.gz`, with `rclone copyto`) into a temporary
+`news-archive-drill-*` directory. It needs `15 GiB + 2 × the snapshot's size`
+free there, sized from the manifest, so it also works when the live database is
+gone. It gunzips the copy, stopping at the manifest's size, and requires its
+sha256 to match the manifest,
 `PRAGMA integrity_check` to return `ok`, and every table's row count to equal
 the manifest's. It records only `local_drill` or `offhost_drill` in
 `STATUS.json`; a failure names the check that failed and exits 1.
@@ -137,11 +143,15 @@ so the PIT rule still marks the hole.
 
 ## Rollback
 
+Remove only this job's line, so any later change to root's crontab survives:
+
 ```bash
-sudo crontab /home/ubuntu/backups/root-crontab.pre-229b
+( sudo crontab -l | grep -v 'deploy/vps/backup_news_archive.py' ) | sudo crontab -
+sudo crontab -l | diff /home/ubuntu/backups/root-crontab.pre-229b - && echo "back to the pre-install crontab"
 ```
 
-The snapshots stay. The report then shows `no run for …` once the last run is
+The saved `root-crontab.pre-229b` stays as the record of the pre-install state;
+restore it whole only if nothing else changed since. The snapshots stay. The report then shows `no run for …` once the last run is
 more than 26 h old.
 
 ## Install log

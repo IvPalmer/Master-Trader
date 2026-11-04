@@ -87,12 +87,15 @@ def required_free_bytes(db: Path) -> int:
     return RESERVE_BYTES + 2 * size
 
 
-def check_free_space(where: Path, db: Path) -> None:
-    need = required_free_bytes(db)
+def _require_free(where: Path, need: int) -> None:
     free = shutil.disk_usage(where).free
     if free < need:
         raise NotEnoughSpace(f"free {free / GIB:.1f} GiB < required {need / GIB:.1f} GiB "
                              f"under {where}")
+
+
+def check_free_space(where: Path, db: Path) -> None:
+    _require_free(where, required_free_bytes(db))
 
 
 def row_counts(db: Path) -> dict[str, int]:
@@ -146,10 +149,15 @@ def local_stamps(dest: Path) -> list[str]:
                   if _is_stamp(p.name) and p.is_dir() and (p / "MANIFEST.json").is_file())
 
 
-def prune_local(dest: Path, now: dt.datetime) -> list[str]:
-    """Apply the archive's retention; also clear staging left by a killed run."""
+def clear_staging(dest: Path) -> None:
+    """Remove staging left by a killed run; callers hold the lock."""
     for stale in dest.glob(".partial-*"):
         shutil.rmtree(stale, ignore_errors=True)
+
+
+def prune_local(dest: Path, now: dt.datetime) -> list[str]:
+    """Apply the archive's retention; also clear staging left by a killed run."""
+    clear_staging(dest)
     stamps = [p.name for p in dest.iterdir() if p.is_dir() and not p.name.startswith(".")]
     doomed = runs_to_prune(stamps, now, **RETENTION)
     for stamp in doomed:
@@ -181,24 +189,51 @@ def upload(run: Path, remote: str, config: Path, rclone: Path, now: dt.datetime,
            runner=subprocess.run) -> list[str]:
     """Copy `run` off-host, verify it, then apply the archive's retention remotely.
 
-    Nothing is purged unless the copy was verified and the listing parsed.
+    The copy lands in <remote>/.partial-<stamp> and is renamed to <remote>/<stamp>
+    only after a downloading check, so a failed or killed upload never looks like
+    a run: retention and drills see complete runs only. Nothing is purged unless
+    the copy was verified and the listing parsed. Returns the purged stamps.
     """
     common = _check_rclone(config, rclone)
-    target = _remote_child(remote, run.name)
-    runner([str(rclone), "copy", str(run), target, *common, "--checksum", "--immutable"],
+    staged = _remote_child(remote, f".partial-{run.name}")
+    runner([str(rclone), "copy", str(run), staged, *common, "--checksum", "--immutable"],
            check=True)
-    runner([str(rclone), "check", str(run), target, *common, "--one-way", "--download"],
+    runner([str(rclone), "check", str(run), staged, *common, "--one-way", "--download"],
            check=True)
-    doomed = runs_to_prune(_remote_names(remote, common, rclone, runner), now, **RETENTION)
+    runner([str(rclone), "moveto", staged, _remote_child(remote, run.name), *common,
+            "--delete-empty-src-dirs"], check=True)
+    names = _remote_names(remote, common, rclone, runner)
+    doomed = runs_to_prune(names, now, **RETENTION)
     for stamp in doomed:
         runner([str(rclone), "purge", _remote_child(remote, stamp), *common], check=True)
+    # Staging left by an earlier failed upload; the lock rules out a live one.
+    for name in names:
+        if name.startswith(".partial-") and name != f".partial-{run.name}":
+            runner([str(rclone), "purge", _remote_child(remote, name), *common], check=False)
     return doomed
 
 
-def _verify(run: Path, restored: Path) -> None:
+def _read_manifest(run: Path) -> dict:
     manifest = json.loads((run / "MANIFEST.json").read_text())
+    size = manifest.get("bytes") if isinstance(manifest, dict) else None
+    if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+        raise BackupError(f"manifest of {run.name} has no valid size")
+    return manifest
+
+
+def _verify(run: Path, manifest: dict, restored: Path) -> None:
+    """Bounded gunzip, then sha256, integrity_check and row counts against the manifest."""
+    limit = manifest["bytes"]
     with gzip.open(run / STORED_AS, "rb") as fin, open(restored, "wb") as fout:
-        shutil.copyfileobj(fin, fout)
+        remaining = limit + 1
+        while remaining > 0:
+            chunk = fin.read(min(1 << 20, remaining))
+            if not chunk:
+                break
+            fout.write(chunk)
+            remaining -= len(chunk)
+    if restored.stat().st_size > limit:
+        raise BackupError(f"decompressed size of {run.name} exceeds its manifest ({limit} bytes)")
     if _sha256(restored) != manifest["sha256"]:
         raise BackupError(f"sha256 of {run.name} does not match its manifest")
     conn = sqlite3.connect(f"{restored.resolve().as_uri()}?mode=ro", uri=True)
@@ -214,11 +249,13 @@ def _verify(run: Path, restored: Path) -> None:
                           f"manifest {manifest['row_counts']}")
 
 
-def drill(source: str, dest: Path, db: Path, remote: str, config: Path, rclone: Path | None,
+def drill(source: str, dest: Path, remote: str, config: Path, rclone: Path | None,
           runner=subprocess.run) -> str:
     """Restore the newest local or remote snapshot to a temporary path and verify it.
 
-    Returns the stamp; raises BackupError naming the check that failed.
+    The free-space budget comes from the snapshot's own manifest, so a drill works
+    when the live database is gone. Returns the stamp; raises BackupError naming
+    the check that failed.
     """
     if source == "local":
         stamps = local_stamps(dest)
@@ -230,15 +267,21 @@ def drill(source: str, dest: Path, db: Path, remote: str, config: Path, rclone: 
     if not stamps:
         raise BackupError(f"no {source} snapshot to drill")
     stamp = stamps[-1]
-    check_free_space(Path(tempfile.gettempdir()), db)
     with tempfile.TemporaryDirectory(prefix="news-archive-drill-") as tmp:
         if source == "local":
             run = dest / stamp
         else:
             run = Path(tmp) / stamp
-            runner([str(rclone), "copy", _remote_child(remote, stamp), str(run), *common],
-                   check=True)
-        _verify(run, Path(tmp) / "archive.sqlite")
+            remote_run = _remote_child(remote, stamp)
+            runner([str(rclone), "copyto", _remote_child(remote_run, "MANIFEST.json"),
+                    str(run / "MANIFEST.json"), *common], check=True)
+        manifest = _read_manifest(run)
+        # the downloaded .gz plus the restored copy, each at most the copy's size
+        _require_free(Path(tmp), RESERVE_BYTES + 2 * manifest["bytes"])
+        if source == "remote":
+            runner([str(rclone), "copyto", _remote_child(remote_run, STORED_AS),
+                    str(run / STORED_AS), *common], check=True)
+        _verify(run, manifest, Path(tmp) / "archive.sqlite")
     return stamp
 
 
@@ -291,6 +334,7 @@ def _run(args: argparse.Namespace, now: dt.datetime, status: dict) -> int:
     status.update(last_run_at=now.isoformat(), last_run_result="failed", last_run_error=None)
     try:
         lower_priority()
+        clear_staging(args.dest)
         check_free_space(args.dest, args.db)
         run = snapshot(args.db, args.dest, now)
         pruned = prune_local(args.dest, now)
@@ -329,8 +373,8 @@ def _drill(args: argparse.Namespace, now: dt.datetime, status: dict) -> int:
     try:
         lower_priority()
         rclone = None if args.drill == "local" else resolve_rclone(args.rclone)
-        record["stamp"] = drill(args.drill, args.dest, args.db, args.drive_remote,
-                                args.rclone_config, rclone, runner=subprocess.run)
+        record["stamp"] = drill(args.drill, args.dest, args.drive_remote, args.rclone_config,
+                                rclone, runner=subprocess.run)
     except Exception as exc:  # noqa: BLE001
         record["error"] = _err(exc)
         print(f"{now.isoformat()} news-archive {args.drill} drill FAILED: {exc}", file=sys.stderr)

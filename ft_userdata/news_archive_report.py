@@ -85,6 +85,11 @@ def _one_line(text: str | None) -> str:
     return " ".join((text or "").split())[:ERROR_CHARS]
 
 
+def _exc_line(exc: BaseException) -> str:
+    """An exception as one physical line, so no report line loses its indent."""
+    return f"{type(exc).__name__}: {' '.join(str(exc).split())}"
+
+
 def _source_lines(conn: sqlite3.Connection, now: datetime) -> list[str]:
     enabled, disabled, stale = [], [], []
     newest_ok = None
@@ -186,7 +191,7 @@ def archive_lines(db_path: str, now: datetime) -> list[str]:
         finally:
             conn.close()
     except Exception as exc:  # noqa: BLE001 - the section must never break the report
-        return [f"  news-archive: database unreadable ({type(exc).__name__}: {exc})"]
+        return [f"  news-archive: database unreadable ({_exc_line(exc)})"]
 
 
 def backup_line(status_path: str, now: datetime) -> str:
@@ -238,7 +243,7 @@ def backup_line(status_path: str, now: datetime) -> str:
             parts.append(f"no run for {_age(now, run_at)}")
         return head + "; ".join(parts)
     except Exception as exc:  # noqa: BLE001 - the section must never break the report
-        return f"{head}local only; status unreadable ({type(exc).__name__}: {exc})"
+        return f"{head}local only; status unreadable ({_exc_line(exc)})"
 
 
 def news_archive_lines(db_path: str | None = None, status_path: str | None = None,

@@ -349,3 +349,19 @@ def test_main_prints_the_news_archive_block_last(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["strategy_health_report.py", "--stdout"])
     shr.main()
     assert capsys.readouterr().out.endswith("\n\nNEWS ARCHIVE\n  news-archive: x\n")
+
+
+def test_multiline_errors_stay_indented(tmp_path, monkeypatch):
+    def raise_multiline(*args, **kwargs):
+        raise RuntimeError("first\nSECOND")
+
+    db = _archive(tmp_path, TWO, polls=_fresh("tree", "rss_coindesk"))
+    status = _status(tmp_path, **OK_RUN, upload=_upload(False, "x"))
+    monkeypatch.setattr(nar, "_source_lines", raise_multiline)
+    monkeypatch.setattr(nar, "_age", raise_multiline)
+    lines = nar.news_archive_lines(db, status, NOW)
+    assert lines == ["  news-archive: database unreadable (RuntimeError: first SECOND)",
+                     "  news-archive backup: local only; status unreadable (RuntimeError: first SECOND)"]
+    monkeypatch.setitem(sys.modules, "news_archive_report",
+                        types.SimpleNamespace(news_archive_lines=raise_multiline))
+    assert shr.news_archive_section() == ["  news-archive: section failed: RuntimeError: first SECOND"]
