@@ -434,3 +434,168 @@ def test_parse_upbit_detail_fixture():
     assert nes_harvest.UPBIT_BODY_KEY == "body"
     assert nes_harvest.UPBIT_DETAIL_URL % 6714 == (
         "https://api-manager.upbit.com/api/v1/announcements/6714")
+
+
+# ---- Codex review of #238 (round 1) -------------------------------------------------
+
+def test_fetch_error_with_http_status_is_a_block(tmp_path):
+    clock = Clock()
+    fake = FakeCms(clock, {161: arts(120)})
+    fake.overrides[1] = FetchError("response larger than 5000000 bytes", 429)
+    h, out = harvester(tmp_path, fake, clock)
+    h.harvest(161)
+    state = json.loads((tmp_path / "state.json").read_text())
+    assert state["suspended_until"] >= fake.calls[1][0] + 6 * 3600
+    assert fake.calls[2][0] >= fake.calls[1][0] + 6 * 3600
+
+
+def test_own_gap_survives_resume(tmp_path):
+    clock = Clock()
+    fake = FakeCms(clock, {161: arts(120)})
+    fake.overrides[2] = Crash()
+    h, _ = harvester(tmp_path, fake, clock)
+    with pytest.raises(Crash):
+        h.harvest(161)
+    fake2 = FakeCms(clock, {161: arts(120)})
+    h2, _ = harvester(tmp_path, fake2, clock)
+    h2.harvest(161)
+    assert fake2.calls[0][0] - fake.calls[2][0] >= 540
+
+
+class SteppingClock(Clock):
+    """Wall time that can step independently of a monotonic clock."""
+
+    def __init__(self, t=T0):
+        super().__init__(t)
+        self.m = 1000.0
+
+    def mono(self):
+        return self.m
+
+    def sleep(self, s):
+        assert s >= 0
+        self.t += s
+        self.m += s
+
+
+def test_wall_step_does_not_shorten_own_gap(tmp_path):
+    clock = SteppingClock()
+    limiter = BinanceLimiter(str(tmp_path / "state.json"), boot_id="b1", mono=clock.mono)
+    fake = FakeCms(clock, {161: arts(120)})
+    fake.hooks[0] = lambda f: setattr(clock, "t", clock.t + 3600)    # wall jumps +1 h
+    out = tmp_path / "raw"
+    h = nes_harvest.CmsHarvester(limiter, fake, clock.wall, clock.sleep, out, mono=clock.mono)
+    h.harvest(161)
+    assert fake.calls[1][0] - fake.calls[0][0] >= 540 + 3600    # mono gap held
+
+
+def test_aborted_harvest_cannot_resume(tmp_path):
+    clock = Clock()
+    fake = FakeCms(clock, {161: arts(120)})
+    fake.overrides[1] = Response(200, b"<html>captcha</html>", {})
+    fake.overrides[2] = Response(429, b"", {})
+    h, out = harvester(tmp_path, fake, clock)
+    with pytest.raises(nes_harvest.HarvestAborted):
+        h.harvest(161)
+    fake2 = FakeCms(clock, {161: arts(120)})
+    h2, _ = harvester(tmp_path, fake2, clock)
+    with pytest.raises(nes_harvest.HarvestAborted):
+        h2.harvest(161)
+    assert fake2.calls == []
+
+
+def test_wall_step_during_suspension_counts_once(tmp_path):
+    clock = SteppingClock()
+    limiter = BinanceLimiter(str(tmp_path / "state.json"), boot_id="b1", mono=clock.mono)
+    fake = FakeCms(clock, {161: arts(120)})
+    fake.overrides[1] = Response(200, b"<html>captcha</html>", {})
+    out = tmp_path / "raw"
+
+    def crash_on_long_sleep(s):
+        if s > 3600:
+            raise Crash()
+        clock.sleep(s)
+    h = nes_harvest.CmsHarvester(limiter, fake, clock.wall, crash_on_long_sleep, out,
+                                 mono=clock.mono)
+    with pytest.raises(Crash):
+        h.harvest(161)
+    clock.t += 120                                   # NTP step while restarting
+    fake2 = FakeCms(clock, {161: arts(120)})
+    h2 = nes_harvest.CmsHarvester(limiter, fake2, clock.wall, clock.sleep, out, mono=clock.mono)
+    h2.harvest(161)
+    meta = json.loads((out / "harvest_meta.json").read_text())
+    assert len(meta["suspensions"]) == 1 and meta["aborted"] is None
+
+
+def test_closing_growth_is_reconciled_not_a_shortfall(tmp_path):
+    clock = Clock()
+    fake = FakeCms(clock, {161: arts(120)})
+    newer = arts(51, first_id=9000, newest_ms=1_790_000_000_000, prefix="N")
+    fake.hooks[3] = lambda f: f.catalogs.__setitem__(161, newer + f.catalogs[161])
+    h, out = harvester(tmp_path, fake, clock)
+    res = h.harvest(161)
+    assert fake.pages() == [1, 2, 3, 1, 2]
+    assert res["completeness"] == {"unique": 171, "total": 171, "total_reported": True,
+                                   "shortfall": 0}
+    assert (out / "cat161" / "closing-02.json").exists()
+
+
+def test_scan_continues_past_short_interior_page(tmp_path):
+    clock = Clock()
+    start = nes_util.WINDOW_START_MS
+    items = arts(200, newest_ms=start + 300 * HOUR_MS)       # all inside the window
+    fake = FakeCms(clock, {49: items}, names={49: "Latest Binance News"})
+    body = page_body(49, items[:49], 200, "Latest Binance News")
+    fake.overrides[0] = Response(200, body, {})              # page 1 returns 49
+    h, _ = harvester(tmp_path, fake, clock)
+    h.scan(49, start)
+    assert fake.pages() == [1, 2, 3, 4]
+
+
+def test_72h_deadline_caps_waits_and_is_inclusive(tmp_path):
+    clock = Clock()
+    fake = FakeCms(clock, {161: arts(120)})
+    fake.hooks[1] = lambda f: clock.sleep(71 * 3600 - (clock.t - f.calls[0][0]))
+    fake.overrides[1] = Response(200, b"<html>captcha</html>", {})
+    h, out = harvester(tmp_path, fake, clock)
+    with pytest.raises(nes_harvest.HarvestAborted):
+        h.harvest(161)
+    first = fake.calls[0][0]
+    assert len(fake.calls) == 2
+    assert clock.t == pytest.approx(first + nes_harvest.MAX_HARVEST_S)
+    assert json.loads((out / "harvest_meta.json").read_text())["aborted"] == "72 h without completing"
+
+
+def test_refuses_when_limiter_state_file_missing(tmp_path):
+    def boom(req):
+        raise AssertionError("fetcher called")
+    (tmp_path / "d").mkdir()
+    rc = nes_harvest.main(["binance", "--harvest", "161", "--out", str(tmp_path / "raw"),
+                           "--limiter-state", str(tmp_path / "d" / "other.json")], fetcher=boom)
+    assert rc == 2
+
+
+def test_malformed_page_is_a_recorded_error(tmp_path):
+    clock = Clock()
+    fake = FakeCms(clock, {161: arts(120)})
+    j = json.loads(page_body(161, [], 120))
+    j["data"]["catalogs"][0]["articles"] = 42
+    fake.overrides[1] = Response(200, json.dumps(j).encode(), {})
+    h, out = harvester(tmp_path, fake, clock)
+    h.harvest(161)
+    assert fake.pages() == [1, 2, 2, 3, 1]
+    assert len(json.loads((out / "harvest_meta.json").read_text())["catalogs"]["161"]["errors"]) == 1
+
+
+def test_upbit_gap_survives_resume(tmp_path):
+    clock = Clock()
+    notices = [upbit_notice(30 + i, "2024-03-01T21:00:00+09:00") for i in range(2)]
+    fake = FakeUpbit(clock, notices)
+    fake.overrides[2] = Response(403, b"<html>Attention Required</html>", {})
+    h, _ = upbit_harvester(tmp_path, fake, clock)
+    with pytest.raises(nes_harvest.HarvestBlocked):
+        h.run(*WIN)
+    fake2 = FakeUpbit(clock, notices)
+    h2, _ = upbit_harvester(tmp_path, fake2, clock)
+    h2.run(*WIN)
+    assert fake2.calls[0][0] - fake.calls[2][0] >= nes_harvest.UPBIT_GAP_S

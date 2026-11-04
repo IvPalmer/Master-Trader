@@ -29,7 +29,6 @@ OWN_GAP_S = 540
 MAX_HARVEST_S = 72 * 3600
 MAX_PAGE_FAILURES = 5        # consecutive non-block failures of one page
 MAX_PAGES = 1000             # guard against an API that ignores pageNo
-SUSPENSION_SAME_S = 60       # suspended_until values this close are one suspension
 
 
 @dataclass
@@ -46,19 +45,29 @@ def cms_url(catalog_id, page_no):
 
 
 def parse_cms_page(body):
+    """Raises ValueError on anything but a well-formed successful page."""
     j = json.loads(body)
     if not isinstance(j, dict) or j.get("success") is not True:
         raise ValueError("binance cms: success is not true")
-    cats = (j.get("data") or {}).get("catalogs") or []
-    if not cats or not isinstance(cats[0], dict):
+    data = j.get("data")
+    cats = data.get("catalogs") if isinstance(data, dict) else None
+    if not isinstance(cats, list) or not cats or not isinstance(cats[0], dict):
         raise ValueError("binance cms: no catalog in the response")
     c = cats[0]
     total = c.get("total")
     if isinstance(total, bool) or not isinstance(total, int):
         total = None
-    arts = [a for a in (c.get("articles") or [])
-            if isinstance(a, dict) and a.get("id") is not None]
-    return CmsPage(int(c.get("catalogId")), c.get("catalogName"), total, arts)
+    arts = c.get("articles")
+    if arts is None:
+        arts = []
+    if not isinstance(arts, list):
+        raise ValueError("binance cms: articles is not a list")
+    arts = [x for x in arts if isinstance(x, dict) and x.get("id") is not None]
+    cid = c.get("catalogId")
+    if isinstance(cid, bool) or not isinstance(cid, int):
+        raise ValueError("binance cms: bad catalogId")
+    name = c.get("catalogName")
+    return CmsPage(cid, name if isinstance(name, str) else None, total, arts)
 
 
 def merge_articles(pages):
@@ -85,27 +94,29 @@ def _iso_s(t):
 
 
 class CmsHarvester:
-    def __init__(self, limiter, fetcher, wall, sleep, out_dir):
+    """Requests: own gap OWN_GAP_S (monotonic within a run, persisted wall time across
+    runs), then a slot from the shared limiter. Every abort is terminal: a harvester
+    opened on an aborted meta refuses to run (plan Task 10: exit 4 is never rerun)."""
+
+    def __init__(self, limiter, fetcher, wall, sleep, out_dir, mono=None):
         self.limiter, self.fetcher = limiter, fetcher
         self.wall, self.sleep = wall, sleep
+        self.mono = mono or wall
         self.out = Path(out_dir)
         self.meta_path = self.out / "harvest_meta.json"
         if self.meta_path.exists():
             self.meta = json.loads(self.meta_path.read_text(encoding="utf-8"))
         else:
-            self.meta = {"first_request": None, "first_request_s": None, "suspensions": [],
-                         "suspended_until_s": [], "aborted": None, "catalogs": {}}
-        self.meta["aborted"] = None
-        for c in self.meta["catalogs"].values():
-            c["aborted"] = None
-        self.last_own = None
+            self.meta = {"first_request": None, "first_request_s": None,
+                         "last_request_s": None, "suspensions": [], "in_suspension": False,
+                         "aborted": None, "catalogs": {}}
+        self.last_own_mono = None
 
     # -- bookkeeping ---------------------------------------------------------------
     def _cat(self, cid):
-        c = self.meta["catalogs"].setdefault(str(cid), {
+        return self.meta["catalogs"].setdefault(str(cid), {
             "catalog_name": None, "pages": [], "completeness": None, "requests": [],
             "suspensions": [], "errors": [], "aborted": None, "files": {}})
-        return c
 
     def _save(self):
         write_atomic(self.meta_path, json.dumps(self.meta, indent=1, sort_keys=True).encode())
@@ -116,48 +127,78 @@ class CmsHarvester:
         self._save()
         raise HarvestAborted(reason)
 
+    def _refuse_if_aborted(self):
+        if self.meta.get("aborted"):
+            raise HarvestAborted("already aborted: %s" % self.meta["aborted"])
+
     def _count_suspension(self, cid, until):
-        seen = self.meta["suspended_until_s"]
-        if any(abs(until - u) <= SUSPENSION_SAME_S for u in seen):
+        """One count per suspension episode: from first seeing the limiter suspended
+        until the harvester next acquires a slot. Persisted, so a restart or a wall-clock
+        step during the episode does not count it twice."""
+        if self.meta["in_suspension"]:
             return
-        seen.append(until)
+        self.meta["in_suspension"] = True
         self.meta["suspensions"].append(_iso_s(until))
         self._cat(cid)["suspensions"].append(_iso_s(until))
         self._save()
-        if len(seen) >= 2:
+        if len(self.meta["suspensions"]) >= 2:
             self._abort(cid, "second suspension")
 
     # -- requests ------------------------------------------------------------------
+    def _own_gap_left(self, now):
+        if self.last_own_mono is not None:
+            return OWN_GAP_S - (self.mono() - self.last_own_mono)
+        last = self.meta.get("last_request_s")
+        if last is None:
+            return 0.0
+        if now < last:                       # wall clock moved back across a restart
+            self.meta["last_request_s"] = last = now
+        return OWN_GAP_S - (now - last)
+
     def _wait_slot(self, cid):
         while True:
             now = self.wall()
             first = self.meta["first_request_s"]
-            if first is not None and now - first > MAX_HARVEST_S:
+            deadline = None if first is None else first + MAX_HARVEST_S
+            if deadline is not None and now >= deadline:
                 self._abort(cid, "72 h without completing")
             until = self.limiter.suspended_until(now)
             if until is not None:
                 self._count_suspension(cid, until)
-                self.sleep(until - now + 1)
-                continue
-            if self.last_own is not None and now - self.last_own < OWN_GAP_S:
-                self.sleep(OWN_GAP_S - (now - self.last_own))
-                continue
-            if self.limiter.try_acquire(now):
-                return now
-            self.sleep(1)
+                wait = until - now + 1
+            else:
+                wait = self._own_gap_left(now)
+                if wait <= 0:
+                    if self.limiter.try_acquire(now):
+                        if self.meta["in_suspension"]:
+                            self.meta["in_suspension"] = False
+                        return now
+                    wait = 1.0
+            if deadline is not None:
+                wait = min(wait, deadline - now)
+            self.sleep(max(wait, 0.0))
 
     def _request(self, cid, url):
-        """One attempt. Returns (body, CmsPage), or None after a block or an error."""
+        """One attempt. Returns (body, CmsPage), "block", or None after an error."""
         cat = self._cat(cid)
         t = self._wait_slot(cid)
         if self.meta["first_request_s"] is None:
             self.meta["first_request_s"] = t
             self.meta["first_request"] = _iso_s(t)
-        self.last_own = t
+        self.last_own_mono = self.mono()
+        self.meta["last_request_s"] = t
         cat["requests"].append(_iso_s(t))
+        self._save()
         try:
             resp = self.fetcher(Req("GET", url, None, na_sources.BINANCE_HEADERS))
         except na_fetch.FetchError as e:
+            if e.status is not None:
+                # an HTTP status with an unreadable body: a block signal, as in the archive
+                self.limiter.suspend(self.wall())
+                cat["errors"].append({"at": _iso_s(t), "url": url, "block": e.status,
+                                      "error": str(e)[:200]})
+                self._save()
+                return "block"
             cat["errors"].append({"at": _iso_s(t), "url": url, "error": str(e)[:200]})
             self._save()
             return None
@@ -174,7 +215,6 @@ class CmsHarvester:
             cat["errors"].append({"at": _iso_s(t), "url": url, "error": str(e)[:200]})
             self._save()
             return None
-        self._save()
         return resp.body, page
 
     def _fetch(self, cid, page_no, fname):
@@ -214,7 +254,10 @@ class CmsHarvester:
 
     # -- public --------------------------------------------------------------------
     def harvest(self, catalog_id):
-        """Every page of the catalog, then a fresh closing page 1 (O16)."""
+        """Every page of the catalog, then fresh closing pages (O16). Closing pages
+        continue while a full one holds only articles newer than the harvested pages,
+        so growth during the harvest is collected rather than read as a shortfall."""
+        self._refuse_if_aborted()
         p1 = self._page(catalog_id, 1)
         n_pages = math.ceil(p1.total / CMS_PAGE_SIZE) if p1.total is not None else None
         pages, page_no = [p1], 1
@@ -227,29 +270,45 @@ class CmsHarvester:
             if page_no > MAX_PAGES:
                 self._abort(catalog_id, "page cap")
             pages.append(self._page(catalog_id, page_no))
-        closing = self._fetch(catalog_id, 1, "closing.json")
-        comp = completeness(merge_articles(pages + [closing]), closing)
+        seen = merge_articles(pages)
+        closings = [self._fetch(catalog_id, 1, "closing.json")]
+        while (len(closings[-1].articles) >= CMS_PAGE_SIZE
+               and not any(str(a["id"]) in seen for a in closings[-1].articles)):
+            k = len(closings) + 1
+            if k > MAX_PAGES:
+                self._abort(catalog_id, "page cap")
+            closings.append(self._fetch(catalog_id, k, "closing-%02d.json" % k))
+        comp = completeness(merge_articles(pages + closings), closings[0])
         cat = self._cat(catalog_id)
         cat["completeness"] = comp
-        if closing.catalog_name:
-            cat["catalog_name"] = closing.catalog_name
+        if closings[0].catalog_name:
+            cat["catalog_name"] = closings[0].catalog_name
         self._save()
         return {"catalog_id": catalog_id, "catalog_name": cat["catalog_name"],
                 "pages": len(pages), "completeness": comp}
 
     def scan(self, catalog_id, stop_before_ms):
-        """Pages from 1 until the first page whose oldest article predates stop_before_ms."""
-        page_no, oldest = 0, None
+        """Pages from 1 until the first page whose oldest article predates stop_before_ms,
+        or the catalog's last page (by its reported total; else the first short page)."""
+        self._refuse_if_aborted()
+        page_no, oldest, n_pages = 0, None, None
         while True:
             page_no += 1
             if page_no > MAX_PAGES:
                 self._abort(catalog_id, "page cap")
             page = self._page(catalog_id, page_no)
+            if page_no == 1 and page.total is not None:
+                n_pages = math.ceil(page.total / CMS_PAGE_SIZE)
             dates = [a.get("releaseDate") for a in page.articles
-                     if isinstance(a.get("releaseDate"), int)]
+                     if isinstance(a.get("releaseDate"), int)
+                     and not isinstance(a.get("releaseDate"), bool)]
             if dates:
                 oldest = min(dates)
-            if not dates or oldest < stop_before_ms or len(page.articles) < CMS_PAGE_SIZE:
+                if oldest < stop_before_ms:
+                    break
+            last = (page_no >= n_pages if n_pages is not None
+                    else len(page.articles) < CMS_PAGE_SIZE)
+            if last:
                 break
         cat = self._cat(catalog_id)
         self._save()
@@ -280,9 +339,10 @@ def parse_upbit_page(body):
     j = json.loads(body)
     if not isinstance(j, dict) or j.get("success") is not True:
         raise ValueError("upbit: success is not true")
-    d = j.get("data") or {}
-    notices = [n for n in (d.get("notices") or [])
-               if isinstance(n, dict) and n.get("id") is not None]
+    d = j.get("data")
+    if not isinstance(d, dict) or not isinstance(d.get("notices"), list):
+        raise ValueError("upbit: no notice list")
+    notices = [n for n in d["notices"] if isinstance(n, dict) and n.get("id") is not None]
     return UpbitPage(_int_or_none(d.get("total_count")), _int_or_none(d.get("total_pages")),
                      notices)
 
@@ -291,7 +351,9 @@ def parse_upbit_detail(body):
     j = json.loads(body)
     if not isinstance(j, dict) or j.get("success") is not True:
         raise ValueError("upbit detail: success is not true")
-    d = j.get("data") or {}
+    d = j.get("data")
+    if not isinstance(d, dict):
+        raise ValueError("upbit detail: no data")
     text = d.get(UPBIT_BODY_KEY)
     if d.get("id") is None or not isinstance(text, str):
         raise ValueError("upbit detail: no id or body")
@@ -323,7 +385,6 @@ class UpbitHarvester:
             self.meta = {"files": {}, "runs": []}
         self.meta.update(host_label=host_label, blocked=None, finished_at=None,
                          started_at=_iso_s(wall()))
-        self.last = None
 
     def _save(self):
         write_atomic(self.meta_path, json.dumps(self.meta, indent=1, sort_keys=True,
@@ -335,11 +396,16 @@ class UpbitHarvester:
         raise HarvestBlocked(reason)
 
     def _get(self, url, rel, parse):
-        if self.last is not None:
-            wait = UPBIT_GAP_S - (self.wall() - self.last)
+        last = self.meta.get("last_request_s")     # persisted: the gap holds across reruns
+        if last is not None:
+            now = self.wall()
+            if now < last:
+                last = now                         # clock moved back: wait a full gap
+            wait = UPBIT_GAP_S - (now - last)
             if wait > 0:
                 self.sleep(wait)
-        self.last = self.wall()
+        self.meta["last_request_s"] = self.wall()
+        self._save()
         try:
             resp = self.fetcher(Req("GET", url, None, na_sources.JSON_HEADERS))
         except na_fetch.FetchError as e:
@@ -350,7 +416,7 @@ class UpbitHarvester:
             if resp.status != 200:
                 raise ValueError("HTTP %d" % resp.status)
             parsed = parse(resp.body)
-        except ValueError as e:
+        except (ValueError, TypeError, KeyError) as e:
             self._stop("error: %s: %s" % (url, e))
         write_atomic(self.out / rel, resp.body)
         self.meta["files"][rel] = sha256_bytes(resp.body)
@@ -400,14 +466,16 @@ def _ids(s):
     return [int(x) for x in s.split(",") if x.strip()] if s else []
 
 
-def _binance(args, fetcher, wall, sleep):
+def _binance(args, fetcher, wall, sleep, mono):
     state = Path(args.limiter_state)
-    if not state.parent.is_dir():
-        print("refusing: limiter state directory %s does not exist; the harvester must "
-              "share the archive's limiter" % state.parent, file=sys.stderr)
+    if not state.is_file():
+        # The archive writes its state file on its first Binance poll; a missing file
+        # means a limiter of our own, which would double the Binance budget.
+        print("refusing: limiter state %s does not exist; the harvester must share the "
+              "running archive's limiter" % state, file=sys.stderr)
         return 2
     limiter = na_fetch.BinanceLimiter(str(state))
-    h = CmsHarvester(limiter, fetcher, wall, sleep, Path(args.out))
+    h = CmsHarvester(limiter, fetcher, wall, sleep, Path(args.out), mono=mono)
     results = []
     try:
         for cid in _ids(args.harvest):
@@ -422,7 +490,14 @@ def _binance(args, fetcher, wall, sleep):
     return 0
 
 
-def main(argv=None, fetcher=None, wall=time.time, sleep=time.sleep):
+FETCH_DEADLINE_S = 60
+
+
+def _bounded_fetch(req):
+    return na_fetch.fetch(req, timeout_s=10, deadline=time.monotonic() + FETCH_DEADLINE_S)
+
+
+def main(argv=None, fetcher=None, wall=time.time, sleep=time.sleep, mono=time.monotonic):
     ap = argparse.ArgumentParser(prog="nes_harvest.py")
     sub = ap.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("binance")
@@ -434,9 +509,9 @@ def main(argv=None, fetcher=None, wall=time.time, sleep=time.sleep):
     u.add_argument("--out", required=True)
     u.add_argument("--host-label", required=True)
     args = ap.parse_args(argv)
-    fetcher = fetcher or na_fetch.fetch
+    fetcher = fetcher or _bounded_fetch
     if args.cmd == "binance":
-        return _binance(args, fetcher, wall, sleep)
+        return _binance(args, fetcher, wall, sleep, mono)
     h = UpbitHarvester(fetcher, wall, sleep, Path(args.out), args.host_label)
     try:
         res = h.run(nes_util.WINDOW_START_MS - nes_util.DAY_MS,
