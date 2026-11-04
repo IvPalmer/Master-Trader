@@ -75,6 +75,9 @@ _TABLE = ("<table><tr><th>디지털 자산</th><th>마켓</th><th>네트워크</
     # A market line whose right side is not a ticker list (a price) says nothing.
     ("KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)", "<p>- BTC 마켓 : 0.00001 BTC (AAA)</p>",
      {"AAA": None, "BBB": None}),
+    ("KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)",
+     "<p>- AAA : KRW 마켓</p><p>- BBB : BTC 마켓</p><p>- KRW 마켓 : BBB (전일 종가 기준)</p>",
+     {"AAA": True, "BBB": False}),
     ("BTC 마켓 디지털 자산 추가 (AAA)", None, {}),                                # not an O8 addition
 ])
 def test_upbit_krw_membership(title, body, expected):

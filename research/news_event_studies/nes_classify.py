@@ -393,6 +393,12 @@ def _markets(text):
     return found | {"KRW"} if "원화" in text else found
 
 
+def _ticker_list(text):
+    """`AAA, BBB & CCC` -> its tickers; () when any piece is not a bare ticker."""
+    pieces = [p.strip() for p in re.split(r"[,&]", text)]
+    return tuple(pieces) if all(_is_ticker(p) for p in pieces) else ()
+
+
 def _body_markets(body, token):
     """The markets the body assigns to `token`: a `마켓` table column, `- ALT : BTC 마켓` or
     `- KRW 마켓 : SHIB` lines. Empty when the body does not say."""
@@ -415,7 +421,7 @@ def _body_markets(body, token):
         if m and m.group(1) == token:
             found |= _markets(m.group(2))
         m = _LINE_MARKET_TOKENS.match(line)
-        if m and token in (_tickers(m.group(2)) or ()):     # a price on the right says nothing
+        if m and token in _ticker_list(m.group(2)):          # a price or a note says nothing
             found |= _markets(m.group(1))
     return found
 
