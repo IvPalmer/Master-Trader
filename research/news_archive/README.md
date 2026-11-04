@@ -141,4 +141,4 @@ files).
 
 | date | source commit | by |
 |---|---|---|
-| — | not installed | — |
+| 2026-11-04 01:29 UTC | `beccbb0` | Claude, on the operator's go-ahead. `once`: 14/15 OK; `upbit` FAILED with HTTP 403 from the VPS IP, as expected, so the installed unit sets `Environment=NEWS_ARCHIVE_DISABLE=upbit`. Unit limits confirmed. `rss_blockworks` polls OK, but the newest item in its feed is dated 2026-01-07: the feed itself is stale. |
