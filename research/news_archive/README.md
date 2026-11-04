@@ -117,6 +117,19 @@ python3 news_archive.py status                  # per source: last OK poll, fail
 `once` waits for the Binance limiter, so a full run takes 3–6 min. `once` refuses to run
 while the service holds the writer lock (exit 3); stop the unit first.
 
+## Monitoring and backup
+
+- **Nightly report.** The health report's last block, `NEWS ARCHIVE`, reads this database
+  read-only (`ft_userdata/news_archive_report.py`): sources OK out of enabled, one line per
+  stale source (no OK poll for `3 × interval + 10 min`), open gaps, gaps closed in 24 h and
+  unrecovered overflow in 7 d, plus the backup state. Only liveness counts, so a feed that
+  polls OK but publishes nothing (`rss_blockworks`) reports OK. Non-list feeds
+  (`fear_greed`, `ff_calendar`, `hyperliquid_universe`) have no loss detector.
+- **Backup.** A separate root job, `deploy/vps/backup_news_archive.py`, snapshots this
+  database daily to `/home/ubuntu/backups/news-archive/`; off-host upload and restore
+  drills are opt-in. Contract, install and rollback:
+  [docs/ops/news-archive-backup.md](../../docs/ops/news-archive-backup.md).
+
 ## Install (spec §8, only after the operator's go-ahead)
 
 1. Copy `research/news_archive/` from the merged `main` commit to

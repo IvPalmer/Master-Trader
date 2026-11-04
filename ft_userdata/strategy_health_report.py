@@ -1218,8 +1218,18 @@ def _format_capital_lines(portfolio: dict) -> list[str]:
     return lines
 
 
+def news_archive_section() -> list[str]:
+    """The NEWS ARCHIVE block (#229 Part B). Never raises, never changes the exit status."""
+    try:
+        from news_archive_report import news_archive_lines
+        return news_archive_lines()
+    except Exception as e:  # noqa: BLE001 — the section must never kill the report
+        return [f"  news-archive: section failed: {type(e).__name__}: {' '.join(str(e).split())}"]
+
+
 def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dict,
-                           prereg_lines: Optional[list[str]] = None) -> str:
+                           prereg_lines: Optional[list[str]] = None,
+                           news_lines: Optional[list[str]] = None) -> str:
     """Format a structured Telegram report."""
     lines = []
     now = datetime.now(timezone.utc)
@@ -1323,6 +1333,12 @@ def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dic
         for r in all_recs:
             lines.append(r)
 
+    # PIT news archive: freshness, gaps and backup state (#229). Always last.
+    if news_lines:
+        lines.append("")
+        lines.append("NEWS ARCHIVE")
+        lines.extend(news_lines)
+
     return "\n".join(lines)
 
 
@@ -1387,7 +1403,8 @@ def main():
     except Exception as e:  # noqa: BLE001 — prereg section must never kill the report
         log.error("check_preregistrations failed: %s", e)
         prereg_lines = [f"  [PREREG] check failed: {e}"]
-    report = format_telegram_report(bot_metrics, portfolio, trends, prereg_lines)
+    report = format_telegram_report(bot_metrics, portfolio, trends, prereg_lines,
+                                    news_lines=news_archive_section())
 
     if args.stdout:
         print(report)
