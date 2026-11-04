@@ -23,7 +23,8 @@ class Env:
         self.routes, self.calls, self.fetch_kw = {}, [], []
         self.tmp = tmp_path
         self.conn = na_store.connect(str(tmp_path / db))
-        self.limiter = BinanceLimiter(str(tmp_path / "binance_cms_state.json"))
+        self.limiter = BinanceLimiter(str(tmp_path / "binance_cms_state.json"),
+                                      mono=lambda: self.m, boot_id="test-boot")
         self.keys = keys
         self.arc = self.new_archive()
 
@@ -462,7 +463,8 @@ def test_once_waits_for_the_shared_binance_limiter(tmp_path, monkeypatch):
     monkeypatch.setattr(news_archive, "fetch",
                         lambda spec, **kw: ok((FIX / "binance_cms_48.json").read_bytes()))
     (tmp_path / "data").mkdir()
-    BinanceLimiter(str(tmp_path / "data" / "binance_cms_state.json")).try_acquire(WALL0 - 10)
+    BinanceLimiter(str(tmp_path / "data" / "binance_cms_state.json"),
+                   boot_id=None).try_acquire(WALL0 - 10)
     assert news_archive.main(_cli(tmp_path, "once", "--source", "binance_listing")) == 0
     assert clock["w"] >= WALL0 + 170
 
@@ -561,3 +563,14 @@ def test_requests_get_the_remaining_poll_deadline(tmp_path):
     # main 9 s + 8 s pacing: the one backfill page gets the 3 s that remain
     assert len(kws) == 2 and kws[1]["timeout_s"] == 3.0
     assert all(k["deadline"] == started + 20 for k in kws)
+
+
+def test_unsynchronized_ntp_at_startup_opens_clock_gaps(tmp_path):
+    env = Env(tmp_path, ["tree"])
+    env.routes[TREE] = tree("1")
+    env.probe = False
+    env.arc.startup()
+    assert [g[3] for g in env.gaps("tree", "clock")] == [None]
+    env.probe = None
+    env.arc.poll("tree")
+    assert flags(env)["1"] == 1

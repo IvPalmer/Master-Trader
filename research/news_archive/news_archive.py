@@ -147,7 +147,11 @@ class Archive:
     def _close_cleared_gaps(self, now):
         disk_ok = self.free_bytes() >= DISK_MIN_BYTES
         suspended = self.limiter.suspended_until(self.wall()) is not None
-        clock_ok = self.clock_probe() is True
+        probe = self.clock_probe()
+        clock_ok = probe is True
+        if probe is False:
+            self._probe_bad = True
+            self._clock_gap_all(now, "NTP not synchronized at startup")
         for g in na_store.open_gaps(self.conn):
             if g["reason"] == "clock" and g["source"] in self.sources and not clock_ok:
                 self._probe_bad = True   # keep probing every tick until NTP is healthy
@@ -520,7 +524,7 @@ def enabled_sources():
 def build_archive(data_dir, sources):
     wall, mono, sleep = _runtime()
     conn = na_store.connect(os.path.join(data_dir, "archive.sqlite"))
-    limiter = BinanceLimiter(os.path.join(data_dir, "binance_cms_state.json"))
+    limiter = BinanceLimiter(os.path.join(data_dir, "binance_cms_state.json"), mono=mono)
     return Archive(conn, sources, limiter, lambda spec, **kw: fetch(spec, **kw), wall, mono,
                    lambda: shutil.disk_usage(data_dir).free, ntp_synchronized, sleep=sleep)
 

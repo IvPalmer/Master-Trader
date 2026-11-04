@@ -85,7 +85,7 @@ def test_html_body_is_block_signal():
 
 def test_limiter_one_request_per_180s_across_instances(tmp_path):
     state = str(tmp_path / "data" / "binance_cms_state.json")
-    a, b = BinanceLimiter(state), BinanceLimiter(state)
+    a, b = BinanceLimiter(state, boot_id=None), BinanceLimiter(state, boot_id=None)
     assert a.try_acquire(0.0) is True
     assert b.try_acquire(10.0) is False
     assert a.try_acquire(179.0) is False
@@ -95,8 +95,8 @@ def test_limiter_one_request_per_180s_across_instances(tmp_path):
 
 def test_suspension_persists_across_instances(tmp_path):
     state = str(tmp_path / "binance_cms_state.json")
-    BinanceLimiter(state).suspend(0.0)
-    fresh = BinanceLimiter(state)
+    BinanceLimiter(state, boot_id=None).suspend(0.0)
+    fresh = BinanceLimiter(state, boot_id=None)
     assert fresh.suspended_until(3600.0) == 6 * 3600.0
     assert fresh.try_acquire(3600.0) is False
     assert fresh.try_acquire(6 * 3600 + 1.0) is True
@@ -107,7 +107,7 @@ def test_corrupt_or_empty_state_file_fails_closed_for_6h(tmp_path):
     for text in ("{not json", ""):
         state = tmp_path / ("s%d.json" % len(text))
         state.write_text(text)
-        lim = BinanceLimiter(str(state))
+        lim = BinanceLimiter(str(state), boot_id=None)
         assert lim.try_acquire(1000.0) is False   # unknown history: assume suspended
         assert lim.suspended_until(1000.0) == 1000.0 + 6 * 3600
         assert lim.try_acquire(1000.0 + 6 * 3600 + 1) is True
@@ -115,7 +115,7 @@ def test_corrupt_or_empty_state_file_fails_closed_for_6h(tmp_path):
 
 def test_state_is_replaced_atomically_under_a_separate_lock(tmp_path):
     state = tmp_path / "binance_cms_state.json"
-    lim = BinanceLimiter(str(state))
+    lim = BinanceLimiter(str(state), boot_id=None)
     ino = None
     for t in (0.0, 200.0):
         assert lim.try_acquire(t) is True
@@ -169,7 +169,48 @@ def test_body_read_stops_at_the_deadline():
 
 
 def test_clock_moving_backwards_does_not_lock_out_for_long(tmp_path):
-    lim = BinanceLimiter(str(tmp_path / "s.json"))
+    lim = BinanceLimiter(str(tmp_path / "s.json"), boot_id=None)
     assert lim.try_acquire(100_000.0) is True
     assert lim.try_acquire(50_000.0) is False    # wall clock jumped back
     assert lim.try_acquire(50_181.0) is True     # one gap from the jump, not 50,000 s
+
+
+def test_forward_wall_step_cannot_end_a_suspension_or_gap_within_one_boot(tmp_path):
+    clock = {"m": 1000.0}
+    state = str(tmp_path / "s.json")
+    mk = lambda: BinanceLimiter(state, mono=lambda: clock["m"], boot_id="boot-1")  # noqa: E731
+    assert mk().try_acquire(0.0) is True
+    clock["m"] += 1
+    assert mk().try_acquire(500.0) is False          # wall stepped +499 s, 1 s really passed
+    mk().suspend(500.0)
+    clock["m"] += 200
+    assert mk().try_acquire(500.0 + 7 * 3600) is False   # +7 h wall step, 200 s really passed
+    assert mk().suspended_until(500.0 + 7 * 3600) is not None
+    clock["m"] += 6 * 3600
+    assert mk().try_acquire(500.0 + 14 * 3600) is True
+    # another boot: monotonic values are not comparable, wall rules alone apply
+    other = BinanceLimiter(state, mono=lambda: 5.0, boot_id="boot-2")
+    assert other.try_acquire(500.0 + 14 * 3600 + 181) is True
+
+
+class DripResp(FakeResp):
+    """Like http.client: read(n) loops until n bytes, read1(n) does one socket read."""
+    def __init__(self, clock):
+        super().__init__(b"x" * 1000)
+        self.clock = clock
+
+    def read(self, n=-1):
+        self.clock["t"] += 1000.0                    # read(n) would gather 1000 one-byte reads
+        return super().read(n)
+
+    def read1(self, n=-1):
+        self.clock["t"] += 1.0
+        return super().read(1)
+
+
+def test_body_reads_use_single_socket_reads():
+    clock = {"t": 0.0}
+    with pytest.raises(FetchError, match="deadline"):
+        fetch(SOURCES["tree"], opener=lambda req, timeout: DripResp(clock), deadline=20.0,
+              mono=lambda: clock["t"])
+    assert clock["t"] <= 22.0

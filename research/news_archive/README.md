@@ -41,6 +41,8 @@ suspends all Binance sources for 6 h, persisted in the same file, and opens a `s
 gap. Redirects are never followed (a 3xx is a failed poll, and for Binance a block
 signal); an oversized or stalled Binance response with an HTTP status also suspends. A
 limiter state file that exists but cannot be parsed fails closed with a 6 h suspension.
+Within one boot the gap and the suspension are also enforced in monotonic time, so a
+forward wall-clock step cannot shorten them.
 `listing-monitor` is not touched.
 
 **Findings from the fixture capture (2026-11-03):**

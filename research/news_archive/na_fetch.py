@@ -60,7 +60,9 @@ def _read(fp, status, max_bytes, deadline, mono):
     while n <= max_bytes:
         if deadline is not None and mono() > deadline:
             raise FetchError("poll deadline exceeded while reading the body", status)
-        b = fp.read(min(CHUNK, max_bytes + 1 - n))
+        # read1: one socket read per call, so the deadline is checked at least once per
+        # socket timeout (HTTPResponse.read(n) loops until n bytes arrive)
+        b = getattr(fp, "read1", fp.read)(min(CHUNK, max_bytes + 1 - n))
         if not b:
             break
         chunks.append(b)
@@ -106,14 +108,32 @@ def is_block_signal(resp):
     return False
 
 
+STATE_KEYS = ("last_request", "suspended_until", "boot_id", "last_request_mono",
+              "suspended_until_mono")
+
+
+def _boot_id():
+    try:
+        with open("/proc/sys/kernel/random/boot_id") as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
 class BinanceLimiter:
     """State lives in `state_path`, replaced atomically (tmp + rename) under an flock on
     `state_path + ".lock"`, so a reader never sees a half-written file. A state file that
-    exists but cannot be parsed fails closed: a fresh 6 h suspension."""
+    exists but cannot be parsed fails closed: a fresh 6 h suspension.
 
-    def __init__(self, state_path, gap_s=180.0):
+    Deadlines are kept in wall time and, within one boot, also in monotonic time, so a
+    forward wall-clock step cannot shorten the 180 s gap or a suspension. Across a
+    reboot (a different boot_id) only the wall-time rules apply."""
+
+    def __init__(self, state_path, gap_s=180.0, mono=time.monotonic, boot_id="auto"):
         self.path = state_path
         self.gap_s = float(gap_s)
+        self.mono = mono
+        self.boot_id = _boot_id() if boot_id == "auto" else boot_id
 
     def _load(self, now):
         try:
@@ -125,15 +145,37 @@ class BinanceLimiter:
             state = json.loads(text)
             if not isinstance(state, dict):
                 raise ValueError("state is not an object")
-            for k in ("last_request", "suspended_until"):
+            for k in ("last_request", "suspended_until", "last_request_mono",
+                      "suspended_until_mono"):
                 v = state.get(k)
-                if v is not None and not isinstance(v, (int, float)):
+                if v is not None and (isinstance(v, bool) or not isinstance(v, (int, float))):
                     raise ValueError("bad %s" % k)
-            return {"last_request": state.get("last_request"),
-                    "suspended_until": state.get("suspended_until")}, False
+            return {k: state.get(k) for k in STATE_KEYS}, False
         except ValueError:
-            return {"last_request": now,
-                    "suspended_until": now + SUSPEND_HOURS * 3600.0}, True
+            return {"last_request": now, "suspended_until": now + SUSPEND_HOURS * 3600.0,
+                    **self._mono_fields(None, SUSPEND_HOURS * 3600.0)}, True
+
+    def _mono_fields(self, gap_mono, suspend_s):
+        """Monotonic stamps for this boot (None when the boot is unknown)."""
+        if self.boot_id is None:
+            return {"boot_id": None, "last_request_mono": None, "suspended_until_mono": None}
+        m = self.mono()
+        return {"boot_id": self.boot_id, "last_request_mono": m if gap_mono else None,
+                "suspended_until_mono": m + suspend_s if suspend_s else None}
+
+    def _same_boot(self, s):
+        return self.boot_id is not None and s.get("boot_id") == self.boot_id
+
+    def _mono_suspended(self, s):
+        until = s.get("suspended_until_mono")
+        return self._same_boot(s) and until is not None and self.mono() < until
+
+    def _mono_too_soon(self, s):
+        last = s.get("last_request_mono")
+        if not self._same_boot(s) or last is None:
+            return False
+        elapsed = self.mono() - last
+        return 0 <= elapsed < self.gap_s   # negative: inconsistent stamp, wall rules apply
 
     def _write(self, state):
         tmp = self.path + ".tmp"
@@ -159,7 +201,7 @@ class BinanceLimiter:
     def try_acquire(self, now):
         def fn(s):
             until = s["suspended_until"]
-            if until is not None and now < until:
+            if (until is not None and now < until) or self._mono_suspended(s):
                 return False, None
             last = s["last_request"]
             if last is not None:
@@ -167,7 +209,11 @@ class BinanceLimiter:
                     return False, {**s, "last_request": now}
                 if now - last < self.gap_s:
                     return False, None
-            return True, {**s, "last_request": now}
+            if self._mono_too_soon(s):
+                return False, None
+            keep = s.get("suspended_until_mono") if self._same_boot(s) else None
+            return True, {**s, "last_request": now, **self._mono_fields(True, 0),
+                          "suspended_until_mono": keep}
         return self._update(now, fn)
 
     def suspend(self, now, hours=SUSPEND_HOURS):
@@ -175,11 +221,21 @@ class BinanceLimiter:
             until = now + hours * 3600.0
             if s["suspended_until"] is not None:
                 until = max(until, s["suspended_until"])
-            return None, {**s, "suspended_until": until}
+            stamps = self._mono_fields(False, hours * 3600.0)
+            if self._same_boot(s):
+                stamps["last_request_mono"] = s.get("last_request_mono")
+                if s.get("suspended_until_mono") is not None and stamps["suspended_until_mono"]:
+                    stamps["suspended_until_mono"] = max(stamps["suspended_until_mono"],
+                                                         s["suspended_until_mono"])
+            return None, {**s, "suspended_until": until, **stamps}
         self._update(now, fn)
 
     def suspended_until(self, now):
         def fn(s):
             until = s["suspended_until"]
-            return (until if until is not None and until > now else None), None
+            wall = until if until is not None and until > now else None
+            if self._mono_suspended(s):
+                mono_until = now + (s["suspended_until_mono"] - self.mono())
+                wall = max(wall or mono_until, mono_until)
+            return wall, None
         return self._update(now, fn)
