@@ -135,6 +135,18 @@ def test_compute_end_to_end_fixture(tmp_path):
     assert (tmp_path / "out" / ("report-%s.md" % DEL)).exists()
 
 
+def test_stored_break_even_results_resolve_exactly(tmp_path):
+    toks = ["T%02d" % i for i in range(20)]
+    m = manifest([DEL], [ev("binance:%d" % i, T1, t) for i, t in enumerate(toks)])
+    out = run(tmp_path, m, Market({(t + "USDT", exit4h(T1)): "99.71" for t in toks}))[DEL]
+    assert out["verdict"] == "FAIL" and out["primary"]["4h"]["median"] == 0.0
+    stored = json.loads((tmp_path / "out" / ("results-%s.json" % DEL)).read_text(encoding="utf-8"))
+    assert {e["horizons"]["4h"]["net"] for e in stored["events"]} == {"0"}
+    assert {e["horizons"]["30m"]["net"] for e in stored["events"]} == {"-29/10000"}
+    assert isinstance(stored["primary"]["4h"]["median"], float) and isinstance(stored["coverage"], float)
+    assert stored["verdict"] == "FAIL" and rp.resolution(stored)["verdict"] == "FAIL"
+
+
 def test_upbit_manifest_yields_long_and_fade_from_same_rows(tmp_path):
     m = manifest([LONG, FADE], [ev("upbit:1", T1, "TST", kind="krw_addition", spot="TSTUSDT"),
                                 ev("upbit:2", T2, "SPT", kind="krw_addition", hl="ineligible",

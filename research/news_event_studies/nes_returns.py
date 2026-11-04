@@ -1,12 +1,15 @@
 """Part C Phase 2 returns, criteria and verdict (#229). Pure functions (O2-O4, O13-O15).
 
 Series rows: candle open ms -> [open, high, low, close] as the CSV strings. The leak test
-uses Decimal on those strings; returns use float.
+uses Decimal on those strings. Returns, announcement means, medians, the concentration share
+and every verdict comparison are exact Fractions built from those strings and from the frozen
+constants as written; only reports convert them to float. The MAE stays float (descriptive).
 """
 import math
 import random
 import statistics
 from decimal import Decimal
+from fractions import Fraction
 
 import nes_util as nu
 
@@ -28,6 +31,11 @@ BOOT_N = 10_000
 BOOT_SEED = 229
 
 _STRENGTH = {"unresolved": 3, "missing": 2, "halted": 1, "ok": 0}   # O4, strongest first
+
+
+def _q(constant):
+    """A frozen constant as the exact decimal it is written as: 4.5 -> 9/2, 0.6 -> 3/5."""
+    return Fraction(str(constant))
 
 
 def _floor(ms):
@@ -64,15 +72,19 @@ def exit_at(rows, scheduled_ms, absent_dates=()):
 
 
 def _cost(venue, slip_bps):
-    return 2 * (FEE_BPS[venue] + slip_bps) / 10_000
+    return 2 * (_q(FEE_BPS[venue]) + _q(slip_bps)) / 10_000
 
 
 def _sign(direction):
     return {"long": 1, "short": -1}[direction]
 
 
+def _ratio(later, earlier):
+    return Fraction(later) / Fraction(earlier) - 1
+
+
 def net(entry, exit, direction, venue, slip_bps):
-    return _sign(direction) * (float(exit) / float(entry) - 1) - _cost(venue, slip_bps)
+    return _sign(direction) * _ratio(exit, entry) - _cost(venue, slip_bps)
 
 
 def mae_short(rows, entry_ms, exit_candle_ms, entry):
@@ -91,14 +103,14 @@ def _horizons(rows, absent, btc_rows, start_ms, entry, direction, venue, with_pa
         status, px, k = exit_at(rows, start_ms + dt, absent)
         item = {"exit_status": status, "gross": None, "net": None, "net_stress": None,
                 "btc_adj_net": None, "mae": None}
-        if px is not None:
-            raw = float(px) / float(entry) - 1
+        if px is not None and entry is not None:
+            raw = _ratio(px, entry)
             item.update(gross=_sign(direction) * raw, net=net(entry, px, direction, venue, SLIP_BPS),
                         net_stress=net(entry, px, direction, venue, STRESS_SLIP_BPS))
             if with_paths:
                 b0, b1 = price_at(btc_rows, start_ms), btc_rows.get(k, [None] * 4)[3]
                 if b0 is not None and b1 is not None:
-                    item["btc_adj_net"] = (_sign(direction) * (raw - (float(b1) / float(b0) - 1))
+                    item["btc_adj_net"] = (_sign(direction) * (raw - _ratio(b1, b0))
                                            - _cost(venue, SLIP_BPS))
                 if direction == "short":
                     item["mae"] = mae_short(rows, start_ms, k, entry)
@@ -115,14 +127,14 @@ def evaluate(event, series, btc_series, direction, venue):
     leak = leaked(rows, t0)
     start = t0 + ENTRY_OFFSET_MS
     entry = price_at(rows, start)
-    if entry is None:
-        return {**base, "status": "missing", "leaked": leak, "horizons": {}, "t60": {}}
+    # Exit statuses do not depend on the entry candle; with no entry they carry no returns.
     horizons = _horizons(rows, absent, btc_series["rows"], start, entry, direction, venue, True)
-    statuses = [h["exit_status"] for h in horizons.values()] + (["missing"] if leak is None else [])
-    status = max(statuses, key=_STRENGTH.get)     # a missing leak candle never hides unresolved
+    statuses = [h["exit_status"] for h in horizons.values()]
+    statuses += ["missing"] if leak is None or entry is None else []
+    status = max(statuses, key=_STRENGTH.get)     # O4: a missing leak or entry candle never hides unresolved
     t60 = {}
     entry60 = price_at(rows, t0 + T60_OFFSET_MS)
-    if entry60 is not None:
+    if entry is not None and entry60 is not None:
         t60 = {h: v["net"] for h, v in _horizons(rows, absent, btc_series["rows"], t0 + T60_OFFSET_MS,
                                                   entry60, direction, venue, False).items()}
     return {**base, "status": status, "leaked": leak, "horizons": horizons, "t60": t60}
@@ -140,7 +152,7 @@ def announcements(results, horizon, include_leaked=False, key="net"):
         v = r["horizons"].get(horizon, {}).get(key)
         if v is None:
             continue
-        groups.setdefault((r["t0_ms"], r["announcement_id"]), []).append(v)
+        groups.setdefault((r["t0_ms"], r["announcement_id"]), []).append(Fraction(v))  # str when stored
     return [(t0, aid, sum(vs) / len(vs)) for (t0, aid), vs in sorted(groups.items())]
 
 
@@ -155,13 +167,13 @@ def criteria(anns):
     half = n // 2
     halves = [_median(values[:half]), _median(values[half:])]
     total = sum(values)
-    top = sum(sorted(values, reverse=True)[:math.ceil(n / 10)]) if n else 0.0
+    top = sum(sorted(values, reverse=True)[:math.ceil(n / 10)]) if n else 0
     share = top / total if total > 0 else None
     med = _median(values)
     return {"n": n, "median": med, "half_medians": halves, "sum": total, "top_decile_share": share,
             "passes": {"n": n >= MIN_ANN, "median": med is not None and med > 0,
                        "halves": all(m is not None and m > 0 for m in halves),
-                       "concentration": share is not None and share < TOP_DECILE_LT}}
+                       "concentration": share is not None and share < _q(TOP_DECILE_LT)}}
 
 
 def coverage(counts, results):
@@ -170,7 +182,7 @@ def coverage(counts, results):
     shortfall = counts["harvest_shortfall"]
     num = counts["unknown"] + counts["missing"] + phase2 + shortfall
     den = counts["candidates"] + counts["unknown"] + counts["missing"] + shortfall
-    return num / den if den else 1.0
+    return Fraction(num, den) if den else Fraction(1)
 
 
 def verdict(counts, results):
@@ -183,7 +195,7 @@ def verdict(counts, results):
         reasons.append("%d unresolved post-entry event(s)" % unresolved)
         verdicts.append("INCONCLUSIVE")
     cov = coverage(counts, results)
-    if cov > COVERAGE_GT:
+    if cov > _q(COVERAGE_GT):
         reasons.append("coverage %.4f > %s" % (cov, COVERAGE_GT))
         verdicts.append("INCONCLUSIVE-by-data")
     c = criteria(announcements(results, PRIMARY))

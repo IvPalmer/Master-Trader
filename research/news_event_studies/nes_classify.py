@@ -16,6 +16,14 @@ END_MARKERS = ("거래지원 종료", "상장폐지", "상장 폐지")
 END_NEGATIONS = ("연기", "철회", "취소")
 START_HEADERS = ("거래지원 개시 시점", "거래 지원 개시 시점")
 START_LINES = ("거래지원 개시", "거래 지원 개시", "거래 오픈")
+# A start declaration: a start keyword in label form, `거래지원 개시 시점: ...` or `거래 오픈 : ...`.
+_DECLARATION = re.compile("(?:%s)(?:\\s*시점)?\\s*[:：]" % "|".join(map(re.escape, START_LINES)))
+# A start declared as not yet set (`거래지원 개시 시점은 추후 ... 안내`). On the harvested corpus
+# (text only) it matched exactly the 8 TBD lines and none of the 785 other keyword lines.
+TBD = re.compile(r"(거래\s?지원 개시|거래 오픈)\s*(시점|일정)?\s*(은|는|[:：])[^.]{0,80}?"
+                 r"(추후|미정|별도 공지|추가 안내|추가로 안내)")
+# Particles a Korean token name may carry and still name the token (스택스의 ...).
+_PARTICLES = ("에서", "으로", "부터", "의", "은", "는", "이", "가", "을", "를", "도", "에", "와", "과", "만", "로")
 
 KST = timezone(timedelta(hours=9))
 _TICKER = re.compile(r"[A-Z0-9]{1,15}")
@@ -265,8 +273,38 @@ def _token_in(text, token):
     return re.search(r"(?<![A-Z0-9])" + re.escape(token) + r"(?![A-Z0-9])", text) is not None
 
 
-def upbit_trading_start_ms(body, token, t0_ms):
-    """The KST trading start stated for `token`, as UTC ms; None when unknown (O10)."""
+def _upbit_names(title):
+    """Each token of an Upbit title with the Korean names it is written with:
+    `에이(AAA), 비(BBB) ...` -> {AAA: [에이], BBB: [비]}; `(이오스 EOS)` -> {EOS: [이오스]}."""
+    names = {t: [] for t in _upbit_tokens(title) or ()}
+    pairs = re.findall(r"([^\s(),\[\]][^(),\[\]]*?)\s*\(([A-Z0-9]{1,15})\)", title)
+    for group in re.findall(r"\(([^()]*)\)", title):
+        pairs += [m.groups() for m in (re.fullmatch(r"\s*(\S.*?)\s+([A-Z0-9]{1,15})\s*", item)
+                                       for item in group.split(",")) if m]
+    for name, tok in pairs:
+        if tok in names and not _is_ticker(name.strip()):
+            names[tok].append(name.strip())
+    return names
+
+
+def _names_token(text, token, names):
+    """The ticker as a whole word, or a Korean name of the title ending at a word boundary or
+    in one particle (스택스의); 비 is not named by 비트코인 or 서비스."""
+    tail = r"(?:%s)?(?![가-힣A-Za-z0-9])" % "|".join(_PARTICLES)
+    return _token_in(text, token) or any(
+        re.search(r"(?<![가-힣A-Za-z0-9])" + re.escape(n) + tail, text) for n in names)
+
+
+def upbit_trading_start_ms(body, token, t0_ms, title=""):
+    """The KST trading start stated for `token`, as UTC ms; None when unknown (O10).
+
+    `title` is the notice title; its tokens and their Korean names (O8) attribute the lines.
+    Outside a table, a single-token notice reads every start line, as on main, except that a
+    TBD line with no dated label line gives None. A multi-token notice reads declarations
+    (a start keyword in label form, or a TBD line, which states no time) and fails closed:
+    if any declaration names a token, each token's start is the one time every declaration
+    naming it states; if none does, the same check runs over all declarations; no
+    declaration, one without a parseable time, or two times give None."""
     body = body or ""
     parser = _TableParser()
     parser.feed(body)
@@ -287,7 +325,24 @@ def upbit_trading_start_ms(body, token, t0_ms):
         return _single(found)
     text = re.sub(r"<br\s*/?>|</(?:p|div|li|tr|h\d|table)>", "\n", body, flags=re.I)
     text = html.unescape(re.sub(r"<[^>]+>", " ", text))
-    for line in text.splitlines():
-        if any(k in line for k in START_LINES):
-            found |= _starts_in(line, t0_ms)
-    return _single(found)
+    names = _upbit_names(title)
+    names.setdefault(token, [])
+    lines = text.splitlines()
+    if len(names) == 1:
+        dated_label = False
+        for line in lines:
+            if any(k in line for k in START_LINES):
+                times = _starts_in(line, t0_ms)
+                found |= times
+                dated_label = dated_label or bool(times and _DECLARATION.search(line))
+        if not dated_label and any(TBD.search(line) for line in lines):
+            return None
+        return _single(found)
+    declared = [(line, {t for t, ns in names.items() if _names_token(line, t, ns)})
+                for line in lines if _DECLARATION.search(line) or TBD.search(line)]
+    if any(scope for _, scope in declared):
+        declared = [(line, scope) for line, scope in declared if token in scope]
+    times = [set() if TBD.search(line) else _starts_in(line, t0_ms) for line, _ in declared]
+    if not times or not all(times):
+        return None                      # no declaration, or one with no parseable time
+    return _single(set().union(*times))

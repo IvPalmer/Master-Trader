@@ -121,6 +121,170 @@ def test_upbit_trading_start_table_without_token_ignores_lines():
     assert nc.upbit_trading_start_ms(body, "BBB", 1709294430000) is None
 
 
+AB_TITLE = "에이(AAA), 비(BBB) KRW 마켓 디지털 자산 추가"
+AB_T0 = 1709294430000               # 2024-03-01 21:00:30 KST
+AT_20 = 1709290800000               # 2024-03-01 20:00 KST, before t0
+
+
+def test_upbit_start_lines_do_not_borrow_another_tokens_time():
+    body = "AAA 거래지원 개시 시점: 2024-03-01 20:00\nBBB 거래지원 개시 시점: 추후 공지"
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, AB_TITLE) == AT_20
+    assert nc.upbit_trading_start_ms(body, "BBB", AB_T0, AB_TITLE) is None       # no parseable start
+    # A token-less start line next to token-specific ones has no clear scope: it is not borrowed.
+    body += "\n거래지원 개시 시점: 2024-03-01 21:30"
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, AB_TITLE) == AT_20
+    assert nc.upbit_trading_start_ms(body, "BBB", AB_T0, AB_TITLE) is None
+
+
+def test_upbit_korean_start_lines_do_not_borrow_time():
+    body = "에이 거래지원 개시 시점: 2024-03-01 20:00\n비 거래지원 개시 시점: 추후 공지"
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, AB_TITLE) == AT_20
+    assert nc.upbit_trading_start_ms(body, "BBB", AB_T0, AB_TITLE) is None
+    # A name inside a longer word is not that token: "서비스" does not name 비.
+    body = "에이 거래지원 개시 시점: 2024-03-01 20:00\n입출금 서비스 거래지원 개시 시점: 2024-03-01 21:30"
+    assert nc.upbit_trading_start_ms(body, "BBB", AB_T0, AB_TITLE) is None
+    # The "(name TICKER)" title form gives a name too.
+    body = "이오스 거래지원 개시 시점: 2024-03-01 20:00\n에이 거래지원 개시 시점: 추후 공지"
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, "원화 마켓 신규 상장 (이오스 EOS, 에이 AAA)") is None
+    assert nc.upbit_trading_start_ms(body, "EOS", AB_T0, "원화 마켓 신규 상장 (이오스 EOS, 에이 AAA)") == AT_20
+
+
+@pytest.mark.parametrize("body", [
+    "<h3>AAA</h3><p>거래지원 개시 시점: 2024-03-01 20:00</p>\n<h3>BBB</h3><p>거래지원 개시 시점: 추후 공지</p>",
+    "<p><strong>에이(AAA)</strong></p><p>거래지원 개시 시점: 2024-03-01 20:00</p>"
+    "<p><strong>비(BBB)</strong></p><p>거래지원 개시 시점: 추후 공지</p>",
+    "디지털 자산: 에이(AAA)\n거래지원 개시 시점: 2024-03-01 20:00\n"
+    "디지털 자산: 비(BBB)\n거래지원 개시 시점: 추후 공지",
+    "<p>AAA 안내<h3>BBB</h3>거래지원 개시 시점: 추후 공지</p>"
+    "<h3>AAA</h3><p>거래지원 개시 시점: 2024-03-01 20:00</p>",
+])
+def test_upbit_token_headings_do_not_borrow_time(body):
+    # Headings and labels do not scope a start line (round 3): the declarations name no token
+    # and one is not parseable, so neither token has a stated start. Fail closed.
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, AB_TITLE) is None
+    assert nc.upbit_trading_start_ms(body, "BBB", AB_T0, AB_TITLE) is None
+
+
+AT_2130 = 1709296200000             # 2024-03-01 21:30 KST
+
+
+def test_upbit_table_without_start_column_then_shared_line():
+    body = ("<table><tr><th>디지털 자산/마켓</th></tr><tr><td>AAA/KRW</td></tr><tr><td>BBB/KRW</td></tr>"
+            "</table>\n<p>거래지원 개시 시점: 2024-03-01 21:30</p>")
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) == AT_2130
+
+
+def test_upbit_common_section_shared_start():
+    body = ("<h3>AAA</h3><p>AAA 입출금 안내</p><h3>BBB</h3><p>BBB 입출금 안내</p>"
+            "<h3>공통 안내</h3><p>거래지원 개시 시점: 2024-03-01 21:30</p>")
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) == AT_2130
+
+
+def test_upbit_dateless_caveat_keeps_shared_start():
+    body = ("<p>거래지원 개시 시점: 2024-03-01 21:30</p><h3>에이(AAA)</h3><p>입출금 안내</p>"
+            "<p>* 거래지원 개시 시점이 연기될 수 있습니다.</p>")
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) == AT_2130
+
+
+@pytest.mark.parametrize("extra,expected", [("거래 오픈: 2024-03-01 21:30", AT_2130),
+                                            ("거래 오픈: 2024-03-01 22:00", None),
+                                            ("거래 오픈: 추후 공지", None)])
+def test_upbit_tokenless_declarations_must_agree(extra, expected):
+    body = "거래지원 개시 시점: 2024-03-01 21:30\n" + extra
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) == expected
+
+
+def test_upbit_korean_particles_name_the_token():
+    title = "스택스(STX), 플로우(FLOW) KRW 마켓 디지털 자산 추가"
+    body = "스택스의 거래지원 개시 시점: 2024-03-01 20:00\n플로우의 거래지원 개시 시점: 추후 공지"
+    assert nc.upbit_trading_start_ms(body, "STX", AB_T0, title) == AT_20
+    assert nc.upbit_trading_start_ms(body, "FLOW", AB_T0, title) is None
+    body = "스택스는 거래지원 개시 시점: 2024-03-01 20:00\n플로우에서 거래 오픈: 2024-03-01 21:30"
+    assert nc.upbit_trading_start_ms(body, "FLOW", AB_T0, title) == AT_2130
+
+
+def test_upbit_name_prefix_of_other_word_does_not_match():
+    # 비 (BBB) is not named by 비트코인: with no declaration naming a token, the line is shared.
+    body = "비트코인 마켓 거래지원 개시 시점: 2024-03-01 21:30"
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, AB_TITLE) == AT_2130
+    assert nc.upbit_trading_start_ms(body, "BBB", AB_T0, AB_TITLE) == AT_2130
+    body = "에이 거래지원 개시 시점: 2024-03-01 20:00\n비트코인 거래지원 개시 시점: 2024-03-01 21:30"
+    assert nc.upbit_trading_start_ms(body, "BBB", AB_T0, AB_TITLE) is None
+
+
+def test_upbit_single_token_notice_reads_every_start_line():
+    body = "거래지원 개시 시점: 2024-03-01 20:00\n에이(AAA) 안내\n거래 오픈: 2024-03-01 21:30"
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, "에이(AAA) KRW 마켓 디지털 자산 추가") is None
+    body = "거래지원 개시 시점: 2024-03-01 20:00\n에이(AAA) 안내"
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, "에이(AAA) KRW 마켓 디지털 자산 추가") == AT_20
+
+
+def test_upbit_tbd_sentence_blocks_shared_fallback():
+    body = ("<h3>AAA</h3><p>거래지원 개시 시점: 2024-03-01 20:00</p>"
+            "<h3>BBB</h3><p>거래지원 개시 시점은 추후 공지 예정입니다.</p>")
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) is None
+
+
+def test_upbit_named_tbd_declaration_fails_closed():
+    body = ("AAA 거래지원 개시 시점: 2024-03-01 20:00\nAAA 거래 오픈: 추후 공지\n"
+            "BBB 거래지원 개시 시점: 추후 공지")
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) is None
+    body = "AAA 거래지원 개시 시점: 2024-03-01 20:00\nAAA 거래지원 개시 시점은 추후 안내 예정입니다."
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, AB_TITLE) is None
+
+
+CAVEATS = ("* 입출금 서비스 개시 이후, 일정 수준의 유동성을 확보하지 못하는 경우 거래지원 개시 시점이 연기될 수 있습니다.",
+           "- 최저 매도가 제한 : … 거래지원 개시 시점 전에 본 공지사항을 통해 안내드리겠습니다.",
+           "…거래지원 개시 시점까지…")
+
+
+def test_upbit_caveats_are_not_tbd():
+    body = "\n".join(("거래지원 개시 시점: 2024-03-01 21:30",) + CAVEATS)
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) == AT_2130
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, "에이(AAA) KRW 마켓 디지털 자산 추가") == AT_2130
+
+
+@pytest.mark.parametrize("line,tbd", [
+    ("9) **거래지원 개시 시점은 추후 본 공지사항을 통해 추가 안내드릴 예정입니다.**", True),
+    ("*AAA 거래지원 개시 시점은 투자자 보호를 위해 … 별도 공지사항을 통해 추가 안내드리도록 하겠습니다.", True),
+    ("거래지원 개시 일정은 추후 본 공지사항을 통해 추가로 안내드릴 예정입니다.", True),
+    ("- 연기된 거래지원 개시 시점 : 추후 안내 예정", True),
+    ("거래지원 개시 시점은 추후 공지 예정입니다.", True),
+    (CAVEATS[0], False), (CAVEATS[1], False), (CAVEATS[2], False),
+    ("거래지원 개시 시점 : 2024년 03월 01일 21:30", False),
+])
+def test_upbit_tbd_regex_on_corpus_forms(line, tbd):
+    assert (nc.TBD.search(line) is not None) is tbd
+
+
+def test_upbit_single_token_tbd_without_dated_label_is_none():
+    title = "에이(AAA) KRW 마켓 디지털 자산 추가"
+    body = "거래지원 개시 시점은 추후 안내 예정입니다.\n2024-03-01 20:00 이후 거래 오픈 예정"
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, title) is None
+    # Otherwise as on main: a dated label line beside a TBD sentence still gives its time.
+    body = "거래지원 개시 시점: 2024-03-01 20:00\n거래지원 개시 시점은 추후 안내 예정입니다."
+    assert nc.upbit_trading_start_ms(body, "AAA", AB_T0, title) == AT_20
+
+
+def test_upbit_shared_start_line_applies_to_every_token():
+    body = ("에이(AAA), 비(BBB) KRW 마켓 추가\n거래지원 개시 시점: 2024-03-01 21:30 KST\n"
+            "* 거래지원 개시 시점이 연기될 수 있습니다.")
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) == 1709296200000   # 21:30 KST
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0) == 1709296200000
+    # A single token-less start line with no token named anywhere is shared too.
+    body = "거래지원 개시 시점: 2024-03-01 21:30\n* 거래지원 개시 시점이 연기될 수 있습니다."
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, AB_T0, AB_TITLE) == 1709296200000
+
+
 def test_upbit_trading_start_year_nearest_t0():
     t0 = 1704036600000             # 2023-12-31T15:30Z = 2024-01-01 00:30 KST
     assert nc.upbit_trading_start_ms("거래지원 개시 시점: 12월 31일 23시 50분", "X", t0) == \

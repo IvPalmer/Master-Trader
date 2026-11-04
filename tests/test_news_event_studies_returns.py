@@ -4,6 +4,7 @@
 """
 import json
 import sys
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -117,6 +118,62 @@ def test_missing_leak_candle_does_not_hide_unresolved_exit():
     assert res["status"] == "unresolved"
     res = nr.evaluate(EVENT, series(full(om10=None)), series(full()), "short", "hyperliquid")
     assert res["status"] == "missing"
+
+
+def test_missing_entry_candle_does_not_hide_unresolved_exit():
+    # Entry candle absent, the +30 min and +4 h exits present, and no candle from the scheduled
+    # +24 h exit through its 72 h resumption window. O4: `unresolved` at any horizon beats `missing`.
+    r = full(o5=None, last=1444)
+    res = nr.evaluate(EVENT, series(r), series(full()), "short", "hyperliquid")
+    assert res["status"] == "unresolved"
+    assert [res["horizons"][h]["exit_status"] for h in ("30m", "4h", "24h")] == ["ok", "ok", "unresolved"]
+    assert all(res["horizons"][h]["net"] is None for h in nr.HORIZONS_MS)
+    res = nr.evaluate(EVENT, series(full(o5=None)), series(full()), "short", "hyperliquid")
+    assert res["status"] == "missing"
+    # Study level: any unresolved event makes the study INCONCLUSIVE, whatever the 20 others show.
+    passing = [_res("x%02d" % i, T0 + i, 0.01) for i in range(20)]
+    gone = nr.evaluate(EVENT, series(r), series(full()), "short", "hyperliquid")
+    assert nr.verdict(_counts(20), passing)[0] == "PASS"
+    got, reasons = nr.verdict(_counts(21), passing + [gone])
+    assert got == "INCONCLUSIVE" and "1 unresolved post-entry event(s)" in reasons
+
+
+def test_exact_break_even_cannot_pass():
+    # 100 -> 99.71 short on Hyperliquid: gross 0.0029 equals 2 x (4.5 + 10) bps, so net is exactly 0.
+    # "median net return > 0" fails, and concentration fails because the sum is not > 0.
+    r = full(o245="99.71")
+    results = [nr.evaluate({**EVENT, "announcement_id": "binance:%d" % i, "token": "T%d" % i},
+                           series(r), series(full()), "short", "hyperliquid") for i in range(20)]
+    assert all(e["horizons"]["4h"]["net"] == 0 for e in results)
+    c = nr.criteria(nr.announcements(results, "4h"))
+    assert c["n"] == 20 and c["median"] == 0 and c["half_medians"] == [0, 0] and c["sum"] == 0
+    assert c["passes"] == {"n": True, "median": False, "halves": False, "concentration": False}
+    got, reasons = nr.verdict(_counts(20), results)
+    assert got == "FAIL"
+    assert {"criterion failed: median", "criterion failed: halves",
+            "criterion failed: concentration"} <= set(reasons)
+    # The exact values survive storage as strings, so a recomputed resolution agrees.
+    stored = json.loads(json.dumps(results, default=str))
+    assert {e["horizons"]["4h"]["net"] for e in stored} == {"0"}
+    assert nr.verdict(_counts(20), stored)[0] == "FAIL"
+
+
+def test_net_is_exact_from_price_strings():
+    assert nr.net("100", "98", "long", "hyperliquid", 10) == Fraction("-0.0229")
+    assert nr.net("100", "99.71", "short", "hyperliquid", 10) == 0
+    assert nr.net("3", "1", "long", "binance_spot", 25) == Fraction(-2, 3) - Fraction("0.0065")
+    # A tenth, two tenths and minus three tenths average to exactly zero.
+    res = [_res("binance:1", T0, v) for v in ("1/10", "2/10", "-3/10")]
+    assert nr.announcements(res, "4h") == [(T0, "binance:1", 0)]
+
+
+@pytest.mark.parametrize("eps,passes", [(0, False), (Fraction(1, 10 ** 20), True)])
+def test_concentration_threshold_is_exact(eps, passes):
+    # Top decile (2 of 20) holds 60% - eps of a sum of 1: "less than 60%" is decided exactly,
+    # not against the binary float 0.6 (which is just below 3/5).
+    values = [(Fraction(3, 5) - eps) / 2] * 2 + [(Fraction(2, 5) + eps) / 18] * 18
+    c = nr.criteria([(T0 + i, "x%02d" % i, v) for i, v in enumerate(values)])
+    assert c["top_decile_share"] == Fraction(3, 5) - eps and c["passes"]["concentration"] is passes
 
 
 def test_mae_short_from_highs_none_on_gap():
