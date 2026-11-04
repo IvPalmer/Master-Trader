@@ -1,0 +1,25 @@
+{
+ "code": "0",
+ "msg": "",
+ "data": [
+  {
+   "details": [
+    {
+     "annType": "announcements-new-listings",
+     "title": "OKX to list TradFi perpetual futures for ADI, FLEX, MELI, PEP and UMC ",
+     "url": "https://www.okx.com/pt-br/help/okx-to-list-tradfi-perpetual-futures-for-adi-flex-meli-pep-and-umc",
+     "pTime": "1793611809261",
+     "businessPTime": "1793611800000"
+    },
+    {
+     "annType": "announcements-new-listings",
+     "title": "OKX to list TradFi perpetual futures for WUXIBIO, GIGADEV, PDD, BIDU, GILD and PFE",
+     "url": "https://www.okx.com/pt-br/help/okx-to-list-tradfi-perpetual-futures-for-wuxibio-gigadev-pdd-bidu-gild-and",
+     "pTime": "1793332810651",
+     "businessPTime": "1793331000000"
+    }
+   ],
+   "totalPage": "63"
+  }
+ ]
+}

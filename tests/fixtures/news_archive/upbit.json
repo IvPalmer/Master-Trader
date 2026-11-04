@@ -1,0 +1,30 @@
+{
+ "success": true,
+ "data": {
+  "total_pages": 41,
+  "total_count": 806,
+  "notices": [
+   {
+    "listed_at": "2026-10-27T16:30:00+09:00",
+    "first_listed_at": "2026-10-27T16:30:00+09:00",
+    "id": 6714,
+    "uuid": "567352085",
+    "title": "닐리온(NIL) KRW 마켓 디지털 자산 추가",
+    "category": "거래",
+    "need_new_badge": false,
+    "need_update_badge": false
+   },
+   {
+    "listed_at": "2026-10-21T21:50:00+09:00",
+    "first_listed_at": "2026-10-21T20:00:00+09:00",
+    "id": 6687,
+    "uuid": "1673103094",
+    "title": "액시스로보틱스(AXIS) 신규 거래지원 안내 (KRW, BTC, USDT 마켓) (매도 최저가 기준 가격 안내)",
+    "category": "거래",
+    "need_new_badge": false,
+    "need_update_badge": false
+   }
+  ],
+  "fixed_notices": []
+ }
+}
