@@ -111,6 +111,15 @@ The full rule text is the O1–O17 list in Task 1. These are the calls worth che
 - **C11: catalog-48 overlap.** Any catalog-48 title naming the token within ±24 h, inclusive.
 - **C12: transient units, not `systemd-run --scope`.** VPS jobs run as transient user units with the §6.2 limits, because a scope dies with the SSH session.
 
+### Changes made in the prereg PR (#237), before any data run
+
+The probes and the Codex review of #237 changed four rules. The frozen O-text in `ft_userdata/preregistrations.json` is authoritative; the tasks below are read with these changes.
+
+- **O5 (probe f):** for a name absent from today's `meta`, Hyperliquid answers HTTP 500 with body `null`. `hl_facts` reads exactly that as "no records" (`never_in_meta`), for such a name only. Any other failure raises `VenueAborted`.
+- **O7 (supersedes C10's "else missing"):** when no candidate has files from date(t0−1 d) to date(t0+2 d), `binance_facts` falls back to the first candidate with files for date(t0−1 d) and date(t0). Its post-entry gaps go through O4, so a series that ends after entry is `unresolved`, never `missing`. The proxy records which tier chose it.
+- **O4 (narrows C7):** a missing exit candle still takes the halt rule. The exception is a scheduled exit whose UTC-day file is absent (404) while a later day's file exists: that is an archive hole, and the event is `missing`. Event status, strongest first: `unresolved`, `missing`, `halted`, `ok`. So `exit_at` takes the series' `absent_dates`.
+- **O10 (Task 4 interface):** the probe's body states the start in a table cell (`10월 27일 16시 40분 예정`), with no year. The parser becomes `upbit_trading_start_ms(body, token, t0_ms)`. It reads the token's row of the `거래지원 개시 시점` column, else a matching line. It accepts `HH:MM` and `H시 M분`, and takes the year nearest t0; a tie is `None`.
+
 ---
 
 ### Task 1: Preregistration PR

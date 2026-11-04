@@ -6,6 +6,7 @@ verbatim rule strings really are spec text.
 
     python3 -m pytest tests/test_news_event_studies_prereg.py -q
 """
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -77,9 +78,57 @@ def test_frozen_study_blocks():
         assert not extra, (i, extra)
 
 
-def test_hl_evidence_identical_and_known():
-    values = {e["frozen"]["hl_evidence"] for e in entries().values()}
-    assert len(values) == 1 and values <= {"fundingHistory", "candleSnapshot_1h"}
+def test_hl_evidence_is_funding_history():   # C1 option A, spec §11 call 14
+    assert {e["frozen"]["hl_evidence"] for e in entries().values()} == {"fundingHistory"}
+
+
+# sha256 of the O1–O17 list as merged in #237 (canonical JSON). Any edit is an amendment.
+O_SHA256 = "4ac7be47a7d37fe9b69c5b0b18679fbd83396546ba288127f21e98988b8f1c71"
+
+
+def _canon_sha(obj):
+    blob = json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def test_operationalization_o1_to_o17_pinned():
+    for i, e in entries().items():
+        ops = e["operationalization"]
+        assert [s.split(" ", 1)[0] for s in ops] == ["O%d" % n for n in range(1, 18)], i
+        assert _canon_sha(ops) == O_SHA256, i
+
+
+def _spec_bullets(start, end):
+    lines = SPEC.read_text(encoding="utf-8").splitlines()
+    a = next(n for n, l in enumerate(lines) if start in l)
+    b = next(n for n, l in enumerate(lines) if n > a and end in l)
+    return [l for l in lines[a + 1:b] if re.match(r"^\s*- ", l)]
+
+
+def _clean(line):
+    return re.sub(r"^\s*- ", "", line).strip().replace("**", "")
+
+
+OWN_VENUE = {IDS[0]: "Delisting study (short)", IDS[1]: "Upbit study (long)",
+             IDS[2]: "Upbit fade (short)"}
+OTHER_EVENTS = {IDS[0]: "Events, both Upbit studies", IDS[1]: "Events, delisting study",
+                IDS[2]: "Events, delisting study"}
+
+
+def test_rules_verbatim_complete():
+    phase2 = [_clean(l) for l in _spec_bullets("**Phase 2 — returns", "## 7. Step 0")]
+    for i, e in entries().items():
+        expected, skipping, in_venues = [], False, False
+        for l in _spec_bullets("**Phase 1 — manifest", "**Phase 2 — returns"):
+            top = l.startswith("- ")
+            if top:
+                skipping = OTHER_EVENTS[i] in l
+                in_venues = "Execution venues" in l
+            if skipping or (in_venues and not top and OWN_VENUE[i] not in l):
+                continue
+            expected.append(_clean(l))
+        assert e["rules_verbatim"]["phase1"] == expected, i
+        assert e["rules_verbatim"]["phase2"] == phase2, i
 
 
 def _norm(s):
