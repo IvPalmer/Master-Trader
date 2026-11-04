@@ -827,7 +827,7 @@
       "registered": "2026-11-04",
       "review_by": "2027-02-01",
       "issue": "#229",
-      "spec": "docs/superpowers/specs/2026-11-03-news-archive-design.md §6 @980236a, with §6.2 Hyperliquid eligibility amended by #PRNUM (C1 option A, §11 call 14)",
+      "spec": "docs/superpowers/specs/2026-11-03-news-archive-design.md §6 @980236a, with §6.2 Hyperliquid eligibility amended by #237 (C1 option A, §11 call 14)",
       "hypothesis": "Negative, forced-selling event. The research's per-coin \"hard event\" class.",
       "frozen": {
         "window_utc": [
@@ -1017,7 +1017,7 @@
       "registered": "2026-11-04",
       "review_by": "2027-02-01",
       "issue": "#229",
-      "spec": "docs/superpowers/specs/2026-11-03-news-archive-design.md §6 @980236a, with §6.2 Hyperliquid eligibility amended by #PRNUM (C1 option A, §11 call 14)",
+      "spec": "docs/superpowers/specs/2026-11-03-news-archive-design.md §6 @980236a, with §6.2 Hyperliquid eligibility amended by #237 (C1 option A, §11 call 14)",
       "hypothesis": "The Korean demand shock, an event source separate from Binance's own announcements.",
       "frozen": {
         "window_utc": [
@@ -1201,7 +1201,7 @@
       "registered": "2026-11-04",
       "review_by": "2027-02-01",
       "issue": "#229",
-      "spec": "docs/superpowers/specs/2026-11-03-news-archive-design.md §6 @980236a, with §6.2 Hyperliquid eligibility amended by #PRNUM (C1 option A, §11 call 14)",
+      "spec": "docs/superpowers/specs/2026-11-03-news-archive-design.md §6 @980236a, with §6.2 Hyperliquid eligibility amended by #237 (C1 option A, §11 call 14)",
       "hypothesis": "The demand shock overshoots and fades after the pump. Generated on data from before this window (below).",
       "frozen": {
         "window_utc": [
