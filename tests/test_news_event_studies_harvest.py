@@ -281,3 +281,156 @@ def test_time_helpers():
     assert nes_util.ms_from_iso("2024-03-01T21:00:30.123+09:00") == 1709294430123
     assert nes_util.utc_date(1709337599999) == "2024-03-01"
     assert nes_util.WINDOW_END_MS - nes_util.WINDOW_START_MS == 1400 * nes_util.DAY_MS
+
+
+# ---- Upbit (operator's Mac) ---------------------------------------------------------
+
+def upbit_notice(nid, first_listed_at, title="테스트(TST) KRW 마켓 디지털 자산 추가"):
+    return {"listed_at": first_listed_at, "first_listed_at": first_listed_at, "id": nid,
+            "uuid": str(nid), "title": title, "category": "거래",
+            "need_new_badge": False, "need_update_badge": False}
+
+
+class FakeUpbit:
+    """Serves the Upbit trade list (20 per page, newest first) and notice details."""
+
+    def __init__(self, clock, notices, fixed=None, total_count=None):
+        self.clock, self.notices, self.fixed = clock, notices, fixed or []
+        self.total_count = total_count
+        self.calls = []        # (wall, "list", page) or (wall, "detail", id)
+        self.overrides = {}
+
+    def __call__(self, req):
+        assert req.method == "GET"
+        i = len(self.calls)
+        u = urlparse(req.url)
+        if u.path.rstrip("/").endswith("/announcements"):
+            q = parse_qs(u.query)
+            assert q["category"] == ["trade"] and q["per_page"] == ["20"]
+            page = int(q["page"][0])
+            self.calls.append((self.clock.wall(), "list", page))
+            j = json.loads((FIX / "upbit_list_page.json").read_text(encoding="utf-8"))
+            n = len(self.notices)
+            j["data"].update(notices=self.notices[(page - 1) * 20:page * 20],
+                             fixed_notices=self.fixed,
+                             total_count=n if self.total_count is None else self.total_count,
+                             total_pages=max(1, -(-n // 20)))
+        else:
+            nid = int(u.path.rstrip("/").rsplit("/", 1)[1])
+            self.calls.append((self.clock.wall(), "detail", nid))
+            j = json.loads((FIX / "upbit_detail.json").read_text(encoding="utf-8"))
+            n = next(x for x in self.notices if x["id"] == nid)
+            j["data"].update(id=nid, title=n["title"], first_listed_at=n["first_listed_at"],
+                             listed_at=n["listed_at"])
+        if i in self.overrides:
+            return self.overrides[i]
+        return Response(200, json.dumps(j, ensure_ascii=False).encode(), {})
+
+
+def upbit_harvester(tmp_path, fake, clock):
+    out = tmp_path / "upbit"
+    return nes_harvest.UpbitHarvester(fake, clock.wall, clock.sleep, out, "test-host"), out
+
+
+WIN = (nes_util.WINDOW_START_MS - nes_util.DAY_MS, nes_util.WINDOW_END_MS + nes_util.DAY_MS)
+
+
+def test_upbit_pages_spaced_10s_then_closing(tmp_path):
+    clock = Clock()
+    notices = [upbit_notice(5000 - i, "2024-03-01T21:00:00+09:00") for i in range(45)]
+    fake = FakeUpbit(clock, notices)
+    h, out = upbit_harvester(tmp_path, fake, clock)
+    res = h.run(*WIN)
+    lists = [p for _, kind, p in fake.calls if kind == "list"]
+    assert lists == [1, 2, 3, 1]
+    assert [k for _, k, _ in fake.calls[:4]] == ["list"] * 4      # list first, then details
+    times = [t for t, _, _ in fake.calls]
+    assert all(b - a >= nes_harvest.UPBIT_GAP_S for a, b in zip(times, times[1:]))
+    assert res["list"]["shortfall"] == 0 and res["list"]["unique"] == 45
+    assert sorted(p.name for p in (out / "list").iterdir()) == [
+        "closing.json", "page-01.json", "page-02.json", "page-03.json"]
+
+
+def test_upbit_block_stops_after_one_request_no_retry(tmp_path):
+    clock = Clock()
+    fake = FakeUpbit(clock, [upbit_notice(1, "2024-03-01T21:00:00+09:00")])
+    fake.overrides[0] = Response(429, b"error code: 1015", {})
+    h, out = upbit_harvester(tmp_path, fake, clock)
+    with pytest.raises(nes_harvest.HarvestBlocked):
+        h.run(*WIN)
+    assert len(fake.calls) == 1
+    meta = json.loads((out / "harvest_meta.json").read_text())
+    assert meta["blocked"]
+
+
+def test_upbit_error_stops_without_retry(tmp_path):
+    clock = Clock()
+    fake = FakeUpbit(clock, [upbit_notice(1, "2024-03-01T21:00:00+09:00")])
+    fake.overrides[1] = Response(500, b'{"success":false}', {})
+    h, out = upbit_harvester(tmp_path, fake, clock)
+    with pytest.raises(nes_harvest.HarvestBlocked):
+        h.run(*WIN)
+    assert len(fake.calls) == 2
+    assert json.loads((out / "harvest_meta.json").read_text())["blocked"].startswith("error")
+
+
+def test_upbit_details_only_inside_window_margin(tmp_path):
+    clock = Clock()
+    notices = [upbit_notice(4, "2026-11-02T09:00:00+09:00"),     # 2026-11-02T00:00Z no
+               upbit_notice(3, "2026-11-02T08:59:00+09:00"),     # 2026-11-01T23:59Z yes
+               upbit_notice(2, "2022-12-31T09:00:00+09:00"),     # 2022-12-31T00:00Z yes
+               upbit_notice(1, "2022-12-31T08:59:00+09:00")]     # 2022-12-30T23:59Z no
+    fake = FakeUpbit(clock, notices)
+    h, out = upbit_harvester(tmp_path, fake, clock)
+    res = h.run(*WIN)
+    assert sorted(n for _, k, n in fake.calls if k == "detail") == [2, 3]
+    assert sorted(res["detail_ids"]) == ["2", "3"]
+    assert sorted(p.name for p in (out / "detail").iterdir()) == ["2.json", "3.json"]
+
+
+def test_upbit_meta_has_host_label_and_hashes(tmp_path):
+    clock = Clock()
+    fake = FakeUpbit(clock, [upbit_notice(7, "2024-03-01T21:00:00+09:00")])
+    h, out = upbit_harvester(tmp_path, fake, clock)
+    h.run(*WIN)
+    meta = json.loads((out / "harvest_meta.json").read_text())
+    assert meta["host_label"] == "test-host"
+    assert meta["started_at"] and meta["finished_at"] and meta["blocked"] is None
+    assert set(meta["files"]) == {"list/page-01.json", "list/closing.json", "detail/7.json"}
+    for rel, sha in meta["files"].items():
+        assert sha == nes_util.sha256_file(out / rel)
+
+
+def test_upbit_completeness_ignores_fixed_notices(tmp_path):
+    clock = Clock()
+    notices = [upbit_notice(10 + i, "2024-03-01T21:00:00+09:00") for i in range(3)]
+    fake = FakeUpbit(clock, notices, fixed=[upbit_notice(99, "2023-06-01T09:00:00+09:00")],
+                     total_count=4)
+    h, _ = upbit_harvester(tmp_path, fake, clock)
+    res = h.run(*WIN)
+    assert res["list"] == {"unique": 3, "total": 4, "total_reported": True, "shortfall": 1}
+    assert 99 not in [n for _, k, n in fake.calls if k == "detail"]
+
+
+def test_upbit_resume_skips_saved_files(tmp_path):
+    clock = Clock()
+    notices = [upbit_notice(20 + i, "2024-03-01T21:00:00+09:00") for i in range(3)]
+    fake = FakeUpbit(clock, notices)
+    fake.overrides[3] = Response(403, b"<html>Attention Required</html>", {})
+    h, _ = upbit_harvester(tmp_path, fake, clock)
+    with pytest.raises(nes_harvest.HarvestBlocked):
+        h.run(*WIN)                       # list, closing, detail 20 saved; detail 21 blocked
+    fake2 = FakeUpbit(clock, notices)
+    h2, _ = upbit_harvester(tmp_path, fake2, clock)
+    res = h2.run(*WIN)
+    assert [(k, n) for _, k, n in fake2.calls] == [("list", 1), ("detail", 21), ("detail", 22)]
+    assert sorted(res["detail_ids"]) == ["20", "21", "22"]
+
+
+def test_parse_upbit_detail_fixture():
+    d = nes_harvest.parse_upbit_detail((FIX / "upbit_detail.json").read_bytes())
+    assert d["id"] == 9003 and d["first_listed_at"] == "2024-03-01T21:00:30+09:00"
+    assert "거래지원 개시 시점" in d["body"]
+    assert nes_harvest.UPBIT_BODY_KEY == "body"
+    assert nes_harvest.UPBIT_DETAIL_URL % 6714 == (
+        "https://api-manager.upbit.com/api/v1/announcements/6714")

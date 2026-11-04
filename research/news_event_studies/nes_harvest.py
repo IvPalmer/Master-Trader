@@ -257,6 +257,145 @@ class CmsHarvester:
                 "pages": page_no, "oldest_ms": oldest}
 
 
+# ---- Upbit (operator's Mac) ----------------------------------------------------------
+
+UPBIT_GAP_S = 10.0
+# Probe on #229 (2026-11-04): the plain detail URL returns JSON with the text in data.body.
+UPBIT_DETAIL_URL = "https://api-manager.upbit.com/api/v1/announcements/%d"
+UPBIT_BODY_KEY = "body"
+
+
+@dataclass
+class UpbitPage:
+    total_count: "int | None"
+    total_pages: "int | None"
+    notices: list
+
+
+def _int_or_none(v):
+    return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+
+def parse_upbit_page(body):
+    j = json.loads(body)
+    if not isinstance(j, dict) or j.get("success") is not True:
+        raise ValueError("upbit: success is not true")
+    d = j.get("data") or {}
+    notices = [n for n in (d.get("notices") or [])
+               if isinstance(n, dict) and n.get("id") is not None]
+    return UpbitPage(_int_or_none(d.get("total_count")), _int_or_none(d.get("total_pages")),
+                     notices)
+
+
+def parse_upbit_detail(body):
+    j = json.loads(body)
+    if not isinstance(j, dict) or j.get("success") is not True:
+        raise ValueError("upbit detail: success is not true")
+    d = j.get("data") or {}
+    text = d.get(UPBIT_BODY_KEY)
+    if d.get("id") is None or not isinstance(text, str):
+        raise ValueError("upbit detail: no id or body")
+    return {"id": d["id"], "title": d.get("title"), "body": text,
+            "first_listed_at": d.get("first_listed_at"), "listed_at": d.get("listed_at")}
+
+
+def notice_ms(n):
+    """Publish time (O1: first_listed_at, KST) as epoch ms, or None."""
+    iso = na_sources.to_utc(n.get("first_listed_at") or n.get("listed_at"), "kst")
+    return nes_util.ms_from_iso(iso) if iso else None
+
+
+class HarvestBlocked(Exception):
+    pass
+
+
+class UpbitHarvester:
+    """Single attempt per request, at least UPBIT_GAP_S apart. A block signal or any
+    other failure writes the meta and stops the run; a rerun skips saved files."""
+
+    def __init__(self, fetcher, wall, sleep, out_dir, host_label):
+        self.fetcher, self.wall, self.sleep = fetcher, wall, sleep
+        self.out = Path(out_dir)
+        self.meta_path = self.out / "harvest_meta.json"
+        if self.meta_path.exists():
+            self.meta = json.loads(self.meta_path.read_text(encoding="utf-8"))
+        else:
+            self.meta = {"files": {}, "runs": []}
+        self.meta.update(host_label=host_label, blocked=None, finished_at=None,
+                         started_at=_iso_s(wall()))
+        self.last = None
+
+    def _save(self):
+        write_atomic(self.meta_path, json.dumps(self.meta, indent=1, sort_keys=True,
+                                                ensure_ascii=False).encode())
+
+    def _stop(self, reason):
+        self.meta["blocked"] = reason
+        self._save()
+        raise HarvestBlocked(reason)
+
+    def _get(self, url, rel, parse):
+        if self.last is not None:
+            wait = UPBIT_GAP_S - (self.wall() - self.last)
+            if wait > 0:
+                self.sleep(wait)
+        self.last = self.wall()
+        try:
+            resp = self.fetcher(Req("GET", url, None, na_sources.JSON_HEADERS))
+        except na_fetch.FetchError as e:
+            self._stop("error: %s: %s" % (url, str(e)[:200]))
+        if na_fetch.is_block_signal(resp):
+            self._stop("block: HTTP %d %s" % (resp.status, url))
+        try:
+            if resp.status != 200:
+                raise ValueError("HTTP %d" % resp.status)
+            parsed = parse(resp.body)
+        except ValueError as e:
+            self._stop("error: %s: %s" % (url, e))
+        write_atomic(self.out / rel, resp.body)
+        self.meta["files"][rel] = sha256_bytes(resp.body)
+        self._save()
+        return parsed
+
+    def _saved_or_get(self, url, rel, parse):
+        path = self.out / rel
+        if path.exists():
+            body = path.read_bytes()
+            self.meta["files"][rel] = sha256_bytes(body)
+            return parse(body)
+        return self._get(url, rel, parse)
+
+    def run(self, detail_from_ms, detail_to_ms):
+        p1 = self._saved_or_get(na_sources.UPBIT_URL % 1, "list/page-01.json",
+                                parse_upbit_page)
+        pages = [p1]
+        for n in range(2, (p1.total_pages or 1) + 1):
+            pages.append(self._saved_or_get(na_sources.UPBIT_URL % n,
+                                            "list/page-%02d.json" % n, parse_upbit_page))
+        closing = self._get(na_sources.UPBIT_URL % 1, "list/closing.json", parse_upbit_page)
+        notices = {}
+        for p in pages + [closing]:
+            for n in p.notices:
+                notices.setdefault(str(n["id"]), n)
+        total = closing.total_count
+        self.meta["list"] = {"unique": len(notices), "total": total,
+                             "total_reported": total is not None,
+                             "shortfall": max(0, total - len(notices)) if total is not None
+                             else 0}
+        wanted = [k for k, n in notices.items()
+                  if (notice_ms(n) is not None
+                      and detail_from_ms <= notice_ms(n) < detail_to_ms)]
+        self.meta["detail_ids"] = wanted
+        self._save()
+        for k in wanted:
+            self._saved_or_get(UPBIT_DETAIL_URL % int(k), "detail/%s.json" % k,
+                               parse_upbit_detail)
+        self.meta["finished_at"] = _iso_s(self.wall())
+        self._save()
+        return {"list": self.meta["list"], "detail_ids": wanted,
+                "host_label": self.meta["host_label"]}
+
+
 def _ids(s):
     return [int(x) for x in s.split(",") if x.strip()] if s else []
 
@@ -291,11 +430,22 @@ def main(argv=None, fetcher=None, wall=time.time, sleep=time.sleep):
     b.add_argument("--scan", default="")
     b.add_argument("--out", required=True)
     b.add_argument("--limiter-state", default=str(nes_util.ARCHIVE_LIMITER_STATE))
+    u = sub.add_parser("upbit")
+    u.add_argument("--out", required=True)
+    u.add_argument("--host-label", required=True)
     args = ap.parse_args(argv)
     fetcher = fetcher or na_fetch.fetch
     if args.cmd == "binance":
         return _binance(args, fetcher, wall, sleep)
-    return 1
+    h = UpbitHarvester(fetcher, wall, sleep, Path(args.out), args.host_label)
+    try:
+        res = h.run(nes_util.WINDOW_START_MS - nes_util.DAY_MS,
+                    nes_util.WINDOW_END_MS + nes_util.DAY_MS)
+    except HarvestBlocked as e:
+        print("upbit harvest stopped: %s" % e, file=sys.stderr)
+        return 3
+    print(json.dumps({"list": res["list"], "details": len(res["detail_ids"])}), flush=True)
+    return 0
 
 
 if __name__ == "__main__":

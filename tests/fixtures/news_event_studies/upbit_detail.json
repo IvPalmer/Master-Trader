@@ -1,0 +1,17 @@
+{
+  "success": true,
+  "data": {
+    "id": 9003,
+    "uuid": "900000003",
+    "title": "테스트(TST) KRW 마켓 디지털 자산 추가",
+    "category": "거래",
+    "first_listed_at": "2024-03-01T21:00:30+09:00",
+    "listed_at": "2024-03-01T21:00:30+09:00",
+    "body": "안녕하세요. 업비트입니다.\r\n\r\n업비트에 아래와 같은 디지털 자산이 KRW 마켓에 추가될 예정입니다.\r\n\r\n<table>\r\n<thead>\r\n  <tr>\r\n    <th>디지털 자산</th>\r\n    <th>마켓</th>\r\n    <th>네트워크</th>\r\n    <th>거래지원 개시 시점</th>\r\n  </tr>\r\n</thead>\r\n<tbody>\r\n  <tr>\r\n    <td>테스트(TST)</td>\r\n    <td>KRW</td>\r\n    <td>Ethereum</td>\r\n    <td>3월 1일 21시 30분 예정</td>\r\n  </tr>\r\n</tbody>\r\n</table>\r\n\r\n* 입출금 서비스 개시 이후, 일정 수준의 유동성을 확보하지 못하는 경우 거래지원 개시 시점이 연기될 수 있습니다.\r\n",
+    "body_url": null,
+    "share_url": "https://upbit.com/service_center/notice?id=9003",
+    "shared_resources": [],
+    "need_new_badge": false,
+    "need_update_badge": false
+  }
+}
