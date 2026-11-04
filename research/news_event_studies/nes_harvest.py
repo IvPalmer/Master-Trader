@@ -29,6 +29,9 @@ OWN_GAP_S = 540
 MAX_HARVEST_S = 72 * 3600
 MAX_PAGE_FAILURES = 5        # consecutive non-block failures of one page
 MAX_PAGES = 1000             # guard against an API that ignores pageNo
+# A new limiter suspension lasts 6 h from the block; a projected end this much later than
+# the last counted one is a new suspension, while a wall-clock step only shifts it a little.
+NEW_SUSPENSION_AFTER_S = 3 * 3600
 
 
 @dataclass
@@ -98,18 +101,20 @@ class CmsHarvester:
     runs), then a slot from the shared limiter. Every abort is terminal: a harvester
     opened on an aborted meta refuses to run (plan Task 10: exit 4 is never rerun)."""
 
-    def __init__(self, limiter, fetcher, wall, sleep, out_dir, mono=None):
+    def __init__(self, limiter, fetcher, wall, sleep, out_dir, mono=None, boot_id=None):
         self.limiter, self.fetcher = limiter, fetcher
         self.wall, self.sleep = wall, sleep
         self.mono = mono or wall
+        self.boot_id = boot_id
         self.out = Path(out_dir)
         self.meta_path = self.out / "harvest_meta.json"
         if self.meta_path.exists():
             self.meta = json.loads(self.meta_path.read_text(encoding="utf-8"))
         else:
             self.meta = {"first_request": None, "first_request_s": None,
-                         "last_request_s": None, "suspensions": [], "in_suspension": False,
-                         "aborted": None, "catalogs": {}}
+                         "last_request_s": None, "last_request_mono": None, "boot_id": None,
+                         "suspensions": [], "suspension_untils": [], "aborted": None,
+                         "catalogs": {}}
         self.last_own_mono = None
 
     # -- bookkeeping ---------------------------------------------------------------
@@ -128,26 +133,34 @@ class CmsHarvester:
         raise HarvestAborted(reason)
 
     def _refuse_if_aborted(self):
+        if len(self.meta.get("suspensions") or []) >= 2 and not self.meta.get("aborted"):
+            self.meta["aborted"] = "second suspension"
+            self._save()
         if self.meta.get("aborted"):
             raise HarvestAborted("already aborted: %s" % self.meta["aborted"])
 
     def _count_suspension(self, cid, until):
-        """One count per suspension episode: from first seeing the limiter suspended
-        until the harvester next acquires a slot. Persisted, so a restart or a wall-clock
-        step during the episode does not count it twice."""
-        if self.meta["in_suspension"]:
+        """Counts a suspension once, identified by its projected end. Persisted, so a
+        restart or a wall-clock step during it does not count it twice; the second count
+        and the abort are saved together."""
+        untils = self.meta["suspension_untils"]
+        if untils and until <= untils[-1] + NEW_SUSPENSION_AFTER_S:
             return
-        self.meta["in_suspension"] = True
+        untils.append(until)
         self.meta["suspensions"].append(_iso_s(until))
         self._cat(cid)["suspensions"].append(_iso_s(until))
-        self._save()
-        if len(self.meta["suspensions"]) >= 2:
+        if len(untils) >= 2:
             self._abort(cid, "second suspension")
+        self._save()
 
     # -- requests ------------------------------------------------------------------
     def _own_gap_left(self, now):
         if self.last_own_mono is not None:
             return OWN_GAP_S - (self.mono() - self.last_own_mono)
+        last_mono = self.meta.get("last_request_mono")
+        if (self.boot_id is not None and self.meta.get("boot_id") == self.boot_id
+                and last_mono is not None and self.mono() >= last_mono):
+            return OWN_GAP_S - (self.mono() - last_mono)   # same boot: immune to wall steps
         last = self.meta.get("last_request_s")
         if last is None:
             return 0.0
@@ -170,8 +183,6 @@ class CmsHarvester:
                 wait = self._own_gap_left(now)
                 if wait <= 0:
                     if self.limiter.try_acquire(now):
-                        if self.meta["in_suspension"]:
-                            self.meta["in_suspension"] = False
                         return now
                     wait = 1.0
             if deadline is not None:
@@ -186,12 +197,16 @@ class CmsHarvester:
             self.meta["first_request_s"] = t
             self.meta["first_request"] = _iso_s(t)
         self.last_own_mono = self.mono()
-        self.meta["last_request_s"] = t
+        self.meta.update(last_request_s=t, last_request_mono=self.last_own_mono,
+                         boot_id=self.boot_id)
         cat["requests"].append(_iso_s(t))
         self._save()
         try:
             resp = self.fetcher(Req("GET", url, None, na_sources.BINANCE_HEADERS))
         except na_fetch.FetchError as e:
+            resp = e
+        if isinstance(resp, na_fetch.FetchError):
+            e = resp
             if e.status is not None:
                 # an HTTP status with an unreadable body: a block signal, as in the archive
                 self.limiter.suspend(self.wall())
@@ -215,6 +230,10 @@ class CmsHarvester:
             cat["errors"].append({"at": _iso_s(t), "url": url, "error": str(e)[:200]})
             self._save()
             return None
+        # Failures above reach the deadline check in the next _wait_slot; a block is
+        # always passed to the shared limiter first.
+        if self.wall() >= self.meta["first_request_s"] + MAX_HARVEST_S:
+            self._abort(cid, "72 h without completing")
         return resp.body, page
 
     def _fetch(self, cid, page_no, fname):
@@ -375,8 +394,10 @@ class UpbitHarvester:
     """Single attempt per request, at least UPBIT_GAP_S apart. A block signal or any
     other failure writes the meta and stops the run; a rerun skips saved files."""
 
-    def __init__(self, fetcher, wall, sleep, out_dir, host_label):
+    def __init__(self, fetcher, wall, sleep, out_dir, host_label, mono=None):
         self.fetcher, self.wall, self.sleep = fetcher, wall, sleep
+        self.mono = mono or wall
+        self.last_mono = None
         self.out = Path(out_dir)
         self.meta_path = self.out / "harvest_meta.json"
         if self.meta_path.exists():
@@ -396,14 +417,16 @@ class UpbitHarvester:
         raise HarvestBlocked(reason)
 
     def _get(self, url, rel, parse):
-        last = self.meta.get("last_request_s")     # persisted: the gap holds across reruns
-        if last is not None:
-            now = self.wall()
-            if now < last:
-                last = now                         # clock moved back: wait a full gap
-            wait = UPBIT_GAP_S - (now - last)
-            if wait > 0:
-                self.sleep(wait)
+        if self.last_mono is not None:             # within a run: monotonic
+            wait = UPBIT_GAP_S - (self.mono() - self.last_mono)
+        elif self.meta.get("last_request_s") is not None:   # across reruns: wall time
+            now, last = self.wall(), self.meta["last_request_s"]
+            wait = UPBIT_GAP_S if now < last else UPBIT_GAP_S - (now - last)
+        else:
+            wait = 0
+        if wait > 0:
+            self.sleep(wait)
+        self.last_mono = self.mono()
         self.meta["last_request_s"] = self.wall()
         self._save()
         try:
@@ -466,8 +489,8 @@ def _ids(s):
     return [int(x) for x in s.split(",") if x.strip()] if s else []
 
 
-def _binance(args, fetcher, wall, sleep, mono):
-    state = Path(args.limiter_state)
+def _binance(args, fetcher, wall, sleep, mono, boot_id):
+    state = Path(nes_util.ARCHIVE_LIMITER_STATE)
     if not state.is_file():
         # The archive writes its state file on its first Binance poll; a missing file
         # means a limiter of our own, which would double the Binance budget.
@@ -475,7 +498,8 @@ def _binance(args, fetcher, wall, sleep, mono):
               "running archive's limiter" % state, file=sys.stderr)
         return 2
     limiter = na_fetch.BinanceLimiter(str(state))
-    h = CmsHarvester(limiter, fetcher, wall, sleep, Path(args.out), mono=mono)
+    h = CmsHarvester(limiter, fetcher, wall, sleep, Path(args.out), mono=mono,
+                     boot_id=boot_id)
     results = []
     try:
         for cid in _ids(args.harvest):
@@ -497,22 +521,24 @@ def _bounded_fetch(req):
     return na_fetch.fetch(req, timeout_s=10, deadline=time.monotonic() + FETCH_DEADLINE_S)
 
 
-def main(argv=None, fetcher=None, wall=time.time, sleep=time.sleep, mono=time.monotonic):
+def main(argv=None, fetcher=None, wall=time.time, sleep=time.sleep, mono=time.monotonic,
+         boot_id="auto"):
     ap = argparse.ArgumentParser(prog="nes_harvest.py")
     sub = ap.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("binance")
     b.add_argument("--harvest", default="")
     b.add_argument("--scan", default="")
     b.add_argument("--out", required=True)
-    b.add_argument("--limiter-state", default=str(nes_util.ARCHIVE_LIMITER_STATE))
     u = sub.add_parser("upbit")
     u.add_argument("--out", required=True)
     u.add_argument("--host-label", required=True)
     args = ap.parse_args(argv)
     fetcher = fetcher or _bounded_fetch
     if args.cmd == "binance":
-        return _binance(args, fetcher, wall, sleep, mono)
-    h = UpbitHarvester(fetcher, wall, sleep, Path(args.out), args.host_label)
+        if boot_id == "auto":
+            boot_id = na_fetch._boot_id()
+        return _binance(args, fetcher, wall, sleep, mono, boot_id)
+    h = UpbitHarvester(fetcher, wall, sleep, Path(args.out), args.host_label, mono=mono)
     try:
         res = h.run(nes_util.WINDOW_START_MS - nes_util.DAY_MS,
                     nes_util.WINDOW_END_MS + nes_util.DAY_MS)

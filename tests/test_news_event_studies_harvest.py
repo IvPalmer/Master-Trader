@@ -258,13 +258,21 @@ def test_scan_stops_at_window_start(tmp_path):
     assert meta["catalogs"]["49"]["completeness"] is None
 
 
-def test_refuses_when_archive_limiter_dir_missing(tmp_path):
-    def boom(req):
-        raise AssertionError("fetcher called")
+def _boom(req):
+    raise AssertionError("fetcher called")
+
+
+def test_refuses_when_archive_limiter_dir_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(nes_util, "ARCHIVE_LIMITER_STATE", tmp_path / "no" / "s.json")
     rc = nes_harvest.main(["binance", "--harvest", "161,48", "--scan", "49",
-                           "--out", str(tmp_path / "raw"),
-                           "--limiter-state", str(tmp_path / "no" / "s.json")], fetcher=boom)
+                           "--out", str(tmp_path / "raw")], fetcher=_boom)
     assert rc == 2
+
+
+def test_no_limiter_override_flag(tmp_path):
+    with pytest.raises(SystemExit):
+        nes_harvest.main(["binance", "--harvest", "161", "--out", str(tmp_path / "raw"),
+                          "--limiter-state", str(tmp_path / "s.json")], fetcher=_boom)
 
 
 def test_default_limiter_is_the_archives():
@@ -562,16 +570,15 @@ def test_72h_deadline_caps_waits_and_is_inclusive(tmp_path):
         h.harvest(161)
     first = fake.calls[0][0]
     assert len(fake.calls) == 2
-    assert clock.t == pytest.approx(first + nes_harvest.MAX_HARVEST_S)
+    assert clock.t == first + nes_harvest.MAX_HARVEST_S
     assert json.loads((out / "harvest_meta.json").read_text())["aborted"] == "72 h without completing"
 
 
-def test_refuses_when_limiter_state_file_missing(tmp_path):
-    def boom(req):
-        raise AssertionError("fetcher called")
+def test_refuses_when_limiter_state_file_missing(tmp_path, monkeypatch):
     (tmp_path / "d").mkdir()
-    rc = nes_harvest.main(["binance", "--harvest", "161", "--out", str(tmp_path / "raw"),
-                           "--limiter-state", str(tmp_path / "d" / "other.json")], fetcher=boom)
+    monkeypatch.setattr(nes_util, "ARCHIVE_LIMITER_STATE", tmp_path / "d" / "s.json")
+    rc = nes_harvest.main(["binance", "--harvest", "161", "--out", str(tmp_path / "raw")],
+                          fetcher=_boom)
     assert rc == 2
 
 
@@ -599,3 +606,87 @@ def test_upbit_gap_survives_resume(tmp_path):
     h2, _ = upbit_harvester(tmp_path, fake2, clock)
     h2.run(*WIN)
     assert fake2.calls[0][0] - fake.calls[2][0] >= nes_harvest.UPBIT_GAP_S
+
+
+# ---- Codex review of #238 (round 2) -------------------------------------------------
+
+def test_resuspension_before_acquire_is_a_second_suspension(tmp_path):
+    clock = Clock()
+    limiter = BinanceLimiter(str(tmp_path / "state.json"), boot_id=None, mono=clock.wall)
+    limiter.suspend(clock.wall())                  # the archive was blocked
+    done = []
+
+    def sleep(s):
+        clock.sleep(s)
+        if s > 3600 and not done:                  # the archive is blocked again on expiry
+            done.append(1)
+            limiter.suspend(clock.wall())
+    fake = FakeCms(clock, {161: arts(120)})
+    h = nes_harvest.CmsHarvester(limiter, fake, clock.wall, sleep, tmp_path / "raw")
+    with pytest.raises(nes_harvest.HarvestAborted):
+        h.harvest(161)
+    assert fake.calls == []
+    meta = json.loads((tmp_path / "raw" / "harvest_meta.json").read_text())
+    assert meta["aborted"] == "second suspension" and len(meta["suspensions"]) == 2
+
+
+def test_two_counted_suspensions_refuse_even_without_saved_abort(tmp_path):
+    out = tmp_path / "raw"
+    out.mkdir()
+    (out / "harvest_meta.json").write_text(json.dumps({
+        "first_request": None, "first_request_s": None, "last_request_s": None,
+        "suspensions": ["a", "b"], "suspension_untils": [1.0, 30000.0], "aborted": None,
+        "catalogs": {}}))
+    clock = Clock()
+    fake = FakeCms(clock, {161: arts(120)})
+    h, _ = harvester(tmp_path, fake, clock)
+    with pytest.raises(nes_harvest.HarvestAborted):
+        h.harvest(161)
+    assert fake.calls == []
+
+
+def test_forward_step_across_restart_keeps_mono_gap(tmp_path):
+    clock = SteppingClock()
+    limiter = BinanceLimiter(str(tmp_path / "state.json"), boot_id="b1", mono=clock.mono)
+    out = tmp_path / "raw"
+    fake = FakeCms(clock, {161: arts(120)})
+    fake.overrides[2] = Crash()
+    h = nes_harvest.CmsHarvester(limiter, fake, clock.wall, clock.sleep, out,
+                                 mono=clock.mono, boot_id="b1")
+    with pytest.raises(Crash):
+        h.harvest(161)
+    clock.t += 3600                                # wall steps forward during the restart
+    fake2 = FakeCms(clock, {161: arts(120)})
+    h2 = nes_harvest.CmsHarvester(limiter, fake2, clock.wall, clock.sleep, out,
+                                  mono=clock.mono, boot_id="b1")
+    h2.harvest(161)
+    assert fake2.calls[0][0] - fake.calls[2][0] >= 3600 + 540
+
+
+def test_upbit_forward_step_within_run_keeps_gap(tmp_path):
+    clock = SteppingClock()
+    notices = [upbit_notice(40 + i, "2024-03-01T21:00:00+09:00") for i in range(3)]
+    fake = FakeUpbit(clock, notices)
+    monos = []
+
+    def fetcher(req):
+        monos.append(clock.mono())
+        r = fake(req)
+        clock.t += 3600                            # wall steps forward after each request
+        return r
+    h = nes_harvest.UpbitHarvester(fetcher, clock.wall, clock.sleep, tmp_path / "u", "t",
+                                   mono=clock.mono)
+    h.run(*WIN)
+    assert all(b - a >= nes_harvest.UPBIT_GAP_S for a, b in zip(monos, monos[1:]))
+
+
+def test_completion_after_deadline_aborts(tmp_path):
+    clock = Clock()
+    fake = FakeCms(clock, {161: arts(120)})
+    # the closing request starts before the deadline and its response arrives after it
+    fake.hooks[3] = lambda f: clock.sleep(f.calls[0][0] + nes_harvest.MAX_HARVEST_S + 1
+                                          - clock.t)
+    h, out = harvester(tmp_path, fake, clock)
+    with pytest.raises(nes_harvest.HarvestAborted):
+        h.harvest(161)
+    assert json.loads((out / "harvest_meta.json").read_text())["aborted"] == "72 h without completing"
