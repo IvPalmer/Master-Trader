@@ -1,0 +1,34 @@
+{
+ "code": "000000",
+ "message": null,
+ "messageDetail": null,
+ "data": {
+  "catalogs": [
+   {
+    "catalogId": 48,
+    "parentCatalogId": null,
+    "catalogName": "New Cryptocurrency Listing",
+    "catalogType": 1,
+    "total": 2292,
+    "articles": [
+     {
+      "id": 288627,
+      "code": "a259777ee4104befa3daba5c1eadc7b5",
+      "title": "Binance Will List Predict (PREDICT) with Seed Tag Applied",
+      "type": 1,
+      "releaseDate": 1793274532329
+     },
+     {
+      "id": 288602,
+      "code": "784c65be33d44de0b2099cadf8742846",
+      "title": "Binance Futures Will Launch Multiple TradFi USDⓈ-Margined Perpetual Contracts (2026-10-29)",
+      "type": 1,
+      "releaseDate": 1793263510993
+     }
+    ],
+    "catalogs": []
+   }
+  ]
+ },
+ "success": true
+}

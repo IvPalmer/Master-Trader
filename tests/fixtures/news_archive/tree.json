@@ -1,0 +1,38 @@
+[
+ {
+  "_id": "2117761239787151807",
+  "source": "Twitter",
+  "title": "Ethereum Foundation (@ethereumfndn): @ncsgy lays out how formally verified and open source wallet pr…",
+  "url": "https://x.com/ethereumfndn/status/2117761239787151807#",
+  "time": 1793748600698,
+  "suggestions": [
+   {
+    "found": [
+     "ETH",
+     "Ethereum"
+    ],
+    "coin": "ETH",
+    "isAccountMapped": true,
+    "symbols": [
+     {
+      "exchange": "binance-futures",
+      "symbol": "ETHUSDT"
+     },
+     {
+      "exchange": "binance",
+      "symbol": "ETHUSDT"
+     }
+    ],
+    "supply": 122186161
+   }
+  ]
+ },
+ {
+  "_id": "1793748275757CWvsatvoc",
+  "source": "Blogs",
+  "title": "COINDESK: What voters said about their views on crypto",
+  "url": "https://www.coindesk.com/policy/2026/11/03/what-voters-said-about-their-views-on-crypto",
+  "time": 1793748275757,
+  "suggestions": []
+ }
+]

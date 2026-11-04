@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='utf-8'?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>https://blockworks.com</id>
+    <title>Blockworks: Building trust in onchain capital markets.</title>
+    <updated>2026-11-03T23:36:43.010Z</updated>
+    <generator>Blockworks</generator>
+    <link rel="alternate" href="https://blockworks.com/" />
+    <link rel="self" href="https://blockworks.com/feed" />
+    <subtitle>Blockworks is a data and software platform for crypto markets.</subtitle>
+    <logo>https://blockworks.com/images/share-image.jpg</logo>
+    <rights>2026, Blockworks</rights>
+    <entry>
+        <title type="html">Venezuela’s sanctions are stablecoins’ proof of concept</title>
+        <id>https://blockworks.com/news/venezuelas-sanctions-stablecoins</id>
+        <link href="https://blockworks.com/news/venezuelas-sanctions-stablecoins" />
+        <link rel="enclosure" href="https://blockworks-co.imgix.net/wp-content/uploads/2026/01/bw-maduro.png" type="image/png" />
+        <updated>2026-01-07T14:00:00.000Z</updated>
+        <summary type="html">Banned from the dollar system, the country uses digital doll…</summary>
+        <author>
+            <name>Byron Gilliam</name>
+            <uri>https://blockworks.com/byrongilliam</uri>
+        </author>
+        <category label="Policy" term="Policy" />
+        <category label="The Breakdown" term="The Breakdown" />
+        <published>2026-01-07T14:00:00.000Z</published>
+        <rights>2026, Blockworks</rights>
+    </entry>
+    <entry>
+        <title type="html">The Strategy playbook looks different in 2026</title>
+        <link href="https://blockworks.com/news/strategy-playbook-2026" />
+        <link rel="enclosure" href="https://blockworks-co.imgix.net/wp-content/uploads/2026/01/bw-saylor-2026.png" type="image/png" />
+        <updated>2026-01-06T17:36:33.000Z</updated>
+        <summary type="html">The treasury company now holds 673,783 BTC, but flow is more…</summary>
+        <author>
+            <name>Shaunda Devens</name>
+            <uri>https://blockworks.com/shaunda-devens</uri>
+        </author>
+        <category label="0xResearch Newsletter" term="0xResearch Newsletter" />
+        <category label="Business" term="Business" />
+        <rights>2026, Blockworks</rights>
+    </entry>
+    </feed>
