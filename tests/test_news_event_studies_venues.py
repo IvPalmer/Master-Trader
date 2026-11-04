@@ -209,6 +209,7 @@ def test_file_probe_sends_head_only_and_caches():
     assert probe.exists(url("um", "AUSDT", "2024-03-02")) is False
     assert [r.method for r in fake.requests] == ["HEAD", "HEAD"]
     assert all(r.body is None for r in fake.requests)
+    assert all(r.headers.get("User-Agent") == nv.na_sources.UA for r in fake.requests)
     assert clock.sleeps.count(nv.PROBE_GAP_S) == 2
 
 

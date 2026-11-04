@@ -211,7 +211,7 @@ class FileProbe:
                 self.sleep(PROBE_RETRY_S)
             self.sleep(PROBE_GAP_S)
             try:
-                resp = self.fetcher(nu.Req("HEAD", url))
+                resp = self.fetcher(nu.Req("HEAD", url, None, {"User-Agent": na_sources.UA}))
             except na_fetch.FetchError as e:
                 last = e
                 continue
