@@ -25,10 +25,46 @@ FIX = ROOT / "tests" / "fixtures" / "news_event_studies"
     ("액시스로보틱스(AXIS) 신규 거래지원 안내 (KRW, BTC, USDT 마켓) (매도 최저가 기준 가격 안내)",
      ("AXIS",)),
     ("에이(AAA), 비(BBB) KRW 마켓 디지털 자산 추가", ("AAA", "BBB")),
+    # upbit:3502: a trailing notice-note group is not the token group.
+    ("KRW, BTC 마켓 디지털 자산 추가 (SUI) (매도 주문 제한 기준 가격 안내)", ("SUI",)),
     ("BTC, USDT 마켓 디지털 자산 추가 (ABC)", None),
 ])
 def test_upbit_addition_formats(title, tokens):
     assert nc.upbit_addition(title) == tokens
+
+
+_TABLE = ("<table><tr><th>디지털 자산</th><th>마켓</th><th>네트워크</th></tr>"
+          "<tr><td>제타체인(ZETA)</td><td>KRW, BTC, USDT</td><td>ZetaChain</td></tr>"
+          "<tr><td>옴니네트워크(OMNI)</td><td>BTC, USDT</td><td>Ethereum</td></tr></table>")
+
+
+@pytest.mark.parametrize("title,body,expected", [
+    # One token, or a title naming only the KRW market: the title says it.
+    ("KRW, BTC 마켓 디지털 자산 추가 (SUI) (매도 주문 제한 기준 가격 안내)", None, {"SUI": True}),
+    ("원화 마켓 디지털 자산 추가 (AXS, STX)", None, {"AXS": True, "STX": True}),
+    # Per-token market groups in the title (upbit:5100, upbit:5183).
+    ("셀레스티아(TIA)(KRW, BTC, USDT 마켓), 아이오넷(IO)(BTC, USDT 마켓) 신규 거래지원 안내 "
+     "(주문 타입 제한 관련 안내)", None, {"TIA": True, "IO": False}),
+    ("라이브피어(LPT)(KRW, USDT 마켓), 포켓네트워크(POKT)(KRW 마켓) 디지털 자산 추가", None,
+     {"LPT": True, "POKT": True}),
+    # Several tokens and markets: the body's per-token markets (upbit:3266, 4070, 4192).
+    ("KRW, BTC 마켓 디지털 자산 추가 (SHIB, GAL)", "<p>- KRW 마켓 : SHIB</p><p>- BTC 마켓 : GAL</p>",
+     {"SHIB": True, "GAL": False}),
+    ("KRW, BTC 마켓 디지털 자산 추가 (ALT, PYTH)", "<p>- ALT : BTC 마켓</p><p>- PYTH : KRW, BTC 마켓</p>",
+     {"ALT": False, "PYTH": True}),
+    ("제타체인(ZETA), 옴니네트워크(OMNI) 신규 거래지원 안내 (KRW, BTC, USDT 마켓)", _TABLE,
+     {"ZETA": True, "OMNI": False}),
+    # Not stated: no body (upbit:2429), or a body silent on a token.
+    ("KRW, BTC 마켓 디지털 자산 추가 (AVAX, IMX) (거래지원 개시 시점 연장 안내)", None,
+     {"AVAX": None, "IMX": None}),
+    ("KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)", "<p>- KRW 마켓 : AAA</p>", {"AAA": True, "BBB": None}),
+    # A sell-limit line names the market a price comes from, not the token's markets.
+    ("KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)",
+     "<p>- KRW 마켓 : AAA</p><p>- BBB : 업비트 BTC 마켓 전일 종가 기준</p>", {"AAA": True, "BBB": None}),
+    ("BTC 마켓 디지털 자산 추가 (AAA)", None, {}),                                # not an O8 addition
+])
+def test_upbit_krw_membership(title, body, expected):
+    assert nc.upbit_krw_membership(title, body) == expected
 
 
 @pytest.mark.parametrize("word", ["종료", "유의", "제거", "변경", "중단", "연기", "재개"])
@@ -60,6 +96,9 @@ def test_upbit_needs_review():
     assert nc.upbit_needs_review("닐리온(NIL) 거래지원 종료 안내") is False
     assert nc.upbit_needs_review("닐리온(NIL) KRW 마켓 거래 유의 안내") is False   # exclude word
     assert nc.upbit_needs_review("닐리온(NIL) BTC 마켓 입금 안내") is False        # no KRW marker
+    # upbit:4273: "마켓 추가" is not an O8 addition marker; decided, not an addition.
+    assert nc.upbit_addition("테더(USDT) KRW, BTC 마켓 추가 안내 (출금 개시 안내)") is None
+    assert nc.upbit_needs_review("테더(USDT) KRW, BTC 마켓 추가 안내 (출금 개시 안내)") is False
 
 
 T_START = 1793089800000      # 2026-10-27T08:30Z = 17:30 KST
@@ -323,6 +362,21 @@ def test_upbit_trading_start_invalid_date_is_none():
     ("Binance Will Delist ABC, DEF (Update)", "full_delist", ("ABC", "DEF")),
     ("Binance Simple Earn Will Delist ABC Products", "excluded:other_product", ()),
     ("Binance Updates Its Tokenomics Guidelines", "unclassified", ()),
+    # Formats first met in the 2026-11-04 harvest (exit 5); one fixture per format.
+    ("Binance to Cease ADAUP & ADADOWN Trading and Subscription Services (2023-08-09)",
+     "excluded:leveraged", ()),
+    ("Suspension of Gifto (GFT) Deposits and Update on the Delisting Date (2024-12-03)",
+     "excluded:delisting_update", ()),
+    ("Notice on Delisting of Binance Loans (Flexible Rate) Loanable Assets - 2025-01-03",
+     "excluded:other_product", ()),
+    ("Binance Earn: Notice on Removal of Dual Investment Token Pairs - 2025-02-21",
+     "excluded:other_product", ()),
+    ("Binance Alpha Will Remove BUZZ, DARK, FROG, GORK (2025-12-19)", "excluded:other_product", ()),
+    ("Binance Will Cease Support for Selected Stocks on 2026-06-05", "excluded:other_product", ()),
+    ("Upcoming Changes to RON Spot Trading on Binance", "excluded:spot_trading_changes", ()),
+    ("Binance Will Delist UTK and Support Rebranding and Airdrop Plan on Binance Alpha",
+     "full_delist", ("UTK",)),
+    ("Notice Regarding the Removal of AEUR and Conversion of AEUR to EUR", "full_delist", ("AEUR",)),
 ])
 def test_classify_binance(title, kind, tokens):
     assert nc.classify_binance(title) == nc.BinanceClass(kind, tokens)

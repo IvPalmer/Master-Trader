@@ -86,12 +86,26 @@ def classify_binance(title):
         return _excluded("options")
     if "Trading Pair" in t or "/" in t:
         return _excluded("pair_removal")
-    if re.match(r"Binance\s+(?!Will\b)\S.*?\s+Will\s+Delist\b", t):
+    if re.match(r"Binance\s+(?!Will\b)\S.*?\s+Will\s+(?:Delist|Remove)\b", t):
         return _excluded("other_product")
-    m = re.match(r"Binance Will Delist\s+(.+)$", t)
+    m = re.match(r"Binance Will Delist\s+(.+?)(?:\s+and\s+Support\b.*)?$", t)
     if m:
         tokens = _tickers(m.group(1))
-        return BinanceClass("full_delist", tokens) if tokens else UNCLASSIFIED
+        if tokens:
+            return BinanceClass("full_delist", tokens)
+    # Formats first met in the 2026-11-04 harvest. They apply only to titles the rules
+    # above leave unclassified, so no earlier classification changes.
+    m = re.match(r"Notice Regarding the Removal of ([A-Z0-9]{1,15}) and Conversion of \1 to ", t)
+    if m:
+        return BinanceClass("full_delist", (m.group(1),))
+    if re.search(r"\b[A-Z0-9]+UP\s*&\s*[A-Z0-9]+DOWN\b", t):
+        return _excluded("leveraged")
+    if re.search(r"Binance Loans|Binance Earn|Dual Investment|Selected Stocks", t):
+        return _excluded("other_product")
+    if "Update on the Delisting Date" in t:
+        return _excluded("delisting_update")
+    if re.match(r"Upcoming Changes to \S+ Spot Trading\b", t):
+        return _excluded("spot_trading_changes")
     return UNCLASSIFIED
 
 
@@ -111,7 +125,8 @@ def _upbit_tokens(title):
     named = re.findall(r"(?<=[^\s(),])\(([A-Z0-9]{1,15})\)", title)
     if named:
         return _dedupe(named)
-    groups = [g for g in re.findall(r"\(([^()]*)\)", title) if not g.strip().endswith("마켓")]
+    # A group naming markets, or a trailing notice note (`(매도 ... 가격 안내)`), names no token.
+    groups = [g for g in re.findall(r"\(([^()]*)\)", title) if not g.strip().endswith(("마켓", "안내"))]
     if not groups:
         return None
     tokens = []
@@ -144,6 +159,8 @@ def upbit_end(title):
 def upbit_needs_review(title):
     if not _has_krw(title) or any(w in title for w in EXCLUDE_WORDS):
         return False
+    if "마켓 추가" in title and not any(m in title for m in ADDITION_MARKERS):
+        return False                   # not an O8 marker: decided not an addition (upbit:4273)
     return upbit_addition(title) is None and upbit_end(title) is None
 
 
@@ -265,6 +282,11 @@ def _starts_in(text, t0_ms):
     return found
 
 
+def _body_lines(body):
+    text = re.sub(r"<br\s*/?>|</(?:p|div|li|tr|h\d|table)>", "\n", body or "", flags=re.I)
+    return html.unescape(re.sub(r"<[^>]+>", " ", text)).splitlines()
+
+
 def _single(values):
     return next(iter(values)) if len(values) == 1 else None
 
@@ -323,11 +345,9 @@ def upbit_trading_start_ms(body, token, t0_ms, title=""):
             break
     if table_seen:
         return _single(found)
-    text = re.sub(r"<br\s*/?>|</(?:p|div|li|tr|h\d|table)>", "\n", body, flags=re.I)
-    text = html.unescape(re.sub(r"<[^>]+>", " ", text))
     names = _upbit_names(title)
     names.setdefault(token, [])
-    lines = text.splitlines()
+    lines = _body_lines(body)
     if len(names) == 1:
         dated_label = False
         for line in lines:
@@ -346,3 +366,68 @@ def upbit_trading_start_ms(body, token, t0_ms, title=""):
     if not times or not all(times):
         return None                      # no declaration, or one with no parseable time
     return _single(set().union(*times))
+
+
+# --- Upbit: which tokens of an addition join the KRW market (O8) -------------------
+
+_MARKETS = ("KRW", "BTC", "USDT")
+_TITLE_TOKEN_MARKETS = re.compile(r"\(([A-Z0-9]{1,15})\)\s*\(([^()]*?)\s*마켓\)")
+_MARKET_WORD = r"(?:KRW|BTC|USDT|원화)"
+_LINE_MARKET_TOKENS = re.compile(r"(%s)\s*마켓\s*[:：]\s*(.+)" % _MARKET_WORD)
+# Only market words before 마켓: `- ALT : BTC 마켓`, never `- ALT : 업비트 BTC 마켓 전일 종가`.
+_LINE_TOKEN_MARKETS = re.compile(r"^[\s\-•·*]*([A-Z0-9]{1,15})\s*[:：]\s*(%s(?:\s*[,/]\s*%s)*)\s*마켓"
+                                 % (_MARKET_WORD, _MARKET_WORD))
+
+
+def _markets(text):
+    found = {m for m in _MARKETS if _token_in(text, m)}
+    return found | {"KRW"} if "원화" in text else found
+
+
+def _body_markets(body, token):
+    """The markets the body assigns to `token`: a `마켓` table column, `- ALT : BTC 마켓` or
+    `- KRW 마켓 : SHIB` lines. Empty when the body does not say."""
+    found = set()
+    parser = _TableParser()
+    parser.feed(body)
+    parser.close()
+    for rows in parser.tables:
+        grid = _grid(rows)
+        for h, header in enumerate(grid):
+            col = next((j for j, c in enumerate(header) if c.strip() == "마켓"), None)
+            if col is None:
+                continue
+            for row in grid[h + 1:]:
+                if col < len(row) and any(_token_in(c, token) for j, c in enumerate(row) if j != col):
+                    found |= _markets(row[col])
+            break
+    for line in _body_lines(body):
+        m = _LINE_TOKEN_MARKETS.match(line)
+        if m and m.group(1) == token:
+            found |= _markets(m.group(2))
+        m = _LINE_MARKET_TOKENS.search(line)
+        if m and _token_in(m.group(2), token):
+            found |= _markets(m.group(1))
+    return found
+
+
+def upbit_krw_membership(title, body=None):
+    """Each token of an O8 addition -> True if it joins the KRW market, False if the notice
+    gives its markets without KRW, None if the notice does not say.
+
+    The token's own market group in the title decides; else a title naming only the KRW
+    market, or a single token, means KRW; else the body's per-token markets."""
+    tokens = upbit_addition(title) or ()
+    own = {tok: _markets(mk) for tok, mk in _TITLE_TOKEN_MARKETS.findall(title)}
+    krw_only = _markets(re.sub(r"\([^()]*\)", " ", title)) | _markets(
+        " ".join(g for g in re.findall(r"\(([^()]*마켓)\)", title))) == {"KRW"}
+    out = {}
+    for tok in tokens:
+        if own.get(tok):
+            out[tok] = "KRW" in own[tok]
+        elif krw_only or len(tokens) == 1:
+            out[tok] = True
+        else:
+            found = _body_markets(body, tok) if body else set()
+            out[tok] = ("KRW" in found) if found else None
+    return out

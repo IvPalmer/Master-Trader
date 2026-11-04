@@ -222,7 +222,12 @@ def upbit_events(notices, details, cms48):
             continue
         detail = details.get(str(nid))
         body = detail.get("body") if detail else None
+        krw = nc.upbit_krw_membership(title, body)
         for tok in adds:
+            if krw.get(tok) is not True:       # O8 per token: not shown to join KRW
+                if krw.get(tok) is None and _in_window(t0):
+                    review.append(_review(aid, t0, title, "upbit_market_unstated", token=tok))
+                continue
             prior = on_krw.get(tok)
             if prior is None:
                 on_krw[tok] = aid

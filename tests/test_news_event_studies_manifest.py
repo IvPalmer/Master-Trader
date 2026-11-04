@@ -223,6 +223,28 @@ def test_upbit_replay_uses_history_before_window():
     assert [(e["announcement_id"], e["exclusion"]) for e in events] == [("upbit:2", "already_on_krw")]
 
 
+def test_upbit_token_added_only_to_btc_is_no_event_and_no_prior():
+    """O8 per token: a multi-market notice adds a token to KRW only if it says so (upbit:3266)."""
+    both = notice(1, "KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)", ms("2023-03-01T00:00:00Z"))
+    body = "<p>- KRW 마켓 : AAA</p><p>- BTC 마켓 : BBB</p>" + start_body(ms("2023-03-01T01:00:00Z"))
+    later = notice(2, ADD % ("비", "BBB"), ms("2024-07-11T00:00:00Z"))
+    events = _upbit([both, later], details={1: body, 2: start_body(ms("2024-07-11T01:00:00Z"))})
+    assert [(e["announcement_id"], e["token"], e["exclusion"]) for e in events] == \
+        [("upbit:1", "AAA", None), ("upbit:2", "BBB", None)]
+
+
+def test_upbit_unstated_market_is_no_prior_before_window_and_review_inside():
+    old = notice(1, "KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)", ms("2022-02-08T00:00:00Z"))   # no detail
+    later = notice(2, ADD % ("비", "BBB"), ms("2023-07-28T00:00:00Z"))
+    events = _upbit([old, later], details={2: start_body(ms("2023-07-28T01:00:00Z"))})
+    assert [(e["announcement_id"], e["exclusion"]) for e in events] == [("upbit:2", None)]
+    inside = notice(3, "KRW, BTC 마켓 디지털 자산 추가 (AAA, BBB)", T)
+    with pytest.raises(nm.NeedsReview) as e:
+        _upbit([inside], details={3: start_body(T + H)})
+    assert [(i["ref"], i["reason"], i["token"]) for i in e.value.items] == \
+        [("upbit:3", "upbit_market_unstated", "AAA"), ("upbit:3", "upbit_market_unstated", "BBB")]
+
+
 def test_upbit_binance48_overlap_inclusive_24h():
     n = notice(1, "에이(AAA), 비(BBB) KRW 마켓 디지털 자산 추가", T)
     events = {e["token"]: e for e in _upbit([n], cms48=[art(50, "Binance Will List AAA (AAA)", T + D)])}
