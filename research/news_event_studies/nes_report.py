@@ -14,6 +14,7 @@ import statistics
 import sys
 import time
 from collections import OrderedDict
+from fractions import Fraction
 from pathlib import Path
 
 import nes_util as nu
@@ -81,6 +82,29 @@ def _series(key, fetcher, work_dir, disk_ok, sleep):
     return s
 
 
+def _num(x):
+    return None if x is None else float(x)
+
+
+def _crit(anns):
+    """nr.criteria with its values as floats, for presentation; the verdict uses the exact values."""
+    c = nr.criteria(anns)
+    return {**c, "median": _num(c["median"]), "half_medians": [_num(m) for m in c["half_medians"]],
+            "sum": _num(c["sum"]), "top_decile_share": _num(c["top_decile_share"])}
+
+
+def _stored(obj):
+    """Exact returns are stored as rational strings ("-29/10000"), which Fraction reads back,
+    so the resolution recomputed from a results file is exact too."""
+    if isinstance(obj, Fraction):
+        return str(obj)
+    if isinstance(obj, dict):
+        return {k: _stored(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_stored(v) for v in obj]
+    return obj
+
+
 def _pct(values, q):
     vs = sorted(values)
     return vs[max(0, math.ceil(q * len(vs)) - 1)] if vs else None
@@ -88,25 +112,25 @@ def _pct(values, q):
 
 def _summary(results, study, manifest, counts):
     events = results
-    primary = {h: nr.criteria(nr.announcements(events, h)) for h in nr.HORIZONS_MS}
+    primary = {h: _crit(nr.announcements(events, h)) for h in nr.HORIZONS_MS}
     out = {"primary": primary,
-           "leak_included": {h: nr.criteria(nr.announcements(events, h, include_leaked=True))
+           "leak_included": {h: _crit(nr.announcements(events, h, include_leaked=True))
                              for h in nr.HORIZONS_MS},
-           "stress": {h: nr.criteria(nr.announcements(events, h, key="net_stress"))
+           "stress": {h: _crit(nr.announcements(events, h, key="net_stress"))
                       for h in nr.HORIZONS_MS},
-           "btc_adjusted_median": {h: nr.criteria(nr.announcements(events, h, key="btc_adj_net"))["median"]
+           "btc_adjusted_median": {h: _crit(nr.announcements(events, h, key="btc_adj_net"))["median"]
                                    for h in nr.HORIZONS_MS},
-           "bootstrap_ci_4h": list(nr.bootstrap_median_ci(
-               [a[2] for a in nr.announcements(events, nr.PRIMARY)])),
+           "bootstrap_ci_4h": [_num(x) for x in nr.bootstrap_median_ci(
+               [a[2] for a in nr.announcements(events, nr.PRIMARY)])],
            "t60_median": {}}
     group_key = "venue" if study == nm.LONG else ("kind" if study == nm.DELISTING else None)
     if group_key:
         groups = sorted({r[group_key] for r in events})
-        out["by_" + group_key] = {g: {h: nr.criteria(nr.announcements(
+        out["by_" + group_key] = {g: {h: _crit(nr.announcements(
             [r for r in events if r[group_key] == g], h)) for h in nr.HORIZONS_MS} for g in groups}
     for h in nr.HORIZONS_MS:
         t60 = [{**r, "horizons": {h: {"net": r["t60"].get(h)}}} for r in events if r["t60"]]
-        out["t60_median"][h] = nr.criteria(nr.announcements(t60, h))["median"]
+        out["t60_median"][h] = _crit(nr.announcements(t60, h))["median"]
     if DIRECTION[study] == "short":
         out["mae"] = {}
         for h in nr.HORIZONS_MS:
@@ -149,11 +173,11 @@ def compute(manifest_path, expect_sha256, out_dir, fetcher, work_dir, disk_ok, c
         counts = nm.manifest_counts(manifest, study)
         verdict, reasons = nr.verdict(counts, events)
         doc = {"study": study, "label": LABEL, "direction": DIRECTION[study], "verdict": verdict,
-               "reasons": reasons, "counts": counts, "coverage": nr.coverage(counts, events),
+               "reasons": reasons, "counts": counts, "coverage": float(nr.coverage(counts, events)),
                "manifest_sha256": sha, "manifest_code_commit": manifest.get("code_commit"),
                "code_commit": code_commit, "computed_at": computed_at,
                **_summary(events, study, manifest, counts), "events": events}
-        nu.write_atomic(out_dir / ("results-%s.json" % study), nu.canonical_bytes(doc))
+        nu.write_atomic(out_dir / ("results-%s.json" % study), nu.canonical_bytes(_stored(doc)))
         nu.write_atomic(out_dir / ("report-%s.md" % study), report_md(doc).encode("utf-8"))
         docs[study] = doc
     return docs
@@ -225,7 +249,7 @@ def resolution(results):
     """Recomputed from the stored events and counts only (the mechanical resolution)."""
     events = results["events"]
     verdict, reasons = nr.verdict(results["counts"], events)
-    c = nr.criteria(nr.announcements(events, nr.PRIMARY))
+    c = _crit(nr.announcements(events, nr.PRIMARY))
     return {"verdict": verdict, "reasons": reasons, "label": LABEL,
             "primary_4h": {k: c[k] for k in ("n", "median", "half_medians", "top_decile_share")},
             "manifest_sha256": results["manifest_sha256"], "code_commit": results["code_commit"],

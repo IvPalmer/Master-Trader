@@ -228,7 +228,7 @@ def upbit_events(notices, details, cms48):
                 on_krw[tok] = aid
             if not _in_window(t0):
                 continue
-            start = nc.upbit_trading_start_ms(body, tok, t0) if body is not None else None
+            start = nc.upbit_trading_start_ms(body, tok, t0, adds) if body is not None else None
             exclusion, ref = None, None
             if prior is not None:
                 exclusion, ref = "already_on_krw", prior

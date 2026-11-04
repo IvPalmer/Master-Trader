@@ -248,6 +248,16 @@ def test_upbit_trading_start_rules():
     assert no_detail["trading_start_ms"] is None
 
 
+def test_upbit_start_line_of_another_token_is_not_borrowed():
+    t0 = ms("2024-03-01T12:00:30Z")                    # 21:00:30 KST
+    n = notice(1, "에이(AAA), 비(BBB) KRW 마켓 디지털 자산 추가", t0)
+    body = "AAA 거래지원 개시 시점: 2024-03-01 20:00\nBBB 거래지원 개시 시점: 추후 공지"
+    events = {e["token"]: e for e in _upbit([n], details={1: body})}
+    assert (events["AAA"]["exclusion"], events["AAA"]["trading_start_ms"]) == \
+        ("began_before_notice", ms("2024-03-01T11:00:00Z"))
+    assert (events["BBB"]["exclusion"], events["BBB"]["trading_start_ms"]) == (None, None)   # -> unknown
+
+
 def test_upbit_t0_is_first_listed_at():
     n = notice(1, ADD % ("에이", "AAA"), T, listed=T + 2 * H)
     e = _upbit([n])[0]

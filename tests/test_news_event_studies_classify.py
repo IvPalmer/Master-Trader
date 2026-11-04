@@ -121,6 +121,27 @@ def test_upbit_trading_start_table_without_token_ignores_lines():
     assert nc.upbit_trading_start_ms(body, "BBB", 1709294430000) is None
 
 
+def test_upbit_start_lines_do_not_borrow_another_tokens_time():
+    body = "AAA 거래지원 개시 시점: 2024-03-01 20:00\nBBB 거래지원 개시 시점: 추후 공지"
+    t0 = 1709294430000              # 2024-03-01 21:00:30 KST
+    tokens = ("AAA", "BBB")
+    assert nc.upbit_trading_start_ms(body, "AAA", t0, tokens) == 1709290800000   # 20:00 KST
+    assert nc.upbit_trading_start_ms(body, "BBB", t0, tokens) is None            # no parseable start
+    # A token-less start line next to token-specific ones has no clear scope: it is not borrowed.
+    body += "\n거래지원 개시 시점: 2024-03-01 21:30"
+    assert nc.upbit_trading_start_ms(body, "AAA", t0, tokens) == 1709290800000
+    assert nc.upbit_trading_start_ms(body, "BBB", t0, tokens) is None
+
+
+def test_upbit_shared_start_line_applies_to_every_token():
+    body = ("에이(AAA), 비(BBB) KRW 마켓 추가\n거래지원 개시 시점: 2024-03-01 21:30 KST\n"
+            "* 거래지원 개시 시점이 연기될 수 있습니다.")
+    t0 = 1709294430000
+    for tok in ("AAA", "BBB"):
+        assert nc.upbit_trading_start_ms(body, tok, t0, ("AAA", "BBB")) == 1709296200000   # 21:30 KST
+        assert nc.upbit_trading_start_ms(body, tok, t0) == 1709296200000
+
+
 def test_upbit_trading_start_year_nearest_t0():
     t0 = 1704036600000             # 2023-12-31T15:30Z = 2024-01-01 00:30 KST
     assert nc.upbit_trading_start_ms("거래지원 개시 시점: 12월 31일 23시 50분", "X", t0) == \

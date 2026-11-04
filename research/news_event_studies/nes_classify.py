@@ -265,8 +265,13 @@ def _token_in(text, token):
     return re.search(r"(?<![A-Z0-9])" + re.escape(token) + r"(?![A-Z0-9])", text) is not None
 
 
-def upbit_trading_start_ms(body, token, t0_ms):
-    """The KST trading start stated for `token`, as UTC ms; None when unknown (O10)."""
+def upbit_trading_start_ms(body, token, t0_ms, notice_tokens=()):
+    """The KST trading start stated for `token`, as UTC ms; None when unknown (O10).
+
+    `notice_tokens` are every token the notice adds. Outside a table, a start line naming
+    `token` is its own; a start line naming none of them is shared, and is used only when no
+    start line names any of them. A token without its own line, in a notice whose start lines
+    name other tokens, has no stated start (None)."""
     body = body or ""
     parser = _TableParser()
     parser.feed(body)
@@ -287,7 +292,9 @@ def upbit_trading_start_ms(body, token, t0_ms):
         return _single(found)
     text = re.sub(r"<br\s*/?>|</(?:p|div|li|tr|h\d|table)>", "\n", body, flags=re.I)
     text = html.unescape(re.sub(r"<[^>]+>", " ", text))
-    for line in text.splitlines():
-        if any(k in line for k in START_LINES):
-            found |= _starts_in(line, t0_ms)
+    starts = [line for line in text.splitlines() if any(k in line for k in START_LINES)]
+    own = [line for line in starts if _token_in(line, token)]
+    named = own or [line for line in starts if any(_token_in(line, t) for t in notice_tokens)]
+    for line in own if named else starts:
+        found |= _starts_in(line, t0_ms)
     return _single(found)
