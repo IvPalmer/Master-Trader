@@ -299,7 +299,7 @@ def test_upload_verifies_before_pruning_with_archive_retention(tmp_path):
     pruned = bna.upload(run, REMOTE, config, rclone, NOW, runner=runner)
 
     assert pruned == [_stamp(70), _stamp(9)]
-    assert [c[1] for c in calls] == ["copy", "check", "moveto", "lsjson", "purge", "purge", "purge"]
+    assert [c[1] for c in calls] == ["copy", "check", "move", "lsjson", "purge", "purge", "purge"]
     staged = f"{REMOTE}/.partial-{run.name}"
     assert calls[0][2:4] == [str(run), staged]
     assert calls[0][-2:] == ["--checksum", "--immutable"]
@@ -341,7 +341,7 @@ def test_listing_failure_never_purges(tmp_path):
     config, rclone = _rclone_files(tmp_path)
     with pytest.raises(bna.BackupError, match="invalid rclone directory listing"):
         bna.upload(run, REMOTE, config, rclone, NOW, runner=runner)
-    assert [c[1] for c in calls] == ["copy", "check", "moveto", "lsjson"]
+    assert [c[1] for c in calls] == ["copy", "check", "move", "lsjson"]
 
 
 def test_upload_needs_its_config(tmp_path):
@@ -498,3 +498,29 @@ def test_abandoned_staging_is_cleared_before_the_space_check(archive_db, tmp_pat
     assert bna.main(_args(archive_db, dest)) == 1
     assert bna.read_status(dest)["last_run_result"] == "skipped"
     assert not staging.exists()
+
+
+@pytest.mark.skipif(shutil.which("rclone") is None, reason="rclone not installed")
+def test_upload_and_remote_drill_with_real_rclone(archive_db, tmp_path):
+    """The real rclone against a local directory standing in for Drive: checks every
+    argv (copy, check, rename, lsjson, purge, copyto) that fakes cannot."""
+    dest = tmp_path / "backups"
+    remote = tmp_path / "drive" / "news-archive"
+    abandoned = remote / ".partial-20261101T043000Z"
+    abandoned.mkdir(parents=True)
+    (abandoned / "archive.sqlite.gz").write_bytes(b"half an upload")
+    config = tmp_path / "rclone.conf"
+    config.write_text("")
+    rc = ["--drive-remote", str(remote), "--rclone", shutil.which("rclone"),
+          "--rclone-config", str(config)]
+
+    assert bna.main(_args(archive_db, dest, "--upload", *rc)) == 0
+    stamp = _runs(dest)[0].name
+    assert sorted(p.name for p in remote.iterdir()) == [stamp]
+    assert sorted(p.name for p in (remote / stamp).iterdir()) == ["MANIFEST.json",
+                                                                  "archive.sqlite.gz"]
+    assert bna.read_status(dest)["upload"]["ok"] is True
+
+    assert bna.main(_args(archive_db, dest, "--drill", "remote", *rc)) == 0
+    assert bna.read_status(dest)["offhost_drill"] == {
+        **bna.read_status(dest)["offhost_drill"], "ok": True, "stamp": stamp, "error": None}

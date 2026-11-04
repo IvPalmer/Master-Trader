@@ -190,7 +190,7 @@ def upload(run: Path, remote: str, config: Path, rclone: Path, now: dt.datetime,
     """Copy `run` off-host, verify it, then apply the archive's retention remotely.
 
     The copy lands in <remote>/.partial-<stamp> and is renamed to <remote>/<stamp>
-    only after a downloading check, so a failed or killed upload never looks like
+    only after a downloading check (`rclone move`), so a failed or killed upload never looks like
     a run: retention and drills see complete runs only. Nothing is purged unless
     the copy was verified and the listing parsed. Returns the purged stamps.
     """
@@ -200,7 +200,8 @@ def upload(run: Path, remote: str, config: Path, rclone: Path, now: dt.datetime,
            check=True)
     runner([str(rclone), "check", str(run), staged, *common, "--one-way", "--download"],
            check=True)
-    runner([str(rclone), "moveto", staged, _remote_child(remote, run.name), *common,
+    # `move` (not `moveto`, which rejects the flag) renames server-side on Drive.
+    runner([str(rclone), "move", staged, _remote_child(remote, run.name), *common,
             "--delete-empty-src-dirs"], check=True)
     names = _remote_names(remote, common, rclone, runner)
     doomed = runs_to_prune(names, now, **RETENTION)

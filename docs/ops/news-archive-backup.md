@@ -77,17 +77,36 @@ root crontab line, after the 03:15 live run and the 03:45 interim copy:
 30 4 * * * /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_news_archive.py >> /var/log/master-trader-news-archive-backup.log 2>&1
 ```
 
+Never pipe `sudo crontab -l` straight into `sudo crontab -`: if the read fails,
+the pipe installs an empty crontab and the live-DB backup schedule is gone. Use
+this function, which reads root's crontab into a file first, refuses to continue
+unless the live backup line is there before and after the edit, shows the diff,
+and only then installs:
+
 ```bash
-( sudo crontab -l | grep -v 'deploy/vps/backup_news_archive.py'; echo '<the line above>' ) | sudo crontab -
-sudo crontab -l | grep backup_news_archive
+set_archive_cron() {  # $1 = the new cron line, or '' to remove the job
+  local now new
+  now=$(mktemp) && new=$(mktemp) || return 1
+  sudo crontab -l > "$now" || { echo "crontab -l failed; nothing changed"; return 1; }
+  grep -q 'backup_live_dbs.py' "$now" || { echo "live backup line not read; nothing changed"; return 1; }
+  grep -v 'deploy/vps/backup_news_archive.py' "$now" > "$new"
+  [ -z "$1" ] || printf '%s\n' "$1" >> "$new"
+  grep -q 'backup_live_dbs.py' "$new" || { echo "live backup line would be lost; nothing changed"; return 1; }
+  diff "$now" "$new"
+  sudo crontab "$new" && sudo crontab -l | grep -E 'backup_live_dbs|backup_news_archive'
+  rm -f "$now" "$new"
+}
+set_archive_cron '30 4 * * * /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_news_archive.py >> /var/log/master-trader-news-archive-backup.log 2>&1'
 ```
+
+The diff must show only the archive line, and the last command must list both jobs.
 
 ## Off-host leg (separate operator go-ahead)
 
 `--upload` copies the new run to `operator-drive:Master-Trader/news-archive/.partial-<stamp>`
 with `rclone copy --checksum --immutable`, verifies it with
 `rclone check --one-way --download`, and only then renames it to `<stamp>` with
-`rclone moveto`. So a failed or killed upload never looks like a run: retention
+`rclone move --delete-empty-src-dirs`. So a failed or killed upload never looks like a run: retention
 and the remote drill see complete runs only. It then lists the remote, purges
 the stamps outside the retention above, and removes `.partial-*` left by earlier
 failed uploads. An unparseable listing purges nothing.
@@ -110,10 +129,10 @@ drill has passed. Until then the report line starts
    must list the stamp.
 3. Remote drill: `sudo /usr/bin/python3 $C/deploy/vps/backup_news_archive.py --drill remote`
    exits 0, and the report section must then show `off-host OK`.
-4. Swap in the `--upload` cron line, the same way as the local one:
+4. Swap in the `--upload` cron line with `set_archive_cron` (see Install):
 
-```cron
-30 4 * * * /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_news_archive.py --upload >> /var/log/master-trader-news-archive-backup.log 2>&1
+```bash
+set_archive_cron '30 4 * * * /usr/bin/python3 /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/deploy/vps/backup_news_archive.py --upload >> /var/log/master-trader-news-archive-backup.log 2>&1'
 ```
 
 ## Restore drill
@@ -143,10 +162,11 @@ so the PIT rule still marks the hole.
 
 ## Rollback
 
-Remove only this job's line, so any later change to root's crontab survives:
+Remove only this job's line with `set_archive_cron` (see Install), so any later
+change to root's crontab survives:
 
 ```bash
-( sudo crontab -l | grep -v 'deploy/vps/backup_news_archive.py' ) | sudo crontab -
+set_archive_cron ''
 sudo crontab -l | diff /home/ubuntu/backups/root-crontab.pre-229b - && echo "back to the pre-install crontab"
 ```
 
