@@ -152,22 +152,33 @@ class HlClient:
             return None
 
 
+def _candidates(token, index):
+    """[T, kT] (O5) with today's spelling, each flagged when today's meta lacks it."""
+    out = []
+    for c in (token, "k" + token):
+        hit = index.get(c.upper())
+        out.append((hit["name"] if hit else c, hit is None))
+    alias = ALIASES.get(token, {}).get("hl")
+    if alias and alias not in [n for n, _ in out]:
+        out.append((alias, alias.upper() not in index))
+    return out
+
+
 def hl_facts(token, t0_ms, index, client):
-    names = hl_names(token, index)
-    if not names:          # looked up by name, both candidates (O5)
-        found = [(c, client.evidence(c, t0_ms, absent_from_meta=True)) for c in (token, "k" + token)]
-        found = [(c, hl_status(times, t0_ms)) for c, times in found if times]
-        if not found:
-            return {"status": "ineligible", "coin": token, "reason": "never_in_meta"}
-        return _facts(*next((f for f in found if f[1] == "eligible"), found[0]))
-    results = [(name, hl_status(client.evidence(name, t0_ms), t0_ms)) for name in names]
-    for name, status in results:
-        if status == "eligible":
-            return _facts(name, status)
-    for name, status in results:
-        if status == "unknown":
-            return _facts(name, status)
-    return _facts(names[0], "ineligible")
+    """Both candidates are always queried; absent names are looked up by name (O5)."""
+    results = []
+    for name, absent in _candidates(token, index):
+        times = client.evidence(name, t0_ms, absent_from_meta=absent)
+        if absent and not times:
+            continue                      # no records under a name today's meta lacks
+        results.append((name, hl_status(times, t0_ms)))
+    if not results:
+        return {"status": "ineligible", "coin": token, "reason": "never_in_meta"}
+    for wanted in ("eligible", "unknown"):
+        for name, status in results:
+            if status == wanted:
+                return _facts(name, status)
+    return _facts(results[0][0], "ineligible")
 
 
 def _facts(coin, status):

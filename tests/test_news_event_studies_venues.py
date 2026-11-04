@@ -46,6 +46,8 @@ class FakeHl:
         body = json.loads(req.body)
         self.requests.append((req, body))
         key = (body["type"], body.get("coin"))
+        if key not in self.script:          # a coin Hyperliquid never had
+            return resp(500, b"null")
         out = self.script[key].pop(0) if len(self.script[key]) > 1 else self.script[key][0]
         if isinstance(out, Exception):
             raise out
@@ -139,6 +141,23 @@ def test_not_in_meta_with_records_is_evaluated():
                                                    "reason": "funding_records"}
 
 
+def test_both_candidates_queried_with_mixed_meta_membership():
+    idx = {"AAA": {"name": "AAA", "delisted": False}}
+    c, fake, _ = client({("fundingHistory", "AAA"): [funding()],
+                         ("fundingHistory", "kAAA"): [funding(T0 - 60_000)]})
+    assert nv.hl_facts("AAA", T0, idx, c) == {"status": "eligible", "coin": "kAAA",
+                                              "reason": "funding_records"}
+    assert [b["coin"] for _, b in fake.requests] == ["AAA", "kAAA"]
+    idx = {"KBBB": {"name": "kBBB", "delisted": False}}
+    c, fake, _ = client({("fundingHistory", "kBBB"): [funding()],
+                         ("fundingHistory", "BBB"): [funding(T0 - 60_000)]})
+    assert nv.hl_facts("BBB", T0, idx, c)["coin"] == "BBB"
+    assert [b["coin"] for _, b in fake.requests] == ["BBB", "kBBB"]
+    c, _, _ = client({("fundingHistory", "AAA"): [funding()]})
+    assert nv.hl_facts("AAA", T0, {"AAA": {"name": "AAA", "delisted": False}}, c) == \
+        {"status": "ineligible", "coin": "AAA", "reason": "no_recent_funding"}
+
+
 def test_not_in_meta_other_failure_stops_the_build():
     c, _, _ = client({("fundingHistory", "GONE"): [resp(502, b"bad gateway")]})
     with pytest.raises(nv.VenueAborted):
@@ -174,7 +193,7 @@ def test_hl_requests_are_paced():
     c, fake, clock = client({("fundingHistory", "OLD"): [funding(T0 - 60_000)]})
     nv.hl_facts("OLD", T0, index(), c)
     nv.hl_facts("OLD", T0, index(), c)
-    assert clock.sleeps == [nv.HL_GAP_S]
+    assert clock.sleeps == [nv.HL_GAP_S] * 3       # OLD, kOLD, OLD, kOLD
 
 
 def test_meta_failure_aborts():

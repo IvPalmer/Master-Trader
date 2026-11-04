@@ -429,7 +429,7 @@ def test_excluded_events_get_no_venue_requests(tmp_path):
     hl, probe = FakeHl(), FakeProbe()
     cms, upb = _dirs(tmp_path, c161=c161, up=up, details=details)
     nm.build(cms, upb, hl, probe, "x")
-    assert sorted(hl.calls) == ["AAA", "BBB"]
+    assert sorted(hl.calls) == ["AAA", "BBB", "kAAA", "kBBB"]
     assert {u.split("/")[-3] for u in probe.urls} <= {"AAAUSDT", "1000AAAUSDT", "1000000AAAUSDT",
                                                       "1MAAAUSDT", "BBBUSDT", "1000BBBUSDT",
                                                       "1000000BBBUSDT", "1MBBBUSDT"}
