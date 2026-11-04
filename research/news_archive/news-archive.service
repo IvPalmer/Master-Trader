@@ -1,0 +1,24 @@
+# PIT news archive (#229 Part A). systemd USER unit, host-side research monitor.
+# Install: research/news_archive/README.md ("Install"). Never copy it into the Dokploy checkout.
+[Unit]
+Description=PIT news archive (#229; host-side research monitor, no fleet containers)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/master-trader/research/news_archive
+ExecStart=/usr/bin/python3 /home/ubuntu/master-trader/research/news_archive/news_archive.py run
+Restart=always
+RestartSec=30
+MemoryMax=256M
+CPUQuota=25%
+Nice=10
+IOSchedulingClass=idle
+# Sources that fail the install check are disabled here, comma-separated, e.g.:
+# Environment=NEWS_ARCHIVE_DISABLE=upbit
+
+[Install]
+WantedBy=default.target

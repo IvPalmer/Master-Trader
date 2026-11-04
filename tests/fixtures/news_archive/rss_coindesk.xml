@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:ns1="http://purl.org/rss/1.0/modules/syndication/" version="2.0">
+  <channel>
+    <title>CoinDesk: Bitcoin, Ethereum, Crypto News and Price Data</title>
+    <link>https://www.coindesk.com/</link>
+    <atom:link rel="self" type="application/rss+xml" href="https://www.coindesk.com/arc/outboundfeeds/rss" />
+    <atom:link rel="hub" href="true" />
+    <description>Leader in cryptocurrency, Bitcoin, Ethereum, XRP, blockchain, DeFi, digital finance and Web 3.0 news with analysis, video and live price updates.</description>
+    <lastBuildDate>Tue, 03 Nov 2026 23:35:44 +0000</lastBuildDate>
+    <language>en-US</language>
+    <copyright>© 2026 CoinDesk, Inc.</copyright>
+    <generator>CoinDesk</generator>
+    <ttl>5</ttl>
+    <ns1:updatePeriod>hourly</ns1:updatePeriod>
+    <ns1:updateFrequency>1</ns1:updateFrequency>
+    <image>
+      <url>https://downloads.coindesk.com/arc/failsafe/feeds/coindesk-feed-logo.png</url>
+      <title>CoinDesk: Bitcoin, Ethereum, Crypto News and Price Data</title>
+      <link>https://www.coindesk.com/</link>
+    </image>
+    <item>
+      <title>What voters said about their views on crypto</title>
+      <link>https://www.coindesk.com/policy/2026/11/03/what-voters-said-about-their-views-on-crypto</link>
+      <guid isPermaLink="false">045b3be7-30bf-444a-bc6f-49fcd6ae5538</guid>
+      <pubDate>Tue, 03 Nov 2026 23:19:44 +0000</pubDate>
+      <description>A CoinDesk-commissioned poll from April sheds light on how v…</description>
+      <dc:creator>Nikhilesh De</dc:creator>
+      <category domain="https://www.coindesk.com/policy">Policy</category>
+      <category domain="tag">Election 2026</category>
+      <category domain="https://www.coindesk.com/">News</category>
+    </item>
+    <item>
+      <title>What happens if North Korea steals Wall Street's tokenized assets next</title>
+      <link>https://www.coindesk.com/business/2026/11/03/what-happens-if-north-korea-steals-wall-street-s-tokenized-assets-next</link>
+      <pubDate>Tue, 03 Nov 2026 23:00:07 +0000</pubDate>
+      <description>The $6.3 billion Binance hack showed how quickly cryptocurre…</description>
+      <dc:creator>Krisztian Sandor</dc:creator>
+      <category domain="https://www.coindesk.com/business">Finance</category>
+      <category domain="tag">Tokenization Weekly</category>
+      <category domain="tag">Tokenization</category>
+      <category domain="tag">Exclusive</category>
+      <category domain="tag">Hack</category>
+      <category domain="https://www.coindesk.com/">News</category>
+    </item>
+    </channel>
+</rss>
