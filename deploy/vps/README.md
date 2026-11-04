@@ -87,6 +87,14 @@ Test on demand:
 /home/ubuntu/master-trader/run-health-report.sh --stdout
 ```
 
+The report's last block, `NEWS ARCHIVE` (#229), reads the PIT news archive read-only:
+source freshness, coverage gaps and the archive backup's `STATUS.json`. Paths come from
+`NEWS_ARCHIVE_DB` and `NEWS_ARCHIVE_BACKUP_STATUS` (defaults under `/home/ubuntu`). The
+section never changes the report's exit status. `--stdout` also saves the trend state
+(`health_report_state.json` under `FT_DIR`), so back it up and restore it around a manual run.
+Note: trade-webhook truncates `status` events to 200 characters before Telegram, so the
+full report is read in `research/logs/health_report.log`.
+
 ## Mac side
 
 `~/Work/Dev/master-trader/` holds code + tracked configs/strategies only (~20 MB).
@@ -123,3 +131,9 @@ the non-destructive restore drill are in
 [live-db-backups-google-drive.md](../../docs/ops/live-db-backups-google-drive.md).
 Releasing the rclone version and authorizing Drive require separate operator
 approval; merging this code does not change the running VPS.
+
+The PIT news archive has its own job, `backup_news_archive.py` (#229), so an archive
+failure can never break this one: root cron at 04:30 UTC, destination
+`/home/ubuntu/backups/news-archive/`, 7 daily plus 8 weekly copies, its own lock and a
+15 GiB free-space floor. Its off-host leg is opt-in and counts only after a remote
+restore drill passes. See [news-archive-backup.md](../../docs/ops/news-archive-backup.md).

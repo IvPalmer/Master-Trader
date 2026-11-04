@@ -1,5 +1,8 @@
 """News-archive section of the nightly health report (#229 Part B, spec §5.1).
 
+It also reports the state of the archive's own backup job
+(deploy/vps/backup_news_archive.py) from the STATUS.json that job writes.
+
 Read-only and stdlib only. It imports no Part A code: the report runs from the
 Dokploy checkout, which carries nothing under research/. The archive is opened
 with mode=ro plus PRAGMA query_only, so the report can never write to it, and
@@ -12,12 +15,17 @@ starts with two spaces.
 
 from __future__ import annotations
 
+import json
+import os
 import sqlite3
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DEFAULT_DB = "/home/ubuntu/master-trader/research/news_archive/data/archive.sqlite"
+DEFAULT_BACKUP_STATUS = "/home/ubuntu/backups/news-archive/STATUS.json"
+STAMP_FORMAT = "%Y%m%dT%H%M%SZ"  # backup run directory names
+BACKUP_OVERDUE_S = 26 * 3600  # the job runs daily
 
 # An enabled source is stale when its last OK poll is older than this many
 # intervals plus the grace below (spec §5.1). Only liveness counts: some feeds
@@ -58,6 +66,19 @@ def _iso(when: datetime) -> str:
 
 def _age(now: datetime, stamp: str) -> str:
     return fmt_age(max(0.0, (now - datetime.fromisoformat(stamp)).total_seconds()))
+
+
+def _exists(path: str) -> bool:
+    """False only for a path that is not there; any other OSError propagates.
+
+    Path.exists() turns some errors into False depending on the Python version,
+    which would make an unreadable path read as "not installed".
+    """
+    try:
+        os.stat(path)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    return True
 
 
 def _one_line(text: str | None) -> str:
@@ -156,7 +177,7 @@ def _unrecovered_line(conn: sqlite3.Connection, now: datetime) -> str:
 def archive_lines(db_path: str, now: datetime) -> list[str]:
     """Freshness and gap lines for the archive at `db_path`. Never raises."""
     try:
-        if not Path(db_path).exists():
+        if not _exists(db_path):
             return ["  news-archive: not installed"]
         conn = connect_ro(db_path)
         try:
@@ -166,3 +187,78 @@ def archive_lines(db_path: str, now: datetime) -> list[str]:
             conn.close()
     except Exception as exc:  # noqa: BLE001 - the section must never break the report
         return [f"  news-archive: database unreadable ({type(exc).__name__}: {exc})"]
+
+
+def backup_line(status_path: str, now: datetime) -> str:
+    """One line on the archive backup, from its STATUS.json. Never raises.
+
+    The off-host copy counts only once the latest remote restore drill passed
+    (spec §5.2); until then the line starts "local only".
+    """
+    head = "  news-archive backup: "
+    try:
+        try:
+            with open(status_path) as f:
+                status = json.load(f)
+        except FileNotFoundError:
+            return head + "local only; no snapshot yet"
+        if not isinstance(status, dict):
+            raise ValueError(f"expected a JSON object, got {type(status).__name__}")
+        upload = status.get("upload") or {}
+        offhost = status.get("offhost_drill") or {}
+        upload_failed = None
+        if upload and not upload.get("ok"):
+            upload_failed = (f"off-host upload FAILED {_age(now, upload['at'])} ago: "
+                             f"{_one_line(upload.get('error'))}")
+        if offhost.get("ok"):
+            if upload.get("ok"):
+                parts = [f"off-host OK (last upload {_age(now, upload['at'])} ago)"]
+            else:
+                parts = [upload_failed or "off-host OK (no upload recorded)"]
+        else:
+            parts = ["local only"]
+            if upload_failed:
+                parts.append(upload_failed)
+            if offhost:
+                parts.append(f"off-host drill FAILED: {_one_line(offhost.get('error'))}")
+
+        stamp = status.get("latest_snapshot")
+        if stamp:
+            taken = datetime.strptime(stamp, STAMP_FORMAT).replace(tzinfo=timezone.utc)
+            parts.append(f"latest snapshot {fmt_age(max(0.0, (now - taken).total_seconds()))}"
+                         f" ago ({stamp})")
+        else:
+            parts.append("no snapshot yet")
+
+        result, run_at = status.get("last_run_result"), status.get("last_run_at")
+        if result in ("failed", "skipped"):
+            parts.append(f"last run {result.upper()} {_age(now, run_at)} ago: "
+                         f"{_one_line(status.get('last_run_error'))}")
+        if run_at and (now - datetime.fromisoformat(run_at)).total_seconds() > BACKUP_OVERDUE_S:
+            parts.append(f"no run for {_age(now, run_at)}")
+        return head + "; ".join(parts)
+    except Exception as exc:  # noqa: BLE001 - the section must never break the report
+        return f"{head}local only; status unreadable ({type(exc).__name__}: {exc})"
+
+
+def news_archive_lines(db_path: str | None = None, status_path: str | None = None,
+                       now: datetime | None = None) -> list[str]:
+    """The report's NEWS ARCHIVE block. Paths come from the environment at call time."""
+    db_path = db_path or os.environ.get("NEWS_ARCHIVE_DB") or DEFAULT_DB
+    status_path = (status_path or os.environ.get("NEWS_ARCHIVE_BACKUP_STATUS")
+                   or DEFAULT_BACKUP_STATUS)
+    now = now or datetime.now(timezone.utc)
+    try:
+        db_there = _exists(db_path)
+    except OSError:
+        db_there = True  # archive_lines reports it as unreadable
+    try:
+        status_there = _exists(status_path)
+    except OSError:
+        status_there = True  # backup_line reports it as unreadable
+    if not db_there:
+        if not status_there:
+            return ["  news-archive: not installed"]
+        # Backups exist, so the archive was installed: a vanished database is loud.
+        return [f"  news-archive: DATABASE MISSING at {db_path}", backup_line(status_path, now)]
+    return [*archive_lines(db_path, now), backup_line(status_path, now)]

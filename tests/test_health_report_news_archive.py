@@ -7,8 +7,11 @@ na_store, so the schema here cannot drift from the real one. Network-free.
     python3 -m pytest tests/test_health_report_news_archive.py -q
 """
 
+import json
+import os
 import sqlite3
 import sys
+import types
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -20,6 +23,7 @@ sys.path.insert(0, str(ROOT / "research" / "news_archive"))
 
 import na_store  # noqa: E402
 import news_archive_report as nar  # noqa: E402
+import strategy_health_report as shr  # noqa: E402
 
 NOW = datetime(2026, 11, 5, 23, 0, tzinfo=timezone.utc)
 
@@ -184,3 +188,164 @@ def test_reads_wal_rows_and_never_writes(tmp_path):
             ro.close()
     finally:
         writer.close()
+
+
+# ---- backup state and the report wiring (Task 4) ----------------------------------
+
+RUN_STAMP = "20261105T043000Z"
+RUN_AT = "2026-11-05T04:30:00.000000+00:00"
+STATUS_KEYS = ("last_run_at", "last_run_result", "last_run_error", "latest_snapshot",
+               "upload", "local_drill", "offhost_drill")
+OK_RUN = {"last_run_at": RUN_AT, "last_run_result": "ok", "latest_snapshot": RUN_STAMP}
+
+
+def _status(tmp_path, **keys):
+    status = dict.fromkeys(STATUS_KEYS)
+    status.update(keys)
+    path = tmp_path / "STATUS.json"
+    path.write_text(json.dumps(status))
+    return str(path)
+
+
+def _upload(ok, error=None):
+    return {"at": RUN_AT, "ok": ok, "error": error, "stamp": RUN_STAMP}
+
+
+def _drill(ok, error=None):
+    return {"at": RUN_AT, "stamp": RUN_STAMP if ok else None, "ok": ok, "error": error}
+
+
+def test_backup_local_only_until_the_remote_drill(tmp_path):
+    expected = "  news-archive backup: local only; latest snapshot 18.5 h ago (20261105T043000Z)"
+    assert nar.backup_line(_status(tmp_path, **OK_RUN), NOW) == expected
+    # an upload and a passing local drill still do not make the copy count off-host
+    assert nar.backup_line(_status(tmp_path, **OK_RUN, upload=_upload(True),
+                                   local_drill=_drill(True)), NOW) == expected
+
+
+def test_failed_upload_shows_before_the_gate(tmp_path):
+    path = _status(tmp_path, **{**OK_RUN, "last_run_result": "upload_failed",
+                                "last_run_error": "Drive unavailable"},
+                   upload=_upload(False, "Drive unavailable"))
+    assert nar.backup_line(path, NOW) == (
+        "  news-archive backup: local only; off-host upload FAILED 18.5 h ago: Drive unavailable;"
+        " latest snapshot 18.5 h ago (20261105T043000Z)")
+
+
+def test_offhost_counts_only_after_a_passing_remote_drill(tmp_path):
+    line = nar.backup_line(_status(tmp_path, **OK_RUN, upload=_upload(True),
+                                   offhost_drill=_drill(True)), NOW)
+    assert line.startswith("  news-archive backup: off-host OK (last upload 18.5 h ago); latest snapshot")
+
+    line = nar.backup_line(_status(tmp_path, **OK_RUN, upload=_upload(False, "quota"),
+                                   offhost_drill=_drill(True)), NOW)
+    assert "off-host upload FAILED 18.5 h ago: quota" in line
+    assert "off-host OK" not in line
+
+    line = nar.backup_line(_status(tmp_path, **OK_RUN, upload=_upload(True),
+                                   offhost_drill=_drill(False, "sha256 of x does not match")), NOW)
+    assert line.startswith("  news-archive backup: local only")
+    assert "off-host drill FAILED: sha256 of x does not match" in line
+
+
+def test_local_failure_skip_and_overdue_are_shown(tmp_path):
+    line = nar.backup_line(_status(
+        tmp_path, last_run_at=ts(hours=30), last_run_result="skipped",
+        last_run_error="free 14.2 GiB < required 15.0 GiB"), NOW)
+    assert line.startswith("  news-archive backup: local only; no snapshot yet")
+    assert "; last run SKIPPED 30.0 h ago: free 14.2 GiB < required 15.0 GiB" in line
+    assert "; no run for 30.0 h" in line
+
+    line = nar.backup_line(_status(tmp_path, **{**OK_RUN, "last_run_result": "failed",
+                                                "last_run_error": "integrity_check failed"}), NOW)
+    assert line.endswith("; last run FAILED 18.5 h ago: integrity_check failed")
+    assert "no run for" not in line
+
+
+def test_unreadable_status_is_one_line(tmp_path):
+    path = tmp_path / "STATUS.json"
+    path.write_text("{not json")
+    assert nar.backup_line(str(path), NOW).startswith(
+        "  news-archive backup: local only; status unreadable (JSONDecodeError")
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads any file")
+def test_status_without_read_permission_is_one_line(tmp_path):
+    path = _status(tmp_path, **OK_RUN)
+    os.chmod(path, 0o000)
+    try:
+        assert nar.news_archive_lines(str(tmp_path / "archive.sqlite"), path, NOW)[-1].startswith(
+            "  news-archive backup: local only; status unreadable (PermissionError")
+    finally:
+        os.chmod(path, 0o600)
+
+
+def test_missing_status_file(tmp_path):
+    assert nar.backup_line(str(tmp_path / "STATUS.json"), NOW) == \
+        "  news-archive backup: local only; no snapshot yet"
+
+
+def test_missing_db_with_backups_is_loud(tmp_path):
+    db = tmp_path / "archive.sqlite"
+    lines = nar.news_archive_lines(str(db), _status(tmp_path, **OK_RUN), NOW)
+    assert lines[0] == f"  news-archive: DATABASE MISSING at {db}"
+    assert lines[1].startswith("  news-archive backup: local only; latest snapshot")
+    assert not any("not installed" in line for line in lines)
+
+
+def test_not_installed_without_db_or_backups(tmp_path):
+    assert nar.news_archive_lines(str(tmp_path / "archive.sqlite"),
+                                  str(tmp_path / "STATUS.json"), NOW) == [
+        "  news-archive: not installed"]
+
+
+def test_env_paths_are_read_at_call_time(tmp_path, monkeypatch):
+    db = _archive(tmp_path, TWO, polls=_fresh("tree", "rss_coindesk"))
+    monkeypatch.setenv("NEWS_ARCHIVE_DB", db)
+    monkeypatch.setenv("NEWS_ARCHIVE_BACKUP_STATUS", _status(tmp_path, **OK_RUN))
+    lines = nar.news_archive_lines(now=NOW)
+    assert lines[0] == "  news-archive: 2/2 enabled sources OK; 0 items in 24 h"
+    assert lines[-1].startswith("  news-archive backup: local only; latest snapshot 18.5 h ago")
+
+
+def test_section_failure_never_breaks_the_report(monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setitem(sys.modules, "news_archive_report",
+                        types.SimpleNamespace(news_archive_lines=boom))
+    assert shr.news_archive_section() == ["  news-archive: section failed: RuntimeError: boom"]
+    monkeypatch.setitem(sys.modules, "news_archive_report", None)
+    assert shr.news_archive_section()[0].startswith(
+        "  news-archive: section failed: ModuleNotFoundError")
+
+
+def test_section_reads_the_archive(tmp_path, monkeypatch):
+    monkeypatch.setenv("NEWS_ARCHIVE_DB", str(tmp_path / "archive.sqlite"))
+    monkeypatch.setenv("NEWS_ARCHIVE_BACKUP_STATUS", str(tmp_path / "STATUS.json"))
+    assert shr.news_archive_section() == ["  news-archive: not installed"]
+
+
+PORTFOLIO = {"closed_pnl": 0.0, "open_pnl": 0.0, "true_pnl": 0.0, "total_trades": 0,
+             "open_positions": 0, "bots_online": 0, "avg_health_score": 0.0}
+
+
+def test_report_ends_with_the_news_archive_block():
+    report = shr.format_telegram_report([], PORTFOLIO, {}, news_lines=["  news-archive: x"])
+    assert report.endswith("\n\nNEWS ARCHIVE\n  news-archive: x")
+    assert "NEWS ARCHIVE" not in shr.format_telegram_report([], PORTFOLIO, {})
+
+
+def test_main_prints_the_news_archive_block_last(monkeypatch, capsys):
+    import logging
+
+    monkeypatch.setattr(shr, "REPORTING_BOTS", {})
+    monkeypatch.setattr(shr, "_setup_logging", lambda json_mode=False: logging.getLogger("t"))
+    monkeypatch.setattr(shr, "load_previous_state", lambda: None)
+    monkeypatch.setattr(shr, "save_state", lambda *a: None)
+    monkeypatch.setattr(shr, "compute_portfolio_metrics", lambda metrics: dict(PORTFOLIO))
+    monkeypatch.setattr(shr, "check_preregistrations", lambda: [])
+    monkeypatch.setattr(shr, "news_archive_section", lambda: ["  news-archive: x"])
+    monkeypatch.setattr(sys, "argv", ["strategy_health_report.py", "--stdout"])
+    shr.main()
+    assert capsys.readouterr().out.endswith("\n\nNEWS ARCHIVE\n  news-archive: x\n")
