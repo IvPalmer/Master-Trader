@@ -1346,8 +1346,13 @@ def format_telegram_report(bot_metrics: list[dict], portfolio: dict, trends: dic
 # Telegram Delivery
 # ---------------------------------------------------------------------------
 
+# trade-webhook sends a long report as up to 8 Telegram messages in one
+# request, each with its own 10 s timeout (#234), so wait longer than that.
+REPORT_SEND_TIMEOUT_S = 120
+
+
 def send_telegram(message: str) -> bool:
-    return send_status(message, bot_name="health-report")
+    return send_status(message, bot_name="health-report", timeout=REPORT_SEND_TIMEOUT_S)
 
 
 # ---------------------------------------------------------------------------
@@ -1412,9 +1417,10 @@ def main():
 
     # Send to Telegram
     print(report)
-    send_telegram(report)
-
-    log.info("Health report complete.")
+    if send_telegram(report):
+        log.info("Health report complete.")
+    else:
+        log.warning("Health report built but not delivered to trade-webhook.")
 
 
 if __name__ == "__main__":

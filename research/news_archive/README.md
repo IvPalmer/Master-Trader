@@ -123,7 +123,7 @@ while the service holds the writer lock (exit 3); stop the unit first.
   read-only (`ft_userdata/news_archive_report.py`): sources OK out of enabled, one line per
   stale source (no OK poll for `3 × interval + 10 min`), open gaps, gaps closed in 24 h and
   unrecovered overflow in 7 d, plus the backup state. Only liveness counts, so a feed that
-  polls OK but publishes nothing (`rss_blockworks`) reports OK. Non-list feeds
+  polls OK but publishes nothing (as `rss_blockworks` did) reports OK. Non-list feeds
   (`fear_greed`, `ff_calendar`, `hyperliquid_universe`) have no loss detector.
 - **Backup.** A separate root job, `deploy/vps/backup_news_archive.py`, snapshots this
   database daily to `/home/ubuntu/backups/news-archive/`; off-host upload and restore
@@ -155,3 +155,4 @@ files).
 | date | source commit | by |
 |---|---|---|
 | 2026-11-04 01:29 UTC | `beccbb0` | Claude, on the operator's go-ahead. `once`: 14/15 OK; `upbit` FAILED with HTTP 403 from the VPS IP, as expected, so the installed unit sets `Environment=NEWS_ARCHIVE_DISABLE=upbit`. Unit limits confirmed. `rss_blockworks` polls OK, but the newest item in its feed is dated 2026-01-07: the feed itself is stale. |
+| 2026-11-04 16:38 UTC | `beccbb0` (unit change only) | Claude, on the operator's go-ahead. `rss_blockworks` disabled: the installed unit now sets `Environment=NEWS_ARCHIVE_DISABLE=upbit,rss_blockworks` (previous unit kept as `news-archive.service.pre-blockworks-disable`). Blockworks stopped publishing site-wide, not just in the feed: `/feed`, `/feed/rss` and the news sitemap all end on 2026-01-07. The 50 archived items stay; status shows the source as `(disabled)`. To re-enable, drop the key from the unit and `systemctl --user daemon-reload && systemctl --user restart news-archive`. |

@@ -240,8 +240,12 @@ def _safe_float(v: Any) -> float | None:
         return None
 
 
-def summarize(event: dict[str, Any]) -> str:
-    """One-line human-friendly summary of a freqtrade event for Telegram."""
+def summarize(event: dict[str, Any], full: bool = False) -> str:
+    """Human-friendly summary of a freqtrade event for Telegram.
+
+    `full` keeps a `status` message whole instead of cutting it at 200 chars
+    (the health report, #234); every other event stays one short line.
+    """
     typ = event.get("type") or "unknown"
     pair = event.get("pair") or ""
     bot = event.get("bot_name") or event.get("strategy") or "?"
@@ -265,7 +269,8 @@ def summarize(event: dict[str, Any]) -> str:
         parts.append(f"FILLED EXIT {pair} @ {rate}")
     elif typ == "status":
         msg = event.get("status") or event.get("message") or ""
-        parts.append(f"STATUS {msg}"[:200])
+        line = f"STATUS {msg}"
+        parts.append(line if full else line[:200])
     elif typ == "warning":
         msg = event.get("status") or event.get("message") or ""
         parts.append(f"WARN {msg}"[:200])
@@ -298,6 +303,83 @@ async def telegram_send(text: str) -> bool:
         return False
 
 
+# A `status` event from these senders reaches Telegram whole (#234); any
+# other sender's status keeps the 200-char line above. The payload's
+# bot_name must match exactly, and when TRADE_WEBHOOK_NOTIFY_TOKEN is
+# configured the event must carry it.
+FULL_STATUS_BOTS = frozenset({"health-report"})
+# Telegram's sendMessage limit is 4096 UTF-16 code units. Parts are cut a
+# little shorter so the "(i/n) " prefix and the cap notice always fit.
+TELEGRAM_PART_UNITS = 3900
+MAX_STATUS_PARTS = 8
+
+
+def _utf16_units(s: str) -> int:
+    """UTF-16 code units, counted without encoding (a lone surrogate is 1)."""
+    return len(s) + sum(1 for c in s if c > "\uffff")
+
+
+def split_for_telegram(text: str, limit: int = TELEGRAM_PART_UNITS,
+                       max_parts: int | None = None) -> tuple[list[str], bool]:
+    """Cut `text` into parts of at most `limit` UTF-16 units.
+
+    A part ends just after a line break (kept in the part) when one fits,
+    otherwise mid-line, so `"".join(parts) == text`. With `max_parts`,
+    splitting stops there and the flag says text was left over. One linear
+    pass, whatever the input.
+    """
+    if limit < 2:
+        raise ValueError("limit must be at least 2 UTF-16 units")
+    parts: list[str] = []
+    buf: list[str] = []
+    used = 0
+    segments = text.split("\n")
+    for i, seg in enumerate(segments):
+        if i < len(segments) - 1:
+            seg += "\n"
+        n = _utf16_units(seg)
+        if used + n > limit and buf:
+            parts.append("".join(buf))
+            buf, used = [], 0
+            if max_parts is not None and len(parts) >= max_parts:
+                return parts, True
+        while n > limit:
+            cut, units = 0, 0
+            for c in seg:
+                w = 2 if c > "\uffff" else 1
+                if units + w > limit:
+                    break
+                units += w
+                cut += 1
+            parts.append(seg[:cut])
+            seg, n = seg[cut:], n - units
+            if max_parts is not None and len(parts) >= max_parts:
+                return parts, bool(seg) or i < len(segments) - 1
+        if seg:
+            buf.append(seg)
+            used += n
+    if buf or not parts:
+        parts.append("".join(buf))
+    return parts, False
+
+
+async def telegram_send_parts(text: str, bot: str) -> bool:
+    """Send `text` as numbered parts; True only if every part was accepted."""
+    parts, cut = split_for_telegram(text, max_parts=MAX_STATUS_PARTS)
+    if cut:
+        log.warning("%s status exceeds %d Telegram parts; sending the first %d",
+                    bot, MAX_STATUS_PARTS, MAX_STATUS_PARTS)
+        parts[-1] = (parts[-1].rstrip("\n")
+                     + f"\n… cut at {MAX_STATUS_PARTS} messages; full text in {bot}.jsonl")
+    parts = [p for p in parts if p.strip()]  # Telegram rejects a blank message
+    if len(parts) > 1:
+        parts = [f"({i}/{len(parts)}) {p}" for i, p in enumerate(parts, 1)]
+    ok = True
+    for part in parts:  # in order; a failed part does not stop the rest
+        ok = await telegram_send(part) and ok
+    return ok
+
+
 @app.get("/healthz")
 async def healthz() -> dict[str, Any]:
     return {
@@ -326,7 +408,8 @@ async def freqtrade_event(request: Request) -> dict[str, Any]:
     bot = (payload.get("bot_name") or payload.get("strategy") or "unknown").strip()
     bot = "".join(c if c.isalnum() or c in "-_" else "_" for c in bot)[:64] or "unknown"
 
-    if not (_token_matches(header_token) or _token_matches(body_token)):
+    authenticated = _token_matches(header_token) or _token_matches(body_token)
+    if not authenticated:
         why = "invalid" if (header_token or body_token) else "missing"
         if EVENT_AUTH == "enforce":
             log.warning("rejected POST /freqtrade/event bot=%s from=%s: %s token",
@@ -349,8 +432,12 @@ async def freqtrade_event(request: Request) -> dict[str, Any]:
         log.exception("append_event failed")
         raise HTTPException(status_code=500, detail=f"append failed: {e}")
 
-    summary = summarize(enriched)
-    sent = await telegram_send(summary)
+    raw_bot = payload.get("bot_name")
+    full = (enriched.get("type") == "status"
+            and isinstance(raw_bot, str) and raw_bot in FULL_STATUS_BOTS
+            and (authenticated or not NOTIFY_TOKEN))
+    summary = summarize(enriched, full=full)
+    sent = await (telegram_send_parts(summary, bot) if full else telegram_send(summary))
 
     # Real-time pair-drift detector. Fires only on losing exit_fill events.
     # Catches structural pair weakness (e.g. ARB-style "informed shorts" on
