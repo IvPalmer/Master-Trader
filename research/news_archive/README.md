@@ -38,7 +38,10 @@ service, `once`, the Part C harvester), through the file-locked limiter in
 `data/binance_cms_state.json`. Each catalog therefore polls about every 6 min
 (`interval_s` = 360). One attempt, no retry. HTTP 403/418/429, or any non-JSON body,
 suspends all Binance sources for 6 h, persisted in the same file, and opens a `suspended`
-gap. `listing-monitor` is not touched.
+gap. Redirects are never followed (a 3xx is a failed poll, and for Binance a block
+signal); an oversized or stalled Binance response with an HTTP status also suspends. A
+limiter state file that exists but cannot be parsed fails closed with a 6 h suspension.
+`listing-monitor` is not touched.
 
 **Findings from the fixture capture (2026-11-03):**
 
@@ -70,7 +73,7 @@ Holes are durable rows in `gaps` (never pruned):
 | `overflow` | a list-feed page holds no previously seen id; one bounded backfill (Tree `limit=2000`, Upbit/OKX ≤ 3 extra pages, Binance and RSS none). Written closed, `detail` = `recovered` / `unrecovered` | — |
 | `suspended` | a Binance block signal (any caller) | that source's next OK poll, or at startup once the 6 h have passed |
 | `disk` | free space below 15 GiB: nothing is stored, the poll counts as failed | the next OK poll, or at startup |
-| `clock` | wall clock jumps > 2 s against the monotonic clock, or `timedatectl` reports NTP unsynchronized (all sources) | the first tick with no jump and a healthy probe |
+| `clock` | wall clock jumps > 2 s against the monotonic clock (checked each tick and again before each poll's writes), or `timedatectl` reports NTP unsynchronized (all sources) | the first tick with no jump; after an unsynchronized report, or at startup, only once `timedatectl` explicitly reports synchronized |
 
 While an ongoing gap (`clock`, `disk`, `suspended`, `outage`) is open for a source, every
 item and revision written for it gets `after_gap = 1`. So does the first OK poll after
@@ -95,8 +98,9 @@ runs at a time.
 Known limitations:
 
 - Revisions are only seen for items still on a source's first page.
-- The 10 s HTTP timeout is per socket operation, so a server that drips bytes can hold one
-  request longer than the 20 s poll deadline (bounded by the 5 MB cap).
+- Each request gets the poll's remaining time (at most 10 s) as its socket timeout, and the
+  20 s deadline is checked between 64 KB body chunks, so one slow read can overrun the
+  deadline by at most one socket timeout.
 - `received_at` relies on the VPS clock (NTP-synchronized; checked hourly).
 
 ## Commands

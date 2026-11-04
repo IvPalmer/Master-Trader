@@ -3,6 +3,8 @@ import io
 import json
 import sys
 import urllib.error
+import urllib.request
+import urllib.response
 from email.message import Message
 from pathlib import Path
 
@@ -101,12 +103,69 @@ def test_suspension_persists_across_instances(tmp_path):
     assert fresh.suspended_until(6 * 3600 + 2.0) is None
 
 
-def test_corrupt_state_file_fails_closed(tmp_path):
+def test_corrupt_or_empty_state_file_fails_closed_for_6h(tmp_path):
+    for text in ("{not json", ""):
+        state = tmp_path / ("s%d.json" % len(text))
+        state.write_text(text)
+        lim = BinanceLimiter(str(state))
+        assert lim.try_acquire(1000.0) is False   # unknown history: assume suspended
+        assert lim.suspended_until(1000.0) == 1000.0 + 6 * 3600
+        assert lim.try_acquire(1000.0 + 6 * 3600 + 1) is True
+
+
+def test_state_is_replaced_atomically_under_a_separate_lock(tmp_path):
     state = tmp_path / "binance_cms_state.json"
-    state.write_text("{not json")
     lim = BinanceLimiter(str(state))
-    assert lim.try_acquire(1000.0) is False      # unknown history: wait one full gap
-    assert lim.try_acquire(1181.0) is True
+    ino = None
+    for t in (0.0, 200.0):
+        assert lim.try_acquire(t) is True
+        json.loads(state.read_text())             # always a complete document
+        assert ino != state.stat().st_ino         # written by rename, not in place
+        ino = state.stat().st_ino
+    assert (tmp_path / "binance_cms_state.json.lock").exists()
+
+
+class FakeHTTPS(urllib.request.HTTPSHandler):
+    def __init__(self, responses):
+        super().__init__()
+        self.responses, self.opened = list(responses), []
+
+    def https_open(self, req):
+        self.opened.append(req.full_url)
+        status, headers, body = self.responses.pop(0)
+        msg = Message()
+        for k, v in headers.items():
+            msg[k] = v
+        r = urllib.response.addinfourl(io.BytesIO(body), msg, req.full_url, status)
+        r.msg = "fake"   # HTTPErrorProcessor reads response.msg
+        return r
+
+
+def test_redirects_are_not_followed():
+    fake = FakeHTTPS([(302, {"Location": "https://www.binance.com/elsewhere"}, b"moved"),
+                      (200, {}, b"{}")])
+    resp = fetch(SOURCES["binance_listing"], opener=na_fetch.make_opener(fake).open)
+    assert resp.status == 302 and len(fake.opened) == 1
+    assert is_block_signal(resp) is True
+
+
+def test_oversized_error_body_keeps_its_status():
+    def opener(req, timeout):
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", Message(),
+                                     io.BytesIO(b"x" * 5_000_001))
+    with pytest.raises(FetchError) as e:
+        fetch(SOURCES["binance_listing"], opener=opener)
+    assert e.value.status == 403
+
+
+def test_body_read_stops_at_the_deadline():
+    clock = iter([0.0, 5.0, 25.0, 30.0, 35.0])
+    with pytest.raises(FetchError, match="deadline"):
+        fetch(SOURCES["tree"], opener=opener_returning(b"x" * 300_000), deadline=20.0,
+              mono=lambda: next(clock))
+    resp = fetch(SOURCES["tree"], opener=opener_returning(b"{}"), deadline=20.0,
+                 mono=lambda: 1.0)
+    assert resp.body == b"{}"
 
 
 def test_clock_moving_backwards_does_not_lock_out_for_long(tmp_path):

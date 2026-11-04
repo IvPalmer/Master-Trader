@@ -20,7 +20,7 @@ class Env:
     def __init__(self, tmp_path, keys, db="archive.sqlite"):
         self.w, self.m = WALL0, 5000.0
         self.free, self.probe = 100 * GIB, True
-        self.routes, self.calls = {}, []
+        self.routes, self.calls, self.fetch_kw = {}, [], []
         self.tmp = tmp_path
         self.conn = na_store.connect(str(tmp_path / db))
         self.limiter = BinanceLimiter(str(tmp_path / "binance_cms_state.json"))
@@ -36,11 +36,14 @@ class Env:
         self.w += s
         self.m += s
 
-    def fetch(self, spec):
+    def fetch(self, spec, **kw):
         self.calls.append(spec.url)
+        self.fetch_kw.append(kw)
         r = self.routes[spec.url]
         if isinstance(r, list):
             r = r.pop(0) if len(r) > 1 else r[0]
+        if callable(r):
+            r = r(spec)
         if isinstance(r, Exception):
             raise r
         return r
@@ -430,7 +433,7 @@ def _cli(tmp_path, *args):
 def test_once_single_source_exits_zero(tmp_path, monkeypatch, capsys):
     calls = []
 
-    def fake_fetch(spec):
+    def fake_fetch(spec, **kw):
         calls.append(spec.url)
         if spec.key == "fear_greed":
             return ok((FIX / "fear_greed.json").read_bytes())
@@ -457,7 +460,7 @@ def test_once_waits_for_the_shared_binance_limiter(tmp_path, monkeypatch):
     monkeypatch.setattr(news_archive, "_runtime",
                         lambda: (lambda: clock["w"], lambda: clock["m"], sleep))
     monkeypatch.setattr(news_archive, "fetch",
-                        lambda spec: ok((FIX / "binance_cms_48.json").read_bytes()))
+                        lambda spec, **kw: ok((FIX / "binance_cms_48.json").read_bytes()))
     (tmp_path / "data").mkdir()
     BinanceLimiter(str(tmp_path / "data" / "binance_cms_state.json")).try_acquire(WALL0 - 10)
     assert news_archive.main(_cli(tmp_path, "once", "--source", "binance_listing")) == 0
@@ -467,7 +470,7 @@ def test_once_waits_for_the_shared_binance_limiter(tmp_path, monkeypatch):
 def test_disabled_sources_are_excluded_and_marked(tmp_path, monkeypatch):
     monkeypatch.setenv("NEWS_ARCHIVE_DISABLE", "upbit, tree")
     monkeypatch.setattr(news_archive, "fetch",
-                        lambda spec: ok((FIX / "fear_greed.json").read_bytes()))
+                        lambda spec, **kw: ok((FIX / "fear_greed.json").read_bytes()))
     assert news_archive.main(_cli(tmp_path, "once", "--source", "fear_greed")) == 0
     conn = na_store.connect(str(tmp_path / "data" / "archive.sqlite"))
     enabled = dict(conn.execute("SELECT source, enabled FROM sources"))
@@ -477,7 +480,84 @@ def test_disabled_sources_are_excluded_and_marked(tmp_path, monkeypatch):
 
 def test_second_writer_is_refused(tmp_path, monkeypatch):
     monkeypatch.setattr(news_archive, "fetch",
-                        lambda spec: ok((FIX / "fear_greed.json").read_bytes()))
+                        lambda spec, **kw: ok((FIX / "fear_greed.json").read_bytes()))
     (tmp_path / "data").mkdir()
     with news_archive.writer_lock(str(tmp_path / "data")):
         assert news_archive.main(_cli(tmp_path, "once", "--source", "fear_greed")) == 3
+
+
+# ---- final-review fixes (Codex Sol/high on PR #232) -----------------------------------
+
+def test_clock_jump_during_fetch_taints_that_poll(tmp_path):
+    env = Env(tmp_path, ["tree"])
+    env.arc.startup()
+    env.routes[TREE] = tree("1")
+    env.arc.tick()
+    env.advance(60)
+
+    def jumping(spec):
+        env.w += 30                                   # wall clock steps while we wait
+        return tree("2", "1")
+    env.routes[TREE] = jumping
+    assert env.arc.poll("tree") is True
+    assert flags(env)["2"] == 1
+    assert [g[3] for g in env.gaps("tree", "clock")] == [None]
+    rec = env.q("SELECT received_at FROM items WHERE source_item_id='2'")[0][0]
+    assert na_store.pit_valid(env.conn, "tree", rec) is False
+
+
+def test_unknown_ntp_state_does_not_clear_a_known_bad_clock(tmp_path):
+    env = Env(tmp_path, ["tree"])
+    env.routes[TREE] = tree("1")
+    env.probe = False
+    env.arc.startup()
+    env.arc.tick()
+    env.probe = None                                  # timedatectl failed this time
+    env.advance(5)
+    env.arc.tick()
+    assert [g[3] for g in env.gaps("tree", "clock")] == [None]
+    env.arc = env.new_archive()                       # nor does a restart with unknown NTP
+    env.arc.startup()
+    assert [g[3] for g in env.gaps("tree", "clock")] == [None]
+    env.probe = True
+    env.advance(5)
+    env.arc.tick()
+    assert env.gaps("tree", "clock")[0][3] == iso(env.w)
+
+
+def test_oversized_binance_response_with_status_suspends(tmp_path):
+    env = Env(tmp_path, ["binance_listing"])
+    env.arc.startup()
+    env.routes[SOURCES["binance_listing"].url] = FetchError("response too large", status=403)
+    assert env.arc.poll("binance_listing") is False
+    assert env.limiter.suspended_until(env.w) is not None
+    assert env.q("SELECT http_status FROM polls") == [(403,)]
+
+
+def test_requests_get_the_remaining_poll_deadline(tmp_path):
+    env = Env(tmp_path, ["upbit"])
+    env.arc.startup()
+    page = json.loads((FIX / "upbit.json").read_bytes())
+
+    def upbit(*ids, took=0.0):
+        p = json.loads(json.dumps(page))
+        p["data"]["notices"] = [{**page["data"]["notices"][0], "id": i} for i in ids]
+
+        def respond(spec):
+            env.advance(took)
+            return ok(p)
+        return respond
+    env.routes[SOURCES["upbit"].url] = upbit(1, 2)
+    env.arc.poll("upbit")
+    env.advance(120)
+    env.fetch_kw.clear()
+    env.routes[SOURCES["upbit"].url] = upbit(10, 11, took=9.0)
+    for spec, ids in zip(SOURCES["upbit"].backfill(), ((12, 13), (14, 15), (16, 17))):
+        env.routes[spec.url] = upbit(*ids, took=9.0)
+    started = env.m
+    env.arc.poll("upbit")
+    kws = env.fetch_kw
+    assert kws[0]["timeout_s"] == 10 and kws[0]["deadline"] == started + 20
+    # main 9 s + 8 s pacing: the one backfill page gets the 3 s that remain
+    assert len(kws) == 2 and kws[1]["timeout_s"] == 3.0
+    assert all(k["deadline"] == started + 20 for k in kws)

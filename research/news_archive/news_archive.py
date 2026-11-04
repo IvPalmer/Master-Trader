@@ -27,11 +27,13 @@ from datetime import timedelta
 from email.utils import parsedate_to_datetime
 
 import na_store
-from na_fetch import BinanceLimiter, fetch, is_block_signal
+from na_fetch import BinanceLimiter, FetchError, fetch, is_block_signal
 from na_sources import SOURCES, diff_universe, universe_names
 
 MAX_BACKOFF_S = 1800
 DEADLINE_S = 20.0
+HTTP_TIMEOUT_S = 10.0
+MIN_REQUEST_S = 1.0
 DISK_MIN_BYTES = 15 * 1024 ** 3
 CLOCK_JUMP_S = 2.0
 CLOCK_CHECK_S = 3600.0
@@ -145,8 +147,10 @@ class Archive:
     def _close_cleared_gaps(self, now):
         disk_ok = self.free_bytes() >= DISK_MIN_BYTES
         suspended = self.limiter.suspended_until(self.wall()) is not None
-        clock_ok = self.clock_probe() is not False
+        clock_ok = self.clock_probe() is True
         for g in na_store.open_gaps(self.conn):
+            if g["reason"] == "clock" and g["source"] in self.sources and not clock_ok:
+                self._probe_bad = True   # keep probing every tick until NTP is healthy
             src, reason = g["source"], g["reason"]
             cleared = (src not in self.sources
                        or (reason == "disk" and disk_ok)
@@ -161,20 +165,31 @@ class Archive:
         for key in self.sources:
             na_store.open_gap(self.conn, key, "clock", now, detail)
 
+    def _detect_jump(self):
+        """Wall vs monotonic drift since the last check; a jump opens clock gaps."""
+        now_w, now_m = self.wall(), self.mono()
+        offset = now_w - now_m
+        if self._offset is None:
+            self._offset = offset
+            return False
+        drift = offset - self._offset
+        self._offset = offset
+        if abs(drift) <= CLOCK_JUMP_S:
+            return False
+        now = na_store.iso_from_epoch(now_w)
+        detail = "jump %+.3f s wall vs monotonic" % drift
+        with na_store.transaction(self.conn):
+            self.conn.execute("INSERT INTO clock_checks VALUES (?,?,?,?)",
+                              (now, None, offset, detail))
+            self._clock_gap_all(now, detail)
+        self.log("clock: " + detail)
+        return True
+
     def _check_clock(self):
+        jumped = self._detect_jump()
         now_w, now_m = self.wall(), self.mono()
         now = na_store.iso_from_epoch(now_w)
         offset = now_w - now_m
-        drift = offset - self._offset
-        self._offset = offset
-        jumped = abs(drift) > CLOCK_JUMP_S
-        if jumped:
-            detail = "jump %+.3f s wall vs monotonic" % drift
-            with na_store.transaction(self.conn):
-                self.conn.execute("INSERT INTO clock_checks VALUES (?,?,?,?)",
-                                  (now, None, offset, detail))
-                self._clock_gap_all(now, detail)
-            self.log("clock: " + detail)
         hourly = now_m >= self._next_clock_check
         if hourly or self._probe_bad:
             probe = self.clock_probe()
@@ -184,7 +199,10 @@ class Archive:
                     "INSERT INTO clock_checks VALUES (?,?,?,?)",
                     (now, None if probe is None else int(bool(probe)), offset,
                      None if probe is not False else "NTP not synchronized"))
-            self._probe_bad = probe is False
+            if probe is True:
+                self._probe_bad = False
+            elif probe is False:
+                self._probe_bad = True   # unknown (None) keeps the previous state
             if self._probe_bad:
                 self._clock_gap_all(now, "NTP not synchronized")
         if not jumped and not self._probe_bad:
@@ -245,13 +263,18 @@ class Archive:
     def _backfill(self, spec, started_m):
         """One bounded backfill. Returns ([(received_at, items)], recovered)."""
         pages, recovered = [], False
+        deadline = started_m + DEADLINE_S
         for bspec in (spec.backfill() if spec.backfill else []):
-            if self.mono() + bspec.min_gap_s - started_m > DEADLINE_S:
+            if deadline - self.mono() - bspec.min_gap_s < MIN_REQUEST_S:
                 break
             if bspec.min_gap_s:
                 self.sleep(bspec.min_gap_s)
+            remaining = deadline - self.mono()
+            if remaining < MIN_REQUEST_S:
+                break
             try:
-                resp = self.fetcher(bspec)
+                resp = self.fetcher(bspec, timeout_s=min(HTTP_TIMEOUT_S, remaining),
+                                    deadline=deadline)
                 received = self._now()
                 if resp.status != 200:
                     break
@@ -284,7 +307,17 @@ class Archive:
             return "denied"
         status, retry_after = None, None
         try:
-            resp = self.fetcher(spec)
+            try:
+                resp = self.fetcher(spec, timeout_s=HTTP_TIMEOUT_S,
+                                    deadline=started_m + DEADLINE_S)
+            except FetchError as fe:
+                status = fe.status
+                if spec.binance and fe.status is not None:
+                    # an unreadable (oversize, stalled) Binance response is not a normal
+                    # CMS page: treat it as a block signal
+                    self._suspend_binance(self.wall(), "unreadable response, HTTP %d"
+                                          % fe.status)
+                raise
             received_w = self.wall()
             received = na_store.iso_from_epoch(received_w)
             status = resp.status
@@ -306,6 +339,7 @@ class Archive:
                 if not na_store.known_ids(self.conn, key, [i.source_item_id for i in items]):
                     overflow = True
                     pages, recovered = self._backfill(spec, started_m)
+            self._detect_jump()           # a clock step during this poll taints its writes
             if self.free_bytes() < DISK_MIN_BYTES:
                 na_store.open_gap(self.conn, key, "disk", received,
                                   "free space below 15 GiB; nothing stored")
@@ -487,7 +521,7 @@ def build_archive(data_dir, sources):
     wall, mono, sleep = _runtime()
     conn = na_store.connect(os.path.join(data_dir, "archive.sqlite"))
     limiter = BinanceLimiter(os.path.join(data_dir, "binance_cms_state.json"))
-    return Archive(conn, sources, limiter, lambda spec: fetch(spec), wall, mono,
+    return Archive(conn, sources, limiter, lambda spec, **kw: fetch(spec, **kw), wall, mono,
                    lambda: shutil.disk_usage(data_dir).free, ntp_synchronized, sleep=sleep)
 
 
