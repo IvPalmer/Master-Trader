@@ -1224,6 +1224,15 @@
             "O8 per token: when one notice adds several tokens to several markets, a token is a KRW addition only when the notice puts that token on KRW. The evidence is, in order: the title's market group for that token; a title naming only the KRW market, or a single-token title; the notice body (a 마켓 table column, '- TOKEN : KRW 마켓' or '- KRW 마켓 : TOKEN, …'). A token added to BTC or USDT only is neither an event nor an O9 prior. A token whose market is unstated is not a prior before the window and needs review inside it. On the harvested corpus this removes 5 BTC/USDT-only tokens from the events (3266 GAL, 3362 ACS, 4070 ALT, 4192 OMNI, 5100 IO) and 7 already-on-KRW exclusions of later KRW additions (3362 MASK, 3654 IMX, 4363 GAL, 5239 ALT, 5375 OMNI, 5644 YGG, 6255 IO); the build has no review items left."
           ],
           "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A2-o10-hour-clock",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "stop": "The Phase 1 build from 89dfe17 (2026-11-05) left 87 Upbit KRW additions `unknown` in each Upbit study: 86 with no parseable trading start and 1 Hyperliquid fetch failure. 80 of the 86 start cells read `M월 D일 H시 예정`, an hour with no minutes, which O10's clock list (`HH:MM` or `H시 M분`) does not read. Those manifests (delisting 46e657bd837a9f81be186bc4755bd879489e89401bc16cf602fda4f34641a974, Upbit 22568ef2fda529451b428a27df902a941f871f47f7c48b9e329621d1dacca9b8) were discarded, not frozen.",
+          "rule": "O10 clocks also include `H시` alone, read as minute 00; `오전`/`오후` apply as before. `H시` must stand alone: it is not read inside a word (`H시간`, `H시점`, `H시작`), nor when minutes follow without `분` (`H시 MM`) or `반` follows. A range `H시 ~ H시` reads as its first time.",
+          "corpus_effect": "On the harvested corpus 81 non-excluded events gain a start (no parseable start: 86 -> 5), as do 27 events already excluded as binance48_overlap. No start already read and no exclusion changes. Every new start is 0.2 to 12.7 h after t0, so none becomes began_before_notice.",
+          "outcome_blind": "Decided from start-cell and body-line formats read with digits masked, counts, and start times against t0; no price, return or outcome from the window was computed, printed or inspected."
         }
       ],
       "resolution": null
@@ -1429,6 +1438,15 @@
             "O8 per token: when one notice adds several tokens to several markets, a token is a KRW addition only when the notice puts that token on KRW. The evidence is, in order: the title's market group for that token; a title naming only the KRW market, or a single-token title; the notice body (a 마켓 table column, '- TOKEN : KRW 마켓' or '- KRW 마켓 : TOKEN, …'). A token added to BTC or USDT only is neither an event nor an O9 prior. A token whose market is unstated is not a prior before the window and needs review inside it. On the harvested corpus this removes 5 BTC/USDT-only tokens from the events (3266 GAL, 3362 ACS, 4070 ALT, 4192 OMNI, 5100 IO) and 7 already-on-KRW exclusions of later KRW additions (3362 MASK, 3654 IMX, 4363 GAL, 5239 ALT, 5375 OMNI, 5644 YGG, 6255 IO); the build has no review items left."
           ],
           "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A2-o10-hour-clock",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "stop": "The Phase 1 build from 89dfe17 (2026-11-05) left 87 Upbit KRW additions `unknown` in each Upbit study: 86 with no parseable trading start and 1 Hyperliquid fetch failure. 80 of the 86 start cells read `M월 D일 H시 예정`, an hour with no minutes, which O10's clock list (`HH:MM` or `H시 M분`) does not read. Those manifests (delisting 46e657bd837a9f81be186bc4755bd879489e89401bc16cf602fda4f34641a974, Upbit 22568ef2fda529451b428a27df902a941f871f47f7c48b9e329621d1dacca9b8) were discarded, not frozen.",
+          "rule": "O10 clocks also include `H시` alone, read as minute 00; `오전`/`오후` apply as before. `H시` must stand alone: it is not read inside a word (`H시간`, `H시점`, `H시작`), nor when minutes follow without `분` (`H시 MM`) or `반` follows. A range `H시 ~ H시` reads as its first time.",
+          "corpus_effect": "On the harvested corpus 81 non-excluded events gain a start (no parseable start: 86 -> 5), as do 27 events already excluded as binance48_overlap. No start already read and no exclusion changes. Every new start is 0.2 to 12.7 h after t0, so none becomes began_before_notice.",
+          "outcome_blind": "Decided from start-cell and body-line formats read with digits masked, counts, and start times against t0; no price, return or outcome from the window was computed, printed or inspected."
         }
       ],
       "resolution": null
