@@ -16,13 +16,26 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 
 UPSTREAM = 'https://api.hyperliquid.xyz'
-CLIENTS = {'killers', 'short', 'accounting'}
+CLIENTS = {'killers', 'short', 'upbit', 'accounting'}
+# Clients whose bot signs exchange actions when live (each with its own HL
+# account and API wallet). Every other client is observation only.
+EXCHANGE_CLIENTS = {'killers', 'upbit'}
 LOW_COST = {'l2Book', 'allMids', 'clearinghouseState', 'orderStatus',
             'spotClearinghouseState', 'exchangeStatus'}
 VARIABLE = {'recentTrades', 'historicalOrders', 'userFills', 'userFillsByTime',
             'fundingHistory', 'userFunding', 'nonUserFundingUpdates', 'twapHistory',
             'userTwapSliceFills', 'userTwapSliceFillsByTime', 'delegatorHistory',
             'delegatorRewards', 'validatorStats'}
+# Per-client slices (#252). A sliced client's reads are background (tier 2) and
+# share the 600-unit background allowance; only its exchange actions and
+# orderStatus reads are priority, and those draw on the client's own slice per
+# rolling minute. Slice rows are never counted against the fleet's priority
+# capacity, and a slice waiter never blocks a fleet waiter, so the pilot cannot
+# take the 250 + 50 units reserved for Killers. Worst case on the IP: 900 fleet
+# + 40 slice per minute (HL allows 1200), leaving 260 for non-fleet users.
+SLICES = {'upbit': 40}
+SLICE_PRIORITY_TYPES = {'orderStatus'}
+FLEET_CAP = 900
 # Only public market data is cached. Never conceal a new order/fill/account update.
 CACHE_TTL = {'allMids': 1, 'l2Book': .5, 'meta': 300, 'spotMeta': 300, 'perpDexs': 300,
              'metaAndAssetCtxs': 10, 'spotMetaAndAssetCtxs': 10, 'candleSnapshot': 2}
@@ -64,6 +77,10 @@ def actual_cost(path, body, result):
 
 
 def priority(client, path, body):
+    if client in SLICES:
+        if path == 'exchange':
+            return 0
+        return 1 if body.get('type') in SLICE_PRIORITY_TYPES else 2
     if path == 'exchange':
         return 0
     # CCXT fetch_ticker(s) uses asset contexts, not just allMids/l2Book.
@@ -73,48 +90,73 @@ def priority(client, path, body):
     return 2
 
 
+def lane(client, tier):
+    """The budget lane of a request: a sliced client's priority traffic has its own."""
+    return client if client in SLICES and tier < 2 else None
+
+
 class Budget:
+    # Rows are [time, weight, tier, lane]; lane None is the fleet budget.
     def __init__(self, clock=time.monotonic):
         self.clock = clock
         self.used = deque()
         self.waiting = [0, 0, 0]
         self.cooldown = 0.0
 
-    def total(self):
+    def _expire(self):
         now = self.clock()
         while self.used and self.used[0][0] <= now - 60:
             self.used.popleft()
+
+    def total(self):
+        """Everything sent on the IP in the last minute."""
+        self._expire()
         return sum(row[1] for row in self.used)
 
-    def reserve(self, weight, tier):
+    def lane_total(self, name):
+        self._expire()
+        return sum(row[1] for row in self.used if row[3] == name)
+
+    def reserve(self, weight, tier, client=None):
+        own = lane(client, tier)
+        if own is not None:
+            if self.clock() < self.cooldown or self.lane_total(own) + weight > SLICES[own]:
+                return None
+            row = [self.clock(), weight, tier, own]
+            self.used.append(row)
+            return row
         # 250 weight reserved for managing live exposure; another 50 for
         # exchange actions. 300/min left for non-fleet users on the VPS IP.
-        total = self.total()
+        total = self.lane_total(None)
         # Background has its own 600-unit allowance. Charging live traffic
         # against that allowance as well double-reserved capacity and starved
         # candles while hundreds of units remained unused.
-        background = sum(row[1] for row in self.used if row[2] == 2)
-        limit = 900 if tier == 0 else 850
+        background = sum(row[1] for row in self.used if row[2] == 2 and row[3] is None)
+        limit = FLEET_CAP if tier == 0 else 850
         if (self.clock() < self.cooldown or any(self.waiting[:tier])
                 or total + weight > limit
                 or (tier == 2 and background + weight > 600)):
             return None
-        row = [self.clock(), weight, tier]
+        row = [self.clock(), weight, tier, None]
         self.used.append(row)
         return row
 
-    async def acquire(self, weight, tier, timeout=12):
+    async def acquire(self, weight, tier, timeout=12, client=None):
         deadline = self.clock() + timeout
-        self.waiting[tier] += 1
+        # A slice waiter never counts as a fleet waiter (it must not hold Killers back).
+        fleet = lane(client, tier) is None
+        if fleet:
+            self.waiting[tier] += 1
         try:
             while self.clock() < deadline:
-                row = self.reserve(weight, tier)
+                row = self.reserve(weight, tier, client)
                 if row is not None:
                     return row
                 await asyncio.sleep(.05)
             return None
         finally:
-            self.waiting[tier] -= 1
+            if fleet:
+                self.waiting[tier] -= 1
 
 
 class Gateway:
@@ -138,7 +180,9 @@ class Gateway:
                             for c in sorted(CLIENTS)},
                 'max_latency_seconds': round(max([r[4] for r in recent] or [0]), 3),
                 'weight_last_minute': self.budget.total(),
-                'background_weight_last_minute': sum(r[1] for r in self.budget.used if r[2] == 2),
+                'background_weight_last_minute': sum(r[1] for r in self.budget.used
+                                                     if r[2] == 2 and r[3] is None),
+                'slice_weight_last_minute': {name: self.budget.lane_total(name) for name in SLICES},
                 'requests_by_type': {kind: sum(r[2] == kind for r in recent)
                                      for kind in sorted({r[2] for r in recent})},
                 'queued': sum(self.budget.waiting)}
@@ -155,7 +199,8 @@ class Gateway:
         tier = priority(client, path, body)
         # Public startup history can wait across a budget window; exit/order
         # reads and actions retain the short deadline and reserved capacity.
-        reservation = await self.budget.acquire(cost(path, body), tier, timeout=70 if tier == 2 else 12)
+        reservation = await self.budget.acquire(cost(path, body), tier,
+                                                timeout=70 if tier == 2 else 12, client=client)
         if reservation is None:
             self.event(client, kind, 'queue_timeout', time.monotonic() - started)
             return 429, b'{"error":"fleet request budget busy; request not forwarded"}'
@@ -211,7 +256,7 @@ async def proxy(client: str, path: str, request: Request):
     if not isinstance(body, dict):
         raise HTTPException(400)
     # Observation clients cannot submit signed actions via this gateway.
-    if path == 'exchange' and client != 'killers':
+    if path == 'exchange' and client not in EXCHANGE_CLIENTS:
         raise HTTPException(403, 'observation client cannot submit exchange actions')
     status, data = await app.state.gateway.forward(client, path, body)
     return Response(data, status_code=status, media_type='application/json')

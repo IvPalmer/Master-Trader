@@ -1,0 +1,38 @@
+[
+ {
+  "_id": "1793874001518E12",
+  "title": "엔진코인(ENJ) 입출금 일시 중단 안내 (11/09 20:00 ~)",
+  "source": "Upbit",
+  "url": "https://upbit.com/service_center/notice?id=d1fecdf2-e7a2-437c-8d31-529213bc6705",
+  "time": 1793874001518,
+  "symbols": [
+   "ENJ_USDT"
+  ],
+  "en": "Notice on temporary suspension of Enjin Coin (ENJ) deposits and withdrawals (11/09 20:00 ~)",
+  "kind": "outage",
+  "venue": null,
+  "importance": 5.5
+ },
+ {
+  "_id": "179386905086910",
+  "title": "서버 점검 안내 (11/09 02:00 ~)",
+  "source": "Upbit",
+  "url": "https://upbit.com/service_center/notice?id=ea934aac-dc9b-4dc3-b5d3-aca1d88a3802",
+  "time": 1793869050869,
+  "symbols": [],
+  "en": "Server Maintenance Notice (11/09 02:00 ~)",
+  "importance": 4.1
+ },
+ {
+  "_id": "1793858584912CKBU",
+  "title": "콜렉터크립트(CARDS) 신규 거래지원 안내 (KRW, BTC, USDT 마켓)",
+  "source": "Upbit",
+  "url": "https://upbit.com/service_center/notice?id=1793858584730",
+  "time": 1793858584912,
+  "symbols": [],
+  "en": "Notice of New Trading Support for CollectorCrypt (CARDS) (KRW, BTC, USDT Markets)",
+  "kind": "listing",
+  "venue": "upbit",
+  "importance": 7.9
+ }
+]

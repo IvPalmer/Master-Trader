@@ -12,7 +12,8 @@ BOTS = [('ft-keltner-bounce', 8095, 'KeltnerBounceV1'),
         ('ft-funding-fade', 8096, 'FundingFadeV1'),
         ('ft-oi-trend-pullback', 8102, 'OITrendPullbackV1'),
         ('ft-killers-scalp', 8099, 'KillersScalpV1'),
-        ('ft-short-keltner-hl-live', 8103, 'ShortKeltnerV2HL')]
+        ('ft-short-keltner-hl-live', 8103, 'ShortKeltnerV2HL'),
+        ('ft-upbit-fade-hl', 8105, 'UpbitFadeLiveV1')]
 
 
 def container(name):

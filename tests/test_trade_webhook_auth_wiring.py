@@ -58,8 +58,8 @@ def _templates(config_name):
     return {k: v for k, v in webhook.items() if isinstance(v, dict)}
 
 
-def test_the_fleet_is_five_bots(prod):
-    assert len(list(_bots(prod))) == 5
+def test_the_fleet_is_six_bots(prod):
+    assert len(list(_bots(prod))) == 6
 
 
 def test_trade_webhook_is_not_on_dokploy_network():

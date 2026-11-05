@@ -1,0 +1,22 @@
+{
+ "universe": [
+  {
+   "szDecimals": 5,
+   "name": "BTC",
+   "maxLeverage": 40,
+   "marginTableId": 56
+  },
+  {
+   "szDecimals": 0,
+   "name": "kPEPE",
+   "maxLeverage": 10,
+   "marginTableId": 52
+  },
+  {
+   "szDecimals": 0,
+   "name": "ENA",
+   "maxLeverage": 10,
+   "marginTableId": 52
+  }
+ ]
+}
