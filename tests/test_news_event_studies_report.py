@@ -188,6 +188,8 @@ def test_resolution_from_results_only_and_verify_detects_edit(tmp_path):
     for e in prereg["preregistrations"]:
         if e.get("id") == DEL:
             e["resolution"] = res
+        elif e.get("id") in (LONG, FADE):        # this fixture has no Upbit results files
+            e["resolution"] = None
     pp = tmp_path / "prereg.json"
     pp.write_text(json.dumps(prereg, ensure_ascii=False), encoding="utf-8")
     assert rp.verify_resolution(pp, tmp_path / "out") == []

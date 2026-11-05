@@ -823,7 +823,7 @@
     {
       "id": "binance-delisting-reaction-2026-11",
       "bot": null,
-      "status": "open",
+      "status": "closed",
       "registered": "2026-11-04",
       "review_by": "2027-02-01",
       "issue": "#229",
@@ -1090,12 +1090,33 @@
           "outcome_blind": "Decided before any Phase 2 return was computed. The supplement split uses notice publication times only."
         }
       ],
-      "resolution": null
+      "resolution": {
+        "verdict": "NOT DETERMINABLE",
+        "reasons": [
+          "4h mean interval spans zero (stress low -0.0375, base high +0.0413)"
+        ],
+        "label": "proxy result",
+        "primary_4h": {
+          "n": 14,
+          "mean": 0.0072070233660768744,
+          "ci": [
+            -0.034466160643965564,
+            0.04134354036131061
+          ],
+          "median": -0.0032069113204787588,
+          "win_rate": 0.42857142857142855
+        },
+        "supplement_sha256": null,
+        "manifest_sha256": "4f979113c7135a185898c06f0d69ae450f4b5d9bc603a7c49a7f5aa87a866c3c",
+        "code_commit": "9991e23",
+        "computed_at": "2026-11-05T17:09:11.842000+00:00"
+      },
+      "resolution_note": "Mechanical A4 resolution from the VPS results (code 9991e23), recorded 2026-11-05. Registered primary (+4 h) NOT DETERMINABLE, n 14. Descriptive, base cost, 98.33% interval: +24 h +3.8% [-3.4%, +10.8%]. No bot and no allocation follow; the lane stays as research only."
     },
     {
       "id": "upbit-krw-listing-reaction-2026-11",
       "bot": null,
-      "status": "open",
+      "status": "closed",
       "registered": "2026-11-04",
       "review_by": "2027-02-01",
       "issue": "#229",
@@ -1368,7 +1389,28 @@
           "supplement_candidates": "26 re-added; 5 candidates in the long study, 4 in the fade (most were not on Binance before t0)"
         }
       ],
-      "resolution": null
+      "resolution": {
+        "verdict": "NOT DETERMINABLE",
+        "reasons": [
+          "4h mean interval spans zero (stress low -0.0341, base high +0.0218)"
+        ],
+        "label": "proxy result",
+        "primary_4h": {
+          "n": 96,
+          "mean": -0.00590403710636244,
+          "ci": [
+            -0.031077784079230893,
+            0.02178542094908302
+          ],
+          "median": -0.010262914153172539,
+          "win_rate": 0.3958333333333333
+        },
+        "supplement_sha256": "e647310c099b33825708a8c29591e46b48c38de331360bd4e78e81e7e39bb62d",
+        "manifest_sha256": "23a6b3541d5799bf2aa679bf4e1913d970a8af89de58d01c4e3f6e3236d77d00",
+        "code_commit": "9991e23",
+        "computed_at": "2026-11-05T17:21:09.639000+00:00"
+      },
+      "resolution_note": "Mechanical A4 resolution from the VPS results (code 9991e23), recorded 2026-11-05. Registered primary (+4 h) NOT DETERMINABLE, n 96. Descriptive, base cost, 98.33% interval: +24 h -5.0% [-9.0%, -0.2%] (buying after the notice loses). The long lane is not pursued; no bot and no allocation follow."
     },
     {
       "id": "upbit-krw-fade-forward-2026-11",
@@ -1529,7 +1571,7 @@
     {
       "id": "upbit-krw-listing-fade-2026-11",
       "bot": null,
-      "status": "open",
+      "status": "closed",
       "registered": "2026-11-04",
       "review_by": "2027-02-01",
       "issue": "#229",
@@ -1812,7 +1854,28 @@
           "supplement_candidates": "26 re-added; 5 candidates in the long study, 4 in the fade (most were not on Binance before t0)"
         }
       ],
-      "resolution": null
+      "resolution": {
+        "verdict": "NOT DETERMINABLE",
+        "reasons": [
+          "4h mean interval spans zero (stress low -0.0089, base high +0.0477)"
+        ],
+        "label": "proxy result",
+        "primary_4h": {
+          "n": 57,
+          "mean": 0.019846264168925758,
+          "ci": [
+            -0.0058783884222724,
+            0.047718370149465415
+          ],
+          "median": 0.019428917683808642,
+          "win_rate": 0.6491228070175439
+        },
+        "supplement_sha256": "e647310c099b33825708a8c29591e46b48c38de331360bd4e78e81e7e39bb62d",
+        "manifest_sha256": "23a6b3541d5799bf2aa679bf4e1913d970a8af89de58d01c4e3f6e3236d77d00",
+        "code_commit": "9991e23",
+        "computed_at": "2026-11-05T17:21:09.639000+00:00"
+      },
+      "resolution_note": "Mechanical A4 resolution from the VPS results (code 9991e23), recorded 2026-11-05. Registered primary (+4 h) NOT DETERMINABLE, n 57. Descriptive, base cost, 98.33% interval, not the registered primary: +24 h +7.4% [+2.9%, +11.4%], win rate 81%. That secondary result is tested forward as a new hypothesis under upbit-krw-fade-forward-2026-11 (paper monitor, #249). No bot, live order or allocation follows from this entry."
     }
   ]
 }
