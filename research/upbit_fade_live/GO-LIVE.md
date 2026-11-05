@@ -267,7 +267,10 @@ before stays paused, and so does one whose circuit breaker has triggered since (
 
 **Rollback to the old image** follows the same procedure, steps 2 to 7 (entries paused,
 in-flight drained, Killers flat, usage under 300, verify, 60 s, restore), with step 5's
-command replaced. Stop the live pilot first: the old image has no `upbit` client. Close its
+command replaced. In step 2 of a rollback, keep the original snapshot: write the current
+state to `killers-state-rollback.txt` instead (`... | jq -r .state | tee killers-state-rollback.txt`)
+and do **not** overwrite `killers-state-before.txt`, because it would now record `paused`.
+Step 7 then restores from `killers-state-before.txt`, the state before the first recreate. Stop the live pilot first: the old image has no `upbit` client. Close its
 positions, set `HL_UPBIT_GATEWAY_CLIENT=short` (or remove it) and
 `HYPERLIQUID_UPBIT_FADE_DRY_RUN=true`, and recreate the bot as in **Back to dry-run**
 below. Step 5 for the rollback:
