@@ -1565,6 +1565,62 @@
         "Forward events never mix with the Part C retrospective sample; results are posted on #229 at each check."
       ],
       "triggers": [],
+      "amendments": [
+        {
+          "date": "2026-11-05",
+          "by": "operator (Palmer); recorded by Claude",
+          "issue": "#252",
+          "reason": "Operator override before resolution. At about 1.7 events a month this preregistration needs about a year to reach its one decision; on 2026-11-05 the operator chose not to wait and authorized a small live pilot now: \"if our backtests support it lets put it live with a bit of money\". The authority is the operator's decision and the Part C proxy result, not any forward result: no comparable forward outcome exists at 2026-11-05. The graduation gates are not met and are not claimed.",
+          "changes": "None to this preregistration. Its measurement, eligibility, cohorts, frozen constants, rules, decision rule, decision count and date are unchanged, and the paper monitor (research/upbit_fade_forward/) keeps running unchanged as the shadow measurement.",
+          "separation": "The live pilot is preregistered separately as upbit-krw-fade-live-pilot-2026-11. Its trades are a separate measurement epoch: they never enter this preregistration's decision, never count toward its 40 announcements, and are reported apart from it. This decision is computed from paper records only.",
+          "rule_note": "The rule 'no deploy, config, sizing or allocation change follows from any result' still holds: the pilot follows from the operator's override, not from a result of this measurement. EDGE here still authorizes only a proposal; NO EDGE still closes the lane, and the pilot would then be stopped."
+        }
+      ],
+      "resolution": null
+    },
+    {
+      "id": "upbit-krw-fade-live-pilot-2026-11",
+      "bot": "UpbitFadeLiveV1",
+      "status": "open",
+      "registered": "2026-11-05",
+      "review_by": "2027-05-05",
+      "min_closed_trades": 10,
+      "issue": "#252",
+      "parent": "upbit-krw-fade-forward-2026-11",
+      "spec": "docs/superpowers/specs/2026-11-05-upbit-fade-forward-design.md, section 'Addendum: live pilot (#252)'",
+      "code": "ft_userdata/user_data/strategies/UpbitFadeLiveV1.py and configs/UpbitFadeLiveV1.json (compose service ft-upbit-fade-hl, 127.0.0.1:8105); research/upbit_fade_live/live_trigger.py (systemd user unit upbit-fade-live-trigger); runbook research/upbit_fade_live/GO-LIVE.md",
+      "authorization": "Operator override, 2026-11-05 (#252; amendment of upbit-krw-fade-forward-2026-11 the same day). Deployed in dry-run first; the operator funds the account, adds the API wallet and flips it live. The agent never places orders and never handles keys.",
+      "hypothesis": "None is decided here. A small live execution pilot of the forward rule: it measures real fills, fees, settled funding and the execution plumbing of the 24 h short against the paper record of the same events. Evidence of edge comes only from upbit-krw-fade-forward-2026-11.",
+      "frozen": {
+        "measurement": "live",
+        "places_orders": true,
+        "venue": "hyperliquid",
+        "account": "a dedicated Hyperliquid master account with its own API wallet (no withdrawal rights), funded with about 150 USDC and traded by no other bot",
+        "selection": "exactly the events the paper monitor enters in the comparable cohort with every requirement established when the live order is decided (uff_report.classify returns ('comparable', [])); eligibility at t0 unchanged",
+        "trigger": "the paper entry record (t0 + 5 min); one POST /forceenter on the local bot per event id, never retried",
+        "latest_entry_after_t0_s": 420,
+        "direction": "short",
+        "order_type": "market",
+        "stake_usdc": 50,
+        "leverage": 1,
+        "margin_mode": "isolated",
+        "max_open": 2,
+        "time_exit_s": 86400,
+        "time_exit": "Freqtrade minimal_roi {\"0\": 100, \"1440\": -1}",
+        "emergency_stop_ratio": -0.6,
+        "emergency_stop_note": "+60% adverse for a short at 1x, above the worst adverse move in Part C (+48.7%), so it does not change the tested 24 h rule",
+        "stop_on_exchange_when_live": true,
+        "dry_run_wallet_usdc": 150,
+        "kill_realized_pnl_usdc": -75,
+        "epoch_start": null
+      },
+      "rules": [
+        "Epoch: the live epoch starts at the first start of ft-upbit-fade-hl with HYPERLIQUID_UPBIT_FADE_DRY_RUN=false, recorded in an amendment (UTC time, source commit) at go-live. Dry-run trades before it are plumbing checks, not results.",
+        "Kill rule (Claude's call, 2026-11-05): pause the trigger (its kill-switch file) when cumulative realized pilot P&L in the live epoch is -75 USDC or worse, or on any execution defect: an orphaned position, a missing exchange stop on a live position, a double entry, or a /forceenter outcome that could not be observed. The trigger engages the switch itself for the P&L limit, an unobserved outcome and a bot that answers for another strategy; the operator applies the others. Open positions keep their 24 h exit and stop. Resuming needs a recorded decision (an amendment).",
+        "Reports are kept apart from the paper decision: per live trade, the entry and exit fills against the paper entry and exit of the same event, fees, settled funding (Hyperliquid userFunding) and P&L; live results are never pooled with paper results and never used in the decision of upbit-krw-fade-forward-2026-11.",
+        "No sizing, leverage, cap or rule change without an amendment. NO EDGE in upbit-krw-fade-forward-2026-11 stops the pilot."
+      ],
+      "triggers": [],
       "amendments": [],
       "resolution": null
     },

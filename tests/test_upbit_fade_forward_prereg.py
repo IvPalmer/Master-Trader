@@ -25,7 +25,14 @@ def entry():
 def test_entry_is_open_research_only_and_unresolved():
     e = entry()
     assert e["status"] == "open" and e["bot"] is None and e["resolution"] is None
-    assert e["issue"] == "#229" and e["triggers"] == [] and e["amendments"] == []
+    assert e["issue"] == "#229" and e["triggers"] == []
+    # The one amendment is the operator's live-pilot override (#252): it changes nothing here
+    # and keeps the pilot's trades out of this decision.
+    (am,) = e["amendments"]
+    assert am["date"] == "2026-11-05" and am["issue"] == "#252"
+    assert am["changes"].startswith("None to this preregistration")
+    assert "upbit-krw-fade-live-pilot-2026-11" in am["separation"]
+    assert "never enter this preregistration's decision" in am["separation"]
     assert e["registered"] == "2026-11-05" and e["review_by"] == "2027-11-05"
     assert e["spec"].startswith("docs/superpowers/specs/2026-11-05-upbit-fade-forward-design.md")
     assert SPEC.exists()
