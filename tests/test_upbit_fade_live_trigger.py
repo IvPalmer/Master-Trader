@@ -121,7 +121,7 @@ def test_a_comparable_paper_entry_is_entered_once_with_the_pilot_order(tmp_path)
     assert post["method"] == "POST"
     assert post["body"] == {"pair": "CARDS/USDC:USDC", "side": "short", "stakeamount": 50,
                             "leverage": 1.0, "ordertype": "market",
-                            "entry_tag": "upbit-fade:" + s.eid()}
+                            "entry_tag": "upbit-fade:%s@%d" % (s.eid(), s.t0 + 7 * f.MIN)}
     res = trig.decisions.get("result:" + s.eid())
     assert res["status"] == "entered" and res["trade_id"] == 7
     intent = trig.decisions.get("intent:" + s.eid())
@@ -171,6 +171,112 @@ def test_a_timed_out_forceenter_is_unknown_and_engages_the_kill_switch(tmp_path)
     assert trig.killed() and json.loads(trig.kill_path.read_text())["reason"].startswith(
         "forceenter outcome unknown")
     assert any("kill switch engaged" in n for n in notes)
+
+
+# --- #252 review, P1 1: the pause for an ambiguous entry is durable -------------------------
+
+def test_a_crash_while_pausing_for_an_unknown_outcome_still_pauses_after_restart(tmp_path,
+                                                                                monkeypatch):
+    """The process dies while it engages the pause for a timed-out /forceenter. The restart
+    must be paused and must not resend, whatever was already on disk."""
+    s = paper(tmp_path)
+    ft = FakeFt()
+    ft.enter = urllib.error.URLError(socket.timeout("timed out"))
+    trig, _, _ = trigger(s, tmp_path, ft)
+    real = lt.Trigger.engage_kill
+
+    def crash(self, reason):
+        raise KeyboardInterrupt("power cut while pausing")
+
+    monkeypatch.setattr(lt.Trigger, "engage_kill", crash)
+    with pytest.raises(KeyboardInterrupt):
+        trig.poll()
+    monkeypatch.setattr(lt.Trigger, "engage_kill", real)
+    ft2 = FakeFt()
+    again, _, _ = trigger(s, tmp_path, ft2)
+    again.tick()
+    assert again.killed() and again.kill_path.exists()
+    assert again.decisions.get("result:" + s.eid())["status"] == "unknown"
+    assert ft2.posts() == [] and len(ft.posts()) == 1
+
+
+def test_removing_the_pause_file_without_a_reconciliation_does_not_resume(tmp_path):
+    s = paper(tmp_path)
+    ft = FakeFt()
+    ft.enter = urllib.error.URLError(socket.timeout("timed out"))
+    trig, _, _ = trigger(s, tmp_path, ft)
+    trig.poll()
+    trig.kill_path.unlink()
+    assert trig.killed() and trig.unresolved() == [s.eid()]
+    trig.tick()                                  # every loop puts the file back
+    assert trig.kill_path.exists()
+    trig.kill_path.unlink()
+    again, _, _ = trigger(s, tmp_path, FakeFt())  # and so does a restart
+    assert again.killed() and again.kill_path.exists()
+
+
+def test_reconcile_records_the_checked_outcome_then_the_file_can_go(tmp_path, capsys):
+    s = paper(tmp_path)
+    ft = FakeFt()
+    ft.enter = urllib.error.URLError(socket.timeout("timed out"))
+    trig, _, _ = trigger(s, tmp_path, ft)
+    trig.poll()
+    live = str(tmp_path / "live")
+    args = ["--data-dir", live, "reconcile", s.eid(), "--by", "palmer", "--note", "no trade on HL"]
+    assert lt.main(args[:4] + ["--outcome", "entered"] + args[4:]) == 2      # needs --trade-id
+    with lt.process_lock(live):                                             # service running
+        assert lt.main(args[:4] + ["--outcome", "not_entered"] + args[4:]) == 3
+    assert lt.main(args[:4] + ["--outcome", "not_entered"] + args[4:]) == 0
+    assert lt.main(args[:4] + ["--outcome", "not_entered"] + args[4:]) == 2  # once only
+    again, ft2, _ = trigger(s, tmp_path, FakeFt())
+    rec = again.decisions.get("reconcile:" + s.eid())
+    assert rec["outcome"] == "not_entered" and rec["by"] == "palmer"
+    assert again.unresolved() == [] and again.killed()                      # the file stays
+    again.kill_path.unlink()
+    again.tick()
+    assert not again.killed() and ft2.posts() == []                         # never resent
+    capsys.readouterr()
+    assert lt.main(["--data-dir", live, "status"]) == 0
+    out = capsys.readouterr().out
+    assert "unreconciled unknown outcomes: none" in out and "reconciled " + s.eid() in out
+
+
+def test_a_failed_write_halts_every_further_entry(tmp_path, monkeypatch):
+    s = paper(tmp_path)
+    trig, ft, _ = trigger(s, tmp_path)
+    real = trig.decisions.append
+    calls = []
+
+    def flaky(rec):
+        calls.append(rec["rid"])
+        if len(calls) == 1:
+            raise OSError(28, "No space left on device")
+        return real(rec)
+
+    monkeypatch.setattr(trig.decisions, "append", flaky)
+    with pytest.raises(OSError):
+        trig.poll()                              # the intent could not be written
+    assert trig.halted and trig.killed() and trig.kill_path.exists()
+    trig.poll()                                  # the disk is back: still no entry
+    assert ft.posts() == []
+    assert trig.decisions.get("skip:" + s.eid())["reason"] == "kill_switch"
+
+
+# --- #252 review, P1 4: the loss limit is latched every loop ------------------------------
+
+def test_the_loss_limit_is_latched_every_loop_without_a_paper_event(tmp_path):
+    ft = FakeFt()
+    api = lt.FtApi(URL, "ft_user", "s3cret", opener=ft)
+    trig = lt.Trigger(tmp_path / "no-paper" / "ledger.jsonl", tmp_path / "live", api,
+                      lambda: 1_800_000_000_000)
+    trig.recover()
+    trig.tick()
+    assert not trig.killed()
+    ft.realized = -75.01
+    trig.tick()
+    assert trig.killed() and trig.kill_path.exists()
+    assert trig.decisions.kind("kill")[0]["reason"].startswith("cumulative realized pilot P&L -75.01")
+    assert ft.posts() == []
 
 
 def test_max_open_asks_the_bot_and_skips(tmp_path):
