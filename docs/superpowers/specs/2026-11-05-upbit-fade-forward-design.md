@@ -73,9 +73,6 @@ or container.
   `hl_status`: the perp is in `meta` and `fundingHistory` shows records in the 24 h
   before t0, including one in the last hour.
 - **Comparable cohort** (the decision set) also requires:
-  - **a known trading start:** the notice body states a start time at or after t0, read with
-    `nes_classify.upbit_trading_start_ms`. With no body, or no start in it, the event goes
-    to the descriptive cohort;
   - **a Binance market before t0:** Binance 1 m klines (USDⓈ-M `fapi/v1/klines` first, else spot
     `api/v3/klines`, the Part C proxy order in `nes_venues.binance_candidates`) show trading in [t0 − 10 min, t0). That is evidence from before t0,
     not today's `exchangeInfo`;
@@ -84,6 +81,21 @@ or container.
     descriptive;
   - **a timely entry:** filled within 2 min of t0 + 5 min. Later entries, up to the 10 min
     deadline, are `delayed` and descriptive.
+- **No known trading start is required.** *Claude's call (2026-11-05, implementation).*
+  Part C required one, but Tree carries no Upbit notice body: the 3 Tree Upbit items in the
+  VPS archive have an empty body, their raw JSON holds only the title, `en`, `kind` and
+  `url`, and the VPS gets 403 from Upbit's announcements API. A deployable bot can act only
+  on the title, so the forward cohort is defined by what such a bot can know. This is one
+  more stated difference from Part C, beside the Tree clock, book fills and funding.
+  - When a body is present, the start is read with `nes_classify.upbit_trading_start_ms`.
+    A start before t0 still excludes the event (`began_before_notice`, above); a start at
+    or after t0 gives `start_unknown = false`. With no body, or no start in it, the event
+    stays comparable with `start_unknown = true`.
+  - *Descriptive only:* `krw_market_first_seen_ms`, the time of the first `market/all`
+    snapshot after t0 that lists `KRW-<TOKEN>`. It never selects events.
+  - `status` and every resolution report show the `start_unknown` and
+    `krw_market_first_seen` counts. The decision metric is over the whole comparable
+    cohort; the subset with `start_unknown = false` is reported as descriptive only.
 - Every other Hyperliquid-eligible event is still measured and reported as the
   **descriptive cohort**.
 
