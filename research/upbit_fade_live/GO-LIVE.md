@@ -81,29 +81,53 @@ and a dry-run Freqtrade never sends one). The gateway changes only at go-live (P
    Pause the trigger meanwhile: `touch .../upbit_fade_live/data/KILL`.
 
    ```bash
+   A=http://127.0.0.1:8105/api/v1
    fe() {  # pair, event id, deadline (ms)
-     curl -s -u "$U:$P" -X POST http://127.0.0.1:8105/api/v1/forceenter -H 'Content-Type: application/json' \
+     curl -s -u "$U:$P" -X POST $A/forceenter -H 'Content-Type: application/json' \
        -d "{\"pair\":\"$1\",\"side\":\"short\",\"stakeamount\":50,\"leverage\":1,\"ordertype\":\"market\",\"entry_tag\":\"upbit-fade:$2@$3\"}"; echo; }
+   fx() { curl -s -u "$U:$P" -X POST $A/forceexit -H 'Content-Type: application/json' -d "{\"tradeid\":\"$1\"}"; echo; }
+   st() { curl -s -u "$U:$P" $A/status; }
+   ev() { st | jq -r ".[$1].enter_tag | capture(\"^upbit-fade:(?<e>[^@]+)@\").e"; }
+   R=plumbing-$(date +%s)   # fresh event ids: the bot refuses any id an earlier trade used
    D=$(( $(date +%s%3N) + 300000 ))
    # a. three concurrent entries: exactly two open, the third refused under the entry lock
-   fe BTC/USDC:USDC plumbing:1 $D & fe ETH/USDC:USDC plumbing:2 $D & fe SOL/USDC:USDC plumbing:3 $D & wait
-   curl -s -u "$U:$P" http://127.0.0.1:8105/api/v1/status | jq 'map({trade_id, pair, is_short, leverage, stake_amount, enter_tag})'
-   # b. refused: a past deadline, a reused event id, a missing tag
-   curl -s -u "$U:$P" -X POST http://127.0.0.1:8105/api/v1/forceexit -H 'Content-Type: application/json' -d '{"tradeid":"all"}'
-   fe AVAX/USDC:USDC plumbing:4 $(( $(date +%s%3N) - 1000 ))
-   fe AVAX/USDC:USDC plumbing:1 $D
+   fe BTC/USDC:USDC $R-1 $D & fe ETH/USDC:USDC $R-2 $D & fe SOL/USDC:USDC $R-3 $D & wait
+   st | jq 'map({trade_id, pair, is_short, leverage, stake_amount, enter_tag})'
+   # b. one refusal per call. Which two of the three opened is a race, so read them back,
+   #    then close one: with one trade open the cap (checked first) cannot mask the others.
+   KEEP_ID=$(st | jq -r '.[0].trade_id'); KEEP_PAIR=$(st | jq -r '.[0].pair'); KEEP_EV=$(ev 0)
+   SHUT_ID=$(st | jq -r '.[1].trade_id'); SHUT_EV=$(ev 1)
+   fx $SHUT_ID; until [ "$(st | jq length)" = 1 ]; do sleep 2; done
+   D=$(( $(date +%s%3N) + 300000 ))
+   fe AVAX/USDC:USDC $KEEP_EV $D                            # event of the open trade
+   fe AVAX/USDC:USDC $SHUT_EV $D                            # event of the closed trade
+   fe "$KEEP_PAIR" $R-4 $D                                  # pair already open
+   fe AVAX/USDC:USDC $R-5 $(( $(date +%s%3N) - 1000 ))      # past the deadline
+   fe AVAX/USDC:USDC $R-6 $(( $(date +%s%3N) + 600000 ))    # deadline more than 7 min ahead
+   curl -s -u "$U:$P" -X POST $A/forceenter -H 'Content-Type: application/json' \
+     -d '{"pair":"AVAX/USDC:USDC","side":"short","stakeamount":50,"leverage":1,"ordertype":"market"}'; echo  # no tag
+   st | jq length
    sudo docker logs ft-upbit-fade-hl --since 5m 2>&1 | grep "refused entry"
+   fx all; until [ "$(st | jq length)" = 0 ]; do sleep 2; done
    ```
 
    Expect exactly two trades in (a), each `is_short`, leverage 1, stake 50. The third call
    fails with `Maximum number of trades is reached.` (it arrived after the others were
    committed) or `Failed to enter position` (refused under the entry lock, with a
-   `refused entry ... 2 trades open` log line). Both calls in (b) fail with `Failed to enter
-   position` and a `refused entry` line naming the deadline and the reused event. Then:
+   `refused entry ... 2 trades open` log line). In (b), every call fails and `st | jq length`
+   still prints `1`. The pair call fails in Freqtrade itself (`position for <KEEP_PAIR>
+   already open - id: <KEEP_ID>`): `/forceenter` rejects an open pair before the strategy
+   runs, so the strategy's own pair check is covered only by the repo tests. The other five
+   fail with `Failed to enter position` and add five `refused entry` lines, one per call, in
+   order: `event <KEEP_EV> already has trade <KEEP_ID>`, `event <SHUT_EV> already has trade
+   <SHUT_ID>`, `past the entry deadline`, `deadline more than 7 min ahead`, and `entry tag
+   'force_entry' is not ...` (Freqtrade fills in `force_entry` when no tag is sent). A
+   `trades open, max 2` line from a (b) call means the exit had not landed and that check
+   proved nothing; any new trade in `st` means a check failed. Then:
    - **stop settings:** `show_config` gives `stoploss: -0.6`, `stoploss_on_exchange: false`
      (dry-run), `minimal_roi: {"0": 100, "1440": -1}`;
    - **ROI time exit, real Freqtrade code:** open one more trade
-     (`fe BTC/USDC:USDC plumbing:5 $(( $(date +%s%3N) + 300000 ))`), leave it, and about
+     (`fe BTC/USDC:USDC $R-7 $(( $(date +%s%3N) + 300000 ))`), leave it, and about
      24 h later check that `/api/v1/trades` shows it closed with `exit_reason: "roi"` and a
      `close_date` at least 24 h after its `open_date` (the repo test only reproduces
      `min_roi_reached`);
