@@ -55,6 +55,8 @@ or container.
 - **t0 and timing:**
   - t0 is Tree's `published_at`, and `received_at` is kept too. Part C used Upbit
     `first_listed_at`, which is not readable from the VPS.
+  - This is a **Tree-clock cohort**. Tree's time is checked only for plausibility, not
+    for equivalence with Upbit's, and every report says so.
   - Timing is flagged `unverified` when `published_at` is missing, is later than
     `received_at`, or lags it by more than 5 min. Unverified events are reported but left
     out of the comparable cohort.
@@ -66,17 +68,24 @@ or container.
     before t0 (no snapshot within 15 min before t0 → `unknown`);
   - a Binance new-listing notice for it falls within the 24 h *before* t0 (the archive's
     `binance_listing` source). A notice published *after* t0 never excludes;
-  - the notice body says trading began before the notice (no body → start `unknown`;
-    recorded, not excluded);
-  - the **leak** rule applies: |drift| > 2% between the 1 m closes at t0 − 10 min and
-    t0 − 2 min. This is checked on Hyperliquid candles, and on the Binance proxy when one
-    exists.
+  - the notice body says trading began before the notice.
 - **Hyperliquid eligibility** is the Part C rule. Reuse `nes_venues.hl_facts` /
   `hl_status`: the perp is in `meta` and `fundingHistory` shows records in the 24 h
   before t0, including one in the last hour.
-- **Comparable cohort:** additionally requires a Binance spot or USDⓈ-M market before t0,
-  from Binance `exchangeInfo` at detection. Hyperliquid-eligible events without one are
-  measured and reported as a separate descriptive cohort.
+- **Comparable cohort** (the decision set) also requires:
+  - **a known trading start:** the notice body states a start time at or after t0, read with
+    `nes_classify.upbit_trading_start_ms`. With no body, or no start in it, the event goes
+    to the descriptive cohort;
+  - **a Binance market before t0:** Binance 1 m klines (spot `api/v3/klines`, else USDⓈ-M
+    `fapi/v1/klines`) show trading in [t0 − 10 min, t0). That is evidence from before t0,
+    not today's `exchangeInfo`;
+  - **the Binance leak test passed:** |drift| ≤ 2% between those klines' closes at
+    t0 − 10 min and t0 − 2 min, the Part C rule. The same test on Hyperliquid candles is
+    descriptive;
+  - **a timely entry:** filled within 2 min of t0 + 5 min. Later entries, up to the 10 min
+    deadline, are `delayed` and descriptive.
+- Every other Hyperliquid-eligible event is still measured and reported as the
+  **descriptive cohort**.
 
 ## Paper trade
 
@@ -90,10 +99,15 @@ or container.
   **Checkpoints** at +30 m and +4 h are book-walk marks of q only.
 - **Fee:** 4.5 bps taker on each leg's actual notional. No extra slippage term; the book
   walk is the slippage.
-- **Funding:** at each hourly settlement during the hold, record the cashflow
-  q × oraclePx × fundingRate, with the sign set so that positive funding pays a short.
-  oraclePx and funding come from `metaAndAssetCtxs`, polled at each settlement boundary while
-  a position is open and checked against `fundingHistory`.
+- **Funding:**
+  - The rates come from finalized `fundingHistory` records, the authoritative source, for
+    each hourly settlement during the hold.
+  - The cashflow is q × oraclePx × rate, with the sign set so that positive funding pays a
+    short. It is labelled **estimated**, because oraclePx is observed through
+    `metaAndAssetCtxs` within ±60 s of each boundary, not read from a settlement receipt.
+  - A boundary with no rate or no observation inside that tolerance makes the event's funding
+    `missing`. The net is then incomplete: it stays out of the decision mean and counts as
+    missing in the tipping point.
 - **Excursion:** MAE/MFE from 1 m `candleSnapshot` highs and lows, *descriptive price
   excursion only*. The book observations at the checkpoints are kept as well.
 - **Missing and late:** every scheduled action has a 10 min deadline, including after a
