@@ -67,15 +67,17 @@ or container.
   - the token already trades on Upbit KRW: it is in the last `market/all` snapshot taken
     before t0 (no snapshot within 15 min before t0 → `unknown`);
   - a Binance new-listing notice for it falls within the 24 h *before* t0 (the archive's
-    `binance_listing` source). A notice published *after* t0 never excludes;
+    `binance_listing` source). A notice published *after* t0 never excludes. Only what the
+    archive had received by t0 counts, revisions included; a notice or revision received
+    later is recorded as descriptive (`late`) and never excludes;
   - the notice body says trading began before the notice.
 - **Hyperliquid eligibility** is the Part C rule. Reuse `nes_venues.hl_facts` /
   `hl_status`: the perp is in `meta` and `fundingHistory` shows records in the 24 h
   before t0, including one in the last hour.
 - **Comparable cohort** (the decision set) also requires:
   - **a Binance market before t0:** Binance 1 m klines (USDⓈ-M `fapi/v1/klines` first, else spot
-    `api/v3/klines`, the Part C proxy order in `nes_venues.binance_candidates`) show trading in [t0 − 10 min, t0). That is evidence from before t0,
-    not today's `exchangeInfo`;
+    `api/v3/klines`, the Part C proxy order in `nes_venues.binance_candidates`) show trading in [t0 − 10 min, t0), counting only candles closed by t0 (open + 60 s ≤ t0).
+    That is evidence from before t0, not today's `exchangeInfo`;
   - **the Binance leak test passed:** |drift| ≤ 2% between those klines' closes at
     t0 − 10 min and t0 − 2 min, the Part C rule. The same test on Hyperliquid candles is
     descriptive;
@@ -91,6 +93,11 @@ or container.
     A start before t0 still excludes the event (`began_before_notice`, above); a start at
     or after t0 gives `start_unknown = false`. With no body, or no start in it, the event
     stays comparable with `start_unknown = true`.
+  - A later observation of the same notice (a duplicate Tree item or a revision) that states
+    a start never creates a second event; it is a versioned evidence record. Received before
+    the entry decision, it counts: a start before t0 excludes the event
+    (`began_before_notice`) and stops the entry, and one at or after t0 sets
+    `start_unknown = false`. Received after the entry decision, it is descriptive only.
   - *Descriptive only:* `krw_market_first_seen_ms`, the time of the first `market/all`
     snapshot after t0 that lists `KRW-<TOKEN>`. It never selects events.
   - `status` and every resolution report show the `start_unknown` and
@@ -121,7 +128,8 @@ or container.
     `missing`. The net is then incomplete: it stays out of the decision mean and counts as
     missing in the tipping point.
 - **Excursion:** MAE/MFE from 1 m `candleSnapshot` highs and lows, *descriptive price
-  excursion only*. The book observations at the checkpoints are kept as well.
+  excursion only*. It is `ok` only when every minute of the hold has a candle; otherwise it
+  is retried, then stored as `partial` with candle counts and labelled partial extrema. The book observations at the checkpoints are kept as well.
 - **Missing and late:** every scheduled action has a 10 min deadline, including after a
   restart. Missing the deadline makes the outcome `missing`; a later recovery is stored as
   `late`, never as the scheduled outcome.
