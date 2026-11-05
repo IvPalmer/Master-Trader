@@ -45,6 +45,14 @@ delisting-study notices. The delisting harvest is complete only when 161 and 49 
 are, and their shortfalls add up (O13). Title rulings made before the freeze are
 amendments `A2-phase1-title-rules` (delisting) and `A1-phase1-title-rules` (Upbit).
 
+## O10 hour-only clock (2026-11-05)
+
+The build from 89dfe17, after catalog 49 was harvested in full (4481 of 4481 articles), left
+86 Upbit additions with no parseable trading start. 80 of their start cells read
+`M월 D일 H시 예정`, an hour with no minutes, which O10's clock list did not cover. Those
+manifests were discarded before any freeze. Amendment `A2-o10-hour-clock` on both Upbit
+entries reads `H시` alone as minute 00; on the corpus it leaves 5 events with no start.
+
 ## Quarantine
 
 The 2018–2022 exploratory results on the VPS (`research/news_exploratory_2026-11/`)
@@ -105,3 +113,4 @@ Raw harvests, manifests' inputs, klines and results stay on the VPS under `data/
 |---|---|---|
 | 2026-11-04 | 0f29d85 (harvesters) | Claude (Part C session) |
 | 2026-11-04 | 3c77081 (main: first build, stopped by O17) | Claude (Part C session) |
+| 2026-11-05 | 89dfe17 (main: option A build, discarded for the O10 clock gap) | Claude (Part C session) |

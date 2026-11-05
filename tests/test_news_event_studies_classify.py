@@ -153,6 +153,33 @@ def test_upbit_trading_start_table_picks_the_tokens_row():
     assert nc.upbit_trading_start_ms(body, "BBB", t0) == 1709290800000   # 20:00 KST, before t0
 
 
+# O10 amendment A2-o10-hour-clock: an hour-only clock `H시` reads as minute 00. 80 of the 86
+# no-start cells of the 89dfe17 build had this form (`M월 D일 H시 예정`, upbit:4363 and others).
+def test_upbit_trading_start_hour_only_table_cell():
+    body = ("<table><tr><th>디지털 자산</th><th>마켓</th><th>네트워크</th><th>입출금 개시 시점</th>"
+            "<th>거래지원 개시 시점</th></tr><tr><td>갤럭시(GAL)</td><td>KRW</td><td>Ethereum</td>"
+            "<td>공지 게시 시점으로부터 2시간 이내</td><td>3월 1일 22시 예정</td></tr></table>")
+    assert nc.upbit_trading_start_ms(body, "GAL", 1709294430000) == 1709298000000   # 22:00 KST
+
+
+@pytest.mark.parametrize("body", [
+    "거래지원 개시 시점 : 10월 27일 17시 예정",
+    "거래지원 개시 시점 : 2026년 10월 27일 17시",
+    "거래지원 개시 시점 : 10월 27일 오후 5시 예정",
+    "거래지원 개시 시점 : 10월 27일 17시 ~ 18시 예정",      # a range reads as its first time
+])
+def test_upbit_trading_start_hour_only_lines(body):
+    assert nc.upbit_trading_start_ms(body, "NIL", T_START) == T_START - 1800000   # 17:00 KST
+
+
+@pytest.mark.parametrize("body", [
+    "거래지원 개시 시점 : 10월 27일 17시간 이내",            # 시간 is a duration, not a clock
+    "거래지원 개시 시점 : 10월 27일 17시 30 예정",           # minutes without 분: not read
+])
+def test_upbit_trading_start_hour_only_is_not_a_duration(body):
+    assert nc.upbit_trading_start_ms(body, "NIL", T_START) is None
+
+
 def test_upbit_trading_start_conflicting_lines_is_none():
     body = "거래지원 개시 시점: 2026-10-27 17:30\n거래 오픈 : 2026-10-27 18:00"
     assert nc.upbit_trading_start_ms(body, "NIL", T_START) is None
