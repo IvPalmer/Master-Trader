@@ -1599,7 +1599,14 @@
         "selection": "exactly the events the paper monitor enters in the comparable cohort with every requirement established when the live order is decided (uff_report.classify returns ('comparable', [])); eligibility at t0 unchanged",
         "trigger": "the paper entry record (t0 + 5 min); one POST /forceenter on the local bot per event id, never retried, with entry tag upbit-fade:<event id>@<t0 + 7 min in ms>",
         "bot_entry_guard": "UpbitFadeLiveV1.confirm_trade_entry, which Freqtrade 2026.7 runs under its entry lock just before the order: refuse unless the tag parses, the side is short, the time is not past the tag's deadline (and the deadline is at most 7 min ahead), fewer than 2 trades are open, the pair has no open trade, no trade (open or closed) carries the event id, and realized P&L of the closed trades in the bot's database is above -75 USDC; any error refuses",
-        "entry_deadline_limitation": "the deadline is checked at confirm time; the order can still reach Hyperliquid up to the gateway queue deadline (12 s) plus the transport timeout (15 s) later. ccxt 4.5.68 does not sign expiresAfter on ordinary orders, so no exchange-side expiry is set",
+        "timing_rule": {
+          "status": "amended timing rule, approved by the operator in chat, 2026-11-05 ('Approve it')",
+          "admission": "by t0 + 7 min, checked by the trigger and again by the bot under its entry lock (confirm_trade_entry)",
+          "submission": "not bounded: after confirm_trade_entry Freqtrade prepares margin mode and leverage, with retries, before it submits the order, and ccxt 4.5.68 does not sign Hyperliquid's expiresAfter on ordinary orders, so no exchange-side expiry is set",
+          "measurement": "for every entry the trigger reads the entry order back from the bot and records its submission time (order_timestamp) and fill time (order_filled_timestamp) against t0 and against the paper entry; reported per trade",
+          "fill_defect_after_t0_s": 600,
+          "defect": "a fill after t0 + 10 min, or no fill by then, is an execution defect: the trigger writes the durable pause"
+        },
         "latest_entry_after_t0_s": 420,
         "direction": "short",
         "order_type": "market",

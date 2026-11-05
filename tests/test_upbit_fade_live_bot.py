@@ -437,5 +437,9 @@ def test_prereg_freezes_what_the_code_runs():
     assert fr["dry_run_wallet_usdc"] == c["dry_run_wallet"] == 150
     assert fr["kill_realized_pnl_usdc"] == lt.KILL_REALIZED_PNL_USD == -75
     assert lt.PREREG_ID == PREREG_ID
+    timing = fr["timing_rule"]
+    assert timing["fill_defect_after_t0_s"] * 1000 == lt.FILL_DEFECT_MS == 10 * 60_000
+    assert "approved by the operator in chat, 2026-11-05 ('Approve it')" in timing["status"]
+    assert "27 s" not in json.dumps(e) and "entry_deadline_limitation" not in fr
     rules = " ".join(e["rules"])
     assert "-75 USDC" in rules and "never used in the decision of upbit-krw-fade-forward-2026-11" in rules

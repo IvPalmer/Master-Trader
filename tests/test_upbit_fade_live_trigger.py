@@ -56,6 +56,9 @@ class FakeFt:
         self.enter = (200, {"trade_id": 7, "pair": "CARDS/USDC:USDC", "open_rate": 1.0,
                             "amount": 50.0, "is_short": True})
         self.down = False
+        self.clock = None               # wall ms; set by trigger()
+        self.fill_after_ms = 400        # the entry order fills this long after submission
+        self.trades = {}                # trade id -> /trade/<id> answer
 
     def __call__(self, req, timeout):
         url = urllib.parse.urlsplit(req.full_url)
@@ -84,7 +87,19 @@ class FakeFt:
                 raise urllib.error.HTTPError(req.full_url, status, "err", {},
                                              io.BytesIO(json.dumps(payload).encode()))
             self.open.append(payload)
+            sub = self.clock()
+            filled = self.fill_after_ms is not None
+            self.trades[payload["trade_id"]] = {"trade_id": payload["trade_id"], "orders": [
+                {"order_id": "0xe1", "ft_order_side": "sell", "ft_order_tag": body["entry_tag"],
+                 "status": "closed" if filled else "open", "filled": 50.0 if filled else 0.0,
+                 "order_timestamp": sub,
+                 "order_filled_timestamp": sub + self.fill_after_ms if filled else None},
+                {"order_id": "0xs1", "ft_order_side": "stoploss", "ft_order_tag": None,
+                 "status": "open", "filled": 0.0, "order_timestamp": sub + 60_000,
+                 "order_filled_timestamp": None}]}
             return Resp(200, payload)
+        if path.startswith("trade/"):
+            return Resp(200, self.trades[int(path.split("/")[1])])
         raise AssertionError("unexpected request %s" % path)
 
     def posts(self):
@@ -103,6 +118,7 @@ def paper(tmp_path, until=5 * f.MIN + 30_000):
 
 def trigger(s, tmp_path, ft=None, notes=None):
     ft = ft or FakeFt()
+    ft.clock = s.clock.wall_ms
     api = lt.FtApi(URL, "ft_user", "s3cret", opener=ft)
     notes = [] if notes is None else notes
     trig = lt.Trigger(s.data / "ledger.jsonl", tmp_path / "live", api, s.clock.wall_ms,
@@ -277,6 +293,76 @@ def test_the_loss_limit_is_latched_every_loop_without_a_paper_event(tmp_path):
     assert trig.killed() and trig.kill_path.exists()
     assert trig.decisions.kind("kill")[0]["reason"].startswith("cumulative realized pilot P&L -75.01")
     assert ft.posts() == []
+
+
+# --- #252 review round 2: submission and fill timing are measured -----------------------
+
+def test_entry_timing_is_recorded_against_t0(tmp_path):
+    s = paper(tmp_path)
+    trig, ft, _ = trigger(s, tmp_path)
+    trig.tick()                                  # enters
+    trig.tick()                                  # reads the entry order back
+    t = trig.decisions.get("timing:" + s.eid())
+    intent = trig.decisions.get("intent:" + s.eid())
+    assert t["defect"] is False and t["order_id"] == "0xe1" and t["trade_id"] == 7
+    assert t["submitted_ms"] == intent["at_ms"] and t["filled_ms"] == intent["at_ms"] + 400
+    assert t["fill_after_t0_s"] == (intent["at_ms"] + 400 - s.t0) / 1000
+    assert t["fill_after_paper_entry_s"] == (intent["at_ms"] + 400 - intent["paper_entry_obs_ms"]) / 1000
+    assert t["fill_limit_ms"] == s.t0 + 10 * f.MIN and not trig.killed()
+    reads = [r for r in ft.requests if r["path"].endswith("/trade/7")]
+    trig.tick()
+    assert len([r for r in ft.requests if r["path"].endswith("/trade/7")]) == len(reads)
+
+
+def test_a_fill_after_t0_plus_10_min_pauses_the_pilot(tmp_path):
+    s = paper(tmp_path)
+    ft = FakeFt()
+    ft.fill_after_ms = 10 * f.MIN               # Freqtrade's margin/leverage retries ran long
+    trig, _, notes = trigger(s, tmp_path, ft)
+    trig.tick()
+    trig.tick()
+    t = trig.decisions.get("timing:" + s.eid())
+    assert t["defect"] is True and t["filled_ms"] > s.t0 + lt.FILL_DEFECT_MS
+    assert trig.killed() and trig.kill_path.exists()
+    assert "execution defect" in json.loads(trig.kill_path.read_text())["reason"]
+    assert any("execution defect" in n for n in notes)
+
+
+def test_no_fill_by_t0_plus_10_min_pauses_the_pilot(tmp_path):
+    s = paper(tmp_path)
+    ft = FakeFt()
+    ft.fill_after_ms = None
+    trig, _, _ = trigger(s, tmp_path, ft)
+    trig.tick()
+    trig.tick()
+    assert "timing:" + s.eid() not in trig.decisions and not trig.killed()   # still in time
+    s.clock.to(s.t0 + lt.FILL_DEFECT_MS + 1)
+    trig.tick()
+    t = trig.decisions.get("timing:" + s.eid())
+    assert t["defect"] is True and t["filled_ms"] is None and t["order_status"] == "open"
+    assert trig.killed()
+
+
+def test_a_reconciled_entry_is_measured_too(tmp_path):
+    s = paper(tmp_path)
+    ft = FakeFt()
+    ft.enter = urllib.error.URLError(socket.timeout("timed out"))
+    trig, _, _ = trigger(s, tmp_path, ft)
+    trig.poll()
+    live = str(tmp_path / "live")
+    assert lt.main(["--data-dir", live, "reconcile", s.eid(), "--outcome", "entered",
+                    "--trade-id", "7", "--by", "palmer", "--note", "trade 7 on HL"]) == 0
+    ft2 = FakeFt()
+    ft2.clock = s.clock.wall_ms
+    ft2.trades[7] = {"trade_id": 7, "orders": [
+        {"order_id": "0xe9", "ft_order_side": "sell",
+         "ft_order_tag": trig.decisions.get("intent:" + s.eid())["entry_tag"], "status": "closed",
+         "filled": 50.0, "order_timestamp": s.t0 + 5 * f.MIN + 20_000,
+         "order_filled_timestamp": s.t0 + 5 * f.MIN + 21_000}]}
+    again, _, _ = trigger(s, tmp_path, ft2)
+    again.tick()
+    t = again.decisions.get("timing:" + s.eid())
+    assert t["order_id"] == "0xe9" and t["fill_after_t0_s"] == 321.0 and t["defect"] is False
 
 
 def test_max_open_asks_the_bot_and_skips(tmp_path):

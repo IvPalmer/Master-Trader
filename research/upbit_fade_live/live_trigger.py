@@ -35,6 +35,13 @@ Never a double entry:
   on the pair or on the event, and any entry once realized P&L is at the loss limit.
 
 The loss limit is also latched here on every loop, not only when a paper event arrives.
+
+Timing (amended rule, pending operator approval before go-live): admission is checked by
+t0 + 7 min, here and under the bot's entry lock; Freqtrade then prepares margin mode and
+leverage (with retries) before it submits, so submission cannot be bounded. For every entry
+the trigger reads the entry order back from the bot and records its submission and fill
+times against t0 (`timing:` records); a fill after t0 + 10 min, or no fill by then, is an
+execution defect that writes the durable pause.
 """
 import argparse
 import base64
@@ -72,6 +79,7 @@ LEVERAGE = 1.0
 MAX_OPEN = 2
 LATEST_ENTRY_MS = 7 * 60_000          # no live entry later than t0 + 7 min
 KILL_REALIZED_PNL_USD = -75.0         # pause at or below this cumulative realized P&L
+FILL_DEFECT_MS = 10 * 60_000          # a fill after t0 + 10 min is an execution defect
 QUOTE = "USDC"
 STRATEGY = "UpbitFadeLiveV1"          # the bot FT_API_URL must answer for
 
@@ -200,6 +208,7 @@ class Trigger:
         self._waiting = {}              # event id -> why it is not decided yet
         self.halted = None              # why state could not be persisted (until restart)
         self._loss_seen = None          # last loss-latch read problem, logged once
+        self._timing_seen = {}          # event id -> last trade-read problem, logged once
 
     # --- plumbing -----------------------------------------------------------------------
 
@@ -299,9 +308,81 @@ class Trigger:
                 realized, KILL_REALIZED_PNL_USD))
 
     def tick(self):
-        """One loop of the service: the latches, then the paper ledger."""
+        """One loop of the service: the latches, the entry timing, then the paper ledger."""
         self.latch()
+        self.measure()
         self.poll()
+
+    # --- entry timing -------------------------------------------------------------------
+
+    def _measurable(self):
+        """(event id, trade id, entry tag) of every entry, sent by the trigger or reconciled
+        as entered, that has no timing record yet."""
+        out = [(r["event_id"], r["trade_id"], r.get("entry_tag"))
+               for r in self.decisions.kind("result") if r.get("status") == "entered"]
+        out += [(r["event_id"], r["trade_id"], r.get("entry_tag"))
+                for r in self.decisions.kind("reconcile")
+                if r.get("outcome") == "entered" and r.get("trade_id") is not None]
+        return [x for x in out if "timing:" + x[0] not in self.decisions]
+
+    @staticmethod
+    def _entry_order(trade, tag):
+        orders = [o for o in trade.get("orders") or [] if isinstance(o, dict)
+                  and o.get("ft_order_side") != "stoploss"]
+        mine = [o for o in orders if o.get("ft_order_tag") == tag] or \
+               [o for o in orders if o.get("ft_order_side") == "sell"]       # a short's entry
+        mine.sort(key=lambda o: o.get("order_timestamp") or 0)
+        return mine[0] if mine else None
+
+    def measure(self):
+        """Record each entry order's submission and fill time against t0; a fill after
+        t0 + 10 min (or none by then) pauses the pilot."""
+        for eid, trade_id, tag in self._measurable():
+            intent = self.decisions.get("intent:" + eid) or {}
+            t0 = intent.get("t0_ms")
+            if t0 is None:
+                continue
+            try:
+                trade = self.api.get("trade/%d" % int(trade_id))
+            except (FtError, TypeError, ValueError) as e:
+                if self._timing_seen.get(eid) != str(e):
+                    LOG.warning("timing %s: cannot read trade %s: %s", eid, trade_id, e)
+                    self._timing_seen[eid] = str(e)
+                continue
+            order = self._entry_order(trade if isinstance(trade, dict) else {}, tag)
+            filled = order is not None and (order.get("filled") or 0) > 0 \
+                and order.get("order_filled_timestamp") is not None
+            limit = t0 + FILL_DEFECT_MS
+            if not filled and self.wall_ms() <= limit:
+                continue                                   # not filled yet; still in time
+            submitted_ms = order.get("order_timestamp") if order else None
+            filled_ms = order.get("order_filled_timestamp") if filled else None
+            defect = filled_ms is None or filled_ms > limit
+
+            def after(ms, ref):
+                return None if ms is None or ref is None else round((ms - ref) / 1000, 3)
+
+            rec = {"rid": "timing:" + eid, "kind": "timing", "event_id": eid,
+                   "trade_id": trade_id, "order_id": order.get("order_id") if order else None,
+                   "order_status": order.get("status") if order else None,
+                   "t0_ms": t0, "deadline_ms": intent.get("deadline_ms"),
+                   "paper_entry_obs_ms": intent.get("paper_entry_obs_ms"),
+                   "intent_ms": intent.get("at_ms"), "submitted_ms": submitted_ms,
+                   "filled_ms": filled_ms, "submit_after_t0_s": after(submitted_ms, t0),
+                   "fill_after_t0_s": after(filled_ms, t0),
+                   "fill_after_paper_entry_s": after(filled_ms, intent.get("paper_entry_obs_ms")),
+                   "fill_limit_ms": limit, "defect": defect}
+            if defect:
+                # The durable pause before the record, as for an unknown outcome.
+                self.engage_kill("execution defect: entry %s (trade %s) %s" % (
+                    eid, trade_id, "filled %.1f s after t0, later than t0 + 10 min" % (
+                        (filled_ms - t0) / 1000) if filled_ms is not None
+                    else "not filled by t0 + 10 min"))
+            self._append(rec)
+            LOG.info("timing %s: submitted %+.1f s, filled %s after t0%s", eid,
+                     rec["submit_after_t0_s"] or 0.0,
+                     "%+.1f s" % rec["fill_after_t0_s"] if filled_ms is not None else "never",
+                     " (DEFECT)" if defect else "")
 
     def _skip(self, eid, reason, **detail):
         self._waiting.pop(eid, None)
@@ -520,6 +601,10 @@ def status(data_dir, kill_path):
     for r in decisions.kind("reconcile"):
         print("  reconciled %s: %s (trade %s) by %s: %s" % (
             r["event_id"], r["outcome"], r.get("trade_id"), r["by"], r["note"]))
+    for r in decisions.kind("timing"):
+        print("  timing %s: submitted %s s, filled %s s after t0%s" % (
+            r["event_id"], r["submit_after_t0_s"], r["fill_after_t0_s"],
+            " DEFECT" if r["defect"] else ""))
     counts = {}
     for r in decisions.kind("result"):
         counts[r["status"]] = counts.get(r["status"], 0) + 1

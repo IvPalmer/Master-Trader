@@ -36,8 +36,8 @@ and has its own procedure below.
    Without them the bot uses the shared fleet credentials. Check:
    `./deploy/vps/preflight-credentials.sh .env`.
 3. Gateway: follow **Gateway deploy (Killers is live)** below. It adds the `upbit` client
-   (the bot cannot load markets without it), the pilot's budget slice and the cold-start
-   rule.
+   (the bot cannot load markets without it), the pilot's budget slice and the budget
+   history that survives restarts.
 
 4. Bot, dry-run (the default while `HYPERLIQUID_UPBIT_FADE_DRY_RUN` is unset):
 
@@ -107,18 +107,32 @@ and has its own procedure below.
 ## Gateway deploy (Killers is live)
 
 Recreating `hl-gateway` interrupts every Hyperliquid call of live Killers (exits, order
-status, account reads) for the recreate, and the new gateway starts with an empty rolling
-window while Hyperliquid still counts the old one. The code's cold-start rule assumes the
-last minute ran at the cap and lets it decay: Killers' actions wait about 1 s, its exit
-reads about 4 s and background about 22 s after the start, all inside their queue deadlines.
+status, account reads) for the recreate, while Hyperliquid keeps counting the last minute.
+From this change on, the gateway saves its rolling history to `/state/budget.json` (volume
+`hl_gateway_state`) about once a second and on shutdown, and restores it at start. The
+**first** deploy of this change has no such file: the new gateway starts with an empty
+window, so recreate only while the trailing-minute usage is low (step 0 below). Later
+recreates restore the file; check `budget_history` after each one anyway.
 
 **Pre-checks** (stop if any fails):
+
+0. Usage: the old gateway reports its trailing-minute weight on `/healthz`. Recreate only
+   while it is **under 300** (of the 900 fleet cap; HL allows 1200 per IP), and keep the
+   reading:
+
+   ```bash
+   T=$(date -u +%Y%m%dT%H%MZ); mkdir -p ~/backups/gateway-$T
+   curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, queued, budget_history}' | tee ~/backups/gateway-$T/usage-before.json
+   ```
+
+   If it is 300 or more, wait (it is a rolling minute) and read it again. Record the value
+   and time on #252 with the deploy.
 
 ```bash
 KU=$(sudo docker exec ft-killers-scalp printenv FREQTRADE__API_SERVER__USERNAME)
 KP=$(sudo docker exec ft-killers-scalp printenv FREQTRADE__API_SERVER__PASSWORD)
 KW=$(sudo docker exec ft-killers-scalp printenv FREQTRADE__EXCHANGE__WALLET_ADDRESS)
-T=$(date -u +%Y%m%dT%H%MZ); mkdir -p ~/backups/gateway-$T && cd ~/backups/gateway-$T
+cd ~/backups/gateway-$T
 curl -s -u "$KU:$KP" http://127.0.0.1:8099/api/v1/status > killers-status.json
 jq 'map({trade_id, pair, has_open_orders, open: [.orders[] | select(.is_open) | {ft_order_side, order_type, status}]})' killers-status.json
 hl() { curl -s https://api.hyperliquid.xyz/info -H 'Content-Type: application/json' -d "$1"; }
@@ -147,7 +161,8 @@ until curl -sf http://127.0.0.1:8104/healthz >/dev/null; do sleep 2; done
 **Verify** (within a few minutes):
 
 ```bash
-curl -s http://127.0.0.1:8104/healthz | jq '{status, weight_last_minute, slice_weight_last_minute, killers: .clients.killers, upbit: .clients.upbit}'
+curl -s http://127.0.0.1:8104/healthz | jq '{status, weight_last_minute, slice_weight_last_minute, budget_history, killers: .clients.killers, upbit: .clients.upbit}'
+sudo docker logs ft-hl-gateway 2>&1 | grep "budget history"
 curl -s -u "$KU:$KP" http://127.0.0.1:8099/api/v1/status | jq 'map({trade_id, pair, has_open_orders})'
 sudo docker logs ft-killers-scalp --since 5m 2>&1 | grep -iE "error|429|timeout|exception" | tail
 sudo docker logs ft-hl-gateway --since 5m 2>&1 | tail -20
@@ -158,11 +173,16 @@ hl "{\"type\":\"frontendOpenOrders\",\"user\":\"$KW\"}" | jq -S 'map({coin, side
 
 - `healthz` lists `upbit`, and `clients.killers` counts `ok` reads (its order-status and
   account reads) with no `queue_timeout` or `rate_limited`;
+- `budget_history.state` is `missing` on the first deploy of this change (the log says
+  "starting with an empty window") and `restored` on every later recreate; within a few
+  seconds `sudo docker exec ft-hl-gateway ls -l /state/budget.json` shows the file;
 - Killers `/status` has the same trades; its log has no new errors;
 - positions, stops and TPs on Hyperliquid are unchanged (a price move can change `.assetPositions`
   marks; compare `szi`, `entryPx` and the order list).
 
-**Rollback** (stop the pilot first: it needs the `upbit` route):
+**Rollback** (stop the pilot first: it needs the `upbit` route). The previous image does
+not read the history, so it starts empty: do the usage check (step 0) first. The volume and
+`BUDGET_STATE_PATH` in the compose file are harmless to it.
 
 ```bash
 sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml stop ft-upbit-fade-hl
@@ -194,6 +214,13 @@ The agent never creates, sees or handles these values.
 
 ## Part 3: go live
 
+**Timing rule** (amended; approved by the operator in chat, 2026-11-05 ('Approve it');
+prereg `timing_rule`): admission by t0 + 7 min, checked by the trigger and by the bot under
+its entry lock; submission and fill delay measured for every entry and reported (the
+trigger's `timing:` records, `live_trigger.py status`); a fill after t0 + 10 min, or no fill
+by then, is an execution defect that pauses the pilot. Freqtrade prepares margin mode and
+leverage, with retries, after the admission check, so submission itself is not bounded.
+
 1. Pause the trigger while you check: `touch /home/ubuntu/master-trader/research/upbit_fade_live/data/KILL`.
 2. In the stack `.env`, set `HYPERLIQUID_UPBIT_FADE_DRY_RUN=false`.
 3. The one command:
@@ -218,7 +245,9 @@ The agent never creates, sees or handles these values.
    the next comparable event.
 7. After the first live entry, check on Hyperliquid that the position has a resting stop
    (Freqtrade places it within about a minute: `stoploss_on_exchange_interval` 60). A live
-   position without one is an execution defect: kill switch, then fix.
+   position without one is an execution defect: kill switch, then fix. Check its timing
+   with `python3 -B live_trigger.py status` (submitted and filled seconds after t0) and
+   report it on #252 with the trade.
 
 Expected alert once live: the exporter has no valuation adapter for the
 `hyperliquid-upbit-fade` account yet, so it pages "Live bot outside the circuit breaker".
@@ -239,8 +268,8 @@ That is a known follow-up, not a fault of the pilot.
   `HYPERLIQUID_UPBIT_FADE_DRY_RUN=true` and run the same `up -d --no-deps ft-upbit-fade-hl`.
 - **Kill rule (prereg):** the trigger engages the switch itself at -75 USDC realized in the
   live database (checked every loop; the bot also refuses entries at that level), on an
-  unobserved `/forceenter` outcome, on a failed write, and if the URL answers for another
-  strategy. The operator engages it for an orphaned position, a missing exchange stop or a
+  unobserved `/forceenter` outcome, on an entry filled after t0 + 10 min (or not filled by
+  then), on a failed write, and if the URL answers for another strategy. The operator engages it for an orphaned position, a missing exchange stop or a
   double entry. Resuming needs a recorded decision (a prereg amendment).
 - **After an `unknown` outcome** the trigger stays paused until the outcome is recorded;
   deleting `KILL` alone does not resume (it is put back on the next loop). Check the bot

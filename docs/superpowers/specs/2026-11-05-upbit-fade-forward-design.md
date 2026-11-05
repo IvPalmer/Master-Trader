@@ -257,19 +257,32 @@ fewer than 2 trades are open, the pair has no open trade, no trade (open or clos
 carries the event id, and the realized P&L of the closed trades in the bot's database is
 above -75 USDC. Any error refuses: Freqtrade's wrapper treats an exception as "confirmed".
 
-*Limitation:* the deadline is checked at confirm time. The order can still reach
-Hyperliquid up to the gateway's 12 s queue deadline plus its 15 s transport timeout later.
-Hyperliquid's signed `expiresAfter` would close that gap, but ccxt 4.5.68 does not sign it
-on ordinary orders (`create_orders_request` signs the action without it), so it is not set.
+**Timing rule** (amended; approved by the operator in chat, 2026-11-05 ('Approve it')).
+Admission is by t0 + 7 min, checked by the trigger and again by the bot under its entry
+lock. Submission is not bounded: after `confirm_trade_entry` Freqtrade prepares margin mode
+and leverage, with retries, before it submits, and ccxt 4.5.68 does not sign Hyperliquid's
+`expiresAfter` on ordinary orders (`create_orders_request` signs the action without it).
+So the delay is measured instead: for every entry the trigger reads the entry order back
+from the bot and records its submission (`order_timestamp`) and fill
+(`order_filled_timestamp`) times against t0 and the paper entry (`timing:` records). A fill
+after t0 + 10 min, or no fill by then, is an execution defect and writes the durable pause.
+Freqtrade takes those times from Hyperliquid's order data when ccxt provides them, else
+from its own clock when it saw the order.
 
 **Gateway allocation.** The `upbit` client's reads are background (tier 2) and share the
 600-unit background allowance. Only its exchange actions and `orderStatus` reads are
 priority, and those draw on its own slice of 40 weight per rolling minute, which is never
 counted against the fleet's priority capacity; a slice waiter never blocks a fleet waiter.
 Killers keeps its 250 + 50 units whatever the pilot does, and nothing changes for Killers
-while the pilot is idle. Worst case on the VPS IP is 940 per minute (HL allows 1200). A
-restarted gateway assumes the previous minute ran at the cap, spread evenly, and lets that
-decay: actions wait about 1 s, priority reads about 4 s and background about 22 s.
+while the pilot is idle. Worst case on the VPS IP is 940 per minute (HL allows 1200).
+
+**Gateway restarts.** Hyperliquid keeps counting the last minute across a restart, so the
+gateway persists its rolling history (wall-clock timestamps, atomic writes about once a
+second and on shutdown) to `/state/budget.json` on the `hl_gateway_state` volume and
+restores it at start, dropping rows older than the window. A missing or unreadable file
+starts empty, as before, logged and shown on `/healthz` (`budget_history`); that includes
+the first deploy of this change, which the runbook only does when the trailing-minute usage
+is low.
 
 **Epochs.** Dry-run trades are plumbing checks, not results. The live epoch starts at the
 first start with the dry-run flag false and is recorded in a prereg amendment. The live
@@ -298,6 +311,7 @@ database and log files, and a pin of the code's constants to the prereg. Since t
 review they also cover the durable pause and `reconcile`, the halt on a failed write, the
 loss latch, the bot-side guard against Freqtrade's force-entry order (concurrent calls,
 same pair, same event, deadline, loss limit, fail closed), and in
-`services/hl-gateway/tests/` the pilot's contention with Killers and the cold start. The
+`services/hl-gateway/tests/` the pilot's contention with Killers and the restored budget
+history across a restart, plus the entry timing measurement. The
 ROI test reproduces Freqtrade's `min_roi_reached`; the real code is checked in dry-run on
 the VPS (GO-LIVE.md, Part 1).
