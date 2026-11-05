@@ -1073,6 +1073,21 @@
             "catalog_49_note": "27 catalog-49 titles contain 'Monitoring Tag' and are not in catalog 161. 25 yield delisting-study events (137 token events); the other two name no added token: the 2023-07 tag introduction (excluded:tag_introduction) and 240714, which only removes tags."
           },
           "note": "Phase 1 complete; no return computed. Built by the nes-build unit on the VPS from main 52cb4a06f1752d15543a24485b43bd846bfabb3d (2026-11-05 08:14-12:27Z, exit 0)."
+        },
+        {
+          "id": "A4-operator-directive-estimates",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "directive": "Operator, 2026-11-05: the gates Claude wrote are arbitrary; do not wait for any date and do not void a study; deliver a solid result.",
+          "review": "Codex review requested as gpt-6.1-sol, reasoning high, read-only; two rounds on 2026-11-05, both before any Phase 2 return was computed.",
+          "decision_rule": "Classification on the announcement-level mean net return at +4 h, primary set (leak test run and passed). EDGE (proxy): the Bonferroni-adjusted (3 studies, 98.33% two-sided) percentile interval of the stress-cost (25 bps per side) mean, from 10,000 calendar-month block-bootstrap resamples (seed 229), lies above zero. NO EDGE: the same interval of the base-cost (10 bps) mean lies at or below zero. Otherwise NOT DETERMINABLE, which includes fewer than two calendar months. The decision metric is the raw (unhedged) net mean; the median and the BTC-adjusted mean (beta 1, no hedge cost) are descriptive.",
+          "missing_outcomes": "The class assumes missing outcomes resemble observed ones. Missing = token-events in the primary population (leak test not run, or passed with no usable +4 h return) plus Phase 1 unknown/missing token-events, counted per token, including announcements that are only partly missing. The report gives the tipping point: the common return of every missing token-event, with each announcement keeping its token weights, at which the class would stop holding.",
+          "voids_removed": "MIN_ANN = 20, positive medians in both halves, top-decile share below 0.6, coverage above 20%, any unresolved event and an incomplete harvest no longer void or decide a study. They are reported as `legacy_gates`, diagnostics only.",
+          "eligibility": "Per horizon: a return enters a horizon when that horizon's exit is ok or halted and the entry exists, so an unresolved exit at one horizon no longer removes the others. Events whose leak test could not run are outside the primary set and inside leak_included.",
+          "reported": "Per horizon: n, months, mean, adjusted interval, median and win rate for base cost, stress cost, no_halt (halted exits dropped), leak_included and BTC-adjusted; +4 h by year; the missing-announcement count; MAE for shorts (now floored at zero).",
+          "date_rule": "The README line 'not before 2026-11-07' is withdrawn. The code's publication guard (last candidate t0 + 5 d + 2 d) stays; with the last candidate at 2026-10-27 it is met.",
+          "limitations": "Binance proxy prices, not Hyperliquid fills; funding not modelled; a proxy is chosen by which day files exist through t0 + 2 d, which can favour series that kept trading (survival of the price series, not of the event); notice text is read from current CMS versions; the BTC adjustment assumes beta 1.",
+          "outcome_blind": "Decided before any Phase 2 return was computed. The supplement split uses notice publication times only."
         }
       ],
       "resolution": null
@@ -1331,6 +1346,26 @@
             "catalog_49_note": "27 catalog-49 titles contain 'Monitoring Tag' and are not in catalog 161. 25 yield delisting-study events (137 token events); the other two name no added token: the 2023-07 tag introduction (excluded:tag_introduction) and 240714, which only removes tags."
           },
           "note": "Phase 1 complete; no return computed. Built by the nes-build unit on the VPS from main 52cb4a06f1752d15543a24485b43bd846bfabb3d (2026-11-05 08:14-12:27Z, exit 0)."
+        },
+        {
+          "id": "A4-operator-directive-estimates",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "directive": "Operator, 2026-11-05: the gates Claude wrote are arbitrary; do not wait for any date and do not void a study; deliver a solid result.",
+          "review": "Codex review requested as gpt-6.1-sol, reasoning high, read-only; two rounds on 2026-11-05, both before any Phase 2 return was computed.",
+          "decision_rule": "Classification on the announcement-level mean net return at +4 h, primary set (leak test run and passed). EDGE (proxy): the Bonferroni-adjusted (3 studies, 98.33% two-sided) percentile interval of the stress-cost (25 bps per side) mean, from 10,000 calendar-month block-bootstrap resamples (seed 229), lies above zero. NO EDGE: the same interval of the base-cost (10 bps) mean lies at or below zero. Otherwise NOT DETERMINABLE, which includes fewer than two calendar months. The decision metric is the raw (unhedged) net mean; the median and the BTC-adjusted mean (beta 1, no hedge cost) are descriptive.",
+          "missing_outcomes": "The class assumes missing outcomes resemble observed ones. Missing = token-events in the primary population (leak test not run, or passed with no usable +4 h return) plus Phase 1 unknown/missing token-events, counted per token, including announcements that are only partly missing. The report gives the tipping point: the common return of every missing token-event, with each announcement keeping its token weights, at which the class would stop holding.",
+          "voids_removed": "MIN_ANN = 20, positive medians in both halves, top-decile share below 0.6, coverage above 20%, any unresolved event and an incomplete harvest no longer void or decide a study. They are reported as `legacy_gates`, diagnostics only.",
+          "eligibility": "Per horizon: a return enters a horizon when that horizon's exit is ok or halted and the entry exists, so an unresolved exit at one horizon no longer removes the others. Events whose leak test could not run are outside the primary set and inside leak_included.",
+          "reported": "Per horizon: n, months, mean, adjusted interval, median and win rate for base cost, stress cost, no_halt (halted exits dropped), leak_included and BTC-adjusted; +4 h by year; the missing-announcement count; MAE for shorts (now floored at zero).",
+          "date_rule": "The README line 'not before 2026-11-07' is withdrawn. The code's publication guard (last candidate t0 + 5 d + 2 d) stays; with the last candidate at 2026-10-27 it is met.",
+          "limitations": "Binance proxy prices, not Hyperliquid fills; funding not modelled; a proxy is chosen by which day files exist through t0 + 2 d, which can favour series that kept trading (survival of the price series, not of the event); notice text is read from current CMS versions; the BTC adjustment assumes beta 1.",
+          "outcome_blind": "Decided before any Phase 2 return was computed. The supplement split uses notice publication times only.",
+          "upbit_supplement": "O11 excluded 43 additions for a Binance new-listing notice within 24 h of t0. 26 of those notices were published after t0, which a bot acting at t0 cannot know (look-ahead). nes_supplement.py re-adds those 26 with Phase 1 venue resolution (no price read); the supplement manifest is frozen below and its candidates join this study's decision set. The 17 whose notice preceded t0 stay excluded, a rule a bot can apply. The frozen-candidates-only result is reported alongside.",
+          "supplement_manifest": "upbit-supplement-manifest.json",
+          "supplement_sha256": "e647310c099b33825708a8c29591e46b48c38de331360bd4e78e81e7e39bb62d",
+          "supplement_code_commit": "483ddd3",
+          "supplement_candidates": "26 re-added; 5 candidates in the long study, 4 in the fade (most were not on Binance before t0)"
         }
       ],
       "resolution": null
@@ -1599,6 +1634,26 @@
             "catalog_49_note": "27 catalog-49 titles contain 'Monitoring Tag' and are not in catalog 161. 25 yield delisting-study events (137 token events); the other two name no added token: the 2023-07 tag introduction (excluded:tag_introduction) and 240714, which only removes tags."
           },
           "note": "Phase 1 complete; no return computed. Built by the nes-build unit on the VPS from main 52cb4a06f1752d15543a24485b43bd846bfabb3d (2026-11-05 08:14-12:27Z, exit 0)."
+        },
+        {
+          "id": "A4-operator-directive-estimates",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "directive": "Operator, 2026-11-05: the gates Claude wrote are arbitrary; do not wait for any date and do not void a study; deliver a solid result.",
+          "review": "Codex review requested as gpt-6.1-sol, reasoning high, read-only; two rounds on 2026-11-05, both before any Phase 2 return was computed.",
+          "decision_rule": "Classification on the announcement-level mean net return at +4 h, primary set (leak test run and passed). EDGE (proxy): the Bonferroni-adjusted (3 studies, 98.33% two-sided) percentile interval of the stress-cost (25 bps per side) mean, from 10,000 calendar-month block-bootstrap resamples (seed 229), lies above zero. NO EDGE: the same interval of the base-cost (10 bps) mean lies at or below zero. Otherwise NOT DETERMINABLE, which includes fewer than two calendar months. The decision metric is the raw (unhedged) net mean; the median and the BTC-adjusted mean (beta 1, no hedge cost) are descriptive.",
+          "missing_outcomes": "The class assumes missing outcomes resemble observed ones. Missing = token-events in the primary population (leak test not run, or passed with no usable +4 h return) plus Phase 1 unknown/missing token-events, counted per token, including announcements that are only partly missing. The report gives the tipping point: the common return of every missing token-event, with each announcement keeping its token weights, at which the class would stop holding.",
+          "voids_removed": "MIN_ANN = 20, positive medians in both halves, top-decile share below 0.6, coverage above 20%, any unresolved event and an incomplete harvest no longer void or decide a study. They are reported as `legacy_gates`, diagnostics only.",
+          "eligibility": "Per horizon: a return enters a horizon when that horizon's exit is ok or halted and the entry exists, so an unresolved exit at one horizon no longer removes the others. Events whose leak test could not run are outside the primary set and inside leak_included.",
+          "reported": "Per horizon: n, months, mean, adjusted interval, median and win rate for base cost, stress cost, no_halt (halted exits dropped), leak_included and BTC-adjusted; +4 h by year; the missing-announcement count; MAE for shorts (now floored at zero).",
+          "date_rule": "The README line 'not before 2026-11-07' is withdrawn. The code's publication guard (last candidate t0 + 5 d + 2 d) stays; with the last candidate at 2026-10-27 it is met.",
+          "limitations": "Binance proxy prices, not Hyperliquid fills; funding not modelled; a proxy is chosen by which day files exist through t0 + 2 d, which can favour series that kept trading (survival of the price series, not of the event); notice text is read from current CMS versions; the BTC adjustment assumes beta 1.",
+          "outcome_blind": "Decided before any Phase 2 return was computed. The supplement split uses notice publication times only.",
+          "upbit_supplement": "O11 excluded 43 additions for a Binance new-listing notice within 24 h of t0. 26 of those notices were published after t0, which a bot acting at t0 cannot know (look-ahead). nes_supplement.py re-adds those 26 with Phase 1 venue resolution (no price read); the supplement manifest is frozen below and its candidates join this study's decision set. The 17 whose notice preceded t0 stay excluded, a rule a bot can apply. The frozen-candidates-only result is reported alongside.",
+          "supplement_manifest": "upbit-supplement-manifest.json",
+          "supplement_sha256": "e647310c099b33825708a8c29591e46b48c38de331360bd4e78e81e7e39bb62d",
+          "supplement_code_commit": "483ddd3",
+          "supplement_candidates": "26 re-added; 5 candidates in the long study, 4 in the fade (most were not on Binance before t0)"
         }
       ],
       "resolution": null

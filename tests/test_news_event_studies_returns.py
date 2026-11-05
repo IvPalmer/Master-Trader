@@ -199,8 +199,9 @@ def test_mae_only_for_shorts_and_t60_entry():
 
 
 def _res(aid, t0, net, status="ok", leaked=False, h="4h"):
+    """The horizon's own exit carries `status` (per-horizon eligibility, A4)."""
     return {"announcement_id": aid, "t0_ms": t0, "token": aid, "status": status, "leaked": leaked,
-            "horizons": {h: {"net": net}}}
+            "horizons": {h: {"net": net, "net_stress": net, "exit_status": status}}}
 
 
 def test_announcement_is_mean_of_its_tokens():
@@ -295,3 +296,114 @@ def test_constants_match_prereg():
         assert (f["min_announcements"], f["top_decile_share_lt"], f["coverage_gate_gt"]) == \
             (nr.MIN_ANN, nr.TOP_DECILE_LT, nr.COVERAGE_GT)
         assert (f["bootstrap_resamples"], f["bootstrap_seed"]) == (nr.BOOT_N, nr.BOOT_SEED)
+
+
+# --- A4 (operator directive 2026-11-05): per-horizon eligibility and estimates ----------
+
+M = 31 * 24 * H          # one month apart is enough to land in different calendar months
+
+
+def test_unresolved_24h_keeps_valid_4h_return():
+    # Codex 2026-11-05: an unresolved 24 h exit used to drop the event's valid 30 m and 4 h returns.
+    res = nr.evaluate(EVENT, series(full(o245="98", last=1444)), series(full()), "short", "hyperliquid")
+    assert res["status"] == "unresolved" and res["horizons"]["24h"]["exit_status"] == "unresolved"
+    anns = nr.announcements([res], "4h")
+    assert [a[1] for a in anns] == ["binance:1"] and anns[0][2] == res["horizons"]["4h"]["net"]
+    assert nr.announcements([res], "24h") == []
+
+
+def test_untested_leak_is_out_of_primary_but_in_leak_included():
+    res = [_res("a", T0, 0.01), _res("n", T0 + 1, 0.02, leaked=None)]
+    assert [a[1] for a in nr.announcements(res, "4h")] == ["a"]
+    assert [a[1] for a in nr.announcements(res, "4h", include_leaked=True)] == ["a", "n"]
+
+
+def test_no_halt_set_drops_halted_exits():
+    res = [_res("a", T0, 0.01), _res("h", T0 + 1, 0.02, "halted")]
+    assert [a[1] for a in nr.announcements(res, "4h")] == ["a", "h"]
+    assert [a[1] for a in nr.announcements(res, "4h", allow_halted=False)] == ["a"]
+
+
+def test_mae_short_never_negative():
+    r = rows({off: "100" for off in range(0, 10)}, highs={off: "90" for off in range(0, 10)})
+    assert nr.mae_short(r, BASE, BASE + 5 * MIN, "100") == 0.0
+
+
+def test_block_bootstrap_needs_two_months_and_is_deterministic():
+    one = [(T0 + i, "x%d" % i, 0.01 * i) for i in range(5)]
+    assert nr.block_bootstrap_mean_ci(one) == (None, None)
+    two = one + [(T0 + M + i, "y%d" % i, -0.01 * i) for i in range(5)]
+    a, b = nr.block_bootstrap_mean_ci(two), nr.block_bootstrap_mean_ci(two)
+    assert a == b and a[0] <= a[1]
+    assert nr.CI_LEVEL == 1 - Fraction(5, 300)
+
+
+def _months(values_by_month, missing=0, status="ok"):
+    out = []
+    for m, vals in enumerate(values_by_month):
+        out += [_res("m%d_%d" % (m, i), T0 + m * M + i, v) for i, v in enumerate(vals)]
+    out += [_res("gone%d" % i, T0 + i, None, "missing") for i in range(missing)]
+    return out
+
+
+def test_classify_edge_no_edge_and_not_determinable():
+    up = [[0.02, 0.03], [0.01, 0.04], [0.03, 0.02], [0.02, 0.05], [0.04, 0.01], [0.03, 0.03]]
+    assert nr.classify(_months(up))[0] == "EDGE (proxy)"
+    down = [[-a, -b] for a, b in up]
+    assert nr.classify(_months(down))[0] == "NO EDGE"
+    mixed = [[0.02, 0.03], [-0.03, -0.02], [0.04, 0.0], [-0.04, -0.01], [0.01, 0.02], [-0.02, -0.01]]
+    got, reasons = nr.classify(_months(mixed))
+    assert got == "NOT DETERMINABLE" and "spans zero" in reasons[0]
+    assert nr.classify(_months([[0.02]]))[0] == "NOT DETERMINABLE"     # one month
+
+
+def test_missingness_counts_partial_and_phase1_tokens():
+    # Codex round 2: one +2% token and one missing token per announcement used to look complete.
+    res = []
+    for m in range(6):
+        t = T0 + m * M
+        res += [_res("a%d" % m, t, 0.02 + 0.001 * m), _res("a%d" % m, t, None, "missing")]
+    miss = nr.missingness(res, extra_missing=[(T0, "a0"), (T0 + 7 * M, "p1")])
+    assert miss == {"token_events": 8, "announcements_fully_missing": 1,
+                    "announcements_partly_missing": 6}
+    got, reasons = nr.classify(res)
+    assert got == "EDGE (proxy)" and "6 missing token-event(s)" in reasons[-1]
+
+
+def test_tipping_point_is_where_the_bound_crosses_zero():
+    up = [[0.02, 0.03], [0.01, 0.04], [0.03, 0.02], [0.02, 0.05], [0.04, 0.01], [0.03, 0.03]]
+    res = _months(up, missing=4)
+    assert nr.classify(res)[0] == "EDGE (proxy)"
+    tip = nr.tipping_point(res, "EDGE (proxy)")
+    v = tip["value"]
+    assert -1 < v < 0.01 and "reverses if the missing events average below" in tip["note"]
+    parts = nr.announcement_parts(res, key="net_stress")
+    draws = nr._draws([(t0, s_ / (a + m), Fraction(m, a + m)) for t0, _i, s_, a, m in parts])
+    assert nr._interval(draws, v + 1e-6)[0] > 0 >= nr._interval(draws, v - 1e-6)[0]
+    assert nr.tipping_point(_months(up), "EDGE (proxy)") is None        # nothing missing
+    assert nr.tipping_point(res, "NOT DETERMINABLE") is None
+
+
+def _half_missing(value):
+    res = []
+    for m in range(6):
+        t = T0 + m * M
+        res += [_res("a%d" % m, t, value), _res("a%d" % m, t, None, "missing")]
+    return res
+
+
+def test_tipping_point_direction_for_both_classes():
+    # Codex round 3: each announcement = (observed + v) / 2, so the bound crosses 0 at v = -observed.
+    edge = nr.tipping_point(_half_missing(0.02), "EDGE (proxy)")
+    assert edge["value"] == pytest.approx(-0.02, abs=1e-9) and "below" in edge["note"]
+    none = nr.tipping_point(_half_missing(-0.02), "NO EDGE")
+    assert none["value"] == pytest.approx(0.02, abs=1e-9) and "above" in none["note"]
+
+
+def test_tipping_point_reports_unbracketed_ranges():
+    huge = nr.tipping_point(_half_missing(20.0), "EDGE (proxy)")
+    assert huge["value"] is None and "holds even if every missing event returns -1000%" in huge["note"]
+    deep = nr.tipping_point(_half_missing(-20.0), "NO EDGE")
+    assert deep["value"] is None and "holds even if every missing event returns +1000%" in deep["note"]
+    odd = nr.tipping_point(_half_missing(-20.0), "EDGE (proxy)")
+    assert odd["value"] is None and "no crossing" in odd["note"]
