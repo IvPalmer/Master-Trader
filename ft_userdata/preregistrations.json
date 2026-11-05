@@ -1377,7 +1377,7 @@
       "registered": "2026-11-05",
       "review_by": "2027-11-05",
       "issue": "#229",
-      "spec": "docs/superpowers/specs/2026-11-05-upbit-fade-forward-design.md @c7c1f9a (approved by Codex after three rounds; operator go-ahead 2026-11-05, \"Sim, monta o dry-run\")",
+      "spec": "docs/superpowers/specs/2026-11-05-upbit-fade-forward-design.md @c7c1f9a (approved by Codex after three rounds; operator go-ahead 2026-11-05, \"Sim, monta o dry-run\"); comparable cohort without a known trading start @f40ec30 (Claude's call, 2026-11-05, implementation: no Upbit notice body is readable from the VPS)",
       "code": "research/upbit_fade_forward/ (systemd user unit upbit-fade-forward)",
       "hypothesis": "New hypothesis, forward only: a paper short of the Hyperliquid perp 5 min after an Upbit KRW-addition notice, held 24 h, earns a positive announcement-level mean net return with real book fills, the taker fee and real funding. Source: the Part C Phase 2 proxy result at +24 h (+7.4% mean net, n = 57; #248, main 9991e23; #229 comment 6664557105). That result used Binance proxy prices, no funding and assumed detection; it is the hypothesis source only and never counts as validation here. The +4 h hold, Part C's registered primary (not determinable), is descriptive only.",
       "frozen": {
@@ -1444,7 +1444,8 @@
         "descriptive_reports_at": [
           20,
           30
-        ]
+        ],
+        "comparable_requires_known_start": false
       },
       "rules_verbatim": {
         "detection": [
@@ -1463,7 +1464,10 @@
           "Hyperliquid eligibility is the Part C rule (nes_venues.hl_facts / hl_status): the perp is in meta and fundingHistory shows records in the 24 h before t0, including one in the last hour."
         ],
         "comparable_cohort": [
-          "A known trading start: the notice body states a start time at or after t0 (nes_classify.upbit_trading_start_ms). With no body, or no start in it, the event goes to the descriptive cohort.",
+          "No known trading start is required (Claude's call, 2026-11-05, implementation). Part C required one, but Tree carries no Upbit notice body and the VPS gets 403 from Upbit's announcements API, so the forward cohort is defined by what a deployable bot can know. This is one more stated difference from Part C, beside the Tree clock, book fills and funding.",
+          "When a body is present, the start is read with nes_classify.upbit_trading_start_ms. A start before t0 still excludes the event (began_before_notice); a start at or after t0 gives start_unknown = false. With no body, or no start in it, the event stays comparable with start_unknown = true.",
+          "Descriptive only: krw_market_first_seen_ms, the time of the first market/all snapshot after t0 that lists KRW-<TOKEN>. It never selects events.",
+          "status and every resolution report show the start_unknown and krw_market_first_seen counts. The decision metric is over the whole comparable cohort; the subset with start_unknown = false is reported as descriptive only.",
           "A Binance market before t0: Binance 1 m klines (USDⓈ-M fapi/v1/klines first, else spot api/v3/klines, the Part C proxy order) show trading in [t0 - 10 min, t0).",
           "The Binance leak test passed: |drift| <= 2% between those klines' closes at t0 - 10 min and t0 - 2 min. The same test on Hyperliquid candles is descriptive.",
           "A timely entry: filled within 2 min of t0 + 5 min. Later entries, up to the 10 min deadline, are delayed and descriptive.",
@@ -1486,7 +1490,7 @@
           "One decision, at 40 events or on 2027-11-05, whichever comes first. The 20- and 30-event reports are descriptive only.",
           "EDGE when the lower bound is above 0, NO EDGE when the upper bound is at or below 0, otherwise NOT DETERMINABLE. No interval (fewer than two months) -> NOT DETERMINABLE.",
           "EDGE authorizes only a proposal for a small live pilot under the graduation gates. NO EDGE closes the lane.",
-          "Descriptive: +4 h marks, latency, missed and unclassified notices, MAE, and the non-comparable cohort."
+          "Descriptive: +4 h marks, latency, missed and unclassified notices, MAE, and the non-comparable cohort; also the start_unknown = false subset and krw_market_first_seen_ms."
         ]
       },
       "operationalization": [
@@ -1503,10 +1507,11 @@
         "U11 Missed-detection audit: a KRW-* market new in market/all with no detected notice for that token whose t0 lies in [first seen - 7 d, first seen + 24 h]. market/all snapshots store the sorted market codes (stored once per distinct set) and every poll's time and hash.",
         "U12 History reads are retried, then recorded unknown or missing: Binance klines and Hyperliquid leak candles up to t0 + 24 h, funding records up to exit + 24 h, hold candles up to exit + 48 h (Hyperliquid keeps about 3.5 days of 1 m candles).",
         "U13 MAE/MFE use the 1 m candles that lie wholly inside the hold.",
-        "U14 The tipping point is nes_returns.tipping_point at the same 95% level (a level argument with the old default was added for this)."
+        "U14 The tipping point is nes_returns.tipping_point at the same 95% level (a level argument with the old default was added for this).",
+        "U15 start_unknown is a stored event flag: no trading start was read (no body, or none parseable in it). It is never a comparable requirement and never makes an outcome missing. krw_market_first_seen_ms is the time of the first market_poll with obs_ms > t0 whose market set lists KRW-<TOKEN>, recorded once per event with the previous snapshot's time and whether that snapshot listed it (true only when the token was already on KRW)."
       ],
       "notes": [
-        "At registration (2026-11-05) Tree's Upbit items carry no body field: the CARDS, ENJ and server-maintenance items on the public Tree API have title, url and time only. Under the known-trading-start rule every event then goes to the descriptive cohort, and the comparable cohort stays empty until a notice-body source exists. Any change to that rule is an amendment made before the first event.",
+        "Stated differences from Part C: t0 on Tree's clock, Hyperliquid book fills, real funding, and no known-trading-start requirement. At registration (2026-11-05) the 3 Tree Upbit items in the VPS archive have an empty body (raw JSON: title, en, kind, url), and the VPS gets 403 from Upbit's announcements API.",
         "If Upbit lists KRW-<token> in market/all before the notice's t0, the already-on-KRW rule excludes the event; the first real events must be checked for this."
       ],
       "rules": [

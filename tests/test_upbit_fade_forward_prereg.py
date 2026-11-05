@@ -7,6 +7,7 @@ import json
 import uff_fakes as f
 import uff_common as uc
 import uff_detect as ud
+import uff_report as ur
 import nes_returns as nr
 import nes_venues as nv
 
@@ -58,6 +59,7 @@ def test_frozen_block_matches_the_code():
     assert fr["decision_announcements"] == uc.DECISION_EVENTS
     assert fr["decision_date_utc"] == uc.iso(uc.DECISION_DATE_MS).replace(".000000+00:00", "Z")
     assert fr["descriptive_reports_at"] == list(uc.MILESTONES)
+    assert fr["comparable_requires_known_start"] is False and "trading_start_known" not in ur.CRITERIA
     assert fr["binance_proxy_order"] == ["binance_um_futures", "binance_spot"]
     assert [m for m, _ in nv.binance_candidates("X", 0)][:1] == ["um"]
 
@@ -66,10 +68,14 @@ def test_verbatim_rules_quote_the_spec():
     spec = " ".join(SPEC.read_text(encoding="utf-8").split())
     rv = entry()["rules_verbatim"]
     for phrase in ("A book older than 5 s, or depth below q, is", "No extra slippage term",
-                   "One decision", "Tree-clock cohort", "unclassified"):
+                   "One decision", "Tree-clock cohort", "unclassified",
+                 "stays comparable with `start_unknown = true`", "It never selects events.",
+                 "The decision metric is over the whole comparable"):
+        plain = phrase.replace("`", "")
         assert phrase in spec
-        assert any(phrase in r for rules in rv.values() for r in rules), phrase
+        assert any(plain in r for rules in rv.values() for r in rules), phrase
     assert ud.UNCLASSIFIED_WORDS == ("거래지원", "마켓")
+    assert not any("no body field" in n for n in entry()["notes"])   # the blocker is resolved
 
 
 def test_part_c_entries_are_untouched():
