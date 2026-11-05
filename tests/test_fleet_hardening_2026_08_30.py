@@ -43,7 +43,7 @@ LIVE_CONFIGS = [
 # Bot services that expose a Freqtrade API and therefore may be issued their
 # own credentials. Keep in sync with api_utils.SERVICE_API_SLUGS.
 EXPECTED_SLUGS = {
-    "KELTNER", "FUNDINGFADE", "OITREND", "KILLERS", "SHORTKELTNER",
+    "KELTNER", "FUNDINGFADE", "OITREND", "KILLERS", "SHORTKELTNER", "UPBITFADE",
 }
 
 
@@ -474,6 +474,7 @@ def test_per_bot_credential_slugs_agree_across_compose_api_utils_dashboard(compo
         ("oi-trend-pullback", "OITREND"),
         ("ft-killers-scalp", "KILLERS"),
         ("ft-short-keltner-hl-live", "SHORTKELTNER"),
+        ("ft-upbit-fade-hl", "UPBITFADE"),
     ],
 )
 def test_each_bot_prefers_its_own_credentials_and_falls_back_to_the_fleet(

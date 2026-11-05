@@ -91,7 +91,7 @@ def test_environment_overrides_are_the_effective_mode_and_database(tmp_path, mon
 
 def test_every_active_bot_entrypoint_runs_the_guard():
     compose = (ROOT / "ft_userdata/docker-compose.prod.yml").read_text()
-    assert compose.count("guard_db_mode.py --config") == 5
+    assert compose.count("guard_db_mode.py --config") == 6
 
 
 @pytest.mark.parametrize(

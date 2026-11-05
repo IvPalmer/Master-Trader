@@ -164,3 +164,36 @@ def test_retired_insiders_client_has_no_route():
                 raise AssertionError('insiders route still served')
     asyncio.run(check())
     assert 'insiders' not in g.Gateway(Session()).health()['clients']
+
+
+class _Request:
+    def __init__(self, body):
+        self.headers = {'content-length': '2'}
+        self._body = body
+
+    async def json(self):
+        return self._body
+
+
+def test_upbit_pilot_client_routes_and_may_submit_exchange_actions():
+    """#252: ft-upbit-fade-hl routes through /upbit with its own account and API
+    wallet; it may forward signed actions once live, like killers. `short`
+    stays observation only."""
+    assert 'upbit' in g.CLIENTS and g.EXCHANGE_CLIENTS == {'killers', 'upbit'}
+    assert g.priority('upbit', 'info', {'type': 'l2Book'}) == 1
+    assert g.priority('upbit', 'info', {'type': 'candleSnapshot'}) == 2
+
+    async def check():
+        session = Session(b'{"status":"ok"}')
+        g.app.state.gateway = g.Gateway(session)
+        resp = await g.proxy('upbit', 'exchange', _Request({'action': {'type': 'order'}}))
+        assert resp.status_code == 200 and session.calls == 1
+        try:
+            await g.proxy('short', 'exchange', _Request({'action': {'type': 'order'}}))
+        except g.HTTPException as exc:
+            assert exc.status_code == 403
+        else:
+            raise AssertionError('observation client forwarded an exchange action')
+        assert session.calls == 1
+        assert 'upbit' in g.Gateway(Session()).health()['clients']
+    asyncio.run(check())

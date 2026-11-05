@@ -16,7 +16,10 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
 
 UPSTREAM = 'https://api.hyperliquid.xyz'
-CLIENTS = {'killers', 'short', 'accounting'}
+CLIENTS = {'killers', 'short', 'upbit', 'accounting'}
+# Clients whose bot signs exchange actions when live (each with its own HL
+# account and API wallet). Every other client is observation only.
+EXCHANGE_CLIENTS = {'killers', 'upbit'}
 LOW_COST = {'l2Book', 'allMids', 'clearinghouseState', 'orderStatus',
             'spotClearinghouseState', 'exchangeStatus'}
 VARIABLE = {'recentTrades', 'historicalOrders', 'userFills', 'userFillsByTime',
@@ -68,7 +71,7 @@ def priority(client, path, body):
         return 0
     # CCXT fetch_ticker(s) uses asset contexts, not just allMids/l2Book.
     # Price reads used by live status and exits must not wait behind candles.
-    if client in {'killers', 'accounting'} and body.get('type') in LOW_COST | VARIABLE | {'openOrders', 'frontendOpenOrders', 'meta', 'spotMeta', 'perpDexs', 'metaAndAssetCtxs', 'spotMetaAndAssetCtxs'}:
+    if client in {'killers', 'upbit', 'accounting'} and body.get('type') in LOW_COST | VARIABLE | {'openOrders', 'frontendOpenOrders', 'meta', 'spotMeta', 'perpDexs', 'metaAndAssetCtxs', 'spotMetaAndAssetCtxs'}:
         return 1
     return 2
 
@@ -211,7 +214,7 @@ async def proxy(client: str, path: str, request: Request):
     if not isinstance(body, dict):
         raise HTTPException(400)
     # Observation clients cannot submit signed actions via this gateway.
-    if path == 'exchange' and client != 'killers':
+    if path == 'exchange' and client not in EXCHANGE_CLIENTS:
         raise HTTPException(403, 'observation client cannot submit exchange actions')
     status, data = await app.state.gateway.forward(client, path, body)
     return Response(data, status_code=status, media_type='application/json')
