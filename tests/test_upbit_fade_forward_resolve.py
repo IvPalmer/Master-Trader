@@ -22,16 +22,19 @@ def month_ms(year, month, day=10):
     return int(datetime(year, month, day, 6, tzinfo=timezone.utc).timestamp() * 1000)
 
 
-def put(led, i, t0, net, token=None, funding=True, comparable=True, final=True):
-    """A finished event whose 24 h net return is `net` (entry 100 at 1, funding 0)."""
+def put(led, i, t0, net, token=None, funding=True, comparable=True, final=True, start=True,
+        seen=False):
+    """A finished event whose 24 h net return is `net` (entry 100 at 1, funding 0).
+    comparable=False fails a requirement (unverified timing); start=False has no body start
+    (start_unknown); seen adds a descriptive KRW-market first-seen record."""
     tok = token or "T%d" % i
     eid, aid = "upbit:n%d:%s" % (i, tok), "upbit:n%d" % i
     iso = uc.iso
     led.append({"rid": "event:" + eid, "kind": "event", "event_id": eid, "announcement_id": aid,
                 "notice_id": "n%d" % i, "token": tok, "title": "t", "t0_ms": t0, "t0": iso(t0),
                 "published_at": iso(t0), "received_at": iso(t0 + 39_000),
-                "detected_ms": t0 + 40_000, "timing": "verified",
-                "trading_start_ms": t0 + f.H if comparable else None,
+                "detected_ms": t0 + 40_000, "timing": "verified" if comparable else "unverified",
+                "trading_start_ms": t0 + f.H if start else None, "start_unknown": not start,
                 "began_before_notice": False, "krw_prior": False,
                 "binance_prior": {"found": False}, "pre_epoch": False})
     led.append({"rid": "hl:" + eid, "kind": "hl", "status": "eligible", "coin": tok,
@@ -41,6 +44,9 @@ def put(led, i, t0, net, token=None, funding=True, comparable=True, final=True):
     led.append({"rid": "bprior:" + eid, "kind": "bprior", "found": False})
     led.append({"rid": "entry:" + eid, "kind": "entry", "status": "timely", "coin": tok,
                 "q": "100", "vwap": "1", "obs_ms": t0 + 5 * f.MIN})
+    if seen:
+        led.append({"rid": "krwseen:" + eid, "kind": "krwseen", "event_id": eid,
+                    "krw_market_first_seen_ms": t0 + 2 * f.H})
     if not final:
         return eid
     x = (1 - FEE - D(str(net))) / (1 + FEE)
@@ -206,3 +212,60 @@ def test_status_reports_the_resolution_numbers(tmp_path):
     text = "\n".join(ur.status_lines(s))
     assert "interim, not the decision: EDGE" in text and "decision: not yet taken" in text
     assert uv.fee(D("100")) == D("0.045")
+
+
+def test_decision_is_over_the_whole_comparable_cohort_with_the_start_known_subset_descriptive(tmp_path):
+    mon, clock = monitor(tmp_path)
+    pairs = months(4, [0.05, 0.06, 0.04, 0.07] * 10)              # 40 announcements
+    for i, (t0, v) in enumerate(pairs):                            # 30 start_unknown, 10 known
+        put(mon.ledger, i, t0, v if i % 4 == 0 else -0.06 if i % 4 == 1 else v,
+            start=(i % 4 == 0), seen=(i % 2 == 0))
+    mon._decide()
+    d = mon.ledger.get("decision")
+    assert len(d["announcements"]) == 40 and d["n_announcements"] == 40   # start_unknown counted
+    assert d["flags"] == {"token_events": 40, "start_unknown": 30, "krw_market_first_seen": 20}
+    sub = d["start_known_subset"]
+    assert sub["descriptive_only"] is True and sub["n_announcements"] == 10
+    whole = ur.resolve(ur.results(ur.views(mon.ledger)))
+    assert (d["class"], d["mean"]) == (whole["class"], whole["mean"])
+    assert sub["mean"] == pytest.approx(0.05, abs=1e-9) and sub["mean"] != d["mean"]
+    text = "\n".join(ur.status_lines(ur.summarize(mon.ledger, um.ul.Ledger(tmp_path / "m.jsonl"),
+                                                   clock.ms)))
+    assert "DECISION (40 comparable announcements" in text and "whole comparable cohort" in text
+    assert "start_unknown=false subset (descriptive only)" in text
+    assert "start_unknown 30, krw_market_first_seen 20 (of 40 token-events)" in text
+
+
+def test_krw_market_first_seen_never_changes_selection(tmp_path):
+    pairs = months(4, [0.03, -0.01, 0.05, 0.02] * 11)
+    plain, seen = monitor(tmp_path / "a")[0], monitor(tmp_path / "b")[0]
+    for i, (t0, v) in enumerate(pairs):
+        put(plain.ledger, i, t0, v)
+        put(seen.ledger, i, t0, v, seen=(i % 3 == 0))
+    for a, b in zip(ur.views(plain.ledger), ur.views(seen.ledger)):
+        assert ur.classify(a) == ur.classify(b) and ur.outcome(a) == ur.outcome(b)
+    plain._decide()
+    seen._decide()
+    da, db = plain.ledger.get("decision"), seen.ledger.get("decision")
+    assert da["announcements"] == db["announcements"]
+    assert (da["class"], da["mean"], da["ci"]) == (db["class"], db["mean"], db["ci"])
+    assert da["flags"]["krw_market_first_seen"] == 0 and db["flags"]["krw_market_first_seen"] == 14
+
+
+def test_krw_seen_scan_starts_strictly_after_t0_on_a_fresh_monitor(tmp_path):
+    mon, clock = monitor(tmp_path)
+    t0 = month_ms(2026, 11)
+    eid = put(mon.ledger, 1, t0, 0.0, token="NEWX", final=False)
+    sets = {"a": ["KRW-BTC"], "b": ["KRW-BTC", "KRW-NEWX"]}
+    for sha, markets in sets.items():
+        mon.markets.append({"rid": "set:" + sha, "kind": "market_set", "sha256": sha,
+                            "markets": markets})
+    for k, (offset, sha) in enumerate(((-5, "a"), (0, "b"), (5, "a"), (10, "a"), (15, "b"), (20, "b"))):
+        mon.markets.append({"rid": "poll:%d" % k, "kind": "market_poll", "obs_ms": t0 + offset * f.MIN,
+                            "sha256": sha})
+    mon._krw_seen()                       # listed at t0 itself: not after t0, so not "seen"
+    seen = mon.ledger.get("krwseen:" + eid)
+    assert seen["krw_market_first_seen_ms"] == t0 + 15 * f.MIN
+    assert seen["prev_snapshot_ms"] == t0 + 10 * f.MIN and seen["prev_listed"] is False
+    mon._krw_seen()
+    assert len(mon.ledger.kind("krwseen")) == 1

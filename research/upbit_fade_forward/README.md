@@ -36,16 +36,21 @@ detection. This monitor measures the same rule forward:
    slippage. Funding: finalized `fundingHistory` rates x q x `oraclePx` observed through
    `metaAndAssetCtxs` within 60 s after each hour (estimated; positive funding pays the
    short). MAE/MFE from 1 m `candleSnapshot` candles (descriptive).
-5. **Cohorts.** *Comparable* (the decision set) also needs a body stating a start at or after
-   t0, Binance 1 m klines in [t0 - 10 min, t0) (USDⓈ-M first, else spot), the Part C leak test
-   passed on them, and an entry filled within 2 min of t0 + 5 min. A requirement that fails
-   makes the event *descriptive*; one that cannot be established (a fetch that never
-   succeeded, an entry never filled) keeps it comparable with a **missing** outcome, so it
-   counts in the tipping point.
+5. **Cohorts.** *Comparable* (the decision set) also needs Binance 1 m klines in
+   [t0 - 10 min, t0) (USDⓈ-M first, else spot), the Part C leak test passed on them, and an
+   entry filled within 2 min of t0 + 5 min. A requirement that fails makes the event
+   *descriptive*; one that cannot be established (a fetch that never succeeded, an entry
+   never filled) keeps it comparable with a **missing** outcome, so it counts in the tipping
+   point. A known trading start is **not** required (Tree carries no Upbit body; spec,
+   *Claude's call 2026-11-05*): no body, or no start in it, sets `start_unknown = true`. Two
+   descriptive extras never select events: `start_unknown`, and `krw_market_first_seen_ms`
+   (the first `market/all` snapshot after t0 that lists `KRW-<TOKEN>`).
 6. **Resolution.** Announcement-level mean net 24 h return of the comparable cohort, A4
    calendar-month block bootstrap at **95%** (`nes_returns`, level passed explicitly). One
    decision, at 40 comparable announcements or on 2027-11-05: EDGE (lower bound > 0), NO
    EDGE (upper bound <= 0), else NOT DETERMINABLE. Reports at 20 and 30 are descriptive.
+   Every report also gives the `start_unknown` and `krw_market_first_seen` counts and, as
+   descriptive only, the same resolution on the `start_unknown = false` subset.
 
 Every scheduled book action has a 10 min deadline, also across restarts: past it the outcome
 is `missing`, and one later book walk (within 6 h) is kept as a separate `late` record, never
@@ -125,12 +130,10 @@ is idle between events (one `market/all` request every 5 min, one archive read e
 
 ## Known limitations
 
-- **Tree carries no notice body.** On the public Tree API (checked 2026-11-05), the CARDS,
-  ENJ and server-maintenance Upbit items have `title`, `url` and `time` but no `body`. The
-  known-trading-start rule then sends every event to the descriptive cohort and the
-  "began before the notice" exclusion never fires, so the comparable cohort stays empty and
-  the decision would be NOT DETERMINABLE. Changing that needs a body source or a prereg
-  amendment before the first event.
+- **Tree carries no notice body** (the 3 Tree Upbit items in the VPS archive, 2026-11-05),
+  and the VPS gets 403 from Upbit's announcements API. Nearly every event is therefore
+  `start_unknown`, and the "began before the notice" exclusion can fire only if a body ever
+  arrives. A notice that states a start before t0 cannot be screened out from the title.
 - If Upbit lists `KRW-<token>` in `market/all` before the notice's t0, the already-on-KRW
   rule excludes the event. Check the first real events.
 - Funding is estimated (observed `oraclePx`, not a settlement receipt).

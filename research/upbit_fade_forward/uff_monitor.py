@@ -11,6 +11,7 @@ and resumes: an action whose deadline passed while the process was down is recor
 cursors; without it the epoch cursors are used and the idempotent ledger absorbs the replay.
 It places no orders and holds no keys.
 """
+import bisect
 import json
 from contextlib import closing
 from decimal import Decimal
@@ -48,6 +49,8 @@ class Monitor:
         for r in self.ledger.kind("reject"):
             self._rejects[r["of"]] = max(self._rejects.get(r["of"], 0), r["n"])
         self._seen = {r["notice_id"]: r["content"] for r in self.ledger.kind("seen")}
+        self._krw_pos = {}       # event id -> index of the next market_poll to check
+        self._sets = {}          # market set hash -> set of market codes
 
     # --- plumbing ------------------------------------------------------------------------
 
@@ -79,7 +82,7 @@ class Monitor:
 
     def tick(self):
         for step in (self._poll_archive, self._critical, self._oracle, self._poll_upbit,
-                     self._history, self._audit, self._decide):
+                     self._krw_seen, self._history, self._audit, self._decide):
             try:
                 step()
             except Exception as e:  # noqa: BLE001 - the loop must never die
@@ -157,6 +160,7 @@ class Monitor:
                "detected_ms": now, "detected_at": uc.iso(now), "timing": timing,
                "timing_reason": why, "trading_start_ms": start,
                "began_before_notice": start is not None and start < t0,
+               "start_unknown": start is None,
                "krw_prior": krw, "krw_snapshot_ms": snapshot,
                "binance_prior": ud.binance_prior(conn, token, t0), "pit": ud.pit(conn, n),
                "pre_epoch": t0 < self.ledger.get("epoch")["start_ms"]}
@@ -452,6 +456,38 @@ class Monitor:
                                      "first_seen_ms": obs, "prev_obs_ms": prev["obs_ms"]})
                 self.log("new Upbit market KRW-%s (previous snapshot %s)" % (
                     token, uc.iso(prev["obs_ms"])))
+
+    def _market_set(self, sha):
+        if sha not in self._sets:
+            self._sets[sha] = set(self.markets.get("set:" + sha)["markets"])
+        return self._sets[sha]
+
+    def _krw_seen(self):
+        """Descriptive only, never selects events: the first market/all snapshot after t0 that
+        lists KRW-<token> (its time is krw_market_first_seen_ms), with the snapshot before it."""
+        polls = self.markets.kind("market_poll")
+        for ev in self._events():
+            eid = ev["event_id"]
+            if "krwseen:" + eid in self.ledger:
+                continue
+            i = self._krw_pos.get(eid)
+            if i is None:
+                i = bisect.bisect_right(polls, ev["t0_ms"], key=lambda p: p["obs_ms"])
+            market = "KRW-" + ev["token"]
+            while i < len(polls) and market not in self._market_set(polls[i]["sha256"]):
+                i += 1
+            self._krw_pos[eid] = i
+            if i == len(polls):
+                continue
+            seen, prev = polls[i], polls[i - 1] if i else None
+            self._append({"rid": "krwseen:" + eid, "kind": "krwseen", "event_id": eid,
+                          "market": market, "descriptive": True,
+                          "krw_market_first_seen_ms": seen["obs_ms"],
+                          "krw_market_first_seen": uc.iso(seen["obs_ms"]),
+                          "snapshot_sha256": seen["sha256"],
+                          "prev_snapshot_ms": prev and prev["obs_ms"],
+                          "prev_listed": prev is not None and market in self._market_set(prev["sha256"]),
+                          "after_t0_ms": seen["obs_ms"] - ev["t0_ms"]})
 
     def _audit(self):
         """A new KRW market with no detected notice in [first seen - 7 d, + 24 h] is a miss."""

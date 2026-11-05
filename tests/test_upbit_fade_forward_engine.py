@@ -207,6 +207,31 @@ def test_new_krw_market_with_a_detected_notice_is_matched(tmp_path):
         ("KRW-CARDS", "matched", [s.eid()])]
 
 
+def test_krw_market_first_seen_is_the_first_snapshot_after_t0_and_descriptive_only(tmp_path):
+    s = started(tmp_path)
+    s.run(s.t0 + 2 * f.H)
+    assert s.rec("krwseen") is None                              # not listed yet
+    before = ur.classify(ur.view(s.mon.ledger, s.rec("event")))
+    listed_from = s.clock.ms
+    s.http.markets_fn = lambda now: ["KRW-BTC", "KRW-ETH"] + (["KRW-CARDS"] if now >= listed_from else [])
+    s.run(s.t0 + 3 * f.H)
+    seen = s.rec("krwseen")
+    first = [p["obs_ms"] for p in s.mon.markets.kind("market_poll") if p["obs_ms"] >= listed_from][0]
+    assert seen["krw_market_first_seen_ms"] == first and seen["descriptive"] is True
+    assert seen["prev_listed"] is False and seen["prev_snapshot_ms"] < first
+    assert seen["after_t0_ms"] == first - s.t0
+    assert ur.classify(ur.view(s.mon.ledger, s.rec("event"))) == before == ("comparable", [])
+    s.new_monitor()                                              # recorded once across restarts
+    s.run(s.t0 + 4 * f.H)
+    assert len(s.mon.ledger.kind("krwseen")) == 1
+    summary = ur.summarize(s.mon.ledger, s.mon.markets, s.clock.ms)
+    assert summary["flags"]["all"] == {"token_events": 1, "start_unknown": 0,
+                                       "krw_market_first_seen": 1}
+    assert summary["events"][0]["krw_market_first_seen_ms"] == first
+    text = "\n".join(ur.status_lines(summary))
+    assert "start_unknown 0, krw_market_first_seen 1 (of 1 token-events)" in text
+
+
 def test_market_snapshots_are_timestamped_and_deduplicated(tmp_path):
     s = f.Scenario(tmp_path)
     s.run(s.t0 - 1000, every_ms=60_000)

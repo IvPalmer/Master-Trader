@@ -31,6 +31,9 @@ def cohort(s):
 def test_comparable_when_every_rule_holds(tmp_path):
     s = detect(scenario(tmp_path), until=61 * f.MIN)
     assert cohort(s) == ("comparable", [])
+    ev = s.rec("event")                                       # a body start at or after t0
+    assert ev["trading_start_ms"] >= s.t0 and ev["start_unknown"] is False
+    assert ur.start_unknown(ev) is False
     assert s.rec("entry")["status"] == "timely"
     assert s.rec("binance")["market"] == "um" and s.rec("binance")["leaked"] is False
     assert s.rec("bprior")["found"] is False
@@ -95,6 +98,7 @@ def test_binance_notice_published_before_t0_but_archived_later_excludes_post_hoc
 def test_body_saying_trading_began_before_the_notice_excludes(tmp_path):
     s = detect(scenario(tmp_path, body=BEFORE_BODY))
     assert s.rec("event")["began_before_notice"] is True
+    assert s.rec("event")["trading_start_ms"] < s.t0 and s.rec("event")["start_unknown"] is False
     assert cohort(s) == ("excluded", ["began_before_notice"]) and s.rec("entry") is None
 
 
@@ -139,12 +143,15 @@ def test_hyperliquid_unreachable_until_the_entry_deadline_is_unknown(tmp_path):
 
 # --- comparable-cohort requirements -------------------------------------------------------------
 
-def test_no_body_or_no_stated_start_is_descriptive(tmp_path):
-    s = detect(scenario(tmp_path, body=None))
-    assert cohort(s) == ("descriptive", ["trading_start_known"])
-    assert s.rec("entry")["status"] == "timely"              # still measured
-    s2 = detect(scenario(tmp_path / "b", body="<p>입출금 일정은 추후 안내</p>"))
-    assert cohort(s2) == ("descriptive", ["trading_start_known"])
+def test_no_body_or_no_stated_start_is_comparable_with_start_unknown(tmp_path):
+    s = detect(scenario(tmp_path, body=None), until=61 * f.MIN)   # Tree items carry no body
+    ev = s.rec("event")
+    assert ev["has_body"] is False and ev["trading_start_ms"] is None
+    assert ev["start_unknown"] is True and ev["began_before_notice"] is False
+    assert cohort(s) == ("comparable", [])                   # a flag, not a missing requirement
+    assert s.rec("entry")["status"] == "timely"
+    s2 = detect(scenario(tmp_path / "b", body="<p>입출금 일정은 추후 안내</p>"), until=61 * f.MIN)
+    assert s2.rec("event")["start_unknown"] is True and cohort(s2) == ("comparable", [])
 
 
 def test_unverified_tree_timing_is_descriptive(tmp_path):
