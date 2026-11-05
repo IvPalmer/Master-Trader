@@ -7,6 +7,7 @@ import asyncio
 from collections import deque
 from contextlib import asynccontextmanager
 import json
+import logging
 import math
 import os
 import time
@@ -35,11 +36,16 @@ VARIABLE = {'recentTrades', 'historicalOrders', 'userFills', 'userFillsByTime',
 # + 40 slice per minute (HL allows 1200), leaving 260 for non-fleet users.
 SLICES = {'upbit': 40}
 SLICE_PRIORITY_TYPES = {'orderStatus'}
-# Cold start (#252): a restarted gateway forgets its rolling window while
-# Hyperliquid still counts it. Assume the previous minute ran at the cap, spread
-# evenly, and let it decay: priority reads wait about 4 s and actions about 1 s
-# after a start (inside their 12 s queue deadline); background waits about 22 s.
 FLEET_CAP = 900
+WINDOW_S = 60
+# Restart safety (#252): Hyperliquid keeps counting the last minute across a
+# gateway restart, so the rolling history is persisted (wall-clock timestamps,
+# atomic writes about once a second and on shutdown) to BUDGET_STATE_PATH on
+# the gateway's volume and restored at start, dropping rows older than the
+# window. No file, or an unreadable one (the first deploy of this change),
+# starts empty, as before, and says so in the log and on /healthz.
+SAVE_INTERVAL_S = 1.0
+LOG = logging.getLogger('uvicorn.error')
 # Only public market data is cached. Never conceal a new order/fill/account update.
 CACHE_TTL = {'allMids': 1, 'l2Book': .5, 'meta': 300, 'spotMeta': 300, 'perpDexs': 300,
              'metaAndAssetCtxs': 10, 'spotMetaAndAssetCtxs': 10, 'candleSnapshot': 2}
@@ -101,23 +107,89 @@ def lane(client, tier):
 
 class Budget:
     # Rows are [time, weight, tier, lane]; lane None is the fleet budget.
-    def __init__(self, clock=time.monotonic, cold_start=False):
+    # `clock` orders the window (monotonic); `wall` dates the persisted rows.
+    def __init__(self, clock=time.monotonic, wall=time.time, state_path=None):
         self.clock = clock
+        self.wall = wall
         self.used = deque()
         self.waiting = [0, 0, 0]
         self.cooldown = 0.0
-        if cold_start:
-            now = self.clock()
-            for i in range(60):
-                at = now - 59 + i
-                self.used.append([at, FLEET_CAP / 60, 2, None])
-                for name, cap in SLICES.items():
-                    self.used.append([at, cap / 60, 0, name])
+        self.state_path = state_path
+        self.dirty = False
+        self.history = 'disabled'
+        self.restored_rows = 0
+        if state_path:
+            self.restore()
 
     def _expire(self):
         now = self.clock()
-        while self.used and self.used[0][0] <= now - 60:
+        while self.used and self.used[0][0] <= now - WINDOW_S:
             self.used.popleft()
+
+    # --- persistence ----------------------------------------------------------
+
+    def snapshot(self):
+        self._expire()
+        offset = self.wall() - self.clock()
+        cooldown = self.cooldown + offset if self.cooldown > self.clock() else None
+        return {'version': 1, 'saved_at': self.wall(), 'cooldown_until': cooldown,
+                'rows': [[row[0] + offset, row[1], row[2], row[3]] for row in self.used]}
+
+    def persist(self):
+        """Write the window atomically if it changed. Never raises."""
+        if not self.state_path or not self.dirty:
+            return False
+        data = json.dumps(self.snapshot(), separators=(',', ':'))
+        tmp = self.state_path + '.tmp'
+        try:
+            with open(tmp, 'w') as f:
+                f.write(data)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, self.state_path)
+        except OSError as exc:
+            LOG.warning('budget history: cannot write %s: %s', self.state_path, exc)
+            return False
+        self.dirty = False
+        return True
+
+    def restore(self):
+        try:
+            with open(self.state_path) as f:
+                data = json.load(f)
+            rows = []
+            for t, weight, tier, lane in data['rows']:
+                if not (isinstance(t, (int, float)) and isinstance(weight, (int, float))
+                        and weight >= 0 and tier in (0, 1, 2)
+                        and (lane is None or lane in SLICES)):
+                    raise ValueError('bad row')
+                rows.append((float(t), float(weight), tier, lane))
+            cooldown = data.get('cooldown_until')
+        except FileNotFoundError:
+            self.history = 'missing'
+            LOG.warning('budget history: no file at %s; starting with an empty window',
+                        self.state_path)
+            return
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            self.history = 'unreadable'
+            LOG.warning('budget history: unreadable %s (%s); starting with an empty window',
+                        self.state_path, exc)
+            return
+        wall_now, mono_now = self.wall(), self.clock()
+        kept = []
+        for t, weight, tier, lane in rows:
+            if t <= wall_now - WINDOW_S:
+                continue
+            # A wall clock that stepped back makes a row look future: count it from now.
+            kept.append([min(t, wall_now) - wall_now + mono_now, weight, tier, lane])
+        kept.sort(key=lambda row: row[0])
+        self.used = deque(kept)
+        if isinstance(cooldown, (int, float)) and cooldown > wall_now:
+            self.cooldown = min(cooldown - wall_now, 10) + mono_now
+        self.history = 'restored'
+        self.restored_rows = len(kept)
+        LOG.info('budget history: restored %d rows, %.0f weight in the last minute, from %s',
+                 len(kept), sum(row[1] for row in kept), self.state_path)
 
     def total(self):
         """Everything sent on the IP in the last minute."""
@@ -135,6 +207,7 @@ class Budget:
                 return None
             row = [self.clock(), weight, tier, own]
             self.used.append(row)
+            self.dirty = True
             return row
         # 250 weight reserved for managing live exposure; another 50 for
         # exchange actions. 300/min left for non-fleet users on the VPS IP.
@@ -150,6 +223,7 @@ class Budget:
             return None
         row = [self.clock(), weight, tier, None]
         self.used.append(row)
+        self.dirty = True
         return row
 
     async def acquire(self, weight, tier, timeout=12, client=None):
@@ -194,6 +268,8 @@ class Gateway:
                 'background_weight_last_minute': sum(r[1] for r in self.budget.used
                                                      if r[2] == 2 and r[3] is None),
                 'slice_weight_last_minute': {name: self.budget.lane_total(name) for name in SLICES},
+                'budget_history': {'state': self.budget.history,
+                                   'restored_rows': self.budget.restored_rows},
                 'requests_by_type': {kind: sum(r[2] == kind for r in recent)
                                      for kind in sorted({r[2] for r in recent})},
                 'queued': sum(self.budget.waiting)}
@@ -222,6 +298,7 @@ class Gateway:
             try:
                 decoded = json.loads(data)
                 reservation[1] = actual_cost(path, body, decoded)
+                self.budget.dirty = True
             except (ValueError, TypeError):
                 pass
             result = (status, data)
@@ -242,11 +319,23 @@ class Gateway:
             return 504, b'{"detail":"upstream outcome unavailable"}'
 
 
+async def _save_budget(budget):
+    while True:
+        await asyncio.sleep(SAVE_INTERVAL_S)
+        budget.persist()
+
+
 @asynccontextmanager
 async def lifespan(app):
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
-        app.state.gateway = Gateway(session, Budget(cold_start=True))
-        yield
+        budget = Budget(state_path=os.environ.get('BUDGET_STATE_PATH') or None)
+        app.state.gateway = Gateway(session, budget)
+        saver = asyncio.create_task(_save_budget(budget))
+        try:
+            yield
+        finally:
+            saver.cancel()
+            budget.persist()
 
 
 app = FastAPI(lifespan=lifespan)

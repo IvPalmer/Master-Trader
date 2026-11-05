@@ -62,6 +62,11 @@ services:
     container_name: ft-hl-gateway
     environment:
       KILLERS_WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
+      # Rolling budget history kept across restarts (#252): HL keeps counting
+      # the last minute, so a restart must not start from an empty window.
+      BUDGET_STATE_PATH: /state/budget.json
+    volumes:
+      - hl_gateway_state:/state
     ports:
       - 127.0.0.1:8104:8080
     healthcheck:
@@ -642,6 +647,7 @@ volumes:
   ft_user_data: null
   ft_exporter_state: null
   killers_receiver_state: null
+  hl_gateway_state: null
   claude_auth:
     external: true
     name: claude-assistant_claude_auth

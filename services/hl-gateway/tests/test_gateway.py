@@ -265,31 +265,132 @@ def test_killers_budget_is_unchanged_when_upbit_is_idle():
     assert g.priority('killers', 'exchange', {}) == 0
 
 
-def test_a_restarted_gateway_assumes_the_last_minute_ran_at_the_cap():
-    now = [1000.0]
-    budget = g.Budget(lambda: now[0], cold_start=True)
-    assert round(budget.lane_total(None)) == 900 and round(budget.lane_total('upbit')) == 40
-    assert budget.reserve(1, 0, 'killers') is None          # nothing bursts at start
-    assert budget.reserve(2, 1, 'killers') is None
-    now[0] += 1
-    assert budget.reserve(1, 0, 'killers')                  # actions after ~1 s
-    assert budget.reserve(2, 1, 'killers') is None
-    now[0] += 3
-    assert budget.reserve(2, 1, 'killers')                  # exit reads after ~4 s
-    assert budget.reserve(20, 2, 'short') is None
-    now[0] += 17
-    assert budget.reserve(20, 2, 'short') is None
-    now[0] += 1
-    assert budget.reserve(20, 2, 'short')                   # background after ~22 s
-    now[0] += 48                                            # t = 70: the assumption is gone
-    assert budget.lane_total('upbit') == 0 and budget.lane_total(None) == 20
-    assert budget.reserve(581, 2, 'short') is None and budget.reserve(580, 2, 'short')
+# --- #252 review round 2: restart safety from persisted history -------------------------
+
+class Clocks:
+    """A monotonic clock that restarts at an arbitrary origin, and a wall clock."""
+    def __init__(self, wall=1_800_000_000.0, mono=500.0):
+        self.w, self.m = wall, mono
+
+    def wall(self):
+        return self.w
+
+    def mono(self):
+        return self.m
+
+    def advance(self, s):
+        self.w += s
+        self.m += s
+
+    def restart(self, mono=9_000.0):
+        self.m = mono                      # a new process: a new monotonic origin
 
 
-def test_the_service_starts_with_the_cold_start_budget():
+def budget(c, path):
+    return g.Budget(clock=c.mono, wall=c.wall, state_path=str(path))
+
+
+def test_a_restart_restores_the_rolling_history_exactly(tmp_path):
+    c = Clocks()
+    path = tmp_path / 'budget.json'
+    b = budget(c, path)
+    assert b.history == 'missing' and b.total() == 0
+    for weight, tier, client in ((20, 2, 'short'), (2, 1, 'killers'), (1, 0, 'killers'),
+                                 (2, 1, 'upbit'), (120, 1, 'killers')):
+        assert b.reserve(weight, tier, client)
+        c.advance(3)
+    before = [(round(r[0] - c.mono(), 6), r[1], r[2], r[3]) for r in b.used]
+    fleet_before = b.lane_total(None)
+    assert b.persist() and not b.persist()           # written once; unchanged after
+    c.advance(2)
+    c.restart()
+    b2 = budget(c, path)
+    assert b2.history == 'restored' and b2.restored_rows == 5
+    after = [(round(r[0] - c.mono() + 2, 6), r[1], r[2], r[3]) for r in b2.used]
+    assert after == before
+    assert b2.lane_total(None) == fleet_before == 143 and b2.lane_total('upbit') == 2
+    c.advance(60)
+    assert b2.total() == 0                           # rows still expire on their own times
+
+
+def test_the_940_plus_400_restart_burst_is_refused(tmp_path):
+    """Codex round 2: 940 just before a restart, then 400 at +30 s, was 1340 in a minute."""
+    c = Clocks()
+    path = tmp_path / 'budget.json'
+    b = budget(c, path)
+    assert b.reserve(600, 2, 'short') and b.reserve(250, 1, 'killers')
+    assert b.reserve(50, 0, 'killers') and b.reserve(40, 0, 'upbit')
+    assert b.total() == 940
+    b.persist()
+    c.advance(1)
+    c.restart()
+    c.advance(29)                                    # +30 s after the burst
+    b2 = budget(c, path)
+    for weight, tier, client in ((400, 2, 'short'), (400, 1, 'killers'), (400, 0, 'killers'),
+                                 (2, 1, 'killers'), (1, 0, 'upbit')):
+        assert b2.reserve(weight, tier, client) is None, (weight, tier, client)
+    c.advance(31)                                    # the burst has left the window
+    assert b2.reserve(400, 2, 'short')
+
+
+def test_killers_fill_read_succeeds_right_after_a_restart_with_room_in_the_window(tmp_path):
+    """The removed cold-start rule made a 120-weight userFills read miss its 12 s deadline
+    with no contention at all."""
+    for kind in ('userFills', 'userFillsByTime'):
+        assert g.cost('info', {'type': kind}) == 120
+        assert g.priority('killers', 'info', {'type': kind}) == 1
+    c = Clocks()
+    path = tmp_path / 'budget.json'
+    b = budget(c, path)
+    assert b.reserve(150, 2, 'short') and b.reserve(40, 1, 'killers')
+    b.persist()
+    c.restart()
+    b2 = budget(c, path)
+
+    async def check():
+        return await b2.acquire(120, 1, timeout=.2, client='killers')
+    assert asyncio.run(check())
+
+
+def test_a_missing_or_unreadable_history_starts_empty(tmp_path, caplog):
+    c = Clocks()
+    caplog.set_level('INFO', logger='uvicorn.error')
+    b = budget(c, tmp_path / 'absent.json')
+    assert b.history == 'missing' and b.total() == 0 and b.reserve(600, 2)
+    bad = tmp_path / 'bad.json'
+    for text in ('{"rows": [[1, 2', '{"rows": [["x", 1, 0, null]]}', '[]',
+                 '{"rows": [[1800000000.0, 5, 1, "insiders"]]}'):
+        bad.write_text(text)
+        b = budget(c, bad)
+        assert b.history == 'unreadable' and b.total() == 0, text
+    assert 'starting with an empty window' in caplog.text
+    assert g.Budget().history == 'disabled'          # no path: no persistence
+
+
+def test_the_service_saves_on_shutdown_and_restores_at_start(tmp_path, monkeypatch):
+    path = tmp_path / 'budget.json'
+    monkeypatch.setenv('BUDGET_STATE_PATH', str(path))
+
     async def check():
         async with g.lifespan(g.app):
-            budget = g.app.state.gateway.budget
-            assert round(budget.total()) == 940
-            assert budget.reserve(2, 1, 'killers') is None
+            gw = g.app.state.gateway
+            assert gw.budget.history == 'missing'
+            assert gw.budget.reserve(120, 1, 'killers')
+        assert path.exists()
+        async with g.lifespan(g.app):
+            gw = g.app.state.gateway
+            assert gw.budget.history == 'restored' and gw.budget.total() == 120
+            assert gw.health()['budget_history'] == {'state': 'restored', 'restored_rows': 1}
     asyncio.run(check())
+    assert not (tmp_path / 'budget.json.tmp').exists()
+
+
+def test_the_compose_service_keeps_its_history_on_a_volume():
+    import yaml
+    prod = yaml.safe_load((Path(__file__).parents[3] / 'ft_userdata/docker-compose.prod.yml').read_text())
+    svc = prod['services']['hl-gateway']
+    assert svc['environment']['BUDGET_STATE_PATH'] == '/state/budget.json'
+    assert svc['volumes'] == ['hl_gateway_state:/state'] and 'hl_gateway_state' in prod['volumes']
+    docker = (Path(__file__).parents[1] / 'Dockerfile').read_text()
+    assert 'mkdir -p /state && chown 1000:1000 /state' in docker
+    assert docker.index('chown 1000:1000 /state') < docker.index('USER 1000:1000')
