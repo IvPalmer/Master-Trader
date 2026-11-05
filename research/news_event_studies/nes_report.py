@@ -214,7 +214,7 @@ def compute(manifest_path, expect_sha256, out_dir, fetcher, work_dir, disk_ok, c
             events.append(nr.evaluate(e, loaded[(p["market"], p["symbol"], e["t0_ms"])],
                                       loaded[("um", "BTCUSDT", e["t0_ms"])], DIRECTION[study], venue))
         counts = nm.manifest_counts(manifest, study)
-        legacy, legacy_reasons = nr.verdict(counts, events)
+        legacy, legacy_reasons = nr.verdict(counts, [r for r in events if not r.get("supplement")])
         frozen_missing = _phase1_missing(manifest, study)
         supp_in = supp is not None and study in supp["studies"]
         phase1_missing = frozen_missing + (_phase1_missing(supp, study) if supp_in else [])
