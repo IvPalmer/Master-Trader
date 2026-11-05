@@ -123,13 +123,20 @@ def _by_year(events, horizon=nr.PRIMARY):
     return {y: nr.estimate([a for a in anns if nu.utc_date(a[0])[:4] == y]) for y in years}
 
 
-def _summary(results, study, manifest, counts):
+def _phase1_missing(manifest, study):
+    """Token-events Phase 1 could not resolve (unknown/missing): missing outcomes for A4."""
+    return [(e["t0_ms"], e["announcement_id"]) for e in manifest["events"]
+            if nm.study_status(e, study) in ("unknown", "missing")]
+
+
+def _summary(results, study, manifest, counts, extra_missing=(), frozen_missing=()):
     events = results
     primary = {h: _crit(nr.announcements(events, h)) for h in nr.HORIZONS_MS}
-    cls, cls_reasons = nr.classify(events)
+    cls, cls_reasons = nr.classify(events, extra_missing=extra_missing)
     out = {"classification": cls, "classification_reasons": cls_reasons,
            "estimates": _estimates(events), "by_year_4h": _by_year(events),
-           "missing_announcements_4h": len(nr.missing_announcements(events)),
+           "missingness_4h": nr.missingness(events, extra_missing=extra_missing),
+           "tipping_point_4h": nr.tipping_point(events, cls, extra_missing=extra_missing),
            "primary": primary,
            "leak_included": {h: _crit(nr.announcements(events, h, include_leaked=True))
                              for h in nr.HORIZONS_MS},
@@ -152,13 +159,14 @@ def _summary(results, study, manifest, counts):
     if DIRECTION[study] == "short":
         out["mae"] = {}
         for h in nr.HORIZONS_MS:
-            vals = [r["horizons"][h]["mae"] for r in events if nr._usable(r) and not r["leaked"]
+            vals = [r["horizons"][h]["mae"] for r in events if r["leaked"] is False
+                    and r["horizons"][h]["exit_status"] in ("ok", "halted")
                     and r["horizons"][h]["mae"] is not None]
             out["mae"][h] = {"n": len(vals), "p50": _pct(vals, 0.5), "p90": _pct(vals, 0.9),
                              "max": max(vals) if vals else None}
     if any(r.get("supplement") for r in events):
         frozen = [r for r in events if not r.get("supplement")]
-        fcls, freasons = nr.classify(frozen)
+        fcls, freasons = nr.classify(frozen, extra_missing=frozen_missing)
         out["frozen_only"] = {"classification": fcls, "classification_reasons": freasons,
                               "estimate_4h": nr.estimate(nr.announcements(frozen, nr.PRIMARY))}
         out["supplement_events"] = sum(bool(r.get("supplement")) for r in events)
@@ -207,12 +215,17 @@ def compute(manifest_path, expect_sha256, out_dir, fetcher, work_dir, disk_ok, c
                                       loaded[("um", "BTCUSDT", e["t0_ms"])], DIRECTION[study], venue))
         counts = nm.manifest_counts(manifest, study)
         legacy, legacy_reasons = nr.verdict(counts, events)
-        summary = _summary(events, study, manifest, counts)
+        frozen_missing = _phase1_missing(manifest, study)
+        supp_in = supp is not None and study in supp["studies"]
+        phase1_missing = frozen_missing + (_phase1_missing(supp, study) if supp_in else [])
+        summary = _summary(events, study, manifest, counts, phase1_missing, frozen_missing)
         doc = {"study": study, "label": LABEL, "direction": DIRECTION[study],
                "verdict": summary["classification"], "reasons": summary["classification_reasons"],
                "legacy_gates": {"verdict": legacy, "reasons": legacy_reasons},
                "counts": counts, "coverage": float(nr.coverage(counts, events)),
-               "manifest_sha256": sha, "supplement_sha256": supp_sha,
+               "manifest_sha256": sha, "supplement_sha256": supp_sha if supp_in else None,
+               "supplement_counts": nm.manifest_counts(supp, study) if supp_in else None,
+               "phase1_missing": [list(x) for x in phase1_missing],
                "manifest_code_commit": manifest.get("code_commit"),
                "code_commit": code_commit, "computed_at": computed_at,
                **summary, "events": events}
@@ -259,7 +272,17 @@ def report_md(doc):
     for y, e in doc["by_year_4h"].items():
         L.append("| %s | %d | %s | %s | %.0f%% |" % (y, e["n"], _f(e["mean"]), _f(e["median"]),
                                                      100 * e["win_rate"]))
-    L += ["", "- announcements with no usable +4h return: %d" % doc["missing_announcements_4h"], ""]
+    mi, tip = doc["missingness_4h"], doc["tipping_point_4h"]
+    L += ["", "- missing +4h outcomes (Phase 1 unknown/missing included): %d token-events; %d"
+          " announcements fully, %d partly missing" % (mi["token_events"],
+                                                       mi["announcements_fully_missing"],
+                                                       mi["announcements_partly_missing"])]
+    L += ["- tipping point: %s" % (tip["note"] if tip else "n/a")]
+    if doc.get("supplement_counts"):
+        sc = doc["supplement_counts"]
+        L += ["- supplement manifest: candidates %d, unknown %d, missing %d, excluded %s"
+              % (sc["candidates"], sc["unknown"], sc["missing"], sc["excluded"])]
+    L += [""]
     c, sc = doc["counts"], doc["status_counts"]
     L += ["## Counts", "",
           "- candidates %d; unknown %d; Phase 1 missing %d; harvest shortfall %d; harvest complete %s"
@@ -311,10 +334,12 @@ def report_md(doc):
 def resolution(results):
     """Recomputed from the stored events only (the mechanical resolution, A4 rule)."""
     events = results["events"]
-    verdict, reasons = nr.classify(events)
+    extra = [tuple(x) for x in results.get("phase1_missing") or []]
+    verdict, reasons = nr.classify(events, extra_missing=extra)
     e = nr.estimate(nr.announcements(events, nr.PRIMARY))
     return {"verdict": verdict, "reasons": reasons, "label": LABEL,
             "primary_4h": {k: e[k] for k in ("n", "mean", "ci", "median", "win_rate")},
+            "supplement_sha256": results.get("supplement_sha256"),
             "manifest_sha256": results["manifest_sha256"], "code_commit": results["code_commit"],
             "computed_at": results["computed_at"]}
 
@@ -363,6 +388,10 @@ def main(argv=None, fetcher=None, wall=time.time, sleep=time.sleep):
     v.add_argument("--results", required=True)
     args = ap.parse_args(argv)
     if args.cmd == "compute":
+        studies = json.loads(Path(args.manifest).read_bytes()).get("studies", [])
+        if any(s in (nm.LONG, nm.FADE) for s in studies) and not (args.supplement and args.supplement_sha256):
+            print("refusing: A4 runs the Upbit studies with the registered supplement", file=sys.stderr)
+            return 2
         work = Path(args.work) if args.work else Path(args.out) / "work"
         try:
             docs = compute(Path(args.manifest), args.expect_sha256, Path(args.out),

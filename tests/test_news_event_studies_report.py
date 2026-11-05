@@ -248,3 +248,18 @@ def test_compute_merges_supplement_and_reports_frozen_only(tmp_path):
         assert rp.resolution(json.loads(json.dumps(doc, default=str)))["verdict"] == doc["verdict"]
     md = (tmp_path / "out" / ("report-%s.md" % FADE)).read_text(encoding="utf-8")
     assert "frozen candidates only" in md and "legacy gates" in md and "By year" in md
+
+
+def test_cli_refuses_upbit_without_supplement_and_resolution_uses_phase1_missing(tmp_path):
+    base = manifest([LONG, FADE], [ev("upbit:1", T1, "TST", kind="krw_addition", spot="TSTUSDT")])
+    p, sha = write(tmp_path, base)
+    market = Market()
+    rc = rp.main(["compute", "--manifest", str(p), "--expect-sha256", sha, "--out", str(tmp_path / "o"),
+                  "--code-commit", "x"], fetcher=market, wall=LATER, sleep=lambda s: None)
+    assert rc == 2 and market.urls == []
+    unk = {**ev("binance:9", T2, "UNK"), "hl": {"status": "unknown", "coin": "UNK", "reason": "x"}}
+    out = run(tmp_path, manifest([DEL], [ev("binance:1", T1, "AAA"), unk]), Market())[DEL]
+    assert out["phase1_missing"] == [[T2, "binance:9"]]
+    assert out["missingness_4h"]["token_events"] == 1
+    stored = json.loads((tmp_path / "out" / ("results-%s.json" % DEL)).read_text(encoding="utf-8"))
+    assert rp.resolution(stored)["verdict"] == stored["verdict"]

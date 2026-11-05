@@ -357,11 +357,28 @@ def test_classify_edge_no_edge_and_not_determinable():
     assert nr.classify(_months([[0.02]]))[0] == "NOT DETERMINABLE"     # one month
 
 
-def test_classify_missing_announcements_can_block_a_conclusion():
+def test_missingness_counts_partial_and_phase1_tokens():
+    # Codex round 2: one +2% token and one missing token per announcement used to look complete.
+    res = []
+    for m in range(6):
+        t = T0 + m * M
+        res += [_res("a%d" % m, t, 0.02 + 0.001 * m), _res("a%d" % m, t, None, "missing")]
+    miss = nr.missingness(res, extra_missing=[(T0, "a0"), (T0 + 7 * M, "p1")])
+    assert miss == {"token_events": 8, "announcements_fully_missing": 1,
+                    "announcements_partly_missing": 6}
+    got, reasons = nr.classify(res)
+    assert got == "EDGE (proxy)" and "6 missing token-event(s)" in reasons[-1]
+
+
+def test_tipping_point_is_where_the_bound_crosses_zero():
     up = [[0.02, 0.03], [0.01, 0.04], [0.03, 0.02], [0.02, 0.05], [0.04, 0.01], [0.03, 0.03]]
-    got, reasons = nr.classify(_months(up, missing=3))      # worst observed is +1%: still an edge
-    assert got == "EDGE (proxy)" and "3 missing" in reasons[-1]
-    lossy = up[:5] + [[0.03, -0.04]]
-    assert nr.classify(_months(lossy))[0] == "EDGE (proxy)"
-    got, reasons = nr.classify(_months(lossy, missing=20))  # 20 imputed -4% losses reverse it
-    assert got == "NOT DETERMINABLE" and "would reverse" in reasons[-1]
+    res = _months(up, missing=4)
+    assert nr.classify(res)[0] == "EDGE (proxy)"
+    tip = nr.tipping_point(res, "EDGE (proxy)")
+    v = tip["value"]
+    assert -1 < v < 0.01 and "reverses if the missing events average below" in tip["note"]
+    parts = nr.announcement_parts(res, key="net_stress")
+    draws = nr._draws([(t0, s_ / (a + m), Fraction(m, a + m)) for t0, _i, s_, a, m in parts])
+    assert nr._interval(draws, v + 1e-6)[0] > 0 >= nr._interval(draws, v - 1e-6)[0]
+    assert nr.tipping_point(_months(up), "EDGE (proxy)") is None        # nothing missing
+    assert nr.tipping_point(res, "NOT DETERMINABLE") is None

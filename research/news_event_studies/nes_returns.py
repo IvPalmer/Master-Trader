@@ -232,23 +232,42 @@ def _month(t0_ms):
     return nu.utc_date(t0_ms)[:7]
 
 
+def _draws(items, n=BOOT_N, seed=BOOT_SEED):
+    """Calendar-month block bootstrap of affine announcement values alpha + beta * v.
+
+    `items` = (t0_ms, alpha, beta). Each resample draws whole UTC months with replacement and
+    keeps (sum alpha, sum beta, announcements), so the mean for any v is (A + B v) / N.
+    None with fewer than two months."""
+    blocks = {}
+    for t0, alpha, beta in items:
+        b = blocks.setdefault(_month(t0), [0.0, 0.0, 0])
+        b[0] += float(alpha)
+        b[1] += float(beta)
+        b[2] += 1
+    bl = [blocks[k] for k in sorted(blocks)]
+    if len(bl) < 2:
+        return None
+    rng = random.Random(seed)
+    out = []
+    for _ in range(n):
+        a = b_ = c = 0
+        for blk in rng.choices(bl, k=len(bl)):
+            a, b_, c = a + blk[0], b_ + blk[1], c + blk[2]
+        out.append((a, b_, c))
+    return out
+
+
+def _interval(draws, v=0.0, level=CI_LEVEL):
+    means = sorted((a + b * v) / c for a, b, c in draws)
+    n, tail = len(means), float((1 - Fraction(level)) / 2)
+    return means[max(0, math.ceil(tail * n) - 1)], means[min(n - 1, math.ceil((1 - tail) * n) - 1)]
+
+
 def block_bootstrap_mean_ci(anns, level=CI_LEVEL, n=BOOT_N, seed=BOOT_SEED):
     """Percentile interval of the announcement-level mean, resampling whole UTC calendar months
     (announcements in one month share a market regime). None with fewer than two months."""
-    blocks = {}
-    for t0, _aid, v in anns:
-        blocks.setdefault(_month(t0), []).append(float(v))
-    bl = [blocks[k] for k in sorted(blocks)]
-    if len(bl) < 2:
-        return None, None
-    rng = random.Random(seed)
-    means = []
-    for _ in range(n):
-        pick = [x for b in rng.choices(bl, k=len(bl)) for x in b]
-        means.append(sum(pick) / len(pick))
-    means.sort()
-    tail = float((1 - Fraction(level)) / 2)
-    return means[max(0, math.ceil(tail * n) - 1)], means[min(n - 1, math.ceil((1 - tail) * n) - 1)]
+    draws = _draws([(a[0], a[2], 0) for a in anns], n, seed)
+    return _interval(draws, 0.0, level) if draws else (None, None)
 
 
 def estimate(anns):
@@ -261,46 +280,90 @@ def estimate(anns):
             "ci": [lo, hi]}
 
 
-def missing_announcements(results, horizon=PRIMARY):
-    """Announcements in the primary population with no usable value at `horizon`: at least one
-    token-event passed the leak test or could not be tested, and none yields a return."""
-    have = {(a[0], a[1]) for a in announcements(results, horizon)}
-    seen = {}
+def announcement_parts(results, horizon=PRIMARY, key="net", extra_missing=()):
+    """Primary population per announcement: (t0, id, sum of usable values, usable, missing).
+
+    A token-event is missing at `horizon` when its leak test did not run, or it passed and the
+    horizon has no usable return. Leaked token-events are outside the population, not missing.
+    `extra_missing` adds Phase 1 unknown/missing token-events as (t0, id)."""
+    parts = {}
     for r in results:
-        if r["leaked"] is not True:
-            seen[(r["t0_ms"], r["announcement_id"])] = True
-    return sorted(k for k in seen if k not in have)
+        if r["leaked"] is True:
+            continue
+        p = parts.setdefault((r["t0_ms"], r["announcement_id"]), [Fraction(0), 0, 0])
+        hz = r["horizons"].get(horizon, {})
+        v = hz.get(key)
+        if r["leaked"] is False and hz.get("exit_status") in ("ok", "halted") and v is not None:
+            p[0] += Fraction(v)
+            p[1] += 1
+        else:
+            p[2] += 1
+    for t0, aid in extra_missing:
+        parts.setdefault((t0, aid), [Fraction(0), 0, 0])[2] += 1
+    return [(t0, aid, s, a, m) for (t0, aid), (s, a, m) in sorted(parts.items())]
 
 
-def classify(results, horizon=PRIMARY):
+def missingness(results, horizon=PRIMARY, extra_missing=()):
+    parts = announcement_parts(results, horizon, extra_missing=extra_missing)
+    return {"token_events": sum(p[4] for p in parts),
+            "announcements_fully_missing": sum(p[3] == 0 and p[4] > 0 for p in parts),
+            "announcements_partly_missing": sum(p[3] > 0 and p[4] > 0 for p in parts)}
+
+
+def tipping_point(results, cls, horizon=PRIMARY, extra_missing=()):
+    """The common return v of every missing token-event at which `cls` would stop holding.
+
+    Each announcement becomes (usable sum + missing * v) / (usable + missing), its intended token
+    weights. EDGE uses the stress-cost lower bound, NO EDGE the base-cost upper bound. Searched
+    over v in [-1, 1]; None when nothing is missing or the class has no bound to cross."""
+    key, side = {"EDGE (proxy)": ("net_stress", 0), "NO EDGE": ("net", 1)}.get(cls, (None, None))
+    if key is None:
+        return None
+    parts = announcement_parts(results, horizon, key, extra_missing)
+    if not any(p[4] for p in parts):
+        return None
+    draws = _draws([(t0, s / (a + m), Fraction(m, a + m)) for t0, _aid, s, a, m in parts])
+    bound = lambda v: _interval(draws, v)[side]          # noqa: E731  increasing in v
+    lo, hi = -1.0, 1.0
+    if side == 0 and bound(lo) > 0:
+        return {"value": None, "note": "EDGE holds even if every missing event loses 100%"}
+    if side == 1 and bound(hi) <= 0:
+        return {"value": None, "note": "NO EDGE holds even if every missing event gains 100%"}
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        if (bound(mid) > 0) == (side == 0):
+            hi = mid
+        else:
+            lo = mid
+    v = (lo + hi) / 2
+    word = "below" if side == 0 else "above"
+    return {"value": v, "note": "%s reverses if the missing events average %s %+.4f"
+            % (cls, word, v)}
+
+
+def classify(results, horizon=PRIMARY, extra_missing=()):
     """A4 decision on the announcement-level mean net return at the primary horizon.
 
     EDGE (proxy): the adjusted interval of the stress-cost mean lies above zero.
     NO EDGE: the adjusted interval of the base-cost mean lies at or below zero.
-    Otherwise NOT DETERMINABLE. A conclusion that flips when every missing announcement takes
-    the worst observed value for it (min for EDGE, max for NO EDGE) is NOT DETERMINABLE too."""
+    Otherwise NOT DETERMINABLE. The class assumes missing outcomes resemble observed ones;
+    `tipping_point` says how far they would have to differ to reverse it."""
     base, stress = announcements(results, horizon), announcements(results, horizon, key="net_stress")
     lo, _ = block_bootstrap_mean_ci(stress)
     _, hi = block_bootstrap_mean_ci(base)
     if lo is None or hi is None:
         return "NOT DETERMINABLE", ["fewer than two calendar months with a %s return" % horizon]
-    missing = missing_announcements(results, horizon)
     if lo > 0:
-        cls, check, key, pick = "EDGE (proxy)", lambda b: b[0] > 0, "net_stress", min
-        anns = stress
+        cls = "EDGE (proxy)"
     elif hi <= 0:
-        cls, check, key, pick = "NO EDGE", lambda b: b[1] <= 0, "net", max
-        anns = base
+        cls = "NO EDGE"
     else:
         return "NOT DETERMINABLE", ["%s mean interval spans zero (stress low %+.4f, base high %+.4f)"
                                     % (horizon, lo, hi)]
     reasons = ["%s mean interval: stress low %+.4f, base high %+.4f" % (horizon, lo, hi)]
-    if missing:
-        worst = pick(a[2] for a in anns)
-        bound = block_bootstrap_mean_ci(anns + [(t0, aid, worst) for t0, aid in missing])
-        if not check(bound):
-            return "NOT DETERMINABLE", reasons + ["%d missing announcement(s) at the worst observed"
-                                                  " value would reverse %s" % (len(missing), cls)]
-        reasons.append("holds with %d missing announcement(s) at the worst observed value"
-                       % len(missing))
+    miss = missingness(results, horizon, extra_missing)
+    if miss["token_events"]:
+        tip = tipping_point(results, cls, horizon, extra_missing)
+        reasons.append("assumes the %d missing token-event(s) resemble observed ones; %s"
+                       % (miss["token_events"], tip["note"]))
     return cls, reasons
