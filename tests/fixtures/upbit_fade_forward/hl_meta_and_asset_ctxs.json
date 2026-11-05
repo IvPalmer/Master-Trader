@@ -1,0 +1,50 @@
+[
+ {
+  "universe": [
+   {
+    "szDecimals": 5,
+    "name": "BTC",
+    "maxLeverage": 40,
+    "marginTableId": 56
+   },
+   {
+    "szDecimals": 0,
+    "name": "ENA",
+    "maxLeverage": 10,
+    "marginTableId": 52
+   }
+  ]
+ },
+ [
+  {
+   "funding": "0.0000125",
+   "openInterest": "40289.50592",
+   "prevDayPx": "80383.0",
+   "dayNtlVlm": "4660688335.9332504272",
+   "premium": "-0.0000395018",
+   "oraclePx": "75946.0",
+   "markPx": "75948.0",
+   "midPx": "75942.5",
+   "impactPxs": [
+    "75942.0",
+    "75943.0"
+   ],
+   "dayBaseVlm": "59294.73799"
+  },
+  {
+   "funding": "0.0000125",
+   "openInterest": "437481388.0",
+   "prevDayPx": "0.18393",
+   "dayNtlVlm": "29256802.5761000067",
+   "premium": "-0.000248911",
+   "oraclePx": "0.1607",
+   "markPx": "0.16065",
+   "midPx": "0.160625",
+   "impactPxs": [
+    "0.160553",
+    "0.16066"
+   ],
+   "dayBaseVlm": "170196566.0"
+  }
+ ]
+]

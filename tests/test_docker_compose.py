@@ -107,7 +107,8 @@ def test_copier_candle_cap_is_scoped_away_from_funding_history():
     key = 'FREQTRADE__EXCHANGE___FT_HAS_PARAMS__ohlcv_candle_limit_per_timeframe__5m'
     for name, service in prod['services'].items():
         env = service.get('environment', {})
-        if name == 'ft-killers-scalp':
+        # The two pass-through bots driven by /forceenter (#252 copies Killers).
+        if name in {'ft-killers-scalp', 'ft-upbit-fade-hl'}:
             assert env[key] == '100'
             assert env['FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS'] == '30'
             assert not any('mark_ohlcv' in k or 'funding_fee' in k for k in env)
@@ -146,7 +147,7 @@ def test_hyperliquid_bots_wait_for_healthy_gateway():
         'service_healthy needs hl-gateway to define a healthcheck'
     bots = {name for name, svc in services.items() if _ccxt_via_hl_gateway(svc)}
     # Guard against the detector silently matching nothing.
-    assert bots == {'ft-killers-scalp', 'ft-short-keltner-hl-live'}
+    assert bots == {'ft-killers-scalp', 'ft-short-keltner-hl-live', 'ft-upbit-fade-hl'}
     for name in bots:
         depends = services[name].get('depends_on')
         assert isinstance(depends, dict), f'{name}: depends_on must be map form'

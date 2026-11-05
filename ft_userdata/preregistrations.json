@@ -669,6 +669,1485 @@
       "triggers": [],
       "amendments": [],
       "resolution": null
+    },
+    {
+      "id": "ff-causal-funding-control-2026-10-12",
+      "bot": "FundingFadeV1",
+      "status": "open",
+      "registered": "2026-10-12",
+      "review_by": "2027-01-12",
+      "issue": "#28",
+      "min_closed_trades": 30,
+      "context": "Remaining FundingFade item of #28: does the funding term add anything over price-only, with causal funding, costs and a held-out half? Complements (does not replace) the forward V2 vs V2-noC test (ff-forward-v2-vs-no-protections-2026-10-01).",
+      "arms": {
+        "gate": "FundingFadeV1 as deployed (funding_below_mean)",
+        "price_only": "FundingFadeV1PriceOnly: funding term always passes; every other term, exit, protection identical",
+        "lagged_funding": "FundingFadeV1LaggedFunding: real term on funding delayed 21 days (keeps distribution/persistence, destroys timing; causal)",
+        "placebo": "FundingFadeV1Placebo01..20: seeded coin flip per (pair, candle) at the real term's own per-pair pass rate"
+      },
+      "causality": "Funding is the last event at or before the candle open (searchsorted right-1), decision at candle close; per-pair and BTC staleness fail-closed guards unchanged. research/evidence_tracks/ff_controls.py tests prove no look-ahead and fail-closed lag start.",
+      "method": "Freqtrade backtesting, --timeframe-detail 1m, --enable-protections, fee 0.00075 (from live orders), live-matched static 19-pair config, $15 stake / 2 slots as in the 2026-09-30 calibrated study; strategies in research/evidence_tracks/FFCausalResearch.py next to the deployed FundingFadeV1.py (md5 recorded in the result). Windows: IS 2023-01-31..2025-06-30 and OOS 2025-07-01..2026-09-30 are the SAME windows as the 2026-09-30 study, so OOS is not a fresh holdout for V2; fresh evidence is only data after 2026-10-12, scored by the same files.",
+      "reading_rule": "Funding term shows discriminative power only if the deployed gate beats price_only AND the placebo 90th percentile on profit factor and net P&L in BOTH IS and OOS (research/evidence_tracks/common.py control_reading_rule). Otherwise 'not demonstrated'. Add +5 bps/fill slippage sensitivity. A pass is evidence about the funding term, not authorization to scale.",
+      "rules": [
+        "Research only: no live order, config, allocation or deployed-strategy change follows automatically from any result. No new live bot or capital increase is authorized.",
+        "Existing preregistrations, epoch labels and dry/live lineage are preserved; this entry adds a separate research epoch.",
+        "Every pre-declared variant is reported, including failures. No threshold, window or exit is tuned after seeing results; a change is a new entry or an amendment."
+      ],
+      "triggers": [],
+      "amendments": [],
+      "resolution": null
+    },
+    {
+      "id": "keltner-exit-universe-validation-2026-10-12",
+      "bot": "KeltnerBounceV1",
+      "status": "open",
+      "registered": "2026-10-12",
+      "review_by": "2027-01-12",
+      "issue": "#28",
+      "min_closed_trades": 30,
+      "context": "Remaining Keltner item of #28: validate the current exit stack and fixed universe, and measure gate-conditional setup frequency BEFORE any filter is changed.",
+      "step_1_frequency": "research/evidence_tracks/keltner_setup_frequency.py: per-pair funnel raw lower-band cross -> +volume (1.75x SMA20) -> +BTC>SMA50 gate, gate-open share, gate-blocked count, setups/month, monthly counts, on the fixed live universe. Frequency only; no P&L. No filter may be proposed from this step alone.",
+      "step_2_exit_stack": "KeltnerExitResearch.py variants, entry/universe/protections/gate inherited unchanged: KeltnerExitV2 (deployed, control), KeltnerExitV1 (-7% stop), KeltnerExitNoTrail, KeltnerExitNoStale. Freqtrade --timeframe-detail 1m, protections on, live fee. Reported per half-year with sample sizes.",
+      "universe": "Fixed live pair list at registration; pairs are not added or dropped on the basis of results. A pair-ablation is descriptive only.",
+      "rules": [
+        "Research only: no live order, config, allocation or deployed-strategy change follows automatically from any result. No new live bot or capital increase is authorized.",
+        "Existing preregistrations, epoch labels and dry/live lineage are preserved; this entry adds a separate research epoch.",
+        "Every pre-declared variant is reported, including failures. No threshold, window or exit is tuned after seeing results; a change is a new entry or an amendment.",
+        "Deployed V2 stack (stoploss -6%, 3%/5% trailing, 120h stale exit) stays live regardless of result; V2 was set after seeing the forward sample, so only post-2026-08-23 live data is clean for it."
+      ],
+      "triggers": [],
+      "amendments": [],
+      "resolution": null
+    },
+    {
+      "id": "insiders-fresh-sample-2026-10-12",
+      "bot": "InsidersScalpV1",
+      "status": "open",
+      "registered": "2026-10-12",
+      "review_by": "2027-01-12",
+      "issue": "#28",
+      "min_closed_trades": 30,
+      "context": "Remaining Insiders item of #28: a fresh sample under the current bounded executor, separate from prior 5x/venue regimes. Applies the corrected bar of insiders-demotion-2026-08-30 (>=30 admitted signals at PF >= 1.3, judged on the fresh epoch alone; never re-judge the pre-remediation seven).",
+      "epochs": "research/evidence_tracks/insiders_epochs.json (boundaries copied from micro-live-fleet-v2 amendments and executable-exits-and-request-budget-2026-09-13). Trades are labelled by ENTRY time; fresh_epoch = grouped-target-executor (2026-09-12T00:46:00Z), the latest executor-contract boundary recorded in the repo. If the synthetic correlation key or market-entry-with-SL support landed later, a later epoch is appended by amendment BEFORE counting.",
+      "tool": "research/evidence_tracks/insiders_fresh_sample.py: per-epoch metrics, exclusions (open/live), bar status in {insufficient_evidence, bar_met, bar_not_met}.",
+      "rules": [
+        "Research only: no live order, config, allocation or deployed-strategy change follows automatically from any result. No new live bot or capital increase is authorized.",
+        "Existing preregistrations, epoch labels and dry/live lineage are preserved; this entry adds a separate research epoch.",
+        "Every pre-declared variant is reported, including failures. No threshold, window or exit is tuned after seeing results; a change is a new entry or an amendment.",
+        "The bot stays dry-run throughout. bar_met only permits a separate operator decision about a bounded live epoch; it changes nothing by itself.",
+        "The 90-day review may conclude insufficient_evidence."
+      ],
+      "triggers": [],
+      "amendments": [],
+      "resolution": null
+    },
+    {
+      "id": "shortkeltner-breakdown-eval-2026-10-12",
+      "bot": "ShortKeltnerBreakdown (research only; not a bot)",
+      "status": "open",
+      "registered": "2026-10-12",
+      "review_by": "2027-04-12",
+      "issue": "#28",
+      "min_closed_trades": 30,
+      "context": "Remaining Short Keltner item of #28, implementing the redesign direction in shortkeltner-redesign-proposal-2026-08-30 as a SEPARATE evaluation; ShortKeltnerV2HL and its dry curve are untouched. Higher signal frequency is not evidence of profitability.",
+      "frozen_spec": {
+        "gate": "btc_bear unchanged (BTC 1h close < SMA50 and SMA200, SMA50 slope(24) < 0, close < daily SMA200)",
+        "trigger": "close crosses DOWN through lower Keltner band (SMA25 - 2.5*ATR25) with volume > 1.75*SMA20; RSI precondition dropped",
+        "entry": "next candle open",
+        "exit": "stop entry+2.0*ATR25(signal bar); target 2R; time exit after 72 bars; same-bar stop+target scored as stop; one position per pair",
+        "costs": "primary 10 bps/side, zero funding carry (carry tailwind not credited); sensitivity 5/20 bps",
+        "null": "200 seeded random masks over gate-open candles at the signal's own pass rate"
+      },
+      "implementation": "research/evidence_tracks/short_keltner_breakdown.py (signal, first-touch scorer, placebo, report). Hourly first-touch is a screen; any positive screen must be re-run with Freqtrade --timeframe-detail 1m on Hyperliquid data before a dry-run bot is proposed.",
+      "rules": [
+        "Research only: no live order, config, allocation or deployed-strategy change follows automatically from any result. No new live bot or capital increase is authorized.",
+        "Existing preregistrations, epoch labels and dry/live lineage are preserved; this entry adds a separate research epoch.",
+        "Every pre-declared variant is reported, including failures. No threshold, window or exit is tuned after seeing results; a change is a new entry or an amendment.",
+        "Evaluation windows: BTC/ETH/SOL as in the redesign proposal; the proposal's frequency count (158 signals) is already seen, so profitability gets no credit from it.",
+        "A result is 'beats placebo' only if mean net R at 10 bps exceeds the placebo 90th percentile AND n >= 30; below 30 the report states no profit claim.",
+        "Binance USDT klines are a proxy for Hyperliquid USDC volume; counts and results are labelled proxy evidence."
+      ],
+      "triggers": [],
+      "amendments": [],
+      "resolution": null
+    },
+    {
+      "id": "killers-entry-policy-replay-2026-10-13",
+      "bot": "KillersScalpV1 (research only; no config change)",
+      "status": "open",
+      "registered": "2026-10-13",
+      "review_by": "2026-11-13",
+      "issue": "GROA-309",
+      "min_closed_trades": 30,
+      "context": "Operator-approved replay of the full Killers channel history (~230 fillable signals of the 278 usable) to compare ENTRY policies. Lead measurement: signal-to-fill latency avg 23s, cost ~0.02%, price already ~1.4% above zone top at message time. Live policy (PR #162) is marketable entry up to 5% past the zone, skip beyond; the June 24h limit-in-zone design missed fills (1 of 13).",
+      "frozen_spec": {
+        "policies": "chase<=5% (live), chase<=2%, chase<=1%; limit at zone top (long: entry_hi, short: entry_lo) waiting W in {1h,4h,12h,24h} then cancel; wait W then chase<=2% at the first 1m open after the deadline. 11 variants = the multiple-testing trial count.",
+        "entry_fill": "chase: open of first 1m candle at/after signal time + 23s; skip if deviation past the zone edge > cap, if price already at/through the posted stop or all targets. limit: filled when 1m low<=bound (long) / high>=bound (short), at min(open,bound); skipped if the stop level trades before the fill. Slippage 0% and 0.5% applied adversely to marketable entries and to stop exits; resting limits/ladder legs get none.",
+        "held_fixed": "posted stop, first 8 posted targets as equal slices with the live $10-leg collapse (tp_plan.executable_targets logic), risk $12, margin $5-40, integer leverage<=3, stop-limit ratio 0.98, entry min notional $11.3, one position per signal (no max-open cap), horizon 14d, residual closed at channel close_full else last candle, same-candle stop before target, HL base fees 4.5 bps taker / 1.5 bps maker.",
+        "metrics": "fill rate; missed-signal outcome (counterfactual uncapped market entry at signal time on the skipped signals: mean R, win rate); expectancy in R (1R = loss at posted stop trigger) and $; PF; max drawdown $ (chronological); all at slippage 0% and 0.5%; split earliest 70% / latest 30% of signals by time.",
+        "multiple_testing": "Deflated Sharpe Ratio (Bailey & Lopez de Prado) on per-trade R with N=11 trials and cross-policy SR variance; a policy is only called better than the live chase<=5% if DSR>=0.95 AND the sign/direction holds in both the 70% and 30% splits at 0.5% slippage."
+      },
+      "implementation": "research/copier-validation/killers/entry_policy_replay.py; tests/test_killers_entry_policy_replay.py",
+      "rules": [
+        "Research only: no deploy, config, sizing or live-policy change follows automatically from any result.",
+        "All 11 variants are reported, including failures. No cap, window, slippage or exit is tuned after seeing results; a change is a new entry or an amendment.",
+        "Candle source is 1m Binance USDT-M (HL 1m where available); the source used must be stated in the result.",
+        "The 278-signal corpus and prior replays (#162/#182) are already seen; they give no credit to any variant."
+      ],
+      "triggers": [],
+      "amendments": [
+        {
+          "id": "A1-exit-arm",
+          "date": "2026-10-15",
+          "by": "operator via master-trader-lead (GROA-309 comment)",
+          "frozen_before_results": true,
+          "note": "Added before any data run (no result existed). Exit arm: signal used only as entry trigger; posted stop and ladder replaced by own levels.",
+          "prior": "The 2026-05-28 study found no edge and exits only changed the size of the loss. Expect ~0 expectancy after fees; any positive arm is a hypothesis needing forward confirmation, not a finding.",
+          "motivation": "Across 33 open signals the posted levels look like a template: stop median 9.7% from zone mid (p10 9.1, p90 11.6), TP1 median 5.1% (~0.53x stop distance), last TP ~67%.",
+          "variants": {
+            "entry": "live chase<=5% for every exit variant, so all arms share identical fills and skips (posted-level eligibility filters kept).",
+            "live_posted": "reference: posted stop + posted 8-rung ladder (not a new trial).",
+            "x1_atr1.5": "stop = fill -/+ 1.5 x ATR(14) on completed UTC-aligned 4h bars built from the 8 days of 1m before signal time (Wilder); needs >=15 bars else skip no_pre; targets 1R/2R/3R.",
+            "x1_atr2.5": "same with k=2.5.",
+            "x2_struct": "stop = most recent confirmed 4h fractal low (long) / high (short), 2 bars each side, within the 8d lookback and beyond the fill, pushed out 0.1%; none -> skip no_structure; targets 1R/2R/3R.",
+            "x3_posted_R": "posted stop; targets at 1R/2R/3R where 1R = fill-to-posted-stop distance."
+          },
+          "held_fixed": "R-targets: equal thirds at 1R/2R/3R through the live $10-leg collapse; stop never moved; fixed-$ risk sizing ($12 at stop-limit trigger, margin $5-40, lev<=3; risk falls below $12 only where the leverage/margin cap binds, and R is always computed on realised notional); fees, slippage 0/0.5%, horizon, 70/30 split, same-candle stop-first as the entry arm.",
+          "extra_metric": "TP1-vs-stop hit rate = share of fills where the first target (1R or posted TP1) traded before the stop, among fills where either did; plus median stop distance.",
+          "multiple_testing": "4 new trials; DSR trial count N=15 (11 entry + 4 exit) for the exit arm, cross-variant SR variance over the 5 exit rows incl. reference. A variant is only called better than live_posted if DSR>=0.95 AND same-sign expectancy in both splits at 0.5% slippage; even then it needs forward confirmation before any use.",
+          "implementation": "run_exit_signal / evaluate_exits in entry_policy_replay.py; pre-history cache files <SYMBOL>_<open_ms>_pre.json (--fetch downloads them)."
+        }
+      ],
+      "resolution": null
+    },
+    {
+      "id": "binance-delisting-reaction-2026-11",
+      "bot": null,
+      "status": "closed",
+      "registered": "2026-11-04",
+      "review_by": "2027-02-01",
+      "issue": "#229",
+      "spec": "docs/superpowers/specs/2026-11-03-news-archive-design.md §6 @980236a, with §6.2 Hyperliquid eligibility amended by #237 (C1 option A, §11 call 14)",
+      "hypothesis": "Negative, forced-selling event. The research's per-coin \"hard event\" class.",
+      "frozen": {
+        "window_utc": [
+          "2023-01-01T00:00:00Z",
+          "2026-11-01T00:00:00Z"
+        ],
+        "unit": "announcement",
+        "entry_offset_s": 300,
+        "descriptive_entry_offset_s": 60,
+        "horizons_s": [
+          1800,
+          14400,
+          86400
+        ],
+        "primary_horizon_s": 14400,
+        "fee_bps_per_side": {
+          "hyperliquid": 4.5,
+          "binance_spot": 7.5
+        },
+        "slippage_bps_per_side": 10,
+        "stress_slippage_bps_per_side": 25,
+        "leak_window_s": [
+          -600,
+          -120
+        ],
+        "leak_abs_drift_gt": "0.02",
+        "halt_resume_window_s": 259200,
+        "min_announcements": 20,
+        "top_decile_share_lt": 0.6,
+        "coverage_gate_gt": 0.2,
+        "bootstrap_resamples": 10000,
+        "bootstrap_seed": 229,
+        "hl_eligibility_window_s": [
+          86400,
+          3600
+        ],
+        "proxy_preference": [
+          "binance_um_futures",
+          "binance_spot"
+        ],
+        "proxy_dates_d": [
+          -1,
+          2
+        ],
+        "kline_download_dates_d": [
+          -1,
+          5
+        ],
+        "direction": "short",
+        "venues": [
+          "hyperliquid"
+        ],
+        "t0_field": "binance_cms.releaseDate",
+        "event_catalogs": [
+          161
+        ],
+        "kinds": [
+          "full_delist",
+          "monitoring_add"
+        ],
+        "same_token_overlap_s": 86400,
+        "manifest": "delisting-manifest.json",
+        "hl_evidence": "fundingHistory"
+      },
+      "rules_verbatim": {
+        "phase1": [
+          "Window: announcements dated 2023-01-01 00:00 UTC to 2026-10-31 23:59 UTC. The start is roughly when Hyperliquid perps begin to exist. Nothing after the window enters this study.",
+          "Events, delisting study (Claude's call):",
+          "Counted: one event per (announcement, token) for two kinds of notice:",
+          "a full Binance spot delisting, where the token loses every spot pair;",
+          "a new monitoring-tag assignment.",
+          "Excluded:",
+          "removal of individual trading pairs where the token keeps at least one spot pair;",
+          "margin-only and futures-only delistings;",
+          "vote-to-delist and similar polls;",
+          "removals of a tag.",
+          "Retractions and corrections stay in. They are unknowable at entry time.",
+          "Classification: from the notice text as harvested. The CMS returns current versions, so later edits cannot be ruled out; this is recorded as a limitation.",
+          "Overlap: if the same token has a second qualifying notice within 24 h of the first, only the first counts. Notices more than 24 h apart are separate events.",
+          "One test: both kinds share one pass/fail. Per-kind results are reported as descriptive only.",
+          "Timestamps:",
+          "Binance: `releaseDate`.",
+          "Upbit: the builder documents whether `listed_at` or `first_listed_at` is the publish time. The prereg names the field before Phase 1 runs.",
+          "Execution venues (Claude's call): Binance futures is CVM-blocked for the operator (see the `listing-reaction-study-2026-07` notes), so only these count:",
+          "Delisting study (short): Hyperliquid perp only. Binance spot cannot short.",
+          "Hyperliquid eligibility needs positive pre-entry evidence (changed after both rounds; evidence source changed by §11 call 14). A token qualifies only if Hyperliquid hourly funding records (`fundingHistory`, by coin name) exist for it in the 24 h before t0, including at least one in the last hour before t0. Candles cannot serve: `candleSnapshot` returns only the most recent ~5,000 candles, which at 1 h reach back to about 2026-04 (probe on #229). Nothing after t0 is used for eligibility; using it would exclude exactly the tokens that become untradeable right after the event. Tokens no longer in today's `meta` are looked up by name through `fundingHistory`. The builder confirms in Phase 1 that this works for delisted coins and documents it.",
+          "Eligibility that cannot be verified is `unknown`. Unknown events are excluded and counted. An earliest daily candle alone is not enough.",
+          "Completeness evidence (changed after round 2).",
+          "Pagination (changed after round 3): each Binance catalog (48 and 161, plus monitoring if separate) and the Upbit list are harvested in full, every page. The harvested count must equal the API's reported `total`.",
+          "Any shortfall is added to the `missing` count, conservatively assumed to fall inside the window.",
+          "If no total is reported, the study is INCONCLUSIVE-by-data.",
+          "This also covers the catalog-48 overlap exclusion.",
+          "Observed 2026-11-03: Upbit's Cloudflare answered error 1015 to page requests 1.5 s apart, so the full Upbit harvest runs at least 8 s per page. Binance catalog 161 reported `total` 446, and its oldest article is dated 2022-02-17.",
+          "Candles (changed after round 3): the exact 1m candles each calculation uses must exist. These are t0−10 min and t0−2 min for the leak test, the entry candle, and each horizon's exit candle. No interpolation and no forward-fill. If any is missing, and the halt rule does not resolve it, the event is `missing`.",
+          "Halts after entry (changed after rounds 3–4): if an exit candle is missing because trading halted, the exit is the first candle after trading resumes, within 72 h of that scheduled exit time.",
+          "Costs are always subtracted from the net return, whatever the side, never applied to a price.",
+          "If trading does not resume within that window, the event is `unresolved`.",
+          "`halted` events stay in every criterion.",
+          "Any unresolved event makes the study INCONCLUSIVE (changed after rounds 4–5). Their outcomes are outcome-dependent: terminal delistings would vanish. So with one or more `unresolved` events the result is INCONCLUSIVE. There is no imputation shortcut: imputed values can move the median and concentration criteria in either direction.",
+          "Coverage gate: `unknown`, `missing` and `unresolved` together above 20% of candidate events make the study INCONCLUSIVE-by-data. So does harvesting that cannot complete within the shared limiter.",
+          "Resource budget for Part C (changed after round 3):",
+          "Harvesting, downloading, decompressing and analysis run under `systemd-run --user --scope -p MemoryMax=1G -p CPUQuota=50%` with `nice` and `ionice -c3`.",
+          "Before each download batch, the 15 GB free-disk guard from §4.4 applies.",
+          "Only the daily kline files covering each event's [t0−1 d, t0+5 d] window are downloaded. That covers entry+24 h plus the 72 h resumption window. Each zip is deleted after the needed rows are extracted.",
+          "The expected footprint is under 1 GB.",
+          "Symbols and price series: the manifest freezes the token → Binance-symbol mapping, including 1000-prefixed contracts and renames, and which proxy series each event will use. Proxy series are Binance 1m klines from `data.binance.vision`, USDⓈ-M futures preferred, spot otherwise. Phase 1 checks only that the series exists; it computes no returns.",
+          "Events with missing proxy data are excluded and counted toward the coverage gate above.",
+          "Freeze: the manifest file's SHA-256 is recorded in a preregistration amendment, merged before Phase 2 starts."
+        ],
+        "phase2": [
+          "Entry latency (changed after review): taker entry at the close of the 1m candle containing t+5 min. Five minutes covers detection by a 60 s poller on Tree plus processing. A t+60 s entry is reported as descriptive only, because the archive's own Binance rotation could not detect that fast.",
+          "Exits: the fixed horizons entry+30 min, entry+4 h and entry+24 h.",
+          "Costs: taker fees of 4.5 bps per side on Hyperliquid or 7.5 bps on Binance spot, plus 10 bps per side of slippage. A stress case at 25 bps per side is reported. Hyperliquid funding is not modelled; at the +4 h primary horizon it is about four hourly payments. This is listed as a limitation.",
+          "Proxy status: the returns come from Binance prices, not Hyperliquid fills. Basis and impact are not measured, so any result is labelled a proxy result. That is acceptable only because a pass authorizes nothing beyond a paper forward monitor, and that monitor measures executable prices.",
+          "The forward monitor keeps each event's venue assignment (changed after round 2). It uses Hyperliquid best bid/offer (BBO) for Hyperliquid-assigned events and Binance spot `bookTicker` for spot-assigned Upbit events. So a pass driven by spot events is validated on spot, not on a different subset.",
+          "Leak flag: reuse the listing study's rule: more than 2% absolute drift over [t0−10 min, t0−2 min]. The primary set excludes leaked events; a sensitivity run includes them.",
+          "Unit of analysis (changed after review): the announcement, not the token. One Binance notice often names several tokens.",
+          "Each announcement's return is the mean net return of its eligible tokens.",
+          "The chronological halves split announcements by date.",
+          "Primary horizon: +4 h, declared now.",
+          "Pass (all required, evaluated at +4 h after fees and 10 bps slippage):",
+          "at least 20 distinct announcements in the primary set;",
+          "announcement-level median net return > 0;",
+          "a positive median in both chronological halves;",
+          "the top decile of announcements contributes less than 60% of the sum of announcement returns. This criterion fails whenever that sum is ≤ 0.",
+          "Also reported, not criteria:",
+          "a bootstrap 95% CI of the announcement-level median (10,000 resamples);",
+          "BTC-adjusted returns;",
+          "for the two short studies, the per-event maximum adverse excursion from entry to each exit, from 1m highs. A short's risk sits in the squeeze tail, which the median does not show. This is descriptive only: a missing candle inside the path makes that event's MAE unavailable. It never changes return eligibility, the coverage gate, aggregation or pass/fail;",
+          "all three horizons, both halves, per venue and per notice kind;",
+          "leak and slippage sensitivities;",
+          "excluded, unknown and missing counts.",
+          "Separate hypotheses. The studies are never pooled, and a pass in one is not evidence for another.",
+          "The Upbit long and fade share their Hyperliquid events. On that subset the fade's net return is the long's gross return with the sign flipped, minus costs.",
+          "So a failed long plus a passed fade is one finding, not two confirmations.",
+          "Kill: with at least 20 announcements, any failed criterion closes that lane for this config. A pass authorizes only a paper forward monitor, preregistered separately, in the `listing-short-forward` style.",
+          "Too few announcements (Claude's call): fewer than 20 is INCONCLUSIVE-by-data, the precedent from the listing study's Hyperliquid venue. The lane stays open, but nothing is authorized: no monitor and no bot. The archive keeps recording these events. Any re-test is a new, forward-only preregistration; retrospective and forward events are never mixed.",
+          "Code and data:",
+          "Code lives in the repo under `research/news_event_studies/`.",
+          "Downloaded klines and results stay on the VPS under `research/news_event_studies/data/`, gitignored.",
+          "The resolution is written into the prereg entry mechanically, from the frozen criteria only."
+        ]
+      },
+      "operationalization": [
+        "O1 t0: Binance `releaseDate` (ms); Upbit `first_listed_at` (KST→UTC). `listed_at` moves when a notice is edited (Part A: id 6687, 21:50 vs 20:00 KST).",
+        "O2 price_at(X) = the close of the Binance 1m candle whose open is floor_minute(X). Entry = price_at(t0+300 s); exit_H = price_at(t0+300 s+H). Leak drift = price_at(t0−120 s) / price_at(t0−600 s) − 1, in exact decimals; leaked if |drift| > 0.02.",
+        "O3 Gross long = exit/entry − 1; gross short = −(exit/entry − 1); net = gross − 2 × (fee + slippage) / 10,000.",
+        "O4 Missing candles: a missing exit candle → the close of the first candle opening in (scheduled, scheduled + 72 h] = `halted`; none → `unresolved`. Exception: when that candle exists but the scheduled exit's UTC-day file is absent (HTTP 404), the gap is an archive hole and the event is `missing`. A missing leak or entry candle → `missing`. Event status, strongest first: `unresolved` at any horizon, then `missing`, then `halted` at any horizon, else `ok`.",
+        "O5 Hyperliquid eligibility: `fundingHistory` by coin name, with candidates [T, \"k\"+T] and names containing \":\" skipped. Queries cover [t0−24 h, t0−1 ms]. eligible: ≥ 1 evidence time in [t0−24 h, t0) and ≥ 1 in [t0−1 h, t0). Evidence times are candle close `T` for candles and `time` for funding records; ineligible: no such evidence. A name absent from today's `meta` that also returns none is ineligible (`never_in_meta`); for such a name, HTTP 500 with body `null` counts as returning none (probe (f) on #229), and any other failed response stops the build; unknown: the evidence cannot be fetched or lies beyond retention (candle mode: t0−24 h earlier than BTC's earliest 1h candle); an unknown status excludes the event from all three studies.",
+        "O6 Binance presence: a daily 1m file on `data.binance.vision` for the UTC day before date(t0), for some candidate symbol. Candidates: UM futures `T`, `1000T`, `1000000T`, `1MT` + `USDT`; spot `T`, `1000T`, `1MT` + `USDT`. The Binance-spot venue needs a spot file for that day.",
+        "O7 Proxy: the first candidate, all UM futures before spot, with files for every UTC date from date(t0−1 d) to date(t0+2 d). Failing that, the first candidate in the same order with files for date(t0−1 d) and date(t0); its later gaps go through O4, so a series that ends after entry is `unresolved`, never `missing`. None → `missing`.",
+        "O8 Upbit KRW addition: a title with a KRW marker (`KRW` or `원화`) and an addition marker (`디지털 자산 추가`, `신규 상장` or `신규 거래지원`), containing none of 종료/유의/제거/변경/중단/연기/재개.",
+        "O9 Already on Upbit KRW: an earlier harvested KRW-addition notice for the token, with no KRW trading-end notice (`거래지원 종료`, `상장폐지` or `상장 폐지`, not limited to BTC/USDT markets) between it and t0.",
+        "O10 Upbit trading began before the notice: the trading-start time stated in the notice body is earlier than t0. A body with no parseable start time makes the event `unknown`. The start is read from the token's row of a table whose header has `거래지원 개시 시점` (or `거래 지원 개시 시점`), else from a line containing `거래지원 개시`, `거래 지원 개시` or `거래 오픈`; clocks are `HH:MM` or `H시 M분`, in KST. A start stated without a year takes the year (t0's KST year, or the one before or after) that puts it nearest t0; a tie is `unknown` (probe on #229: `10월 27일 16시 40분 예정` in a table cell).",
+        "O11 Catalog-48 overlap: any catalog-48 title naming the token within ±24 h of t0, inclusive.",
+        "O12 Delisting events come from harvested titles only. Overlap is computed over the full harvest before the window filter. A notice ≤ 24 h after the token's last kept notice is dropped.",
+        "O13 Coverage = (unknown + missing + unresolved + harvest shortfall) / (token-events not excluded by a verified rule + harvest shortfall). Above 0.20 → INCONCLUSIVE-by-data. A catalog-48 shortfall counts for both Upbit studies.",
+        "O14 Statistics: halves: announcements sorted by (t0, id), the first floor(n/2) against the rest; top decile: the ceil(n/10) largest announcement returns; median: `statistics.median`.",
+        "O15 Reported only: the bootstrap uses 10,000 resamples with `random.Random(229)`, 2.5/97.5 percentiles of the median. BTC adjustment uses BTCUSDT UM futures with β = 1.",
+        "O16 Harvest completeness: a full Binance catalog = pages 1..ceil(total/50), plus a closing page-1 fetch; complete when unique ids ≥ the closing `total`; two limiter suspensions, or 72 h without completing, mean the harvest cannot complete → INCONCLUSIVE-by-data; Upbit is harvested from the operator's Mac, and the manifest records the host.",
+        "O17 Monitoring-tag notices come from catalog 161. Catalog 49 is scanned back to 2023-01-01, and a monitoring-tag title found there stops Phase 1 for an operator decision."
+      ],
+      "pass_criteria": [
+        "at least 20 distinct announcements in the primary set;",
+        "announcement-level median net return > 0;",
+        "a positive median in both chronological halves;",
+        "the top decile of announcements contributes less than 60% of the sum of announcement returns. This criterion fails whenever that sum is ≤ 0."
+      ],
+      "kill": "Kill: with at least 20 announcements, any failed criterion closes that lane for this config. A pass authorizes only a paper forward monitor, preregistered separately, in the `listing-short-forward` style.",
+      "inconclusive": [
+        "Too few announcements (Claude's call): fewer than 20 is INCONCLUSIVE-by-data, the precedent from the listing study's Hyperliquid venue. The lane stays open, but nothing is authorized: no monitor and no bot. The archive keeps recording these events. Any re-test is a new, forward-only preregistration; retrospective and forward events are never mixed.",
+        "INCONCLUSIVE, not FAIL, when the data cannot decide. This applies in three cases: fewer than 20 announcements; `unknown`, `missing` and `unresolved` events together above 20% of candidates; or any `unresolved` post-entry event at all. Nothing is authorized, and any re-test is forward-only (§6.2)."
+      ],
+      "rules": [
+        "Research only: no deploy, config, sizing or allocation change follows from any result; a PASS authorizes only a separately preregistered paper forward monitor.",
+        "Phase 1 builds an outcome-blind manifest; its SHA-256 is recorded in an amendment merged before any return is computed.",
+        "The 2018–2022 exploratory check (#229 comment 6617239337) is the hypothesis source only; it never counts as validation and sets no parameter."
+      ],
+      "triggers": [],
+      "amendments": [
+        {
+          "id": "A1-o17-catalog-49",
+          "date": "2026-11-04",
+          "frozen_before_results": true,
+          "stop": "O17 stopped Phase 1. The build from main 3c77081 found 27 monitoring-tag titles in catalog 49 dated inside the window (2023-07-26 to 2026-10-09), none of them in catalog 161, which holds 1 in the window. The stop and options A/B/C were posted on #229: https://github.com/IvPalmer/Master-Trader/issues/229#issuecomment-6639121740",
+          "operator_decision": "Opção A",
+          "decided": "2026-11-04, by the operator, relayed by the lead session",
+          "rule": "Monitoring-tag notices come from catalog 161 and catalog 49. From catalog 49 only titles containing 'Monitoring Tag' are taken, and an article in both catalogs is one notice. Catalog 49 is harvested in full under O16 (pages 1..ceil(total/50) plus closing fetches) on the shared limiter. The delisting harvest is complete only when catalogs 161 and 49 are both complete, and catalog 49's shortfall adds to the delisting harvest_shortfall (O13). O12 overlap runs over both catalogs together. frozen.event_catalogs stays as registered ([161]); this amendment is the record that catalog 49 also supplies monitoring-tag titles.",
+          "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A2-phase1-title-rules",
+          "date": "2026-11-04",
+          "frozen_before_results": true,
+          "rulings": [
+            "20 in-window catalog-161 titles the classifier did not cover were decided from the title alone. Binance Alpha, Binance Loans, Binance Earn / Dual Investment and Selected Stocks notices are other products. 'Binance to Cease ADAUP & ADADOWN Trading…' is a leveraged-token notice. '…Update on the Delisting Date' updates an earlier delisting and is not a new one. 'Upcoming Changes to RON/CZK Spot Trading on Binance' is not a delisting title. 'Binance Will Delist UTK and Support Rebranding…' is a full delisting of UTK, and 'Notice Regarding the Removal of AEUR and Conversion of AEUR to EUR' is a full delisting of AEUR.",
+            "Catalog-49 monitoring titles: the added list ends at the first removal clause (' and Remove', ', Remove' or ', and Remove'). 'Binance Will Extend the Monitoring Tag to GPS' adds GPS. 'Introducing Seed Tags & Monitoring Tags for Tokens with High Volatility and Risks' (2023-07-26) names no token and is excluded as the tag's launch notice.",
+            "Catalog 49 supplies monitoring-tag titles only, so the one full-delisting title found only there (184419, removal of BUSD and conversion to FDUSD) is not an event."
+          ],
+          "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A3-manifest-freeze",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "manifest": "delisting-manifest.json",
+          "manifest_sha256": "4f979113c7135a185898c06f0d69ae450f4b5d9bc603a7c49a7f5aa87a866c3c",
+          "code_commit": "52cb4a0",
+          "counts": {
+            "candidates": 16,
+            "excluded": {
+              "no_hl": 251
+            },
+            "harvest_complete": true,
+            "harvest_shortfall": 0,
+            "missing": 0,
+            "unknown": 0
+          },
+          "harvest": {
+            "binance_from": "vps",
+            "upbit_from": "operator-mac",
+            "completeness": {
+              "binance:161": {
+                "shortfall": 0,
+                "total": 446,
+                "total_reported": true,
+                "unique": 446
+              },
+              "binance:48": {
+                "shortfall": 0,
+                "total": 2292,
+                "total_reported": true,
+                "unique": 2292
+              },
+              "binance:49": {
+                "shortfall": 0,
+                "total": 4481,
+                "total_reported": true,
+                "unique": 4481
+              }
+            },
+            "catalog_49_monitoring_titles": 27,
+            "catalog_49_note": "27 catalog-49 titles contain 'Monitoring Tag' and are not in catalog 161. 25 yield delisting-study events (137 token events); the other two name no added token: the 2023-07 tag introduction (excluded:tag_introduction) and 240714, which only removes tags."
+          },
+          "note": "Phase 1 complete; no return computed. Built by the nes-build unit on the VPS from main 52cb4a06f1752d15543a24485b43bd846bfabb3d (2026-11-05 08:14-12:27Z, exit 0)."
+        },
+        {
+          "id": "A4-operator-directive-estimates",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "directive": "Operator, 2026-11-05: the gates Claude wrote are arbitrary; do not wait for any date and do not void a study; deliver a solid result.",
+          "review": "Codex review requested as gpt-6.1-sol, reasoning high, read-only; two rounds on 2026-11-05, both before any Phase 2 return was computed.",
+          "decision_rule": "Classification on the announcement-level mean net return at +4 h, primary set (leak test run and passed). EDGE (proxy): the Bonferroni-adjusted (3 studies, 98.33% two-sided) percentile interval of the stress-cost (25 bps per side) mean, from 10,000 calendar-month block-bootstrap resamples (seed 229), lies above zero. NO EDGE: the same interval of the base-cost (10 bps) mean lies at or below zero. Otherwise NOT DETERMINABLE, which includes fewer than two calendar months. The decision metric is the raw (unhedged) net mean; the median and the BTC-adjusted mean (beta 1, no hedge cost) are descriptive.",
+          "missing_outcomes": "The class assumes missing outcomes resemble observed ones. Missing = token-events in the primary population (leak test not run, or passed with no usable +4 h return) plus Phase 1 unknown/missing token-events, counted per token, including announcements that are only partly missing. The report gives the tipping point: the common return of every missing token-event, with each announcement keeping its token weights, at which the class would stop holding.",
+          "voids_removed": "MIN_ANN = 20, positive medians in both halves, top-decile share below 0.6, coverage above 20%, any unresolved event and an incomplete harvest no longer void or decide a study. They are reported as `legacy_gates`, diagnostics only.",
+          "eligibility": "Per horizon: a return enters a horizon when that horizon's exit is ok or halted and the entry exists, so an unresolved exit at one horizon no longer removes the others. Events whose leak test could not run are outside the primary set and inside leak_included.",
+          "reported": "Per horizon: n, months, mean, adjusted interval, median and win rate for base cost, stress cost, no_halt (halted exits dropped), leak_included and BTC-adjusted; +4 h by year; the missing-announcement count; MAE for shorts (now floored at zero).",
+          "date_rule": "The README line 'not before 2026-11-07' is withdrawn. The code's publication guard (last candidate t0 + 5 d + 2 d) stays; with the last candidate at 2026-10-27 it is met.",
+          "limitations": "Binance proxy prices, not Hyperliquid fills; funding not modelled; a proxy is chosen by which day files exist through t0 + 2 d, which can favour series that kept trading (survival of the price series, not of the event); notice text is read from current CMS versions; the BTC adjustment assumes beta 1.",
+          "outcome_blind": "Decided before any Phase 2 return was computed. The supplement split uses notice publication times only."
+        }
+      ],
+      "resolution": {
+        "verdict": "NOT DETERMINABLE",
+        "reasons": [
+          "4h mean interval spans zero (stress low -0.0375, base high +0.0413)"
+        ],
+        "label": "proxy result",
+        "primary_4h": {
+          "n": 14,
+          "mean": 0.0072070233660768744,
+          "ci": [
+            -0.034466160643965564,
+            0.04134354036131061
+          ],
+          "median": -0.0032069113204787588,
+          "win_rate": 0.42857142857142855
+        },
+        "supplement_sha256": null,
+        "manifest_sha256": "4f979113c7135a185898c06f0d69ae450f4b5d9bc603a7c49a7f5aa87a866c3c",
+        "code_commit": "9991e23",
+        "computed_at": "2026-11-05T17:09:11.842000+00:00"
+      },
+      "resolution_note": "Mechanical A4 resolution from the VPS results (code 9991e23), recorded 2026-11-05. Registered primary (+4 h) NOT DETERMINABLE, n 14. Descriptive, base cost, 98.33% interval: +24 h +3.8% [-3.4%, +10.8%]. No bot and no allocation follow; the lane stays as research only."
+    },
+    {
+      "id": "upbit-krw-listing-reaction-2026-11",
+      "bot": null,
+      "status": "closed",
+      "registered": "2026-11-04",
+      "review_by": "2027-02-01",
+      "issue": "#229",
+      "spec": "docs/superpowers/specs/2026-11-03-news-archive-design.md §6 @980236a, with §6.2 Hyperliquid eligibility amended by #237 (C1 option A, §11 call 14)",
+      "hypothesis": "The Korean demand shock, an event source separate from Binance's own announcements.",
+      "frozen": {
+        "window_utc": [
+          "2023-01-01T00:00:00Z",
+          "2026-11-01T00:00:00Z"
+        ],
+        "unit": "announcement",
+        "entry_offset_s": 300,
+        "descriptive_entry_offset_s": 60,
+        "horizons_s": [
+          1800,
+          14400,
+          86400
+        ],
+        "primary_horizon_s": 14400,
+        "fee_bps_per_side": {
+          "hyperliquid": 4.5,
+          "binance_spot": 7.5
+        },
+        "slippage_bps_per_side": 10,
+        "stress_slippage_bps_per_side": 25,
+        "leak_window_s": [
+          -600,
+          -120
+        ],
+        "leak_abs_drift_gt": "0.02",
+        "halt_resume_window_s": 259200,
+        "min_announcements": 20,
+        "top_decile_share_lt": 0.6,
+        "coverage_gate_gt": 0.2,
+        "bootstrap_resamples": 10000,
+        "bootstrap_seed": 229,
+        "hl_eligibility_window_s": [
+          86400,
+          3600
+        ],
+        "proxy_preference": [
+          "binance_um_futures",
+          "binance_spot"
+        ],
+        "proxy_dates_d": [
+          -1,
+          2
+        ],
+        "kline_download_dates_d": [
+          -1,
+          5
+        ],
+        "direction": "long",
+        "venues": [
+          "hyperliquid",
+          "binance_spot"
+        ],
+        "t0_field": "upbit.first_listed_at",
+        "binance48_overlap_s": 86400,
+        "exclude_title_words": [
+          "종료",
+          "유의",
+          "제거",
+          "변경",
+          "중단",
+          "연기",
+          "재개"
+        ],
+        "manifest": "upbit-manifest.json",
+        "hl_evidence": "fundingHistory"
+      },
+      "rules_verbatim": {
+        "phase1": [
+          "Window: announcements dated 2023-01-01 00:00 UTC to 2026-10-31 23:59 UTC. The start is roughly when Hyperliquid perps begin to exist. Nothing after the window enters this study.",
+          "Events, both Upbit studies (one shared manifest): one event per (notice, token) for Upbit `category=trade` notices whose title matches the KRW-market-addition pattern.",
+          "Tokens already on Upbit KRW are excluded.",
+          "So are tokens with a Binance catalog-48 listing announcement within ±24 h. That keeps the closed listing lane out of this sample.",
+          "Events whose Upbit KRW trading began before the notice are excluded too.",
+          "Timestamps:",
+          "Binance: `releaseDate`.",
+          "Upbit: the builder documents whether `listed_at` or `first_listed_at` is the publish time. The prereg names the field before Phase 1 runs.",
+          "Execution venues (Claude's call): Binance futures is CVM-blocked for the operator (see the `listing-reaction-study-2026-07` notes), so only these count:",
+          "Upbit study (long): a Hyperliquid perp, else Binance spot. Tokens that trade only on Binance futures are excluded.",
+          "Hyperliquid eligibility needs positive pre-entry evidence (changed after both rounds; evidence source changed by §11 call 14). A token qualifies only if Hyperliquid hourly funding records (`fundingHistory`, by coin name) exist for it in the 24 h before t0, including at least one in the last hour before t0. Candles cannot serve: `candleSnapshot` returns only the most recent ~5,000 candles, which at 1 h reach back to about 2026-04 (probe on #229). Nothing after t0 is used for eligibility; using it would exclude exactly the tokens that become untradeable right after the event. Tokens no longer in today's `meta` are looked up by name through `fundingHistory`. The builder confirms in Phase 1 that this works for delisted coins and documents it.",
+          "Eligibility that cannot be verified is `unknown`. Unknown events are excluded and counted. An earliest daily candle alone is not enough.",
+          "Completeness evidence (changed after round 2).",
+          "Pagination (changed after round 3): each Binance catalog (48 and 161, plus monitoring if separate) and the Upbit list are harvested in full, every page. The harvested count must equal the API's reported `total`.",
+          "Any shortfall is added to the `missing` count, conservatively assumed to fall inside the window.",
+          "If no total is reported, the study is INCONCLUSIVE-by-data.",
+          "This also covers the catalog-48 overlap exclusion.",
+          "Observed 2026-11-03: Upbit's Cloudflare answered error 1015 to page requests 1.5 s apart, so the full Upbit harvest runs at least 8 s per page. Binance catalog 161 reported `total` 446, and its oldest article is dated 2022-02-17.",
+          "Candles (changed after round 3): the exact 1m candles each calculation uses must exist. These are t0−10 min and t0−2 min for the leak test, the entry candle, and each horizon's exit candle. No interpolation and no forward-fill. If any is missing, and the halt rule does not resolve it, the event is `missing`.",
+          "Halts after entry (changed after rounds 3–4): if an exit candle is missing because trading halted, the exit is the first candle after trading resumes, within 72 h of that scheduled exit time.",
+          "Costs are always subtracted from the net return, whatever the side, never applied to a price.",
+          "If trading does not resume within that window, the event is `unresolved`.",
+          "`halted` events stay in every criterion.",
+          "Any unresolved event makes the study INCONCLUSIVE (changed after rounds 4–5). Their outcomes are outcome-dependent: terminal delistings would vanish. So with one or more `unresolved` events the result is INCONCLUSIVE. There is no imputation shortcut: imputed values can move the median and concentration criteria in either direction.",
+          "Coverage gate: `unknown`, `missing` and `unresolved` together above 20% of candidate events make the study INCONCLUSIVE-by-data. So does harvesting that cannot complete within the shared limiter.",
+          "Resource budget for Part C (changed after round 3):",
+          "Harvesting, downloading, decompressing and analysis run under `systemd-run --user --scope -p MemoryMax=1G -p CPUQuota=50%` with `nice` and `ionice -c3`.",
+          "Before each download batch, the 15 GB free-disk guard from §4.4 applies.",
+          "Only the daily kline files covering each event's [t0−1 d, t0+5 d] window are downloaded. That covers entry+24 h plus the 72 h resumption window. Each zip is deleted after the needed rows are extracted.",
+          "The expected footprint is under 1 GB.",
+          "Symbols and price series: the manifest freezes the token → Binance-symbol mapping, including 1000-prefixed contracts and renames, and which proxy series each event will use. Proxy series are Binance 1m klines from `data.binance.vision`, USDⓈ-M futures preferred, spot otherwise. Phase 1 checks only that the series exists; it computes no returns.",
+          "Events with missing proxy data are excluded and counted toward the coverage gate above.",
+          "Freeze: the manifest file's SHA-256 is recorded in a preregistration amendment, merged before Phase 2 starts."
+        ],
+        "phase2": [
+          "Entry latency (changed after review): taker entry at the close of the 1m candle containing t+5 min. Five minutes covers detection by a 60 s poller on Tree plus processing. A t+60 s entry is reported as descriptive only, because the archive's own Binance rotation could not detect that fast.",
+          "Exits: the fixed horizons entry+30 min, entry+4 h and entry+24 h.",
+          "Costs: taker fees of 4.5 bps per side on Hyperliquid or 7.5 bps on Binance spot, plus 10 bps per side of slippage. A stress case at 25 bps per side is reported. Hyperliquid funding is not modelled; at the +4 h primary horizon it is about four hourly payments. This is listed as a limitation.",
+          "Proxy status: the returns come from Binance prices, not Hyperliquid fills. Basis and impact are not measured, so any result is labelled a proxy result. That is acceptable only because a pass authorizes nothing beyond a paper forward monitor, and that monitor measures executable prices.",
+          "The forward monitor keeps each event's venue assignment (changed after round 2). It uses Hyperliquid best bid/offer (BBO) for Hyperliquid-assigned events and Binance spot `bookTicker` for spot-assigned Upbit events. So a pass driven by spot events is validated on spot, not on a different subset.",
+          "Leak flag: reuse the listing study's rule: more than 2% absolute drift over [t0−10 min, t0−2 min]. The primary set excludes leaked events; a sensitivity run includes them.",
+          "Unit of analysis (changed after review): the announcement, not the token. One Binance notice often names several tokens.",
+          "Each announcement's return is the mean net return of its eligible tokens.",
+          "The chronological halves split announcements by date.",
+          "Primary horizon: +4 h, declared now.",
+          "Pass (all required, evaluated at +4 h after fees and 10 bps slippage):",
+          "at least 20 distinct announcements in the primary set;",
+          "announcement-level median net return > 0;",
+          "a positive median in both chronological halves;",
+          "the top decile of announcements contributes less than 60% of the sum of announcement returns. This criterion fails whenever that sum is ≤ 0.",
+          "Also reported, not criteria:",
+          "a bootstrap 95% CI of the announcement-level median (10,000 resamples);",
+          "BTC-adjusted returns;",
+          "for the two short studies, the per-event maximum adverse excursion from entry to each exit, from 1m highs. A short's risk sits in the squeeze tail, which the median does not show. This is descriptive only: a missing candle inside the path makes that event's MAE unavailable. It never changes return eligibility, the coverage gate, aggregation or pass/fail;",
+          "all three horizons, both halves, per venue and per notice kind;",
+          "leak and slippage sensitivities;",
+          "excluded, unknown and missing counts.",
+          "Separate hypotheses. The studies are never pooled, and a pass in one is not evidence for another.",
+          "The Upbit long and fade share their Hyperliquid events. On that subset the fade's net return is the long's gross return with the sign flipped, minus costs.",
+          "So a failed long plus a passed fade is one finding, not two confirmations.",
+          "Kill: with at least 20 announcements, any failed criterion closes that lane for this config. A pass authorizes only a paper forward monitor, preregistered separately, in the `listing-short-forward` style.",
+          "Too few announcements (Claude's call): fewer than 20 is INCONCLUSIVE-by-data, the precedent from the listing study's Hyperliquid venue. The lane stays open, but nothing is authorized: no monitor and no bot. The archive keeps recording these events. Any re-test is a new, forward-only preregistration; retrospective and forward events are never mixed.",
+          "Code and data:",
+          "Code lives in the repo under `research/news_event_studies/`.",
+          "Downloaded klines and results stay on the VPS under `research/news_event_studies/data/`, gitignored.",
+          "The resolution is written into the prereg entry mechanically, from the frozen criteria only."
+        ]
+      },
+      "operationalization": [
+        "O1 t0: Binance `releaseDate` (ms); Upbit `first_listed_at` (KST→UTC). `listed_at` moves when a notice is edited (Part A: id 6687, 21:50 vs 20:00 KST).",
+        "O2 price_at(X) = the close of the Binance 1m candle whose open is floor_minute(X). Entry = price_at(t0+300 s); exit_H = price_at(t0+300 s+H). Leak drift = price_at(t0−120 s) / price_at(t0−600 s) − 1, in exact decimals; leaked if |drift| > 0.02.",
+        "O3 Gross long = exit/entry − 1; gross short = −(exit/entry − 1); net = gross − 2 × (fee + slippage) / 10,000.",
+        "O4 Missing candles: a missing exit candle → the close of the first candle opening in (scheduled, scheduled + 72 h] = `halted`; none → `unresolved`. Exception: when that candle exists but the scheduled exit's UTC-day file is absent (HTTP 404), the gap is an archive hole and the event is `missing`. A missing leak or entry candle → `missing`. Event status, strongest first: `unresolved` at any horizon, then `missing`, then `halted` at any horizon, else `ok`.",
+        "O5 Hyperliquid eligibility: `fundingHistory` by coin name, with candidates [T, \"k\"+T] and names containing \":\" skipped. Queries cover [t0−24 h, t0−1 ms]. eligible: ≥ 1 evidence time in [t0−24 h, t0) and ≥ 1 in [t0−1 h, t0). Evidence times are candle close `T` for candles and `time` for funding records; ineligible: no such evidence. A name absent from today's `meta` that also returns none is ineligible (`never_in_meta`); for such a name, HTTP 500 with body `null` counts as returning none (probe (f) on #229), and any other failed response stops the build; unknown: the evidence cannot be fetched or lies beyond retention (candle mode: t0−24 h earlier than BTC's earliest 1h candle); an unknown status excludes the event from all three studies.",
+        "O6 Binance presence: a daily 1m file on `data.binance.vision` for the UTC day before date(t0), for some candidate symbol. Candidates: UM futures `T`, `1000T`, `1000000T`, `1MT` + `USDT`; spot `T`, `1000T`, `1MT` + `USDT`. The Binance-spot venue needs a spot file for that day.",
+        "O7 Proxy: the first candidate, all UM futures before spot, with files for every UTC date from date(t0−1 d) to date(t0+2 d). Failing that, the first candidate in the same order with files for date(t0−1 d) and date(t0); its later gaps go through O4, so a series that ends after entry is `unresolved`, never `missing`. None → `missing`.",
+        "O8 Upbit KRW addition: a title with a KRW marker (`KRW` or `원화`) and an addition marker (`디지털 자산 추가`, `신규 상장` or `신규 거래지원`), containing none of 종료/유의/제거/변경/중단/연기/재개.",
+        "O9 Already on Upbit KRW: an earlier harvested KRW-addition notice for the token, with no KRW trading-end notice (`거래지원 종료`, `상장폐지` or `상장 폐지`, not limited to BTC/USDT markets) between it and t0.",
+        "O10 Upbit trading began before the notice: the trading-start time stated in the notice body is earlier than t0. A body with no parseable start time makes the event `unknown`. The start is read from the token's row of a table whose header has `거래지원 개시 시점` (or `거래 지원 개시 시점`), else from a line containing `거래지원 개시`, `거래 지원 개시` or `거래 오픈`; clocks are `HH:MM` or `H시 M분`, in KST. A start stated without a year takes the year (t0's KST year, or the one before or after) that puts it nearest t0; a tie is `unknown` (probe on #229: `10월 27일 16시 40분 예정` in a table cell).",
+        "O11 Catalog-48 overlap: any catalog-48 title naming the token within ±24 h of t0, inclusive.",
+        "O12 Delisting events come from harvested titles only. Overlap is computed over the full harvest before the window filter. A notice ≤ 24 h after the token's last kept notice is dropped.",
+        "O13 Coverage = (unknown + missing + unresolved + harvest shortfall) / (token-events not excluded by a verified rule + harvest shortfall). Above 0.20 → INCONCLUSIVE-by-data. A catalog-48 shortfall counts for both Upbit studies.",
+        "O14 Statistics: halves: announcements sorted by (t0, id), the first floor(n/2) against the rest; top decile: the ceil(n/10) largest announcement returns; median: `statistics.median`.",
+        "O15 Reported only: the bootstrap uses 10,000 resamples with `random.Random(229)`, 2.5/97.5 percentiles of the median. BTC adjustment uses BTCUSDT UM futures with β = 1.",
+        "O16 Harvest completeness: a full Binance catalog = pages 1..ceil(total/50), plus a closing page-1 fetch; complete when unique ids ≥ the closing `total`; two limiter suspensions, or 72 h without completing, mean the harvest cannot complete → INCONCLUSIVE-by-data; Upbit is harvested from the operator's Mac, and the manifest records the host.",
+        "O17 Monitoring-tag notices come from catalog 161. Catalog 49 is scanned back to 2023-01-01, and a monitoring-tag title found there stops Phase 1 for an operator decision."
+      ],
+      "pass_criteria": [
+        "at least 20 distinct announcements in the primary set;",
+        "announcement-level median net return > 0;",
+        "a positive median in both chronological halves;",
+        "the top decile of announcements contributes less than 60% of the sum of announcement returns. This criterion fails whenever that sum is ≤ 0."
+      ],
+      "kill": "Kill: with at least 20 announcements, any failed criterion closes that lane for this config. A pass authorizes only a paper forward monitor, preregistered separately, in the `listing-short-forward` style.",
+      "inconclusive": [
+        "Too few announcements (Claude's call): fewer than 20 is INCONCLUSIVE-by-data, the precedent from the listing study's Hyperliquid venue. The lane stays open, but nothing is authorized: no monitor and no bot. The archive keeps recording these events. Any re-test is a new, forward-only preregistration; retrospective and forward events are never mixed.",
+        "INCONCLUSIVE, not FAIL, when the data cannot decide. This applies in three cases: fewer than 20 announcements; `unknown`, `missing` and `unresolved` events together above 20% of candidates; or any `unresolved` post-entry event at all. Nothing is authorized, and any re-test is forward-only (§6.2)."
+      ],
+      "rules": [
+        "Research only: no deploy, config, sizing or allocation change follows from any result; a PASS authorizes only a separately preregistered paper forward monitor.",
+        "Phase 1 builds an outcome-blind manifest; its SHA-256 is recorded in an amendment merged before any return is computed.",
+        "The 2018–2022 exploratory check (#229 comment 6617239337) is the hypothesis source only; it never counts as validation and sets no parameter."
+      ],
+      "triggers": [],
+      "amendments": [
+        {
+          "id": "A1-phase1-title-rules",
+          "date": "2026-11-04",
+          "frozen_before_results": true,
+          "rulings": [
+            "upbit 3502 'KRW, BTC 마켓 디지털 자산 추가 (SUI) (매도 주문 제한 기준 가격 안내)': a parenthetical ending in 안내 or 마켓 is a note, not a token, so SUI is the token.",
+            "upbit 4273 '테더(USDT) KRW, BTC 마켓 추가 안내 (출금 개시 안내)' has none of the O8 addition markers, so it is not a KRW addition.",
+            "O8 per token: when one notice adds several tokens to several markets, a token is a KRW addition only when the notice puts that token on KRW. The evidence is, in order: the title's market group for that token; a title naming only the KRW market, or a single-token title; the notice body (a 마켓 table column, '- TOKEN : KRW 마켓' or '- KRW 마켓 : TOKEN, …'). A token added to BTC or USDT only is neither an event nor an O9 prior. A token whose market is unstated is not a prior before the window and needs review inside it. On the harvested corpus this removes 5 BTC/USDT-only tokens from the events (3266 GAL, 3362 ACS, 4070 ALT, 4192 OMNI, 5100 IO) and 7 already-on-KRW exclusions of later KRW additions (3362 MASK, 3654 IMX, 4363 GAL, 5239 ALT, 5375 OMNI, 5644 YGG, 6255 IO); the build has no review items left."
+          ],
+          "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A2-o10-hour-clock",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "stop": "The Phase 1 build from 89dfe17 (2026-11-05) left 87 Upbit KRW additions `unknown` in each Upbit study: 86 with no parseable trading start and 1 Hyperliquid fetch failure. 80 of the 86 start cells read `M월 D일 H시 예정`, an hour with no minutes, which O10's clock list (`HH:MM` or `H시 M분`) does not read. Those manifests (delisting 46e657bd837a9f81be186bc4755bd879489e89401bc16cf602fda4f34641a974, Upbit 22568ef2fda529451b428a27df902a941f871f47f7c48b9e329621d1dacca9b8) were discarded, not frozen.",
+          "rule": "O10 clocks also include `H시` alone, read as minute 00; `오전`/`오후` apply as before. `H시` must stand alone: it is not read inside a word (`H시간`, `H시점`, `H시작`), nor when minutes follow without `분` (`H시 MM`) or `반` follows. A range `H시 ~ H시` reads as its first time.",
+          "corpus_effect": "On the harvested corpus 81 non-excluded events gain a start (no parseable start: 86 -> 5), as do 27 events already excluded as binance48_overlap. No start already read and no exclusion changes. Every new start is 0.2 to 12.7 h after t0, so none becomes began_before_notice.",
+          "outcome_blind": "Decided from start-cell and body-line formats read with digits masked, counts, and start times against t0; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A3-manifest-freeze",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "manifest": "upbit-manifest.json",
+          "manifest_sha256": "23a6b3541d5799bf2aa679bf4e1913d970a8af89de58d01c4e3f6e3236d77d00",
+          "code_commit": "52cb4a0",
+          "counts": {
+            "candidates": 95,
+            "excluded": {
+              "binance48_overlap": 43,
+              "futures_only": 16,
+              "not_on_binance": 26
+            },
+            "harvest_complete": true,
+            "harvest_shortfall": 0,
+            "missing": 0,
+            "unknown": 5
+          },
+          "harvest": {
+            "binance_from": "vps",
+            "upbit_from": "operator-mac",
+            "completeness": {
+              "binance:161": {
+                "shortfall": 0,
+                "total": 446,
+                "total_reported": true,
+                "unique": 446
+              },
+              "binance:48": {
+                "shortfall": 0,
+                "total": 2292,
+                "total_reported": true,
+                "unique": 2292
+              },
+              "binance:49": {
+                "shortfall": 0,
+                "total": 4481,
+                "total_reported": true,
+                "unique": 4481
+              },
+              "upbit:list": {
+                "shortfall": 0,
+                "total": 806,
+                "total_reported": true,
+                "unique": 806
+              }
+            },
+            "catalog_49_monitoring_titles": 27,
+            "catalog_49_note": "27 catalog-49 titles contain 'Monitoring Tag' and are not in catalog 161. 25 yield delisting-study events (137 token events); the other two name no added token: the 2023-07 tag introduction (excluded:tag_introduction) and 240714, which only removes tags."
+          },
+          "note": "Phase 1 complete; no return computed. Built by the nes-build unit on the VPS from main 52cb4a06f1752d15543a24485b43bd846bfabb3d (2026-11-05 08:14-12:27Z, exit 0)."
+        },
+        {
+          "id": "A4-operator-directive-estimates",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "directive": "Operator, 2026-11-05: the gates Claude wrote are arbitrary; do not wait for any date and do not void a study; deliver a solid result.",
+          "review": "Codex review requested as gpt-6.1-sol, reasoning high, read-only; two rounds on 2026-11-05, both before any Phase 2 return was computed.",
+          "decision_rule": "Classification on the announcement-level mean net return at +4 h, primary set (leak test run and passed). EDGE (proxy): the Bonferroni-adjusted (3 studies, 98.33% two-sided) percentile interval of the stress-cost (25 bps per side) mean, from 10,000 calendar-month block-bootstrap resamples (seed 229), lies above zero. NO EDGE: the same interval of the base-cost (10 bps) mean lies at or below zero. Otherwise NOT DETERMINABLE, which includes fewer than two calendar months. The decision metric is the raw (unhedged) net mean; the median and the BTC-adjusted mean (beta 1, no hedge cost) are descriptive.",
+          "missing_outcomes": "The class assumes missing outcomes resemble observed ones. Missing = token-events in the primary population (leak test not run, or passed with no usable +4 h return) plus Phase 1 unknown/missing token-events, counted per token, including announcements that are only partly missing. The report gives the tipping point: the common return of every missing token-event, with each announcement keeping its token weights, at which the class would stop holding.",
+          "voids_removed": "MIN_ANN = 20, positive medians in both halves, top-decile share below 0.6, coverage above 20%, any unresolved event and an incomplete harvest no longer void or decide a study. They are reported as `legacy_gates`, diagnostics only.",
+          "eligibility": "Per horizon: a return enters a horizon when that horizon's exit is ok or halted and the entry exists, so an unresolved exit at one horizon no longer removes the others. Events whose leak test could not run are outside the primary set and inside leak_included.",
+          "reported": "Per horizon: n, months, mean, adjusted interval, median and win rate for base cost, stress cost, no_halt (halted exits dropped), leak_included and BTC-adjusted; +4 h by year; the missing-announcement count; MAE for shorts (now floored at zero).",
+          "date_rule": "The README line 'not before 2026-11-07' is withdrawn. The code's publication guard (last candidate t0 + 5 d + 2 d) stays; with the last candidate at 2026-10-27 it is met.",
+          "limitations": "Binance proxy prices, not Hyperliquid fills; funding not modelled; a proxy is chosen by which day files exist through t0 + 2 d, which can favour series that kept trading (survival of the price series, not of the event); notice text is read from current CMS versions; the BTC adjustment assumes beta 1.",
+          "outcome_blind": "Decided before any Phase 2 return was computed. The supplement split uses notice publication times only.",
+          "upbit_supplement": "O11 excluded 43 additions for a Binance new-listing notice within 24 h of t0. 26 of those notices were published after t0, which a bot acting at t0 cannot know (look-ahead). nes_supplement.py re-adds those 26 with Phase 1 venue resolution (no price read); the supplement manifest is frozen below and its candidates join this study's decision set. The 17 whose notice preceded t0 stay excluded, a rule a bot can apply. The frozen-candidates-only result is reported alongside.",
+          "supplement_manifest": "upbit-supplement-manifest.json",
+          "supplement_sha256": "e647310c099b33825708a8c29591e46b48c38de331360bd4e78e81e7e39bb62d",
+          "supplement_code_commit": "483ddd3",
+          "supplement_candidates": "26 re-added; 5 candidates in the long study, 4 in the fade (most were not on Binance before t0)"
+        }
+      ],
+      "resolution": {
+        "verdict": "NOT DETERMINABLE",
+        "reasons": [
+          "4h mean interval spans zero (stress low -0.0341, base high +0.0218)"
+        ],
+        "label": "proxy result",
+        "primary_4h": {
+          "n": 96,
+          "mean": -0.00590403710636244,
+          "ci": [
+            -0.031077784079230893,
+            0.02178542094908302
+          ],
+          "median": -0.010262914153172539,
+          "win_rate": 0.3958333333333333
+        },
+        "supplement_sha256": "e647310c099b33825708a8c29591e46b48c38de331360bd4e78e81e7e39bb62d",
+        "manifest_sha256": "23a6b3541d5799bf2aa679bf4e1913d970a8af89de58d01c4e3f6e3236d77d00",
+        "code_commit": "9991e23",
+        "computed_at": "2026-11-05T17:21:09.639000+00:00"
+      },
+      "resolution_note": "Mechanical A4 resolution from the VPS results (code 9991e23), recorded 2026-11-05. Registered primary (+4 h) NOT DETERMINABLE, n 96. Descriptive, base cost, 98.33% interval: +24 h -5.0% [-9.0%, -0.2%] (buying after the notice loses). The long lane is not pursued; no bot and no allocation follow."
+    },
+    {
+      "id": "upbit-krw-fade-forward-2026-11",
+      "bot": null,
+      "status": "open",
+      "registered": "2026-11-05",
+      "review_by": "2027-11-05",
+      "issue": "#229",
+      "spec": "docs/superpowers/specs/2026-11-05-upbit-fade-forward-design.md @c7c1f9a (approved by Codex after three rounds; operator go-ahead 2026-11-05, \"Sim, monta o dry-run\"); comparable cohort without a known trading start @f40ec30 (Claude's call, 2026-11-05, implementation: no Upbit notice body is readable from the VPS); Codex code review round 1 fixes @93ac650 (Binance prior received by t0, versioned later start evidence, klines closed by t0, partial excursion)",
+      "code": "research/upbit_fade_forward/ (systemd user unit upbit-fade-forward)",
+      "hypothesis": "New hypothesis, forward only: a paper short of the Hyperliquid perp 5 min after an Upbit KRW-addition notice, held 24 h, earns a positive announcement-level mean net return with real book fills, the taker fee and real funding. Source: the Part C Phase 2 proxy result at +24 h (+7.4% mean net, n = 57; #248, main 9991e23; #229 comment 6664557105). That result used Binance proxy prices, no funding and assumed detection; it is the hypothesis source only and never counts as validation here. The +4 h hold, Part C's registered primary (not determinable), is descriptive only.",
+      "frozen": {
+        "measurement": "paper",
+        "places_orders": false,
+        "direction": "short",
+        "venue": "hyperliquid",
+        "unit": "announcement",
+        "t0_field": "tree.published_at",
+        "t0_clock": "Tree clock: checked for plausibility only, never for equivalence with Upbit's first_listed_at",
+        "detection": "research/news_archive tree items and item_revisions read with durable cursors over item_pk and rev_pk; url an upbit.com/service_center/notice page; one event per (notice id, token)",
+        "archive_poll_s": 15,
+        "classifiers": [
+          "nes_classify.upbit_addition",
+          "nes_classify.upbit_krw_membership",
+          "nes_classify.upbit_trading_start_ms",
+          "nes_classify.mentions_token"
+        ],
+        "tree_lag_max_s": 300,
+        "upbit_market_poll_s": 300,
+        "krw_snapshot_max_age_s": 900,
+        "binance_prior_window_s": [
+          -86400,
+          0
+        ],
+        "hl_evidence": "fundingHistory",
+        "hl_eligibility_window_s": [
+          86400,
+          3600
+        ],
+        "binance_market_window_s": [
+          -600,
+          0
+        ],
+        "binance_proxy_order": [
+          "binance_um_futures",
+          "binance_spot"
+        ],
+        "leak_window_s": [
+          -600,
+          -120
+        ],
+        "leak_abs_drift_le": "0.02",
+        "entry_offset_s": 300,
+        "timely_entry_s": 120,
+        "action_deadline_s": 600,
+        "hold_s": 86400,
+        "checkpoints_s": [
+          1800,
+          14400
+        ],
+        "notional_usdc": 100,
+        "book_max_age_s": 5,
+        "taker_fee_bps_per_side": 4.5,
+        "extra_slippage_bps": 0,
+        "oracle_tolerance_s": 60,
+        "primary_horizon_s": 86400,
+        "ci_level": "0.95",
+        "bootstrap": "calendar-month block (nes_returns.block_bootstrap_mean_ci, level passed explicitly)",
+        "bootstrap_resamples": 10000,
+        "bootstrap_seed": 229,
+        "decision_announcements": 40,
+        "decision_date_utc": "2027-11-05T00:00:00Z",
+        "descriptive_reports_at": [
+          20,
+          30
+        ],
+        "comparable_requires_known_start": false
+      },
+      "rules_verbatim": {
+        "detection": [
+          "Primary: the PIT news archive, read-only. Every 15 s, read with durable cursors over both items (item_pk) and item_revisions (rev_pk); a revised title can turn into a listing.",
+          "Take Tree items whose url is an upbit.com/service_center/notice page, and deduplicate them per notice id.",
+          "Classify with nes_classify.upbit_addition and upbit_krw_membership (title, plus the body when present), by import.",
+          "Upbit notices that mention 거래지원 or 마켓 but don't classify go to an unclassified queue in the status output and are never traded.",
+          "Audit: poll api.upbit.com/v1/market/all every 5 min and store each timestamped snapshot. A new KRW-* market with no matched notice is logged as a missed detection.",
+          "t0 is Tree's published_at, and received_at is kept too. This is a Tree-clock cohort, and every report says so.",
+          "Timing is flagged unverified when published_at is missing, is later than received_at, or lags it by more than 5 min. Unverified events are reported but left out of the comparable cohort."
+        ],
+        "eligibility": [
+          "Excluded when the token already trades on Upbit KRW: it is in the last market/all snapshot taken before t0 (no snapshot within 15 min before t0 -> unknown).",
+          "Excluded when a Binance new-listing notice for it falls within the 24 h before t0 (the archive's binance_listing source). A notice published after t0 never excludes. Only what the archive had received by t0 counts, revisions included; a notice or revision received later is recorded as descriptive (late) and never excludes.",
+          "Excluded when the notice body says trading began before the notice.",
+          "Hyperliquid eligibility is the Part C rule (nes_venues.hl_facts / hl_status): the perp is in meta and fundingHistory shows records in the 24 h before t0, including one in the last hour."
+        ],
+        "comparable_cohort": [
+          "No known trading start is required (Claude's call, 2026-11-05, implementation). Part C required one, but Tree carries no Upbit notice body and the VPS gets 403 from Upbit's announcements API, so the forward cohort is defined by what a deployable bot can know. This is one more stated difference from Part C, beside the Tree clock, book fills and funding.",
+          "When a body is present, the start is read with nes_classify.upbit_trading_start_ms. A start before t0 still excludes the event (began_before_notice); a start at or after t0 gives start_unknown = false. With no body, or no start in it, the event stays comparable with start_unknown = true.",
+          "A later observation of the same notice (a duplicate Tree item or a revision) that states a start never creates a second event; it is a versioned evidence record. Received before the entry decision, it counts: a start before t0 excludes the event (began_before_notice) and stops the entry, and one at or after t0 sets start_unknown = false. Received after the entry decision, it is descriptive only.",
+          "Descriptive only: krw_market_first_seen_ms, the time of the first market/all snapshot after t0 that lists KRW-<TOKEN>. It never selects events.",
+          "status and every resolution report show the start_unknown and krw_market_first_seen counts. The decision metric is over the whole comparable cohort; the subset with start_unknown = false is reported as descriptive only.",
+          "A Binance market before t0: Binance 1 m klines (USDⓈ-M fapi/v1/klines first, else spot api/v3/klines, the Part C proxy order) show trading in [t0 - 10 min, t0), counting only candles closed by t0 (open + 60 s <= t0).",
+          "The Binance leak test passed: |drift| <= 2% between those klines' closes at t0 - 10 min and t0 - 2 min. The same test on Hyperliquid candles is descriptive.",
+          "A timely entry: filled within 2 min of t0 + 5 min. Later entries, up to the 10 min deadline, are delayed and descriptive.",
+          "Every other Hyperliquid-eligible event is still measured and reported as the descriptive cohort."
+        ],
+        "paper_trade": [
+          "Entry at max(t0 + 5 min, detection): read l2Book and sell about 100 USDC into the bids, then freeze the exchange-valid quantity q (rounded to szDecimals). Record the VWAP, mid, best bid and ask, levels used, book time and any delay.",
+          "A book older than 5 s, or depth below q, is rejected for that attempt. Part C priced the close of the 1 m candle that contains t0 + 5 min; the difference is noted, not corrected.",
+          "Exit at entry + 24 h: buy back q from the asks, with the same checks. Checkpoints at +30 m and +4 h are book-walk marks of q only.",
+          "Fee: 4.5 bps taker on each leg's actual notional. No extra slippage term; the book walk is the slippage.",
+          "Funding: rates from finalized fundingHistory records for each hourly settlement during the hold; cashflow q x oraclePx x rate, positive funding pays a short; labelled estimated because oraclePx is observed through metaAndAssetCtxs within +-60 s of each boundary.",
+          "A boundary with no rate or no observation inside that tolerance makes the event's funding missing. The net is then incomplete: it stays out of the decision mean and counts as missing in the tipping point.",
+          "Excursion: MAE/MFE from 1 m candleSnapshot highs and lows, descriptive price excursion only. It is ok only when every minute of the hold has a candle; otherwise it is retried, then stored as partial with candle counts and labelled partial extrema.",
+          "Every scheduled action has a 10 min deadline, including after a restart. Missing the deadline makes the outcome missing; a later recovery is stored as late, never as the scheduled outcome.",
+          "Ledger: an append-only JSONL ledger with event ids, idempotent on replay. The resolution reports how many outcomes are missing and gives the A4 tipping point."
+        ],
+        "resolution": [
+          "Metric: the announcement-level mean net return of the comparable cohort, computed from book fills, fees and funding.",
+          "Interval: the A4 calendar-month block bootstrap, passed level=0.95 explicitly (the helper defaults to 98.33%).",
+          "One decision, at 40 events or on 2027-11-05, whichever comes first. The 20- and 30-event reports are descriptive only.",
+          "EDGE when the lower bound is above 0, NO EDGE when the upper bound is at or below 0, otherwise NOT DETERMINABLE. No interval (fewer than two months) -> NOT DETERMINABLE.",
+          "EDGE authorizes only a proposal for a small live pilot under the graduation gates. NO EDGE closes the lane.",
+          "Descriptive: +4 h marks, latency, missed and unclassified notices, MAE, and the non-comparable cohort; also the start_unknown = false subset and krw_market_first_seen_ms."
+        ]
+      },
+      "operationalization": [
+        "U1 Comparable requirements are each True, False or not established. Any False -> descriptive. Not established (Hyperliquid facts unknown, no market/all snapshot within 15 min, Binance klines unreadable for 24 h, a leak test that could not run, an entry never filled) -> the event stays in the comparable cohort with a missing outcome, so it counts in the tipping point rather than vanishing.",
+        "U2 The entry window is [max(t0 + 5 min, detection), t0 + 15 min] on the monitor's clock (book receipt time); timely when filled by t0 + 7 min. A notice detected after t0 + 15 min has a missing entry; a short is never opened late.",
+        "U3 Marks and the exit are scheduled from the entry's fill time; each has a 10 min deadline. A missed one is recorded missing, and at most one later book walk of q (within 6 h) is kept as a separate late record.",
+        "U4 q is the size whose sale into the bids raises 100 USDC, rounded half-even to szDecimals; q = 0 is rejected. A book is stale when the receipt time minus the book's time exceeds 5 s.",
+        "U5 Funding boundaries are the hours in (entry, exit]. A fundingHistory record belongs to its nearest hour. oraclePx is read once per hour in [hour, hour + 60 s] for every position open at that hour.",
+        "U6 The Binance-prior exclusion counts an archive item published in [t0 - 24 h, t0] only through a version naming the token that was received at or before t0: the item itself (items.received_at) or a revision (item_revisions.received_at). It is checked at detection and again at t0 + 1 h. A version received after t0 (a late item, or a later revision naming the token) is listed as late, descriptive only, and never excludes.",
+        "U7 'In meta': a perp that nes_venues.hl_facts finds eligible but that today's meta lacks, or flags delisted, is ineligible (not_in_meta).",
+        "U8 The unclassified queue holds notices that mention 거래지원 or 마켓 with neither an addition nor an end (nes_classify.upbit_end) classification, and additions whose KRW membership the notice does not state.",
+        "U9 The monitor's first start is the epoch: archive cursors start at the archive's current maxima, and events with t0 before the epoch are not part of the measurement.",
+        "U10 The decision set is the first 40 comparable announcements in t0 order whose token-events are all final (an earlier event still open delays it), or on 2027-11-05 every comparable announcement with t0 before that date once all are final. It is recorded once in the ledger and never recomputed.",
+        "U11 Missed-detection audit: a KRW-* market new in market/all with no detected notice for that token whose t0 lies in [first seen - 7 d, first seen + 24 h]. market/all snapshots store the sorted market codes (stored once per distinct set) and every poll's time and hash.",
+        "U12 History reads are retried, then recorded unknown or missing: Binance klines and Hyperliquid leak candles up to t0 + 24 h, funding records up to exit + 24 h, hold candles up to exit + 48 h (Hyperliquid keeps about 3.5 days of 1 m candles).",
+        "U13 MAE/MFE use the 1 m candles that lie wholly inside the hold. The excursion is ok only with every expected minute; with fewer it is retried until exit + 48 h and then stored as partial (candles and expected counts, extrema under partial_* names), or missing with none.",
+        "U14 The tipping point is nes_returns.tipping_point at the same 95% level (a level argument with the old default was added for this).",
+        "U15 start_unknown is a stored event flag: no trading start was read (no body, or none parseable in it). It is never a comparable requirement and never makes an outcome missing. krw_market_first_seen_ms is the time of the first market_poll with obs_ms > t0 whose market set lists KRW-<TOKEN>, recorded once per event with the previous snapshot's time and whether that snapshot listed it (true only when the token was already on KRW).",
+        "U16 Evidence: a later Tree observation (duplicate item or revision) of an existing event's notice whose body states a start is appended as evidence:<event>:<ref> with a version number; the event id never changes. It counts for selection when no entry record exists yet and it was received by the entry deadline (t0 + 15 min). Among those and the event's own observation when it states a start, the latest by receipt (received_at, then items before item_revisions, then pk), not by processing order, sets the start. Otherwise its effect is descriptive.",
+        "U17 Binance presence and the leak test use only 1 m klines closed by t0 (open + 60 s <= t0); a candle that contains t0 is no evidence of a market before t0, and the next proxy candidate is tried."
+      ],
+      "notes": [
+        "Stated differences from Part C: t0 on Tree's clock, Hyperliquid book fills, real funding, and no known-trading-start requirement. At registration (2026-11-05) the 3 Tree Upbit items in the VPS archive have an empty body (raw JSON: title, en, kind, url), and the VPS gets 403 from Upbit's announcements API.",
+        "If Upbit lists KRW-<token> in market/all before the notice's t0, the already-on-KRW rule excludes the event; the first real events must be checked for this."
+      ],
+      "rules": [
+        "Paper only: no orders and no keys; no deploy, config, sizing or allocation change follows from any result. EDGE authorizes only a proposal for a small live pilot under the graduation gates; NO EDGE closes the lane.",
+        "One decision, at 40 comparable announcements or on 2027-11-05, on the 95% A4 interval of the announcement-level mean net 24 h return; the 20- and 30-event reports are descriptive only.",
+        "Forward events never mix with the Part C retrospective sample; results are posted on #229 at each check."
+      ],
+      "triggers": [],
+      "amendments": [
+        {
+          "date": "2026-11-05",
+          "by": "operator (Palmer); recorded by Claude",
+          "issue": "#252",
+          "reason": "Operator override before resolution. At about 1.7 events a month this preregistration needs about a year to reach its one decision; on 2026-11-05 the operator chose not to wait and authorized a small live pilot now: \"if our backtests support it lets put it live with a bit of money\". The authority is the operator's decision and the Part C proxy result, not any forward result: no comparable forward outcome exists at 2026-11-05. The graduation gates are not met and are not claimed.",
+          "changes": "None to this preregistration. Its measurement, eligibility, cohorts, frozen constants, rules, decision rule, decision count and date are unchanged, and the paper monitor (research/upbit_fade_forward/) keeps running unchanged as the shadow measurement.",
+          "separation": "The live pilot is preregistered separately as upbit-krw-fade-live-pilot-2026-11. Its trades are a separate measurement epoch: they never enter this preregistration's decision, never count toward its 40 announcements, and are reported apart from it. This decision is computed from paper records only.",
+          "rule_note": "The rule 'no deploy, config, sizing or allocation change follows from any result' still holds: the pilot follows from the operator's override, not from a result of this measurement. EDGE here still authorizes only a proposal; NO EDGE still closes the lane, and the pilot would then be stopped."
+        }
+      ],
+      "resolution": null
+    },
+    {
+      "id": "upbit-krw-fade-live-pilot-2026-11",
+      "bot": "UpbitFadeLiveV1",
+      "status": "open",
+      "registered": "2026-11-05",
+      "review_by": "2027-05-05",
+      "min_closed_trades": 10,
+      "issue": "#252",
+      "parent": "upbit-krw-fade-forward-2026-11",
+      "spec": "docs/superpowers/specs/2026-11-05-upbit-fade-forward-design.md, section 'Addendum: live pilot (#252)'",
+      "code": "ft_userdata/user_data/strategies/UpbitFadeLiveV1.py and configs/UpbitFadeLiveV1.json (compose service ft-upbit-fade-hl, 127.0.0.1:8105); research/upbit_fade_live/live_trigger.py (systemd user unit upbit-fade-live-trigger); runbook research/upbit_fade_live/GO-LIVE.md",
+      "authorization": "Operator override, 2026-11-05 (#252; amendment of upbit-krw-fade-forward-2026-11 the same day). Deployed in dry-run first; the operator funds the account, adds the API wallet and flips it live. The agent never places orders and never handles keys.",
+      "hypothesis": "None is decided here. A small live execution pilot of the forward rule: it measures real fills, fees, settled funding and the execution plumbing of the 24 h short against the paper record of the same events. Evidence of edge comes only from upbit-krw-fade-forward-2026-11.",
+      "frozen": {
+        "measurement": "live",
+        "places_orders": true,
+        "venue": "hyperliquid",
+        "account": "a dedicated Hyperliquid master account with its own API wallet (no withdrawal rights), funded with about 150 USDC and traded by no other bot",
+        "selection": "exactly the events the paper monitor enters in the comparable cohort with every requirement established when the live order is decided (uff_report.classify returns ('comparable', [])); eligibility at t0 unchanged",
+        "trigger": "the paper entry record (t0 + 5 min); one POST /forceenter on the local bot per event id, never retried, with entry tag upbit-fade:<event id>@<t0 + 7 min in ms>",
+        "bot_entry_guard": "UpbitFadeLiveV1.confirm_trade_entry, which Freqtrade 2026.7 runs under its entry lock just before the order: refuse unless the tag parses, the side is short, the time is not past the tag's deadline (and the deadline is at most 7 min ahead), fewer than 2 trades are open, the pair has no open trade, no trade (open or closed) carries the event id, and realized P&L of the closed trades in the bot's database is above -75 USDC; any error refuses",
+        "timing_rule": {
+          "status": "amended timing rule, approved by the operator in chat, 2026-11-05 ('Approve it')",
+          "admission": "by t0 + 7 min, checked by the trigger and again by the bot under its entry lock (confirm_trade_entry)",
+          "submission": "not bounded: after confirm_trade_entry Freqtrade prepares margin mode and leverage, with retries, before it submits the order, and ccxt 4.5.68 does not sign Hyperliquid's expiresAfter on ordinary orders, so no exchange-side expiry is set",
+          "measurement": "for every entry the trigger reads the entry order back from the bot and records its submission time (order_timestamp) and fill time (order_filled_timestamp) against t0 and against the paper entry; reported per trade",
+          "fill_defect_after_t0_s": 600,
+          "defect": "a fill after t0 + 10 min, or no timely fill confirmed by then (the trade unreadable, no entry order on it, or not filled), is an execution defect: the trigger writes the durable pause before its record"
+        },
+        "latest_entry_after_t0_s": 420,
+        "direction": "short",
+        "order_type": "market",
+        "stake_usdc": 50,
+        "leverage": 1,
+        "margin_mode": "isolated",
+        "max_open": 2,
+        "time_exit_s": 86400,
+        "time_exit": "Freqtrade minimal_roi {\"0\": 100, \"1440\": -1}",
+        "emergency_stop_ratio": -0.6,
+        "emergency_stop_note": "+60% adverse for a short at 1x, above the worst adverse move in Part C (+48.7%), so it does not change the tested 24 h rule",
+        "stop_on_exchange_when_live": true,
+        "dry_run_wallet_usdc": 150,
+        "kill_realized_pnl_usdc": -75,
+        "kill_latch": "the trigger reads the bot's realized P&L every loop and writes its pause file at -75 USDC or worse; the bot refuses entries at that level by itself",
+        "unknown_outcome_pause": "an unobserved /forceenter outcome writes the pause file before the outcome record; while any unknown outcome has no reconciliation record (live_trigger.py reconcile, after the operator checks the bot and Hyperliquid) the trigger stays paused and re-creates the file every loop and at every start; a failure to persist any state stops further entries",
+        "gateway": "dry-run: the deployed hl-gateway client short (reads at the background tier, exchange actions refused), so the dry-run deploy does not change the gateway; live: hl-gateway client upbit (reads at the background tier; exchange actions and orderStatus reads in its own slice of 40 weight per minute, outside the fleet's priority capacity), added by one gateway recreate only when Killers is flat (no open positions and no open orders on Hyperliquid) and the trailing-minute usage read just before is under 300; the gateway keeps no budget state",
+        "epoch_start": null
+      },
+      "rules": [
+        "Epoch: the live epoch starts at the first start of ft-upbit-fade-hl with HYPERLIQUID_UPBIT_FADE_DRY_RUN=false, recorded in an amendment (UTC time, source commit) at go-live. Dry-run trades before it are plumbing checks, not results.",
+        "Kill rule (Claude's call, 2026-11-05): pause the trigger (its kill-switch file) when cumulative realized pilot P&L in the live epoch is -75 USDC or worse, or on any execution defect: an orphaned position, a missing exchange stop on a live position, a double entry, or a /forceenter outcome that could not be observed. The trigger engages the switch itself for the P&L limit, an unobserved outcome and a bot that answers for another strategy; the operator applies the others. Open positions keep their 24 h exit and stop. Resuming needs a recorded decision (an amendment).",
+        "Reports are kept apart from the paper decision: per live trade, the entry and exit fills against the paper entry and exit of the same event, fees, settled funding (Hyperliquid userFunding) and P&L; live results are never pooled with paper results and never used in the decision of upbit-krw-fade-forward-2026-11.",
+        "No sizing, leverage, cap or rule change without an amendment. NO EDGE in upbit-krw-fade-forward-2026-11 stops the pilot."
+      ],
+      "triggers": [],
+      "amendments": [],
+      "resolution": null
+    },
+    {
+      "id": "upbit-krw-listing-fade-2026-11",
+      "bot": null,
+      "status": "closed",
+      "registered": "2026-11-04",
+      "review_by": "2027-02-01",
+      "issue": "#229",
+      "spec": "docs/superpowers/specs/2026-11-03-news-archive-design.md §6 @980236a, with §6.2 Hyperliquid eligibility amended by #237 (C1 option A, §11 call 14)",
+      "hypothesis": "The demand shock overshoots and fades after the pump. Generated on data from before this window (below).",
+      "frozen": {
+        "window_utc": [
+          "2023-01-01T00:00:00Z",
+          "2026-11-01T00:00:00Z"
+        ],
+        "unit": "announcement",
+        "entry_offset_s": 300,
+        "descriptive_entry_offset_s": 60,
+        "horizons_s": [
+          1800,
+          14400,
+          86400
+        ],
+        "primary_horizon_s": 14400,
+        "fee_bps_per_side": {
+          "hyperliquid": 4.5,
+          "binance_spot": 7.5
+        },
+        "slippage_bps_per_side": 10,
+        "stress_slippage_bps_per_side": 25,
+        "leak_window_s": [
+          -600,
+          -120
+        ],
+        "leak_abs_drift_gt": "0.02",
+        "halt_resume_window_s": 259200,
+        "min_announcements": 20,
+        "top_decile_share_lt": 0.6,
+        "coverage_gate_gt": 0.2,
+        "bootstrap_resamples": 10000,
+        "bootstrap_seed": 229,
+        "hl_eligibility_window_s": [
+          86400,
+          3600
+        ],
+        "proxy_preference": [
+          "binance_um_futures",
+          "binance_spot"
+        ],
+        "proxy_dates_d": [
+          -1,
+          2
+        ],
+        "kline_download_dates_d": [
+          -1,
+          5
+        ],
+        "direction": "short",
+        "venues": [
+          "hyperliquid"
+        ],
+        "t0_field": "upbit.first_listed_at",
+        "binance48_overlap_s": 86400,
+        "exclude_title_words": [
+          "종료",
+          "유의",
+          "제거",
+          "변경",
+          "중단",
+          "연기",
+          "재개"
+        ],
+        "manifest": "upbit-manifest.json",
+        "shares_manifest_with": "upbit-krw-listing-reaction-2026-11",
+        "hl_evidence": "fundingHistory"
+      },
+      "rules_verbatim": {
+        "phase1": [
+          "Window: announcements dated 2023-01-01 00:00 UTC to 2026-10-31 23:59 UTC. The start is roughly when Hyperliquid perps begin to exist. Nothing after the window enters this study.",
+          "Events, both Upbit studies (one shared manifest): one event per (notice, token) for Upbit `category=trade` notices whose title matches the KRW-market-addition pattern.",
+          "Tokens already on Upbit KRW are excluded.",
+          "So are tokens with a Binance catalog-48 listing announcement within ±24 h. That keeps the closed listing lane out of this sample.",
+          "Events whose Upbit KRW trading began before the notice are excluded too.",
+          "Timestamps:",
+          "Binance: `releaseDate`.",
+          "Upbit: the builder documents whether `listed_at` or `first_listed_at` is the publish time. The prereg names the field before Phase 1 runs.",
+          "Execution venues (Claude's call): Binance futures is CVM-blocked for the operator (see the `listing-reaction-study-2026-07` notes), so only these count:",
+          "Upbit fade (short): Hyperliquid perp only, under the same eligibility rule below. Spot-only tokens are excluded and counted, because Binance spot cannot short.",
+          "Hyperliquid eligibility needs positive pre-entry evidence (changed after both rounds; evidence source changed by §11 call 14). A token qualifies only if Hyperliquid hourly funding records (`fundingHistory`, by coin name) exist for it in the 24 h before t0, including at least one in the last hour before t0. Candles cannot serve: `candleSnapshot` returns only the most recent ~5,000 candles, which at 1 h reach back to about 2026-04 (probe on #229). Nothing after t0 is used for eligibility; using it would exclude exactly the tokens that become untradeable right after the event. Tokens no longer in today's `meta` are looked up by name through `fundingHistory`. The builder confirms in Phase 1 that this works for delisted coins and documents it.",
+          "Eligibility that cannot be verified is `unknown`. Unknown events are excluded and counted. An earliest daily candle alone is not enough.",
+          "Completeness evidence (changed after round 2).",
+          "Pagination (changed after round 3): each Binance catalog (48 and 161, plus monitoring if separate) and the Upbit list are harvested in full, every page. The harvested count must equal the API's reported `total`.",
+          "Any shortfall is added to the `missing` count, conservatively assumed to fall inside the window.",
+          "If no total is reported, the study is INCONCLUSIVE-by-data.",
+          "This also covers the catalog-48 overlap exclusion.",
+          "Observed 2026-11-03: Upbit's Cloudflare answered error 1015 to page requests 1.5 s apart, so the full Upbit harvest runs at least 8 s per page. Binance catalog 161 reported `total` 446, and its oldest article is dated 2022-02-17.",
+          "Candles (changed after round 3): the exact 1m candles each calculation uses must exist. These are t0−10 min and t0−2 min for the leak test, the entry candle, and each horizon's exit candle. No interpolation and no forward-fill. If any is missing, and the halt rule does not resolve it, the event is `missing`.",
+          "Halts after entry (changed after rounds 3–4): if an exit candle is missing because trading halted, the exit is the first candle after trading resumes, within 72 h of that scheduled exit time.",
+          "Costs are always subtracted from the net return, whatever the side, never applied to a price.",
+          "If trading does not resume within that window, the event is `unresolved`.",
+          "`halted` events stay in every criterion.",
+          "Any unresolved event makes the study INCONCLUSIVE (changed after rounds 4–5). Their outcomes are outcome-dependent: terminal delistings would vanish. So with one or more `unresolved` events the result is INCONCLUSIVE. There is no imputation shortcut: imputed values can move the median and concentration criteria in either direction.",
+          "Coverage gate: `unknown`, `missing` and `unresolved` together above 20% of candidate events make the study INCONCLUSIVE-by-data. So does harvesting that cannot complete within the shared limiter.",
+          "Resource budget for Part C (changed after round 3):",
+          "Harvesting, downloading, decompressing and analysis run under `systemd-run --user --scope -p MemoryMax=1G -p CPUQuota=50%` with `nice` and `ionice -c3`.",
+          "Before each download batch, the 15 GB free-disk guard from §4.4 applies.",
+          "Only the daily kline files covering each event's [t0−1 d, t0+5 d] window are downloaded. That covers entry+24 h plus the 72 h resumption window. Each zip is deleted after the needed rows are extracted.",
+          "The expected footprint is under 1 GB.",
+          "Symbols and price series: the manifest freezes the token → Binance-symbol mapping, including 1000-prefixed contracts and renames, and which proxy series each event will use. Proxy series are Binance 1m klines from `data.binance.vision`, USDⓈ-M futures preferred, spot otherwise. Phase 1 checks only that the series exists; it computes no returns.",
+          "Events with missing proxy data are excluded and counted toward the coverage gate above.",
+          "Freeze: the manifest file's SHA-256 is recorded in a preregistration amendment, merged before Phase 2 starts."
+        ],
+        "phase2": [
+          "Entry latency (changed after review): taker entry at the close of the 1m candle containing t+5 min. Five minutes covers detection by a 60 s poller on Tree plus processing. A t+60 s entry is reported as descriptive only, because the archive's own Binance rotation could not detect that fast.",
+          "Exits: the fixed horizons entry+30 min, entry+4 h and entry+24 h.",
+          "Costs: taker fees of 4.5 bps per side on Hyperliquid or 7.5 bps on Binance spot, plus 10 bps per side of slippage. A stress case at 25 bps per side is reported. Hyperliquid funding is not modelled; at the +4 h primary horizon it is about four hourly payments. This is listed as a limitation.",
+          "Proxy status: the returns come from Binance prices, not Hyperliquid fills. Basis and impact are not measured, so any result is labelled a proxy result. That is acceptable only because a pass authorizes nothing beyond a paper forward monitor, and that monitor measures executable prices.",
+          "The forward monitor keeps each event's venue assignment (changed after round 2). It uses Hyperliquid best bid/offer (BBO) for Hyperliquid-assigned events and Binance spot `bookTicker` for spot-assigned Upbit events. So a pass driven by spot events is validated on spot, not on a different subset.",
+          "Leak flag: reuse the listing study's rule: more than 2% absolute drift over [t0−10 min, t0−2 min]. The primary set excludes leaked events; a sensitivity run includes them.",
+          "Unit of analysis (changed after review): the announcement, not the token. One Binance notice often names several tokens.",
+          "Each announcement's return is the mean net return of its eligible tokens.",
+          "The chronological halves split announcements by date.",
+          "Primary horizon: +4 h, declared now.",
+          "Pass (all required, evaluated at +4 h after fees and 10 bps slippage):",
+          "at least 20 distinct announcements in the primary set;",
+          "announcement-level median net return > 0;",
+          "a positive median in both chronological halves;",
+          "the top decile of announcements contributes less than 60% of the sum of announcement returns. This criterion fails whenever that sum is ≤ 0.",
+          "Also reported, not criteria:",
+          "a bootstrap 95% CI of the announcement-level median (10,000 resamples);",
+          "BTC-adjusted returns;",
+          "for the two short studies, the per-event maximum adverse excursion from entry to each exit, from 1m highs. A short's risk sits in the squeeze tail, which the median does not show. This is descriptive only: a missing candle inside the path makes that event's MAE unavailable. It never changes return eligibility, the coverage gate, aggregation or pass/fail;",
+          "all three horizons, both halves, per venue and per notice kind;",
+          "leak and slippage sensitivities;",
+          "excluded, unknown and missing counts.",
+          "Separate hypotheses. The studies are never pooled, and a pass in one is not evidence for another.",
+          "The Upbit long and fade share their Hyperliquid events. On that subset the fade's net return is the long's gross return with the sign flipped, minus costs.",
+          "So a failed long plus a passed fade is one finding, not two confirmations.",
+          "Kill: with at least 20 announcements, any failed criterion closes that lane for this config. A pass authorizes only a paper forward monitor, preregistered separately, in the `listing-short-forward` style.",
+          "Too few announcements (Claude's call): fewer than 20 is INCONCLUSIVE-by-data, the precedent from the listing study's Hyperliquid venue. The lane stays open, but nothing is authorized: no monitor and no bot. The archive keeps recording these events. Any re-test is a new, forward-only preregistration; retrospective and forward events are never mixed.",
+          "Code and data:",
+          "Code lives in the repo under `research/news_event_studies/`.",
+          "Downloaded klines and results stay on the VPS under `research/news_event_studies/data/`, gitignored.",
+          "The resolution is written into the prereg entry mechanically, from the frozen criteria only."
+        ],
+        "fade_origin": [
+          "Why the fade was added (2026-11-03, before any Phase 1 work). An exploratory check on 2018–2022 data, all of it before this window, covered 42 token events in 33 Upbit KRW-addition notices, all for tokens already on Binance spot ([#229 comment](https://github.com/IvPalmer/Master-Trader/issues/229#issuecomment-6617239337)).",
+          "The median Binance price was already +11% by t+5 min.",
+          "A long from t+5 min lost. These are token-level medians net of costs, BTC-hedged: −4.5% at +4 h and −6.3% at +24 h, with 19% of events positive at +24 h. Unhedged, they were −3.7% and −7.4%.",
+          "This study does not use those statistics. Its decision metric stays the registered one: unadjusted, announcement-level net returns.",
+          "The operator asked for the inverse to be preregistered.",
+          "The 2018–2022 sample is the hypothesis source. It never counts as validation and is never mixed with this window.",
+          "The long study stays registered exactly as written. The fade reuses its Phase 1 manifest and every Phase 2 rule: entry, horizons, primary horizon, costs, leak flag, unit of analysis and pass criteria. Only two things differ: the direction, and the venue rule (Hyperliquid only)."
+        ]
+      },
+      "operationalization": [
+        "O1 t0: Binance `releaseDate` (ms); Upbit `first_listed_at` (KST→UTC). `listed_at` moves when a notice is edited (Part A: id 6687, 21:50 vs 20:00 KST).",
+        "O2 price_at(X) = the close of the Binance 1m candle whose open is floor_minute(X). Entry = price_at(t0+300 s); exit_H = price_at(t0+300 s+H). Leak drift = price_at(t0−120 s) / price_at(t0−600 s) − 1, in exact decimals; leaked if |drift| > 0.02.",
+        "O3 Gross long = exit/entry − 1; gross short = −(exit/entry − 1); net = gross − 2 × (fee + slippage) / 10,000.",
+        "O4 Missing candles: a missing exit candle → the close of the first candle opening in (scheduled, scheduled + 72 h] = `halted`; none → `unresolved`. Exception: when that candle exists but the scheduled exit's UTC-day file is absent (HTTP 404), the gap is an archive hole and the event is `missing`. A missing leak or entry candle → `missing`. Event status, strongest first: `unresolved` at any horizon, then `missing`, then `halted` at any horizon, else `ok`.",
+        "O5 Hyperliquid eligibility: `fundingHistory` by coin name, with candidates [T, \"k\"+T] and names containing \":\" skipped. Queries cover [t0−24 h, t0−1 ms]. eligible: ≥ 1 evidence time in [t0−24 h, t0) and ≥ 1 in [t0−1 h, t0). Evidence times are candle close `T` for candles and `time` for funding records; ineligible: no such evidence. A name absent from today's `meta` that also returns none is ineligible (`never_in_meta`); for such a name, HTTP 500 with body `null` counts as returning none (probe (f) on #229), and any other failed response stops the build; unknown: the evidence cannot be fetched or lies beyond retention (candle mode: t0−24 h earlier than BTC's earliest 1h candle); an unknown status excludes the event from all three studies.",
+        "O6 Binance presence: a daily 1m file on `data.binance.vision` for the UTC day before date(t0), for some candidate symbol. Candidates: UM futures `T`, `1000T`, `1000000T`, `1MT` + `USDT`; spot `T`, `1000T`, `1MT` + `USDT`. The Binance-spot venue needs a spot file for that day.",
+        "O7 Proxy: the first candidate, all UM futures before spot, with files for every UTC date from date(t0−1 d) to date(t0+2 d). Failing that, the first candidate in the same order with files for date(t0−1 d) and date(t0); its later gaps go through O4, so a series that ends after entry is `unresolved`, never `missing`. None → `missing`.",
+        "O8 Upbit KRW addition: a title with a KRW marker (`KRW` or `원화`) and an addition marker (`디지털 자산 추가`, `신규 상장` or `신규 거래지원`), containing none of 종료/유의/제거/변경/중단/연기/재개.",
+        "O9 Already on Upbit KRW: an earlier harvested KRW-addition notice for the token, with no KRW trading-end notice (`거래지원 종료`, `상장폐지` or `상장 폐지`, not limited to BTC/USDT markets) between it and t0.",
+        "O10 Upbit trading began before the notice: the trading-start time stated in the notice body is earlier than t0. A body with no parseable start time makes the event `unknown`. The start is read from the token's row of a table whose header has `거래지원 개시 시점` (or `거래 지원 개시 시점`), else from a line containing `거래지원 개시`, `거래 지원 개시` or `거래 오픈`; clocks are `HH:MM` or `H시 M분`, in KST. A start stated without a year takes the year (t0's KST year, or the one before or after) that puts it nearest t0; a tie is `unknown` (probe on #229: `10월 27일 16시 40분 예정` in a table cell).",
+        "O11 Catalog-48 overlap: any catalog-48 title naming the token within ±24 h of t0, inclusive.",
+        "O12 Delisting events come from harvested titles only. Overlap is computed over the full harvest before the window filter. A notice ≤ 24 h after the token's last kept notice is dropped.",
+        "O13 Coverage = (unknown + missing + unresolved + harvest shortfall) / (token-events not excluded by a verified rule + harvest shortfall). Above 0.20 → INCONCLUSIVE-by-data. A catalog-48 shortfall counts for both Upbit studies.",
+        "O14 Statistics: halves: announcements sorted by (t0, id), the first floor(n/2) against the rest; top decile: the ceil(n/10) largest announcement returns; median: `statistics.median`.",
+        "O15 Reported only: the bootstrap uses 10,000 resamples with `random.Random(229)`, 2.5/97.5 percentiles of the median. BTC adjustment uses BTCUSDT UM futures with β = 1.",
+        "O16 Harvest completeness: a full Binance catalog = pages 1..ceil(total/50), plus a closing page-1 fetch; complete when unique ids ≥ the closing `total`; two limiter suspensions, or 72 h without completing, mean the harvest cannot complete → INCONCLUSIVE-by-data; Upbit is harvested from the operator's Mac, and the manifest records the host.",
+        "O17 Monitoring-tag notices come from catalog 161. Catalog 49 is scanned back to 2023-01-01, and a monitoring-tag title found there stops Phase 1 for an operator decision."
+      ],
+      "pass_criteria": [
+        "at least 20 distinct announcements in the primary set;",
+        "announcement-level median net return > 0;",
+        "a positive median in both chronological halves;",
+        "the top decile of announcements contributes less than 60% of the sum of announcement returns. This criterion fails whenever that sum is ≤ 0."
+      ],
+      "kill": "Kill: with at least 20 announcements, any failed criterion closes that lane for this config. A pass authorizes only a paper forward monitor, preregistered separately, in the `listing-short-forward` style.",
+      "inconclusive": [
+        "Too few announcements (Claude's call): fewer than 20 is INCONCLUSIVE-by-data, the precedent from the listing study's Hyperliquid venue. The lane stays open, but nothing is authorized: no monitor and no bot. The archive keeps recording these events. Any re-test is a new, forward-only preregistration; retrospective and forward events are never mixed.",
+        "INCONCLUSIVE, not FAIL, when the data cannot decide. This applies in three cases: fewer than 20 announcements; `unknown`, `missing` and `unresolved` events together above 20% of candidates; or any `unresolved` post-entry event at all. Nothing is authorized, and any re-test is forward-only (§6.2)."
+      ],
+      "rules": [
+        "Research only: no deploy, config, sizing or allocation change follows from any result; a PASS authorizes only a separately preregistered paper forward monitor.",
+        "Phase 1 builds an outcome-blind manifest; its SHA-256 is recorded in an amendment merged before any return is computed.",
+        "The 2018–2022 exploratory check (#229 comment 6617239337) is the hypothesis source only; it never counts as validation and sets no parameter."
+      ],
+      "triggers": [],
+      "amendments": [
+        {
+          "id": "A1-phase1-title-rules",
+          "date": "2026-11-04",
+          "frozen_before_results": true,
+          "rulings": [
+            "upbit 3502 'KRW, BTC 마켓 디지털 자산 추가 (SUI) (매도 주문 제한 기준 가격 안내)': a parenthetical ending in 안내 or 마켓 is a note, not a token, so SUI is the token.",
+            "upbit 4273 '테더(USDT) KRW, BTC 마켓 추가 안내 (출금 개시 안내)' has none of the O8 addition markers, so it is not a KRW addition.",
+            "O8 per token: when one notice adds several tokens to several markets, a token is a KRW addition only when the notice puts that token on KRW. The evidence is, in order: the title's market group for that token; a title naming only the KRW market, or a single-token title; the notice body (a 마켓 table column, '- TOKEN : KRW 마켓' or '- KRW 마켓 : TOKEN, …'). A token added to BTC or USDT only is neither an event nor an O9 prior. A token whose market is unstated is not a prior before the window and needs review inside it. On the harvested corpus this removes 5 BTC/USDT-only tokens from the events (3266 GAL, 3362 ACS, 4070 ALT, 4192 OMNI, 5100 IO) and 7 already-on-KRW exclusions of later KRW additions (3362 MASK, 3654 IMX, 4363 GAL, 5239 ALT, 5375 OMNI, 5644 YGG, 6255 IO); the build has no review items left."
+          ],
+          "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A2-o10-hour-clock",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "stop": "The Phase 1 build from 89dfe17 (2026-11-05) left 87 Upbit KRW additions `unknown` in each Upbit study: 86 with no parseable trading start and 1 Hyperliquid fetch failure. 80 of the 86 start cells read `M월 D일 H시 예정`, an hour with no minutes, which O10's clock list (`HH:MM` or `H시 M분`) does not read. Those manifests (delisting 46e657bd837a9f81be186bc4755bd879489e89401bc16cf602fda4f34641a974, Upbit 22568ef2fda529451b428a27df902a941f871f47f7c48b9e329621d1dacca9b8) were discarded, not frozen.",
+          "rule": "O10 clocks also include `H시` alone, read as minute 00; `오전`/`오후` apply as before. `H시` must stand alone: it is not read inside a word (`H시간`, `H시점`, `H시작`), nor when minutes follow without `분` (`H시 MM`) or `반` follows. A range `H시 ~ H시` reads as its first time.",
+          "corpus_effect": "On the harvested corpus 81 non-excluded events gain a start (no parseable start: 86 -> 5), as do 27 events already excluded as binance48_overlap. No start already read and no exclusion changes. Every new start is 0.2 to 12.7 h after t0, so none becomes began_before_notice.",
+          "outcome_blind": "Decided from start-cell and body-line formats read with digits masked, counts, and start times against t0; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A3-manifest-freeze",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "manifest": "upbit-manifest.json",
+          "manifest_sha256": "23a6b3541d5799bf2aa679bf4e1913d970a8af89de58d01c4e3f6e3236d77d00",
+          "code_commit": "52cb4a0",
+          "counts": {
+            "candidates": 55,
+            "excluded": {
+              "binance48_overlap": 43,
+              "no_hl": 16,
+              "not_on_binance": 26,
+              "spot_only": 40
+            },
+            "harvest_complete": true,
+            "harvest_shortfall": 0,
+            "missing": 0,
+            "unknown": 5
+          },
+          "harvest": {
+            "binance_from": "vps",
+            "upbit_from": "operator-mac",
+            "completeness": {
+              "binance:161": {
+                "shortfall": 0,
+                "total": 446,
+                "total_reported": true,
+                "unique": 446
+              },
+              "binance:48": {
+                "shortfall": 0,
+                "total": 2292,
+                "total_reported": true,
+                "unique": 2292
+              },
+              "binance:49": {
+                "shortfall": 0,
+                "total": 4481,
+                "total_reported": true,
+                "unique": 4481
+              },
+              "upbit:list": {
+                "shortfall": 0,
+                "total": 806,
+                "total_reported": true,
+                "unique": 806
+              }
+            },
+            "catalog_49_monitoring_titles": 27,
+            "catalog_49_note": "27 catalog-49 titles contain 'Monitoring Tag' and are not in catalog 161. 25 yield delisting-study events (137 token events); the other two name no added token: the 2023-07 tag introduction (excluded:tag_introduction) and 240714, which only removes tags."
+          },
+          "note": "Phase 1 complete; no return computed. Built by the nes-build unit on the VPS from main 52cb4a06f1752d15543a24485b43bd846bfabb3d (2026-11-05 08:14-12:27Z, exit 0)."
+        },
+        {
+          "id": "A4-operator-directive-estimates",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "directive": "Operator, 2026-11-05: the gates Claude wrote are arbitrary; do not wait for any date and do not void a study; deliver a solid result.",
+          "review": "Codex review requested as gpt-6.1-sol, reasoning high, read-only; two rounds on 2026-11-05, both before any Phase 2 return was computed.",
+          "decision_rule": "Classification on the announcement-level mean net return at +4 h, primary set (leak test run and passed). EDGE (proxy): the Bonferroni-adjusted (3 studies, 98.33% two-sided) percentile interval of the stress-cost (25 bps per side) mean, from 10,000 calendar-month block-bootstrap resamples (seed 229), lies above zero. NO EDGE: the same interval of the base-cost (10 bps) mean lies at or below zero. Otherwise NOT DETERMINABLE, which includes fewer than two calendar months. The decision metric is the raw (unhedged) net mean; the median and the BTC-adjusted mean (beta 1, no hedge cost) are descriptive.",
+          "missing_outcomes": "The class assumes missing outcomes resemble observed ones. Missing = token-events in the primary population (leak test not run, or passed with no usable +4 h return) plus Phase 1 unknown/missing token-events, counted per token, including announcements that are only partly missing. The report gives the tipping point: the common return of every missing token-event, with each announcement keeping its token weights, at which the class would stop holding.",
+          "voids_removed": "MIN_ANN = 20, positive medians in both halves, top-decile share below 0.6, coverage above 20%, any unresolved event and an incomplete harvest no longer void or decide a study. They are reported as `legacy_gates`, diagnostics only.",
+          "eligibility": "Per horizon: a return enters a horizon when that horizon's exit is ok or halted and the entry exists, so an unresolved exit at one horizon no longer removes the others. Events whose leak test could not run are outside the primary set and inside leak_included.",
+          "reported": "Per horizon: n, months, mean, adjusted interval, median and win rate for base cost, stress cost, no_halt (halted exits dropped), leak_included and BTC-adjusted; +4 h by year; the missing-announcement count; MAE for shorts (now floored at zero).",
+          "date_rule": "The README line 'not before 2026-11-07' is withdrawn. The code's publication guard (last candidate t0 + 5 d + 2 d) stays; with the last candidate at 2026-10-27 it is met.",
+          "limitations": "Binance proxy prices, not Hyperliquid fills; funding not modelled; a proxy is chosen by which day files exist through t0 + 2 d, which can favour series that kept trading (survival of the price series, not of the event); notice text is read from current CMS versions; the BTC adjustment assumes beta 1.",
+          "outcome_blind": "Decided before any Phase 2 return was computed. The supplement split uses notice publication times only.",
+          "upbit_supplement": "O11 excluded 43 additions for a Binance new-listing notice within 24 h of t0. 26 of those notices were published after t0, which a bot acting at t0 cannot know (look-ahead). nes_supplement.py re-adds those 26 with Phase 1 venue resolution (no price read); the supplement manifest is frozen below and its candidates join this study's decision set. The 17 whose notice preceded t0 stay excluded, a rule a bot can apply. The frozen-candidates-only result is reported alongside.",
+          "supplement_manifest": "upbit-supplement-manifest.json",
+          "supplement_sha256": "e647310c099b33825708a8c29591e46b48c38de331360bd4e78e81e7e39bb62d",
+          "supplement_code_commit": "483ddd3",
+          "supplement_candidates": "26 re-added; 5 candidates in the long study, 4 in the fade (most were not on Binance before t0)"
+        }
+      ],
+      "resolution": {
+        "verdict": "NOT DETERMINABLE",
+        "reasons": [
+          "4h mean interval spans zero (stress low -0.0089, base high +0.0477)"
+        ],
+        "label": "proxy result",
+        "primary_4h": {
+          "n": 57,
+          "mean": 0.019846264168925758,
+          "ci": [
+            -0.0058783884222724,
+            0.047718370149465415
+          ],
+          "median": 0.019428917683808642,
+          "win_rate": 0.6491228070175439
+        },
+        "supplement_sha256": "e647310c099b33825708a8c29591e46b48c38de331360bd4e78e81e7e39bb62d",
+        "manifest_sha256": "23a6b3541d5799bf2aa679bf4e1913d970a8af89de58d01c4e3f6e3236d77d00",
+        "code_commit": "9991e23",
+        "computed_at": "2026-11-05T17:21:09.639000+00:00"
+      },
+      "resolution_note": "Mechanical A4 resolution from the VPS results (code 9991e23), recorded 2026-11-05. Registered primary (+4 h) NOT DETERMINABLE, n 57. Descriptive, base cost, 98.33% interval, not the registered primary: +24 h +7.4% [+2.9%, +11.4%], win rate 81%. That secondary result is tested forward as a new hypothesis under upbit-krw-fade-forward-2026-11 (paper monitor, #249). No bot, live order or allocation follows from this entry."
+    },
+    {
+      "id": "xasset-riskoff-guard-2026-11",
+      "bot": null,
+      "status": "closed",
+      "registered": "2026-11-05",
+      "review_by": "2026-11-20",
+      "issue": "#254",
+      "code": "research/xasset_guard_2026-11/xasset_guard.py; tests/test_xasset_guard.py",
+      "hypothesis": "A price-based cross-asset risk-off guard (an ES=F drop or a VIX spike) that blocks new entries for N hours would have raised the first-order net P&L of the existing FF, Keltner and Killers closed-trade lists: the blocked trades do worse than the kept ones, and the real trigger times beat date-shifted ones. Motivation: on 2026-11-05 a market-wide risk-off move (S&P 500 -3.8%, VIX 16.6 -> 26.9) hit crypto, and no archived headline came before it (#254). The headline/macro vetoes of research/news_veto_2026-11 did not help; this tests whether prices do better than headlines.",
+      "frozen": {
+        "measurement": "historical, first order: blocked trades are removed and freed slots are not refilled",
+        "places_orders": false,
+        "fetched_at_utc": "2026-11-05T19:36:00Z",
+        "raw_sha256": {
+          "yahoo_1h_ES_F.json": "fb1848c1dc37dbf943588a7b4e28b3109d5cd40336844bdf4e8fb5210a826426",
+          "yahoo_1h__VIX.json": "60b146a805331f42d32c42b874be28e12c7777a8aa8985c48c8a49b83ce1e06d",
+          "cboe_VIX_History.csv": "50731d77d6723344b67789e2fafe65c32bf005710d5918e693da5f1f62e231e8"
+        },
+        "data": {
+          "es": "Yahoo chart API ES=F, interval=1h, range=730d (first bar 2024-06-14 04:00Z); bars with a null high/close, a start not on a half hour, or ending after fetched_at_utc are dropped",
+          "vix_intraday": "Yahoo chart API ^VIX, interval=1h, range=730d (first bar 2024-01-19); same filters",
+          "vix_daily": "CBOE VIX_History.csv (cdn-api.cboe.com), daily CLOSE",
+          "stored": "VPS research/xasset_guard_2026-11/data/raw/ (not in git)"
+        },
+        "es_drop": "0.010",
+        "vix_rise": "0.20",
+        "vixd_rise": "0.20",
+        "bar_s": 3600,
+        "latency_s": 300,
+        "vix_close_et": "16:15",
+        "guards": {
+          "ES60": "two consecutive ES=F hourly bars (starts exactly 3600 s apart): close / previous close - 1 <= -es_drop; effective at the second bar's start + bar_s + latency_s",
+          "VIX20": "the first ^VIX hourly bar of an America/New_York date whose close (not high: VIX opening prints are erratic) >= (1 + vix_rise) x the CBOE close of the most recent earlier CBOE date; at most one per ET date; effective at bar start + bar_s + latency_s",
+          "OR": "the union of ES60 and VIX20 trigger times",
+          "VIXD": "secondary, full window: CBOE close >= (1 + vixd_rise) x the previous CBOE close; effective at vix_close_et on that date + latency_s"
+        },
+        "block": "a new entry with trigger <= entry_time < trigger + N h for any trigger of the variant (intervals merged); every entry, long or short",
+        "hours": [
+          4,
+          12,
+          24
+        ],
+        "vixd_hours": [
+          24
+        ],
+        "variants": "ES60, VIX20, OR x hours (9) + VIXD x vixd_hours (1)",
+        "n_variants": 10,
+        "primary": {
+          "guard": "OR",
+          "hours": 12,
+          "list": "FF_V2_current"
+        },
+        "window_intraday_utc": [
+          "2024-06-15T00:00:00Z",
+          "2026-11-01T00:00:00Z"
+        ],
+        "window_daily_utc": [
+          "2023-01-01T00:00:00Z",
+          "2026-11-01T00:00:00Z"
+        ],
+        "trade_lists": {
+          "FF_V2_current": {
+            "file": "ff_roi_2026-09-30/user_data/backtest_results/backtest-result-2026-09-30_23-45-13.zip",
+            "strategy": "FFX_V0_current",
+            "sha256": "22f8ad2f72dcdf61a92abcfaca0cb4a958cc12feb6c540b35bd4f40011f4ac54",
+            "unit": "USDT"
+          },
+          "FF_PreV2_sens": {
+            "file": "ff_entry_ablation_2026-10-01/user_data/backtest_results/backtest-result-2026-10-01_03-28-54.zip",
+            "strategy": "FFA_PreV2",
+            "sha256": "00203e8b90fc60bb44b897c34da6479756f1fd943e034645a331bc6107d22a67",
+            "unit": "USDT"
+          },
+          "Keltner_R4_live18": {
+            "file": "oos_retest_2026-07/results/R4.zip",
+            "strategy": "KeltnerBounceV1",
+            "sha256": "7dcf76de167b4bc86d9954c59deacba0ddba47d6f5c171bcd7d19445435346f5",
+            "unit": "USDT"
+          },
+          "Keltner_R5_wl60": {
+            "file": "oos_retest_2026-07/results/R5.zip",
+            "strategy": "KeltnerBounceV1",
+            "sha256": "b1fe233a730d2a850175fc7e3482b121e7a37c04e9ed86b3056c851e2a75ee37",
+            "unit": "USDT"
+          },
+          "Killers_channel": {
+            "file": "copier-validation/killers/killers_signals.json",
+            "sha256": "b384b724b721d89424b9a3ea10782a5cabef80770fefbf843338b0bffc594d79",
+            "unit": "margin units (channel-reported)"
+          },
+          "Killers_dry": {
+            "file": "tg_bots_audit_2026-07/killers_trades_full.json",
+            "sha256": "901f0ad3841abe644223bb807cbf26eccd3be2b56a5c885a654c31cbabc78000",
+            "unit": "USDT"
+          },
+          "FF_live": {
+            "file": [
+              "tradesv3.live.FundingFadeV1.sqlite",
+              "tradesv3.live.FundingFadeV1.v2.sqlite"
+            ],
+            "sha256": [
+              "11d2961b81a408fc338b149c93fbdaed06f0f0624860a1c2b4e0ae1d6fe44329",
+              "629ee69f451dd0e5accbcf02243b7aa1a1d680ec2a76211e26542bf94ee2b229"
+            ],
+            "unit": "USDT"
+          },
+          "Keltner_live": {
+            "file": "tradesv3.live.KeltnerBounceV1.sqlite",
+            "sha256": "12d79033b5f1642c016dbcf916d5faee1f0d83a4bd825bdb05972e765416cf86",
+            "unit": "USDT"
+          },
+          "Killers_live": {
+            "file": "tradesv3.live.KillersScalpV1.hyperliquid.sqlite",
+            "sha256": "e44060bad68dede35db57032a3b68fc378f79a707b2b5573a98140a9e0cbd7c0",
+            "unit": "USDC"
+          }
+        },
+        "live_source": "the 2026-11-05T03:15Z nightly backup (/home/ubuntu/backups/master-trader/20261105T031501Z), gunzipped read-only copies; closed trades (is_open = 0) only",
+        "entry_time": "open_timestamp (backtests, Killers dry), signal post time (Killers channel), open_date as UTC (live)",
+        "pnl": "profit_abs after backtest fees (backtests, Killers dry); channel-reported margin units (Killers channel); close_profit_abs, which includes partial exits (live)",
+        "longs_only_sensitivity": [
+          "Killers_channel",
+          "Killers_dry",
+          "Killers_live"
+        ],
+        "metrics": "per list x variant: n and n blocked in the variant's window, net P&L without and with the guard, change = -(sum of blocked P&L), blocked and kept mean profit ratio and win rate, share of window time guarded",
+        "bootstrap": "calendar-month blocks of the list's in-window trades, resampled with replacement: percentile CIs for net without, net with, change, and blocked-minus-kept mean ratio (draws with an empty group skipped and counted)",
+        "bootstrap_resamples": 10000,
+        "bootstrap_seed": 2291105,
+        "ci_level": "0.95",
+        "placebo": "every trigger time of the variant shifted by one common offset of +/-1..placebo_max_days whole days (sign and size uniform); percentile = share of placebo changes below the real change, ties counted half",
+        "placebo_draws": 1000,
+        "placebo_max_days": 30,
+        "placebo_seed": "the bootstrap_seed stream; the offsets are drawn first, once, and shared by every cell",
+        "min_blocked_for_pass": 10,
+        "secondary_placebo_pctile": "99.5",
+        "descriptive_timeline": "2026-11-05 only, not a test: first minute of a 30-min drop >= 1% and of a 1% fall below the 12:00Z level for ES=F, NQ=F (Yahoo 1m) and Binance spot BTCUSDT (1m); first ^VIX 1m close >= 1.20 x the prior CBOE close; hourly rule times that day"
+      },
+      "pass_criteria": "helps: on the primary cell (OR, 12 h, FF_V2_current, all entries), n blocked >= 10, change > 0, the change's 95% CI lower bound > 0 and placebo percentile >= 95.",
+      "kill": "hurts: on the primary cell, n blocked >= 10, change < 0, the CI upper bound < 0 and placebo percentile <= 5.",
+      "inconclusive": "anything else, including fewer than 10 blocked trades.",
+      "rules": [
+        "Research only: no bot, config, container or allocation change follows from any result. A 'helps' verdict justifies only proposing a forward shadow (guard logged, never enforced) on the archive's 5-min cross-asset snapshots, under its own entry.",
+        "Every list x variant cell is reported, failures included. No threshold, window, N, list or statistic changes after results; a change is an amendment with its reason.",
+        "Cells other than the primary are descriptive. One supports the hypothesis only with placebo percentile >= 99.5 (Bonferroni over the 10 variants) and a change CI excluding 0.",
+        "Hourly stand-in: the task's 'ES -1% in 30 min' is tested as ES60, one hourly bar -1%. No free keyless sub-hour ES history covers the trade windows (Yahoo serves <= 60 days below 1 h; Dukascopy timed out on 2 of 3 requests from the VPS; FRED is unreachable from the VPS and daily). The exact 30-min rule becomes testable forward from the archive's 1m snapshots.",
+        "Hindsight: the thresholds were suggested on 2026-11-05 after watching that day's move. 2026-11-05 is after every trade list ends, so it counts neither for nor against the guard; its timeline is descriptive.",
+        "Killers_channel outcomes are channel-reported (no costs; unreported losers count 0 or their best partial). The 2026-05-28 real-price replay found these signals lose money. Those rows are timing checks, never P&L evidence.",
+        "Live lists are small (FF 35, Keltner 5, Killers 20 closed trades in the backup) and descriptive. Per-trade live rows stay on the VPS; only aggregates are published.",
+        "First order only: a block frees a slot (FF max_open 2, Keltner 3) that another signal might have filled; those trades are not simulated."
+      ],
+      "seen_before_freeze": [
+        "research/news_veto_2026-11/RESULTS.md: no headline or macro veto helped; the CPI/FOMC blackout removed FF winners.",
+        "Guard data coverage only: bar counts, first and last timestamps, null counts, bar spacing. Live DB closed-trade counts and date ranges. No trigger list had been computed and no trigger had been joined to any trade.",
+        "2026-11-05 itself, from the #254 brief and probes: VIX 25.2 against a 16.61 prior close and ES 7419 against 7720 at about 19:20Z, so VIX20 and probably ES60 fire that day. That day is outside every trade list."
+      ],
+      "triggers": [],
+      "amendments": [
+        {
+          "id": "A1-codex-pre-run",
+          "date": "2026-11-05",
+          "by": "Claude, from Codex Sol/high review round 1 (thread 01a1ad42-6a18-7d53-bb29-4aee8f822406)",
+          "frozen_before_results": true,
+          "note": "Made before the study was run: no trigger had been joined to any trade and no trigger list had been computed.",
+          "reasons": [
+            "Placebo coverage: shifting triggers by up to 30 days pulled them across the ends of the data (ES history starts 2024-06-14, the fetch ends 2026-11-05), so shifted guards saw fewer triggers near the window edges and could inflate the real guard's rank.",
+            "Resolution: +/-1..30 whole days gives only 60 distinct shifts, so 1,000 random draws repeat them and no rank test can reach the 0.5% tail the secondary Bonferroni rule asked for.",
+            "Clustering: blocked trades from one month give a degenerate month-block CI, so a single event could pass the verdict."
+          ],
+          "changes": {
+            "trigger_scope": "triggers are used only inside the variant's window (window_intraday_utc or window_daily_utc), for the real guard and the placebos alike",
+            "placebo": "each of the 60 whole-day shifts in +/-1..placebo_max_days applied to every in-window trigger, wrapping circularly within the window (whole-day shifts of a whole-day window keep the hour of day); enumerated, no random draw. Exact one-sided rank p: p_helps = (1 + #placebo changes >= real) / 61, p_hurts = (1 + #placebo changes <= real) / 61; the percentile (ties half) is reported for continuity",
+            "placebo_draws": 60,
+            "placebo_seed": null,
+            "p_max": "0.05",
+            "min_blocked_months_for_verdict": 3,
+            "secondary_placebo_pctile": null,
+            "pass_criteria": "helps: on the primary cell (OR, 12 h, FF_V2_current, all entries), n blocked >= 10 from >= 3 calendar months, change > 0, the change's 95% CI lower bound > 0 and p_helps <= 0.05.",
+            "kill": "hurts: on the primary cell, n blocked >= 10 from >= 3 calendar months, change < 0, the CI upper bound < 0 and p_hurts <= 0.05.",
+            "secondary": "Cells other than the primary are descriptive only and support nothing, replacing the Bonferroni support rule.",
+            "snapshot_sources": "unrelated to the study: the #254 archive snapshot parsers now fail the poll when the quote time cannot be normalized"
+          }
+        },
+        {
+          "id": "A2-codex-pre-run",
+          "date": "2026-11-05",
+          "by": "Claude, from Codex Sol/high review round 2 (same thread)",
+          "frozen_before_results": true,
+          "note": "Made before the study was run: no trigger had been joined to any trade and no trigger list had been computed.",
+          "reasons": [
+            "The +/-1..30-day rotations of A1 are not the complete rotation group, so under a random-phase null the observed phase is not exchangeable with them and the rank p is not exact (Codex: a periodic synthetic case rejects 6.45% at nominal 5%).",
+            "Wrapping trigger starts alone loses guard exposure at the window end: a tail past the end vanished instead of continuing at the start, so placebo exposure varied."
+          ],
+          "changes": {
+            "placebo": "the real guard mask (merged intervals clipped to the variant's window) rotated circularly by every nonzero whole-day offset of that whole-day window; a piece crossing the window end is split and continues at its start, so guarded time is identical under every rotation and the hour of day is kept. Exact one-sided rank p over the full group: p_helps = (1 + #rotations with change >= real) / (1 + N), p_hurts = (1 + #rotations with change <= real) / (1 + N), ties against the real guard; N = 868 (intraday window) or 1399 (daily window)",
+            "placebo_draws": "full whole-day rotation group: 868 (intraday window), 1399 (daily window)",
+            "local_placebo": "descriptive only: the same mask rotation restricted to +/-1..placebo_max_days (60 rotations), reported as a percentile for comparison with research/news_veto_2026-11",
+            "local_placebo_draws": 60
+          }
+        }
+      ],
+      "resolution": {"verdict": "INCONCLUSIVE", "reasons": ["2 blocked trades from 2 months, below the frozen floor of 10 from at least 3 months (A1)"], "label": "historical, first order", "primary": {"guard": "OR", "hours": 12, "list": "FF_V2_current", "n": 158, "n_blocked": 2, "blocked_months": 2, "net_without": 19.4478, "net_with": 17.5071, "change": -1.9407, "change_ci95": [-5.0767, 0.0], "p_helps": 0.809, "p_hurts": 0.1922, "rotations": 868}, "results_sha256": "2cfbc6874ce320a61c8779dc9ee075b0c9274391b9464af0cedb83f148d03c74", "code_commit": "f1334c7", "run_utc": "2026-11-05 20:00-20:01"},
+      "resolution_note": "Mechanical resolution from the VPS run of f1334c7, recorded 2026-11-05. Primary (OR, 12 h, FF_V2_current) INCONCLUSIVE: 2 blocked trades, both winners (HBAR +8.00% on 2024-11-16, NEAR +4.99% on 2026-03-02); change -1.94 USDT, 95% CI [-5.08, 0.00]. No cell has a positive point estimate; on FF the guard removes winners. Other cells are descriptive only (A1). The exact 30-min ES rule can be tested forward from the archive's px_es and px_vix snapshots (installed from be5bad3); no forward test is registered. No bot, config or allocation follows from this entry."
     }
   ]
 }

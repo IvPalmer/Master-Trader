@@ -164,3 +164,156 @@ def test_retired_insiders_client_has_no_route():
                 raise AssertionError('insiders route still served')
     asyncio.run(check())
     assert 'insiders' not in g.Gateway(Session()).health()['clients']
+
+
+class _Request:
+    def __init__(self, body):
+        self.headers = {'content-length': '2'}
+        self._body = body
+
+    async def json(self):
+        return self._body
+
+
+def test_upbit_pilot_client_routes_and_may_submit_exchange_actions():
+    """#252: ft-upbit-fade-hl routes through /upbit with its own account and API
+    wallet; it may forward signed actions once live, like killers. `short`
+    stays observation only."""
+    assert 'upbit' in g.CLIENTS and g.EXCHANGE_CLIENTS == {'killers', 'upbit'}
+    assert g.priority('upbit', 'info', {'type': 'l2Book'}) == 2
+    assert g.priority('upbit', 'info', {'type': 'candleSnapshot'}) == 2
+
+    async def check():
+        session = Session(b'{"status":"ok"}')
+        g.app.state.gateway = g.Gateway(session)
+        resp = await g.proxy('upbit', 'exchange', _Request({'action': {'type': 'order'}}))
+        assert resp.status_code == 200 and session.calls == 1
+        try:
+            await g.proxy('short', 'exchange', _Request({'action': {'type': 'order'}}))
+        except g.HTTPException as exc:
+            assert exc.status_code == 403
+        else:
+            raise AssertionError('observation client forwarded an exchange action')
+        assert session.calls == 1
+        assert 'upbit' in g.Gateway(Session()).health()['clients']
+    asyncio.run(check())
+
+
+# --- #252 review: the pilot can never take Killers' protected capacity -------------------
+
+KILLERS_PROTECTED = [('info', {'type': 'orderStatus'}), ('info', {'type': 'clearinghouseState'}),
+                     ('info', {'type': 'l2Book'}), ('exchange', {'action': {'type': 'order'}})]
+
+
+def test_upbit_reads_are_background_and_only_actions_and_order_status_use_its_slice():
+    assert g.priority('upbit', 'exchange', {}) == 0
+    assert g.priority('upbit', 'info', {'type': 'orderStatus'}) == 1
+    for kind in ('l2Book', 'clearinghouseState', 'allMids', 'metaAndAssetCtxs', 'meta',
+                 'frontendOpenOrders', 'openOrders', 'userFills', 'candleSnapshot'):
+        assert g.priority('upbit', 'info', {'type': kind}) == 2, kind
+    assert g.lane('upbit', 0) == g.lane('upbit', 1) == 'upbit' and g.lane('upbit', 2) is None
+    assert g.lane('killers', 0) is None and g.SLICES == {'upbit': 40}
+
+
+def test_maximum_upbit_load_never_rejects_killers_order_status_or_actions():
+    """Codex's case: 600 background units plus 250 upbit units used to leave Killers'
+    order-status read with nothing (the fleet's 850 tier-1 limit)."""
+    budget = g.Budget(lambda: 100)
+    assert budget.reserve(600, 2, 'short')
+    upbit = [(path, {'type': kind}) for kind in ('l2Book', 'clearinghouseState', 'orderStatus',
+                                                 'metaAndAssetCtxs') for path in ('info',)]
+    upbit.append(('exchange', {'action': {'type': 'order'}}))
+    for _ in range(250):
+        for path, body in upbit:
+            budget.reserve(g.cost(path, body), g.priority('upbit', path, body), 'upbit')
+    assert budget.lane_total('upbit') <= 40
+    for path, body in KILLERS_PROTECTED:
+        assert budget.reserve(g.cost(path, body), g.priority('killers', path, body), 'killers'), body
+    # Killers still has its whole 250 tier-1 and 50 action allowance.
+    assert budget.reserve(250 - 2 - 2 - 2 - 1, 1, 'killers')
+    assert budget.reserve(50, 0, 'killers')
+
+
+def test_an_upbit_waiter_on_its_spent_slice_never_holds_killers_back():
+    async def check():
+        budget = g.Budget()
+        assert budget.reserve(40, 0, 'upbit')
+        waiter = asyncio.ensure_future(budget.acquire(1, 0, timeout=1, client='upbit'))
+        await asyncio.sleep(.1)
+        assert budget.waiting == [0, 0, 0]
+        assert await budget.acquire(2, 1, timeout=.2, client='killers')
+        assert await budget.acquire(20, 2, timeout=.2, client='killers')
+        assert await waiter is None
+    asyncio.run(check())
+
+
+def test_killers_budget_is_unchanged_when_upbit_is_idle():
+    """The pre-#252 allowance sequence, client given or not."""
+    for client in (None, 'killers', 'short', 'accounting'):
+        now = [100.0]
+        budget = g.Budget(lambda: now[0])
+        assert budget.reserve(600, 2, client)
+        assert budget.reserve(1, 2, client) is None
+        assert budget.reserve(250, 1, client)
+        assert budget.reserve(1, 1, client) is None
+        assert budget.reserve(50, 0, client)
+        assert budget.reserve(1, 0, client) is None
+        now[0] += 61
+        assert budget.reserve(600, 2, client)
+    for kind in ('orderStatus', 'l2Book', 'metaAndAssetCtxs', 'candleSnapshot'):
+        assert g.priority('killers', 'info', {'type': kind}) == (2 if kind == 'candleSnapshot' else 1)
+    assert g.priority('killers', 'exchange', {}) == 0
+
+
+# --- #252 review round 3: no budget persistence, no synthetic start ---------------------
+
+def test_the_gateway_keeps_no_budget_state_and_starts_empty(tmp_path, monkeypatch):
+    """Round 3: the persisted history and the synthetic cold start are both gone. A started
+    gateway has an empty window and writes nothing; restarts are made safe by the
+    deploy procedure (Killers flat, trailing-minute usage under 300), not by state."""
+    import inspect
+    import yaml
+    assert list(inspect.signature(g.Budget).parameters) == ['clock']
+    assert not hasattr(g.Budget, 'persist') and not hasattr(g.Budget, 'restore')
+    monkeypatch.setenv('BUDGET_STATE_PATH', str(tmp_path / 'budget.json'))
+    monkeypatch.chdir(tmp_path)
+
+    async def check():
+        async with g.lifespan(g.app):
+            gw = g.app.state.gateway
+            assert gw.budget.total() == 0 and gw.budget.reserve(120, 1, 'killers')
+            health = gw.health()
+            assert health['weight_last_minute'] == 120 and 'budget_history' not in health
+    asyncio.run(check())
+    assert list(tmp_path.iterdir()) == []
+    root = Path(__file__).parents[3]
+    svc = yaml.safe_load((root / 'ft_userdata/docker-compose.prod.yml').read_text())
+    assert 'volumes' not in svc['services']['hl-gateway']
+    assert 'BUDGET_STATE_PATH' not in svc['services']['hl-gateway']['environment']
+    assert 'hl_gateway_state' not in svc['volumes']
+    assert '/state' not in (Path(__file__).parents[1] / 'Dockerfile').read_text()
+
+
+def test_the_deployed_short_client_serves_a_dry_run_bot():
+    """Round 3: in dry-run the pilot uses `short`, unchanged from the deployed gateway:
+    every info read is forwarded at the background tier and exchange actions are refused
+    (a dry-run Freqtrade never posts one: create_order, cancel_order, set_leverage and
+    set_margin_mode all return early in dry-run)."""
+    for kind in ('meta', 'metaAndAssetCtxs', 'spotMeta', 'perpDexs', 'allMids', 'l2Book',
+                 'candleSnapshot', 'fundingHistory', 'orderStatus', 'clearinghouseState'):
+        assert g.priority('short', 'info', {'type': kind}) == 2, kind
+        assert g.lane('short', 2) is None
+
+    async def check():
+        session = Session(b'[]')
+        g.app.state.gateway = g.Gateway(session)
+        for kind in ('meta', 'metaAndAssetCtxs', 'candleSnapshot', 'fundingHistory', 'l2Book'):
+            resp = await g.proxy('short', 'info', _Request({'type': kind}))
+            assert resp.status_code == 200, kind
+        try:
+            await g.proxy('short', 'exchange', _Request({'action': {'type': 'order'}}))
+        except g.HTTPException as exc:
+            assert exc.status_code == 403
+        else:
+            raise AssertionError('short forwarded an exchange action')
+    asyncio.run(check())

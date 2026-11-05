@@ -1,0 +1,153 @@
+{
+    "_note": "Upbit KRW listing fade live pilot (#252, prereg upbit-krw-fade-live-pilot-2026-11). Entries only from research/upbit_fade_live/live_trigger.py via /forceenter. Dry-run by default: the compose entrypoint picks the database and stoploss_on_exchange from HYPERLIQUID_UPBIT_FADE_DRY_RUN (true -> dry-run, exchange stop off; false -> live, exchange stop on). See research/upbit_fade_live/GO-LIVE.md.",
+    "dry_run": true,
+    "dry_run_wallet": 150,
+    "cancel_open_orders_on_exit": true,
+    "trading_mode": "futures",
+    "margin_mode": "isolated",
+    "liquidation_buffer": 0.05,
+    "stake_currency": "USDC",
+    "stake_amount": 50,
+    "tradable_balance_ratio": 0.99,
+    "fiat_display_currency": "",
+    "max_open_trades": 2,
+    "amount_reserve_percent": 0.05,
+    "unfilledtimeout": {
+        "entry": 10,
+        "exit": 10,
+        "exit_timeout_count": 0,
+        "unit": "minutes"
+    },
+    "entry_pricing": {
+        "price_side": "other",
+        "use_order_book": true,
+        "order_book_top": 1,
+        "price_last_balance": 0.0,
+        "check_depth_of_market": {
+            "enabled": false,
+            "bids_to_ask_delta": 1
+        }
+    },
+    "exit_pricing": {
+        "price_side": "other",
+        "use_order_book": true,
+        "order_book_top": 1
+    },
+    "order_types": {
+        "entry": "market",
+        "exit": "market",
+        "emergency_exit": "market",
+        "force_exit": "market",
+        "force_entry": "market",
+        "stoploss": "limit",
+        "stoploss_on_exchange": false,
+        "stoploss_on_exchange_interval": 60,
+        "stoploss_on_exchange_limit_ratio": 0.95
+    },
+    "exchange": {
+        "name": "hyperliquid",
+        "walletAddress": "",
+        "privateKey": "",
+        "ccxt_config": {"options": {"fetchMarkets": {"types": ["swap"]}, "hip3TokensByName": {}, "cachedCurrenciesById": {}}},
+        "ccxt_async_config": {},
+        "pair_whitelist": ["BTC/USDC:USDC"],
+        "pair_blacklist": []
+    },
+    "pairlists": [
+        {
+            "method": "StaticPairList"
+        }
+    ],
+    "webhook": {
+        "enabled": true,
+        "url": "http://trade-webhook:8088/freqtrade/event",
+        "format": "json",
+        "webhookentry": {
+            "type": "entry",
+            "bot_name": "UpbitFadeLiveV1",
+            "pair": "{pair}",
+            "stake_amount": "{stake_amount}",
+            "stake_currency": "{stake_currency}",
+            "limit": "{limit}",
+            "open_rate": "{open_rate}",
+            "order_type": "{order_type}",
+            "direction": "{direction}",
+            "leverage": "{leverage}"
+        },
+        "webhookentrycancel": {
+            "type": "entry_cancel",
+            "bot_name": "UpbitFadeLiveV1",
+            "pair": "{pair}",
+            "reason": "{reason}"
+        },
+        "webhookentryfill": {
+            "type": "entry_fill",
+            "bot_name": "UpbitFadeLiveV1",
+            "pair": "{pair}",
+            "stake_amount": "{stake_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "order_type": "{order_type}",
+            "direction": "{direction}",
+            "leverage": "{leverage}"
+        },
+        "webhookexit": {
+            "type": "exit",
+            "bot_name": "UpbitFadeLiveV1",
+            "pair": "{pair}",
+            "profit_ratio": "{profit_ratio}",
+            "profit_amount": "{profit_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "close_rate": "{close_rate}",
+            "exit_reason": "{exit_reason}",
+            "direction": "{direction}"
+        },
+        "webhookexitcancel": {
+            "type": "exit_cancel",
+            "bot_name": "UpbitFadeLiveV1",
+            "pair": "{pair}",
+            "reason": "{reason}"
+        },
+        "webhookexitfill": {
+            "type": "exit_fill",
+            "bot_name": "UpbitFadeLiveV1",
+            "pair": "{pair}",
+            "profit_ratio": "{profit_ratio}",
+            "profit_amount": "{profit_amount}",
+            "stake_currency": "{stake_currency}",
+            "open_rate": "{open_rate}",
+            "close_rate": "{close_rate}",
+            "exit_reason": "{exit_reason}",
+            "direction": "{direction}"
+        },
+        "webhookstatus": {
+            "type": "status",
+            "bot_name": "UpbitFadeLiveV1",
+            "status": "{status}"
+        }
+    },
+    "telegram": {
+        "enabled": false,
+        "token": "",
+        "chat_id": ""
+    },
+    "api_server": {
+        "enabled": true,
+        "listen_ip_address": "0.0.0.0",
+        "listen_port": 8080,
+        "verbosity": "error",
+        "enable_openapi": true,
+        "jwt_secret_key": "OVERRIDE_VIA_ENV",
+        "CORS_origins": [],
+        "username": "OVERRIDE_VIA_ENV",
+        "password": "OVERRIDE_VIA_ENV"
+    },
+    "bot_name": "UpbitFadeLive",
+    "initial_state": "running",
+    "force_entry_enable": true,
+    "internals": {
+        "process_throttle_secs": 5
+    },
+    "db_url": "sqlite:////freqtrade/user_data/tradesv3.dryrun.UpbitFadeLiveV1.hyperliquid.sqlite"
+}

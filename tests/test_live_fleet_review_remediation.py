@@ -409,5 +409,5 @@ def test_production_freqtrade_image_is_digest_pinned_and_funding_v2_isolated():
     )
 
     assert "freqtradeorg/freqtrade:stable" not in compose
-    assert compose.count(digest) == 6
+    assert compose.count(digest) == 7
     assert funding["db_url"].endswith("tradesv3.live.FundingFadeV1.v2.sqlite")

@@ -25,7 +25,7 @@ fi
 # Read without sourcing: the file holds secrets and arbitrary shell would run.
 get() { sed -n "s/^$1=//p" "$ENV_FILE" | tail -n1; }
 
-SLUGS="KELTNER FUNDINGFADE OITREND KILLERS SHORTKELTNER"
+SLUGS="KELTNER FUNDINGFADE OITREND KILLERS SHORTKELTNER UPBITFADE"
 
 echo "== receiver ingress token =="
 K_TOKEN="$(get KILLERS_INGRESS_TOKEN)"

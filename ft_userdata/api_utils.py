@@ -55,6 +55,7 @@ SERVICE_API_SLUGS = {
     "ft-oi-trend-pullback": "OITREND",
     "ft-killers-scalp": "KILLERS",
     "ft-short-keltner-hl-live": "SHORTKELTNER",
+    "ft-upbit-fade-hl": "UPBITFADE",
 }
 
 
@@ -67,6 +68,7 @@ PORT_API_SLUGS = {
     8102: "OITREND",
     8099: "KILLERS",
     8103: "SHORTKELTNER",
+    8105: "UPBITFADE",
 }
 
 _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
