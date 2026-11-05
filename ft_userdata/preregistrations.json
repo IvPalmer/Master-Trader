@@ -1597,7 +1597,9 @@
         "venue": "hyperliquid",
         "account": "a dedicated Hyperliquid master account with its own API wallet (no withdrawal rights), funded with about 150 USDC and traded by no other bot",
         "selection": "exactly the events the paper monitor enters in the comparable cohort with every requirement established when the live order is decided (uff_report.classify returns ('comparable', [])); eligibility at t0 unchanged",
-        "trigger": "the paper entry record (t0 + 5 min); one POST /forceenter on the local bot per event id, never retried",
+        "trigger": "the paper entry record (t0 + 5 min); one POST /forceenter on the local bot per event id, never retried, with entry tag upbit-fade:<event id>@<t0 + 7 min in ms>",
+        "bot_entry_guard": "UpbitFadeLiveV1.confirm_trade_entry, which Freqtrade 2026.7 runs under its entry lock just before the order: refuse unless the tag parses, the side is short, the time is not past the tag's deadline (and the deadline is at most 7 min ahead), fewer than 2 trades are open, the pair has no open trade, no trade (open or closed) carries the event id, and realized P&L of the closed trades in the bot's database is above -75 USDC; any error refuses",
+        "entry_deadline_limitation": "the deadline is checked at confirm time; the order can still reach Hyperliquid up to the gateway queue deadline (12 s) plus the transport timeout (15 s) later. ccxt 4.5.68 does not sign expiresAfter on ordinary orders, so no exchange-side expiry is set",
         "latest_entry_after_t0_s": 420,
         "direction": "short",
         "order_type": "market",
@@ -1612,6 +1614,9 @@
         "stop_on_exchange_when_live": true,
         "dry_run_wallet_usdc": 150,
         "kill_realized_pnl_usdc": -75,
+        "kill_latch": "the trigger reads the bot's realized P&L every loop and writes its pause file at -75 USDC or worse; the bot refuses entries at that level by itself",
+        "unknown_outcome_pause": "an unobserved /forceenter outcome writes the pause file before the outcome record; while any unknown outcome has no reconciliation record (live_trigger.py reconcile, after the operator checks the bot and Hyperliquid) the trigger stays paused and re-creates the file every loop and at every start; a failure to persist any state stops further entries",
+        "gateway": "hl-gateway client upbit: reads at the background tier; exchange actions and orderStatus reads in its own slice of 40 weight per minute, outside the fleet's priority capacity",
         "epoch_start": null
       },
       "rules": [

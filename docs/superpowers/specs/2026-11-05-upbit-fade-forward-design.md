@@ -234,10 +234,42 @@ something the paper could not judge.
   `KPEPE/USDC:USDC`, as ccxt names it;
 - kill-switch file `data/KILL`: while it exists, no entry is sent. *Claude's call:* the
   trigger engages it itself when the cumulative realized P&L of the bot's database is
-  -75 USDC or worse, when a `/forceenter` outcome could not be observed (timeout, or an
-  unexpected status), and when the URL answers for another strategy. An intent without a
-  result after a crash is recorded `unknown` and engages it too. The operator removes the
-  file after checking the bot.
+  -75 USDC or worse (read on every loop, not only when a paper event arrives), when a
+  `/forceenter` outcome could not be observed (timeout, or an unexpected status), and when
+  the URL answers for another strategy. An intent without a result after a crash is
+  recorded `unknown` and engages it too;
+- an unknown outcome writes the pause file **before** the outcome record. While any
+  unknown outcome has no reconciliation record, the trigger stays paused and puts the file
+  back on every loop and at every start, so deleting it does not resume. The operator
+  checks the bot and Hyperliquid, then records the outcome with
+  `live_trigger.py reconcile <event id> --outcome entered|not_entered`, and only then
+  removes the file;
+- a failure to persist any record or the pause file stops every further entry from that
+  process (and writes the pause file if it can).
+
+**Bot-side guard** (`UpbitFadeLiveV1.confirm_trade_entry`, #252 review). Freqtrade 2026.7
+runs the `/forceenter` max-open and same-pair checks before it takes its entry lock, so two
+concurrent calls (the trigger and a manual call) could both pass them. `execute_entry` calls
+`confirm_trade_entry` under that lock, just before the order. The trigger's entry tag is
+`upbit-fade:<event id>@<t0 + 7 min in ms>`, and the strategy refuses unless the tag parses,
+the side is short, the time is not past the deadline (which may be at most 7 min ahead),
+fewer than 2 trades are open, the pair has no open trade, no trade (open or closed)
+carries the event id, and the realized P&L of the closed trades in the bot's database is
+above -75 USDC. Any error refuses: Freqtrade's wrapper treats an exception as "confirmed".
+
+*Limitation:* the deadline is checked at confirm time. The order can still reach
+Hyperliquid up to the gateway's 12 s queue deadline plus its 15 s transport timeout later.
+Hyperliquid's signed `expiresAfter` would close that gap, but ccxt 4.5.68 does not sign it
+on ordinary orders (`create_orders_request` signs the action without it), so it is not set.
+
+**Gateway allocation.** The `upbit` client's reads are background (tier 2) and share the
+600-unit background allowance. Only its exchange actions and `orderStatus` reads are
+priority, and those draw on its own slice of 40 weight per rolling minute, which is never
+counted against the fleet's priority capacity; a slice waiter never blocks a fleet waiter.
+Killers keeps its 250 + 50 units whatever the pilot does, and nothing changes for Killers
+while the pilot is idle. Worst case on the VPS IP is 940 per minute (HL allows 1200). A
+restarted gateway assumes the previous minute ran at the cap, spread evenly, and lets that
+decay: actions wait about 1 s, priority reads about 4 s and background about 22 s.
 
 **Epochs.** Dry-run trades are plumbing checks, not results. The live epoch starts at the
 first start with the dry-run flag false and is recorded in a prereg amendment. The live
@@ -262,4 +294,10 @@ reporting.
 cover idempotency, crash and restart, max open, the kill switch and the P&L kill, stale
 records, unavailable pairs, auth headers and the loopback rule, the strategy and config
 settings, the compose entrypoint in both modes, `--no-deps` safety, unique ports and
-database and log files, and a pin of the code's constants to the prereg.
+database and log files, and a pin of the code's constants to the prereg. Since the #252
+review they also cover the durable pause and `reconcile`, the halt on a failed write, the
+loss latch, the bot-side guard against Freqtrade's force-entry order (concurrent calls,
+same pair, same event, deadline, loss limit, fail closed), and in
+`services/hl-gateway/tests/` the pilot's contention with Killers and the cold start. The
+ROI test reproduces Freqtrade's `min_roi_reached`; the real code is checked in dry-run on
+the VPS (GO-LIVE.md, Part 1).

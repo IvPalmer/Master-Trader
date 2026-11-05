@@ -22,7 +22,8 @@ Merging does not authorize any step below. Each part needs the operator's go-ahe
 ## Part 1: deploy in dry-run
 
 Run the pre-flight checklist in `docs/ops/UPDATING-WITHOUT-BREAKING-BOTS.md` first: step 3
-recreates `hl-gateway`, which every Hyperliquid bot, including live Killers, calls through.
+recreates `hl-gateway`, which every Hyperliquid bot, including live Killers, calls through,
+and has its own procedure below.
 
 1. Merge the PR to `main`, open the release PR `main` → `vps-deploy`, merge it, then on the VPS:
 
@@ -34,15 +35,9 @@ recreates `hl-gateway`, which every Hyperliquid bot, including live Killers, cal
    `FT_API_PASS_UPBITFADE`, `FT_API_JWT_UPBITFADE` (at least 32 chars) to the stack `.env`.
    Without them the bot uses the shared fleet credentials. Check:
    `./deploy/vps/preflight-credentials.sh .env`.
-3. Gateway (adds the `upbit` client; the bot cannot load markets without it). Pick a moment
-   with no Killers entry in flight:
-
-   ```bash
-   cd /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/ft_userdata
-   sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml build hl-gateway
-   sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml up -d --no-deps hl-gateway
-   curl -sf http://127.0.0.1:8104/healthz
-   ```
+3. Gateway: follow **Gateway deploy (Killers is live)** below. It adds the `upbit` client
+   (the bot cannot load markets without it), the pilot's budget slice and the cold-start
+   rule.
 
 4. Bot, dry-run (the default while `HYPERLIQUID_UPBIT_FADE_DRY_RUN` is unset):
 
@@ -72,21 +67,110 @@ recreates `hl-gateway`, which every Hyperliquid bot, including live Killers, cal
    cd /home/ubuntu/master-trader/research/upbit_fade_live && python3 -B live_trigger.py status
    cp upbit-fade-live-trigger.service ~/.config/systemd/user/
    systemctl --user daemon-reload && systemctl --user enable --now upbit-fade-live-trigger
-   journalctl --user -u upbit-fade-live-trigger -n 20    # "start: prereg ..., kill switch off"
+   journalctl --user -u upbit-fade-live-trigger -n 20    # "start: prereg ..., pause: off"
    ```
 
-7. Plumbing check in dry-run (a dry-run trade; not a result):
+7. Dry-run acceptance (dry-run trades; plumbing checks, not results). The bot refuses any
+   entry without a tag `upbit-fade:<event id>@<deadline ms>`, so the checks build one.
+   Pause the trigger meanwhile: `touch .../upbit_fade_live/data/KILL`.
 
    ```bash
-   curl -s -u "$U:$P" -X POST http://127.0.0.1:8105/api/v1/forceenter -H 'Content-Type: application/json' \
-     -d '{"pair":"BTC/USDC:USDC","side":"short","stakeamount":50,"leverage":1,"ordertype":"market","entry_tag":"plumbing-check"}'
-   curl -s -u "$U:$P" http://127.0.0.1:8105/api/v1/status | jq 'map({trade_id, pair, is_short, leverage, stake_amount})'
+   fe() {  # pair, event id, deadline (ms)
+     curl -s -u "$U:$P" -X POST http://127.0.0.1:8105/api/v1/forceenter -H 'Content-Type: application/json' \
+       -d "{\"pair\":\"$1\",\"side\":\"short\",\"stakeamount\":50,\"leverage\":1,\"ordertype\":\"market\",\"entry_tag\":\"upbit-fade:$2@$3\"}"; echo; }
+   D=$(( $(date +%s%3N) + 300000 ))
+   # a. three concurrent entries: exactly two open, the third refused under the entry lock
+   fe BTC/USDC:USDC plumbing:1 $D & fe ETH/USDC:USDC plumbing:2 $D & fe SOL/USDC:USDC plumbing:3 $D & wait
+   curl -s -u "$U:$P" http://127.0.0.1:8105/api/v1/status | jq 'map({trade_id, pair, is_short, leverage, stake_amount, enter_tag})'
+   # b. refused: a past deadline, a reused event id, a missing tag
    curl -s -u "$U:$P" -X POST http://127.0.0.1:8105/api/v1/forceexit -H 'Content-Type: application/json' -d '{"tradeid":"all"}'
+   fe AVAX/USDC:USDC plumbing:4 $(( $(date +%s%3N) - 1000 ))
+   fe AVAX/USDC:USDC plumbing:1 $D
+   sudo docker logs ft-upbit-fade-hl --since 5m 2>&1 | grep "refused entry"
    ```
 
-   Then leave it running until at least one real paper event has passed through the trigger
-   (`python3 -B live_trigger.py status` shows its decision and, if entered, its dry-run trade
-   closes about 24 h later by `roi`).
+   Expect exactly two trades in (a), each `is_short`, leverage 1, stake 50. The third call
+   fails with `Maximum number of trades is reached.` (it arrived after the others were
+   committed) or `Failed to enter position` (refused under the entry lock, with a
+   `refused entry ... 2 trades open` log line). Both calls in (b) fail with `Failed to enter
+   position` and a `refused entry` line naming the deadline and the reused event. Then:
+   - **stop settings:** `show_config` gives `stoploss: -0.6`, `stoploss_on_exchange: false`
+     (dry-run), `minimal_roi: {"0": 100, "1440": -1}`;
+   - **ROI time exit, real Freqtrade code:** open one more trade
+     (`fe BTC/USDC:USDC plumbing:5 $(( $(date +%s%3N) + 300000 ))`), leave it, and about
+     24 h later check that `/api/v1/trades` shows it closed with `exit_reason: "roi"` and a
+     `close_date` at least 24 h after its `open_date` (the repo test only reproduces
+     `min_roi_reached`);
+   - remove `data/KILL` and leave the trigger running until at least one real paper event
+     has passed through it (`python3 -B live_trigger.py status`).
+
+## Gateway deploy (Killers is live)
+
+Recreating `hl-gateway` interrupts every Hyperliquid call of live Killers (exits, order
+status, account reads) for the recreate, and the new gateway starts with an empty rolling
+window while Hyperliquid still counts the old one. The code's cold-start rule assumes the
+last minute ran at the cap and lets it decay: Killers' actions wait about 1 s, its exit
+reads about 4 s and background about 22 s after the start, all inside their queue deadlines.
+
+**Pre-checks** (stop if any fails):
+
+```bash
+KU=$(sudo docker exec ft-killers-scalp printenv FREQTRADE__API_SERVER__USERNAME)
+KP=$(sudo docker exec ft-killers-scalp printenv FREQTRADE__API_SERVER__PASSWORD)
+KW=$(sudo docker exec ft-killers-scalp printenv FREQTRADE__EXCHANGE__WALLET_ADDRESS)
+T=$(date -u +%Y%m%dT%H%MZ); mkdir -p ~/backups/gateway-$T && cd ~/backups/gateway-$T
+curl -s -u "$KU:$KP" http://127.0.0.1:8099/api/v1/status > killers-status.json
+jq 'map({trade_id, pair, has_open_orders, open: [.orders[] | select(.is_open) | {ft_order_side, order_type, status}]})' killers-status.json
+hl() { curl -s https://api.hyperliquid.xyz/info -H 'Content-Type: application/json' -d "$1"; }
+hl "{\"type\":\"clearinghouseState\",\"user\":\"$KW\"}" | jq -S '.assetPositions' > hl-positions-before.json
+hl "{\"type\":\"frontendOpenOrders\",\"user\":\"$KW\"}" | jq -S 'map({coin, side, sz, triggerPx, limitPx, orderType, reduceOnly, oid})' > hl-orders-before.json
+sudo docker logs killers-receiver --since 10m 2>&1 | tail -20
+```
+
+- every Killers trade has `has_open_orders: false` (no entry or exit order in flight; the
+  resting stop is not counted);
+- `hl-orders-before.json` holds only the resting stops and TP orders you expect, and
+  `hl-positions-before.json` matches the bot's trades;
+- the receiver log shows no signal being handled; avoid the US open (13:30 UTC) and news.
+
+**Keep the previous image** for rollback, then recreate:
+
+```bash
+cd /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/ft_userdata
+IMG=$(sudo docker inspect -f '{{.Config.Image}}' ft-hl-gateway); IMG=${IMG%%:*}
+sudo docker tag "$(sudo docker inspect -f '{{.Image}}' ft-hl-gateway)" "$IMG:pre-252"
+sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml build hl-gateway
+sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml up -d --no-deps hl-gateway
+until curl -sf http://127.0.0.1:8104/healthz >/dev/null; do sleep 2; done
+```
+
+**Verify** (within a few minutes):
+
+```bash
+curl -s http://127.0.0.1:8104/healthz | jq '{status, weight_last_minute, slice_weight_last_minute, killers: .clients.killers, upbit: .clients.upbit}'
+curl -s -u "$KU:$KP" http://127.0.0.1:8099/api/v1/status | jq 'map({trade_id, pair, has_open_orders})'
+sudo docker logs ft-killers-scalp --since 5m 2>&1 | grep -iE "error|429|timeout|exception" | tail
+sudo docker logs ft-hl-gateway --since 5m 2>&1 | tail -20
+cd ~/backups/gateway-$T
+hl "{\"type\":\"clearinghouseState\",\"user\":\"$KW\"}" | jq -S '.assetPositions' | diff hl-positions-before.json - && echo positions unchanged
+hl "{\"type\":\"frontendOpenOrders\",\"user\":\"$KW\"}" | jq -S 'map({coin, side, sz, triggerPx, limitPx, orderType, reduceOnly, oid})' | diff hl-orders-before.json - && echo stops and TPs unchanged
+```
+
+- `healthz` lists `upbit`, and `clients.killers` counts `ok` reads (its order-status and
+  account reads) with no `queue_timeout` or `rate_limited`;
+- Killers `/status` has the same trades; its log has no new errors;
+- positions, stops and TPs on Hyperliquid are unchanged (a price move can change `.assetPositions`
+  marks; compare `szi`, `entryPx` and the order list).
+
+**Rollback** (stop the pilot first: it needs the `upbit` route):
+
+```bash
+sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml stop ft-upbit-fade-hl
+sudo docker tag "$IMG:pre-252" "$IMG:latest"
+sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml up -d --no-deps --force-recreate hl-gateway
+```
+
+Then repeat the verification.
 
 ## Part 2: account and keys (operator only)
 
@@ -154,11 +238,26 @@ That is a known follow-up, not a fault of the pilot.
   their exchange stops stay on Hyperliquid with nothing managing the 24 h exit), then set
   `HYPERLIQUID_UPBIT_FADE_DRY_RUN=true` and run the same `up -d --no-deps ft-upbit-fade-hl`.
 - **Kill rule (prereg):** the trigger engages the switch itself at -75 USDC realized in the
-  live database, on an unobserved `/forceenter` outcome, and if the URL answers for another
+  live database (checked every loop; the bot also refuses entries at that level), on an
+  unobserved `/forceenter` outcome, on a failed write, and if the URL answers for another
   strategy. The operator engages it for an orphaned position, a missing exchange stop or a
   double entry. Resuming needs a recorded decision (a prereg amendment).
-- After an `unknown` outcome: check `/api/v1/status` for entry tag `upbit-fade:<event id>`
-  and the Hyperliquid account before removing `KILL`. The trigger never resends that event.
+- **After an `unknown` outcome** the trigger stays paused until the outcome is recorded;
+  deleting `KILL` alone does not resume (it is put back on the next loop). Check the bot
+  (`/api/v1/status` and `/api/v1/trades` for entry tag `upbit-fade:<event id>@...`) and the
+  Hyperliquid account, then:
+
+  ```bash
+  systemctl --user stop upbit-fade-live-trigger
+  cd /home/ubuntu/master-trader/research/upbit_fade_live
+  python3 -B live_trigger.py reconcile '<event id>' --outcome not_entered --by palmer --note 'no trade, no HL position'
+  #   or: --outcome entered --trade-id <id> --note 'trade <id> open with its stop'
+  python3 -B live_trigger.py status
+  rm data/KILL && systemctl --user start upbit-fade-live-trigger
+  ```
+
+  The trigger never resends that event. A `halted:` pause (a write failed) needs the disk
+  or permission fixed, then a restart and the `KILL` file removed.
 
 ## Remove entirely
 
