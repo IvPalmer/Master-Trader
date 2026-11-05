@@ -175,9 +175,16 @@ def test_upbit_trading_start_hour_only_lines(body):
 @pytest.mark.parametrize("body", [
     "거래지원 개시 시점 : 10월 27일 17시간 이내",            # 시간 is a duration, not a clock
     "거래지원 개시 시점 : 10월 27일 17시 30 예정",           # minutes without 분: not read
+    "거래지원 개시 시점 : 10월 27일 17시 반 예정",           # half past is not minute 00
+    "거래지원 개시 시점 : 10월 27일 17시점",                 # 시 inside a word
 ])
 def test_upbit_trading_start_hour_only_is_not_a_duration(body):
     assert nc.upbit_trading_start_ms(body, "NIL", T_START) is None
+
+
+def test_upbit_trading_start_hour_inside_a_word_adds_no_second_time():
+    body = "거래지원 개시 시점 : 10월 27일 17:30 (점검: 10월 27일 2시작)"
+    assert nc.upbit_trading_start_ms(body, "NIL", T_START) == T_START
 
 
 def test_upbit_trading_start_conflicting_lines_is_none():

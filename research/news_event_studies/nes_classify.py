@@ -241,9 +241,10 @@ def _grid(rows):
 
 
 _WEEKDAY = r"(?:\s*\(\s*[월화수목금토일]\s*\))?"
-# `H시` alone is minute 00 (amendment A2-o10-hour-clock); not `H시간` and not `H시 MM` without 분.
+# `H시` alone is minute 00 (amendment A2-o10-hour-clock): a standalone clock, so not part of
+# a word (`H시간`, `H시점`, `H시작`) and not followed by minutes without 분 (`H시 MM`) or by `반`.
 _CLOCK = (r"\s*(?P<ampm>오전|오후)?\s*(?:(?P<h1>\d{1,2})\s*:\s*(?P<m1>\d{2})"
-          r"|(?P<h2>\d{1,2})\s*시(?:\s*(?P<m2>\d{1,2})\s*분|(?!간)(?!\s*\d)))")
+          r"|(?P<h2>\d{1,2})\s*시(?:\s*(?P<m2>\d{1,2})\s*분|(?![가-힣A-Za-z0-9])(?!\s*(?:\d|반))))")
 _WITH_YEAR = [re.compile(d + _WEEKDAY + _CLOCK) for d in (
     r"(?P<y>\d{4})\s*년\s*(?P<mo>\d{1,2})\s*월\s*(?P<d>\d{1,2})\s*일",
     r"(?P<y>\d{4})-(?P<mo>\d{1,2})-(?P<d>\d{1,2})",

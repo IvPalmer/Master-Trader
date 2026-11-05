@@ -1230,7 +1230,7 @@
           "date": "2026-11-05",
           "frozen_before_results": true,
           "stop": "The Phase 1 build from 89dfe17 (2026-11-05) left 87 Upbit KRW additions `unknown` in each Upbit study: 86 with no parseable trading start and 1 Hyperliquid fetch failure. 80 of the 86 start cells read `M월 D일 H시 예정`, an hour with no minutes, which O10's clock list (`HH:MM` or `H시 M분`) does not read. Those manifests (delisting 46e657bd837a9f81be186bc4755bd879489e89401bc16cf602fda4f34641a974, Upbit 22568ef2fda529451b428a27df902a941f871f47f7c48b9e329621d1dacca9b8) were discarded, not frozen.",
-          "rule": "O10 clocks also include `H시` alone, read as minute 00; `오전`/`오후` apply as before. `H시간` (a duration) and `H시 MM` without `분` are not clocks. A range `H시 ~ H시` reads as its first time.",
+          "rule": "O10 clocks also include `H시` alone, read as minute 00; `오전`/`오후` apply as before. `H시` must stand alone: it is not read inside a word (`H시간`, `H시점`, `H시작`), nor when minutes follow without `분` (`H시 MM`) or `반` follows. A range `H시 ~ H시` reads as its first time.",
           "corpus_effect": "On the harvested corpus 81 non-excluded events gain a start (no parseable start: 86 -> 5), as do 27 events already excluded as binance48_overlap. No start already read and no exclusion changes. Every new start is 0.2 to 12.7 h after t0, so none becomes began_before_notice.",
           "outcome_blind": "Decided from start-cell and body-line formats read with digits masked, counts, and start times against t0; no price, return or outcome from the window was computed, printed or inspected."
         }
@@ -1444,7 +1444,7 @@
           "date": "2026-11-05",
           "frozen_before_results": true,
           "stop": "The Phase 1 build from 89dfe17 (2026-11-05) left 87 Upbit KRW additions `unknown` in each Upbit study: 86 with no parseable trading start and 1 Hyperliquid fetch failure. 80 of the 86 start cells read `M월 D일 H시 예정`, an hour with no minutes, which O10's clock list (`HH:MM` or `H시 M분`) does not read. Those manifests (delisting 46e657bd837a9f81be186bc4755bd879489e89401bc16cf602fda4f34641a974, Upbit 22568ef2fda529451b428a27df902a941f871f47f7c48b9e329621d1dacca9b8) were discarded, not frozen.",
-          "rule": "O10 clocks also include `H시` alone, read as minute 00; `오전`/`오후` apply as before. `H시간` (a duration) and `H시 MM` without `분` are not clocks. A range `H시 ~ H시` reads as its first time.",
+          "rule": "O10 clocks also include `H시` alone, read as minute 00; `오전`/`오후` apply as before. `H시` must stand alone: it is not read inside a word (`H시간`, `H시점`, `H시작`), nor when minutes follow without `분` (`H시 MM`) or `반` follows. A range `H시 ~ H시` reads as its first time.",
           "corpus_effect": "On the harvested corpus 81 non-excluded events gain a start (no parseable start: 86 -> 5), as do 27 events already excluded as binance48_overlap. No start already read and no exclusion changes. Every new start is 0.2 to 12.7 h after t0, so none becomes began_before_notice.",
           "outcome_blind": "Decided from start-cell and body-line formats read with digits masked, counts, and start times against t0; no price, return or outcome from the window was computed, printed or inspected."
         }
