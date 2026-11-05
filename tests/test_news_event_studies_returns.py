@@ -382,3 +382,28 @@ def test_tipping_point_is_where_the_bound_crosses_zero():
     assert nr._interval(draws, v + 1e-6)[0] > 0 >= nr._interval(draws, v - 1e-6)[0]
     assert nr.tipping_point(_months(up), "EDGE (proxy)") is None        # nothing missing
     assert nr.tipping_point(res, "NOT DETERMINABLE") is None
+
+
+def _half_missing(value):
+    res = []
+    for m in range(6):
+        t = T0 + m * M
+        res += [_res("a%d" % m, t, value), _res("a%d" % m, t, None, "missing")]
+    return res
+
+
+def test_tipping_point_direction_for_both_classes():
+    # Codex round 3: each announcement = (observed + v) / 2, so the bound crosses 0 at v = -observed.
+    edge = nr.tipping_point(_half_missing(0.02), "EDGE (proxy)")
+    assert edge["value"] == pytest.approx(-0.02, abs=1e-9) and "below" in edge["note"]
+    none = nr.tipping_point(_half_missing(-0.02), "NO EDGE")
+    assert none["value"] == pytest.approx(0.02, abs=1e-9) and "above" in none["note"]
+
+
+def test_tipping_point_reports_unbracketed_ranges():
+    huge = nr.tipping_point(_half_missing(20.0), "EDGE (proxy)")
+    assert huge["value"] is None and "holds even if every missing event returns -1000%" in huge["note"]
+    deep = nr.tipping_point(_half_missing(-20.0), "NO EDGE")
+    assert deep["value"] is None and "holds even if every missing event returns +1000%" in deep["note"]
+    odd = nr.tipping_point(_half_missing(-20.0), "EDGE (proxy)")
+    assert odd["value"] is None and "no crossing" in odd["note"]

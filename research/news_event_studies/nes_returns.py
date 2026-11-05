@@ -310,12 +310,17 @@ def missingness(results, horizon=PRIMARY, extra_missing=()):
             "announcements_partly_missing": sum(p[3] > 0 and p[4] > 0 for p in parts)}
 
 
+TIP_RANGE = (-10.0, 10.0)        # -1000% .. +1000% per missing token-event
+
+
 def tipping_point(results, cls, horizon=PRIMARY, extra_missing=()):
     """The common return v of every missing token-event at which `cls` would stop holding.
 
     Each announcement becomes (usable sum + missing * v) / (usable + missing), its intended token
-    weights. EDGE uses the stress-cost lower bound, NO EDGE the base-cost upper bound. Searched
-    over v in [-1, 1]; None when nothing is missing or the class has no bound to cross."""
+    weights. Both percentile bounds are nondecreasing in v (every slope is >= 0). EDGE uses the
+    stress-cost lower bound and holds while it is > 0, so it reverses below the crossing; NO EDGE
+    uses the base-cost upper bound and holds while it is <= 0, so it reverses above it. None
+    when nothing is missing or the class has no bound."""
     key, side = {"EDGE (proxy)": ("net_stress", 0), "NO EDGE": ("net", 1)}.get(cls, (None, None))
     if key is None:
         return None
@@ -323,22 +328,29 @@ def tipping_point(results, cls, horizon=PRIMARY, extra_missing=()):
     if not any(p[4] for p in parts):
         return None
     draws = _draws([(t0, s / (a + m), Fraction(m, a + m)) for t0, _aid, s, a, m in parts])
-    bound = lambda v: _interval(draws, v)[side]          # noqa: E731  increasing in v
-    lo, hi = -1.0, 1.0
-    if side == 0 and bound(lo) > 0:
-        return {"value": None, "note": "EDGE holds even if every missing event loses 100%"}
-    if side == 1 and bound(hi) <= 0:
-        return {"value": None, "note": "NO EDGE holds even if every missing event gains 100%"}
-    for _ in range(40):
+    bound = lambda v: _interval(draws, v)[side]          # noqa: E731
+    lo, hi = TIP_RANGE
+    if bound(lo) > 0:
+        if side == 0:
+            return {"value": None, "note": "EDGE holds even if every missing event returns %+.0f%%"
+                    % (100 * lo)}
+        return {"value": None, "note": "no crossing in the searched range (bound > 0 at %+.0f%%)"
+                % (100 * lo)}
+    if bound(hi) <= 0:
+        if side == 1:
+            return {"value": None, "note": "NO EDGE holds even if every missing event returns %+.0f%%"
+                    % (100 * hi)}
+        return {"value": None, "note": "no crossing in the searched range (bound <= 0 at %+.0f%%)"
+                % (100 * hi)}
+    for _ in range(60):                  # bracket: bound(lo) <= 0 < bound(hi)
         mid = (lo + hi) / 2
-        if (bound(mid) > 0) == (side == 0):
+        if bound(mid) > 0:
             hi = mid
         else:
             lo = mid
     v = (lo + hi) / 2
     word = "below" if side == 0 else "above"
-    return {"value": v, "note": "%s reverses if the missing events average %s %+.4f"
-            % (cls, word, v)}
+    return {"value": v, "note": "%s reverses if the missing events average %s %+.4f" % (cls, word, v)}
 
 
 def classify(results, horizon=PRIMARY, extra_missing=()):
