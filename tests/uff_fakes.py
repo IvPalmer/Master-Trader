@@ -105,6 +105,7 @@ class FakeHl:
         self.mid = {"CARDS": "1.0", "BTC": "80000"}
         self.oracle = {"CARDS": "1.0", "BTC": "80000"}
         self.book_fn = None            # (coin, now_ms) -> book json, overrides `mid`
+        self.candle_keep = None        # (open ms) -> bool: drop candles from candleSnapshot
         self.fail = set()              # request types answered HTTP 500
         self.n429 = 0
         self.requests = []
@@ -141,6 +142,8 @@ class FakeHl:
             start = r["startTime"] - r["startTime"] % MIN
             out = []
             for t in range(start, r["endTime"] + 1, MIN):
+                if self.candle_keep is not None and not self.candle_keep(t):
+                    continue
                 px = Decimal(self.mid.get(r["coin"], "1.0"))
                 out.append({"t": t, "T": t + MIN - 1, "s": r["coin"], "i": "1m", "o": str(px),
                             "c": str(px), "h": str(px * Decimal("1.05")),
@@ -169,7 +172,8 @@ def klines(start_ms, end_ms, close_fn):
 
 class FakeHttp:
     """Binance klines and Upbit market/all. `klines[(market, symbol)]` = close_fn(open ms), a
-    status int, or absent (invalid symbol). `listed_from[symbol]` = first kline open ms."""
+    status int, or absent (invalid symbol). `listed_from[symbol]` (or `[(market, symbol)]`) =
+    first kline open ms."""
 
     def __init__(self, clock):
         self.clock = clock
@@ -194,7 +198,8 @@ class FakeHttp:
             return resp(400, {"code": -1121, "msg": "Invalid symbol."})
         if isinstance(script, int):
             return resp(script, b"")
-        start = max(int(q["startTime"]), self.listed_from.get(q["symbol"], 0))
+        listed = self.listed_from.get((market, q["symbol"]), self.listed_from.get(q["symbol"], 0))
+        start = max(int(q["startTime"]), listed)
         return resp(200, klines(start, int(q["endTime"]), script))
 
     def count(self, needle):

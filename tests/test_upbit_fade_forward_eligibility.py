@@ -85,14 +85,37 @@ def test_binance_notice_after_t0_or_older_than_24_h_never_excludes(tmp_path):
     assert s.rec("bprior")["found"] is False and cohort(s)[0] == "comparable"
 
 
-def test_binance_notice_published_before_t0_but_archived_later_excludes_post_hoc(tmp_path):
+def test_binance_notice_received_after_t0_is_late_and_never_excludes(tmp_path):
     s = scenario(tmp_path)
     detect(s)                                      # traded: nothing in the archive yet
     s.archive.binance(5, "Binance Will List CARDS (CARDS)", s.t0 - 2 * f.MIN, s.t0 + 20 * f.MIN)
-    s.run(s.t0 + 61 * f.MIN)                       # the t0 + 1 h re-check finds it
+    s.run(s.t0 + 61 * f.MIN)                       # the t0 + 1 h re-check sees it, too late
     assert s.rec("entry")["status"] == "timely"
-    assert s.rec("bprior")["found"] is True
-    assert cohort(s) == ("excluded", ["binance_listing_prior"])
+    b = s.rec("bprior")
+    assert b["found"] is False and [x["ref"] for x in b["late"]] == ["binance:5"]
+    assert cohort(s) == ("comparable", [])
+
+
+def test_binance_revision_received_after_t0_never_excludes(tmp_path):
+    s = scenario(tmp_path)
+    s.archive.binance(6, "Binance Will List OTHER (OTHER)", s.t0 - f.H, s.t0 - f.H)
+    detect(s)
+    s.clock.to(s.t0 + 5 * f.MIN)                   # revised after t0 to name CARDS
+    s.archive.binance(6, "Binance Will List CARDS (CARDS)", s.t0 - f.H, s.t0 + 5 * f.MIN)
+    s.run(s.t0 + 61 * f.MIN)
+    b = s.rec("bprior")
+    assert b["found"] is False and b["late"][0]["received_at"] == f.uc.iso(s.t0 + 5 * f.MIN)
+    assert s.rec("event")["binance_prior"]["found"] is False
+    assert cohort(s) == ("comparable", [])
+
+
+def test_binance_revision_received_before_t0_excludes(tmp_path):
+    s = scenario(tmp_path)
+    s.archive.binance(7, "Binance Will List OTHER (OTHER)", s.t0 - 2 * f.H, s.t0 - 2 * f.H)
+    s.archive.binance(7, "Binance Will List CARDS (CARDS)", s.t0 - 2 * f.H, s.t0 - 30 * f.MIN)
+    detect(s)
+    assert s.rec("event")["binance_prior"]["ref"] == "binance:7"
+    assert cohort(s) == ("excluded", ["binance_listing_prior"]) and s.rec("entry") is None
 
 
 def test_body_saying_trading_began_before_the_notice_excludes(tmp_path):
@@ -176,6 +199,17 @@ def test_spot_is_the_fallback_only_when_no_usdm_market_exists(tmp_path):
     detect(s)
     assert (s.rec("binance")["market"], s.rec("binance")["symbol"]) == ("spot", "CARDSUSDT")
     assert cohort(s)[0] == "comparable"
+
+
+def test_a_lone_usdm_candle_containing_t0_is_no_presence_and_falls_through_to_spot(tmp_path):
+    s = scenario(tmp_path)
+    s.http.listed_from[("um", "CARDSUSDT")] = s.t0 - s.t0 % f.MIN     # opens before t0, closes after
+    s.http.klines[("spot", "CARDSUSDT")] = f.flat("2.0")
+    detect(s)
+    b = s.rec("binance")
+    assert ["um", "CARDSUSDT", "no_klines"] in b["tried"]
+    assert (b["market"], b["symbol"], b["market_pre_t0"]) == ("spot", "CARDSUSDT", True)
+    assert b["candles"] == 10 and b["leaked"] is False
 
 
 def test_a_failed_usdm_read_is_retried_not_replaced_by_spot(tmp_path):

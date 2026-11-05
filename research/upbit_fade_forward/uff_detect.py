@@ -135,28 +135,38 @@ def trading_start(body, token, t0_ms, title):
 
 
 def binance_prior(conn, token, t0_ms):
-    """A `binance_listing` notice for `token` published in [t0 - 24 h, t0], from the archive.
-
-    A notice published after t0 never excludes. Revised titles count too."""
+    """A `binance_listing` notice for `token` published in [t0 - 24 h, t0] that the archive had
+    received by t0: the item's first version, or a revision, received at or before t0 must
+    name the token. A notice published after t0 never counts. Versions naming the token that
+    were received after t0 (a late item, or a later revision) are listed as `late`,
+    descriptive only: a bot at t0 could not have read them."""
     lo, hi = uc.iso(t0_ms - uc.BINANCE_PRIOR_MS), uc.iso(t0_ms)
     rows = conn.execute(
-        "SELECT item_pk, source_item_id, published_at, title FROM items WHERE source = ?"
-        " AND published_at >= ? AND published_at <= ? ORDER BY published_at, item_pk",
-        (BINANCE_LISTING, lo, hi)).fetchall()
-    for pk, sid, published, title in rows:
-        titles = [title or ""]
-        for (raw,) in conn.execute("SELECT raw_json FROM item_revisions WHERE item_pk = ?", (pk,)):
+        "SELECT item_pk, source_item_id, published_at, received_at, title FROM items"
+        " WHERE source = ? AND published_at >= ? AND published_at <= ?"
+        " ORDER BY published_at, item_pk", (BINANCE_LISTING, lo, hi)).fetchall()
+    late = []
+    for pk, sid, published, received, title in rows:
+        versions = [(received, title or "")]
+        for rev_received, raw in conn.execute(
+                "SELECT received_at, raw_json FROM item_revisions WHERE item_pk = ?"
+                " ORDER BY rev_pk", (pk,)):
             try:
-                titles.append(json.loads(raw).get("title") or "")
+                versions.append((rev_received, json.loads(raw).get("title") or ""))
             except (ValueError, AttributeError):
                 continue
-        if any(nc.mentions_token(t, token) for t in titles):
+        hits = [(r, t) for r, t in versions if nc.mentions_token(t, token)]
+        timely = [(r, t) for r, t in hits if uc.ms(r) <= t0_ms]
+        if timely:
             return {"found": True, "ref": "binance:%s" % sid, "published_at": published,
-                    "title": title}
+                    "received_at": timely[0][0], "title": timely[0][1], "late": late}
+        if hits:
+            late.append({"ref": "binance:%s" % sid, "published_at": published,
+                         "received_at": hits[0][0], "title": hits[0][1]})
     gaps = conn.execute(
         "SELECT COUNT(*) FROM gaps WHERE source = ? AND gap_start <= ?"
         " AND (gap_end IS NULL OR gap_end >= ?)", (BINANCE_LISTING, hi, lo)).fetchone()[0]
-    return {"found": False, "source_gaps_in_window": int(gaps)}
+    return {"found": False, "source_gaps_in_window": int(gaps), "late": late}
 
 
 def pit(conn, notice):

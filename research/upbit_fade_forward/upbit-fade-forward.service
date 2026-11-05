@@ -11,7 +11,8 @@ StartLimitBurst=5
 [Service]
 Type=simple
 WorkingDirectory=/home/ubuntu/master-trader/research/upbit_fade_forward
-ExecStart=/usr/bin/python3 /home/ubuntu/master-trader/research/upbit_fade_forward/upbit_fade_forward.py run
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -B /home/ubuntu/master-trader/research/upbit_fade_forward/upbit_fade_forward.py run
 Restart=always
 RestartSec=30
 MemoryMax=512M

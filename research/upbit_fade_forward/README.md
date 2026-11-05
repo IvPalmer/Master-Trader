@@ -25,9 +25,9 @@ detection. This monitor measures the same rule forward:
 2. **t0** is Tree's `published_at` (a **Tree-clock cohort**). Timing is `unverified` when
    `published_at` is missing, later than `received_at`, or more than 5 min earlier.
 3. **Eligibility at t0.** Excluded: already on Upbit KRW (last `market/all` snapshot before
-   t0, at most 15 min old), a Binance new-listing notice in the 24 h before t0 (archive
-   `binance_listing`, re-checked at t0 + 1 h), or a body saying trading began before the
-   notice. Hyperliquid eligibility is the Part C rule (`nes_venues.hl_facts`), plus the perp
+   t0, at most 15 min old), a Binance new-listing notice in the 24 h before t0 that the
+   archive had received by t0 (`binance_listing`, revisions included; later receipts are
+   descriptive `late`), or a body saying trading began before the notice. Hyperliquid eligibility is the Part C rule (`nes_venues.hl_facts`), plus the perp
    must be in today's `meta`.
 4. **Paper trade.** At max(t0 + 5 min, detection) it walks the live `l2Book` bids for about
    100 USDC and freezes q (rounded to `szDecimals`). Marks of q at +30 min and +4 h; exit
@@ -35,16 +35,20 @@ detection. This monitor measures the same rule forward:
    rejected for that attempt. Fee 4.5 bps on each leg's actual notional; the walk is the
    slippage. Funding: finalized `fundingHistory` rates x q x `oraclePx` observed through
    `metaAndAssetCtxs` within 60 s after each hour (estimated; positive funding pays the
-   short). MAE/MFE from 1 m `candleSnapshot` candles (descriptive).
-5. **Cohorts.** *Comparable* (the decision set) also needs Binance 1 m klines in
-   [t0 - 10 min, t0) (USDⓈ-M first, else spot), the Part C leak test passed on them, and an
+   short). MAE/MFE from 1 m `candleSnapshot` candles (descriptive; `ok` only with every
+   minute of the hold, else `partial` with candle counts).
+5. **Cohorts.** *Comparable* (the decision set) also needs Binance 1 m klines closed
+   by t0 in [t0 - 10 min, t0) (USDⓈ-M first, else spot), the Part C leak test passed on them, and an
    entry filled within 2 min of t0 + 5 min. A requirement that fails makes the event
    *descriptive*; one that cannot be established (a fetch that never succeeded, an entry
    never filled) keeps it comparable with a **missing** outcome, so it counts in the tipping
    point. A known trading start is **not** required (Tree carries no Upbit body; spec,
    *Claude's call 2026-11-05*): no body, or no start in it, sets `start_unknown = true`. Two
    descriptive extras never select events: `start_unknown`, and `krw_market_first_seen_ms`
-   (the first `market/all` snapshot after t0 that lists `KRW-<TOKEN>`).
+   (the first `market/all` snapshot after t0 that lists `KRW-<TOKEN>`). A later duplicate or
+   revision of the notice with a stated start is a versioned `evidence` record, never a
+   second event: before the entry decision it can exclude the event or make its start
+   known; after it, it is descriptive only.
 6. **Resolution.** Announcement-level mean net 24 h return of the comparable cohort, A4
    calendar-month block bootstrap at **95%** (`nes_returns`, level passed explicitly). One
    decision, at 40 comparable announcements or on 2027-11-05: EDGE (lower bound > 0), NO

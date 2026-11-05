@@ -256,7 +256,9 @@ def mark_return(entry, mark):
 
 def excursion(rows, entry_ms, exit_ms, entry_vwap):
     """Descriptive price excursion of a short from 1m candles lying wholly inside the hold:
-    MAE = max high / entry - 1, MFE = 1 - min low / entry (both floored at 0)."""
+    MAE = max high / entry - 1, MFE = 1 - min low / entry (both floored at 0). `ok` only when
+    every expected minute is there; otherwise `partial` (or `missing`), with the extrema of
+    the candles present under partial_* names so they are never read as complete."""
     first = -(-entry_ms // uc.MINUTE_MS) * uc.MINUTE_MS
     keys = [k for k in sorted(rows) if k >= first and k + uc.MINUTE_MS <= exit_ms]
     expected = max(0, (exit_ms - first) // uc.MINUTE_MS)
@@ -265,9 +267,12 @@ def excursion(rows, entry_ms, exit_ms, entry_vwap):
     e = Decimal(entry_vwap)
     high = max(Decimal(rows[k][1]) for k in keys)
     low = min(Decimal(rows[k][2]) for k in keys)
-    return {"status": "ok", "descriptive": True, "candles": len(keys), "expected": expected,
-            "max_high": str(high), "min_low": str(low),
-            "mae": str(max(Decimal(0), high / e - 1)), "mfe": str(max(Decimal(0), 1 - low / e))}
+    ext = {"max_high": str(high), "min_low": str(low),
+           "mae": str(max(Decimal(0), high / e - 1)), "mfe": str(max(Decimal(0), 1 - low / e))}
+    if len(keys) < expected:
+        return {"status": "partial", "descriptive": True, "candles": len(keys), "expected": expected,
+                **{"partial_" + k: v for k, v in ext.items()}}
+    return {"status": "ok", "descriptive": True, "candles": len(keys), "expected": expected, **ext}
 
 
 # --- Binance klines --------------------------------------------------------------------
@@ -296,7 +301,7 @@ def _invalid_symbol(resp):
 
 def binance_facts(token, t0_ms, fetcher, sleep):
     """The first Part C proxy candidate (USDⓈ-M, then spot; nes_venues.binance_candidates) whose
-    1m klines show trading in [t0 - 10 min, t0), and the Part C leak test on those closes
+    1m klines show trading in [t0 - 10 min, t0) (only candles closed by t0: open + 60 s <= t0), and the Part C leak test on those closes
     (nes_returns.leaked: |close(t0-2m) / close(t0-10m) - 1| > 2%). None when a read fails before
     a candidate answers, so a failed USDⓈ-M read never falls through to spot."""
     start, end = uc.floor_minute(t0_ms - uc.MARKET_WINDOW_MS), t0_ms - 1
@@ -313,7 +318,8 @@ def binance_facts(token, t0_ms, fetcher, sleep):
         if resp.status != 200:
             return None
         try:
-            rows = {k: v for k, v in parse_klines(resp.body).items() if start <= k < t0_ms}
+            rows = {k: v for k, v in parse_klines(resp.body).items()   # closed by t0
+                    if start <= k and k + uc.MINUTE_MS <= t0_ms}
         except (ValueError, IndexError, TypeError):
             return None
         if not rows:

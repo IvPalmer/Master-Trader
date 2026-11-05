@@ -19,9 +19,26 @@ CRITERIA = ("timing_verified", "krw_snapshot", "hl_eligible", "binance_market_pr
             "binance_leak_passed", "entry_timely")
 
 
+def evidence(ledger, eid):
+    """The versioned later observations of an event's notice that state a trading start."""
+    return [r for r in ledger.kind("evidence") if r["event_id"] == eid]
+
+
+def effective(ledger, ev):
+    """The event as the bot knew it at its entry decision: the latest evidence received before
+    that decision sets the trading start (a start before t0 excludes, one at or after t0 is
+    known). Evidence after the decision is descriptive and changes nothing."""
+    usable = [r for r in evidence(ledger, ev["event_id"]) if r["before_entry"]]
+    if not usable:
+        return ev
+    start = usable[-1]["trading_start_ms"]
+    return {**ev, "trading_start_ms": start, "began_before_notice": start < ev["t0_ms"],
+            "start_unknown": False, "start_from": usable[-1]["rid"]}
+
+
 def view(ledger, ev):
     eid = ev["event_id"]
-    v = {"event": ev}
+    v = {"event": effective(ledger, ev), "evidence": evidence(ledger, eid)}
     for a in ACTIONS:
         v[a] = ledger.get("%s:%s" % (a, eid))
     v["late"] = {a: ledger.get("late:%s:%s" % (a, eid)) for a in LATE_ACTIONS}
@@ -278,18 +295,34 @@ def event_row(v):
             "funding_usdc": n and n["funding"], "marks": marks,
             "exit_late": v["late"]["exit"] is not None,
             "mae": (v["excursion"] or {}).get("mae"), "mfe": (v["excursion"] or {}).get("mfe"),
+            "excursion": _excursion_label(v["excursion"]),
+            "evidence": [{"version": r["version"], "effect": r["effect"],
+                          "trading_start_ms": r["trading_start_ms"]} for r in v["evidence"]],
             "detect_latency_ms": ev["detected_ms"] - ev["t0_ms"],
             "tree_lag_ms": (None if ev["published_at"] is None
                             else uc.ms(ev["received_at"]) - uc.ms(ev["published_at"])),
             "entry_delay_ms": (v["entry"] or {}).get("delay_ms")}
 
 
+def _excursion_label(rec):
+    """`ok`, or the partial / missing status with its candle counts: partial extrema are kept
+    under partial_* names and never shown as the MAE / MFE."""
+    if rec is None:
+        return None
+    if rec["status"] == "ok":
+        return "ok"
+    out = "%s %d/%d candles" % (rec["status"], rec.get("candles", 0), rec.get("expected", 0))
+    if rec["status"] == "partial":
+        out += ", partial MAE %s, partial MFE %s" % (_pct(rec["partial_mae"]), _pct(rec["partial_mfe"]))
+    return out
+
+
 def _missing_actions(v):
     out = [a for a in ("entry", "cp30m", "cp4h", "exit") if (v[a] or {}).get("status") == "missing"]
     if (v["funding"] or {}).get("status") == "missing":
         out.append("funding")
-    if (v["excursion"] or {}).get("status") == "missing":
-        out.append("excursion")
+    if (v["excursion"] or {}).get("status") in ("missing", "partial"):
+        out.append("excursion_" + v["excursion"]["status"])
     for a in ("hl", "binance"):
         rec = v[a] or {}
         if rec and (rec.get("status") == "unknown" or (a == "binance" and rec.get("market_pre_t0") is None)):
@@ -409,13 +442,13 @@ def status_lines(s):
     lines.append("CLOSED (%d)" % len(s["closed"]))
     for r in s["closed"]:
         lines.append("  %s %s cohort %s: net %s (ex funding %s, funding %s USDC %s), exit %s%s,"
-                     " +30m %s, +4h %s, MAE %s, MFE %s" % (
+                     " +30m %s, +4h %s, MAE %s, MFE %s (excursion %s)" % (
                          r["event_id"], r["coin"], r["cohort"], _pct(r["net_return"]),
                          _pct(r["net_ex_funding_return"]), r["funding_usdc"] or "-",
                          r["funding"] or "-", r["exit"], " (late mark kept)" if r["exit_late"] else "",
                          _pct((r["marks"].get("cp30m") or {}).get("net_ex_funding")),
                          _pct((r["marks"].get("cp4h") or {}).get("net_ex_funding")),
-                         _pct(r["mae"]), _pct(r["mfe"])))
+                         _pct(r["mae"]), _pct(r["mfe"]), r["excursion"] or "pending"))
     lines.append("COHORTS (%d token-events)" % s["n_events"])
     for name in ("comparable", "descriptive", "excluded", "ineligible", "pre_epoch"):
         c = s["cohorts"].get(name)

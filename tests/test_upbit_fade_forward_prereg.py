@@ -85,3 +85,13 @@ def test_part_c_entries_are_untouched():
                  "upbit-krw-listing-fade-2026-11"):
         assert kept in ids
     assert len(ids) == len(set(ids))
+
+
+def test_service_unit_writes_no_bytecode_and_keeps_its_limits():
+    unit = (f.ROOT / "research" / "upbit_fade_forward" / "upbit-fade-forward.service").read_text()
+    lines = unit.splitlines()
+    assert "Environment=PYTHONDONTWRITEBYTECODE=1" in lines
+    exec_start = [x for x in lines if x.startswith("ExecStart=")]
+    assert len(exec_start) == 1 and exec_start[0].startswith("ExecStart=/usr/bin/python3 -B ")
+    for limit in ("MemoryMax=512M", "CPUQuota=25%", "Nice=10"):
+        assert limit in lines

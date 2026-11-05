@@ -12,7 +12,9 @@ import uff_report as ur
 import uff_venues as uv
 import nes_returns as nr
 
-BODY = "<p>거래지원 개시 시점 : 2026년 11월 10일 17:00 예정</p>"
+BODY = "<p>거래지원 개시 시점 : 2026년 11월 10일 17:00 예정</p>"            # 08:00Z, after t0
+BEFORE_BODY = "<p>거래지원 개시 시점 : 2026년 11월 10일 14:00</p>"         # 05:00Z, before t0
+TREE_ID = "1793858584912CKBU"
 
 
 def started(tmp_path):
@@ -238,3 +240,138 @@ def test_market_snapshots_are_timestamped_and_deduplicated(tmp_path):
     polls = s.mon.markets.kind("market_poll")
     assert len(polls) == 12 and len(s.mon.markets.kind("market_set")) == 1
     assert all(b["obs_ms"] - a["obs_ms"] >= 5 * f.MIN for a, b in zip(polls, polls[1:]))
+
+
+# --- later start evidence for an existing event ---------------------------------------------
+
+def titled(tmp_path):
+    """Tree relays the notice with no body (as it does today)."""
+    s = f.Scenario(tmp_path, body=None)
+    s.run(s.t0 - 1000, every_ms=60_000)
+    s.publish()
+    s.run(s.t0 + f.MIN)
+    return s
+
+
+def observe(s, at_ms, body, _id=TREE_ID):
+    """A later Tree observation of the same notice: a revision (same id) or a duplicate item."""
+    s.clock.to(at_ms)
+    s.archive.tree([f.tree_item(_id, f.CARDS_TITLE, body=body)], at_ms)
+
+
+def test_start_before_t0_received_before_entry_excludes_without_a_second_event(tmp_path):
+    s = titled(tmp_path)
+    observe(s, s.t0 + 2 * f.MIN, BEFORE_BODY)                    # a revision with a body
+    s.run(s.t0 + 20 * f.MIN)
+    assert len(s.mon.ledger.kind("event")) == 1 and s.rec("event")["start_unknown"] is True
+    ev = s.mon.ledger.kind("evidence")
+    assert [(r["version"], r["before_entry"], r["effect"]) for r in ev] == [
+        (1, True, "began_before_notice")]
+    assert s.rec("entry") is None and s.hl.count("l2Book") == 0
+    v = ur.view(s.mon.ledger, s.rec("event"))
+    assert ur.classify(v) == ("excluded", ["began_before_notice"])
+
+
+def test_start_at_or_after_t0_before_entry_clears_start_unknown(tmp_path):
+    s = titled(tmp_path)
+    observe(s, s.t0 + 3 * f.MIN, BODY, _id="1793858584912DUPL")  # a duplicate Tree item
+    s.run(s.t0 + 20 * f.MIN)
+    assert len(s.mon.ledger.kind("event")) == 1
+    v = ur.view(s.mon.ledger, s.rec("event"))
+    assert v["event"]["start_unknown"] is False and v["evidence"][0]["effect"] == "start_known"
+    assert ur.classify(v) == ("comparable", []) and s.rec("entry")["status"] == "timely"
+    assert ur.summarize(s.mon.ledger, s.mon.markets, s.clock.ms)["flags"]["all"]["start_unknown"] == 0
+
+
+def test_evidence_after_entry_is_descriptive_and_changes_nothing(tmp_path):
+    s = titled(tmp_path)
+    s.run(s.t0 + 10 * f.MIN)
+    assert s.rec("entry")["status"] == "timely"
+    observe(s, s.t0 + 30 * f.MIN, BEFORE_BODY)
+    s.run(s.t0 + 40 * f.MIN)
+    observe(s, s.t0 + 50 * f.MIN, BODY)
+    s.run(s.t0 + 60 * f.MIN)
+    ev = s.mon.ledger.kind("evidence")
+    assert [(r["version"], r["before_entry"], r["effect"]) for r in ev] == [
+        (1, False, "descriptive"), (2, False, "descriptive")]
+    v = ur.view(s.mon.ledger, s.rec("event"))
+    assert v["event"]["start_unknown"] is True and v["event"]["began_before_notice"] is False
+    assert ur.classify(v) == ("comparable", []) and len(s.mon.ledger.kind("event")) == 1
+    s.new_monitor()                                               # replay adds nothing
+    s.run(s.t0 + 61 * f.MIN)
+    assert len(s.mon.ledger.kind("evidence")) == 2
+
+
+# --- crash between the market poll and its new_market records -------------------------------
+
+def test_new_market_records_lost_in_a_crash_are_rebuilt_on_restart(tmp_path):
+    s = f.Scenario(tmp_path)
+    s.run(s.t0 - 1000, every_ms=60_000)
+    s.http.markets_fn = lambda now: ["KRW-BTC", "KRW-ETH", "KRW-NEWX"]
+    append = s.mon.markets.append
+
+    def crash(rec):
+        if rec["kind"] == "new_market":
+            raise OSError("killed between the two writes")
+        return append(rec)
+    s.mon.markets.append = crash
+    s.run(s.t0 + 6 * f.MIN, every_ms=60_000)
+    assert s.mon.markets.kind("new_market") == [] and any("_poll_upbit" in e for e in s.mon.errors)
+    s.new_monitor()
+    first = [p for p in s.mon.markets.kind("market_poll") if p["n_krw"] == 3][0]
+    nm = s.mon.markets.kind("new_market")
+    assert [(m["market"], m["first_seen_ms"]) for m in nm] == [("KRW-NEWX", first["obs_ms"])]
+    s.new_monitor()
+    assert len(s.mon.markets.kind("new_market")) == 1             # idempotent
+
+
+# --- funding: a rate gap is retried until exit + 24 h ------------------------------------------
+
+def test_empty_funding_after_settle_is_retried_until_a_full_response(tmp_path):
+    s = started(tmp_path)
+    s.run(s.t0 + 5 * f.MIN + f.D - 10 * f.MIN)
+    full, s.hl.funding["CARDS"] = s.hl.funding["CARDS"], []        # empty successes
+    exit_ms = s.rec("entry")["obs_ms"] + f.D
+    s.run(exit_ms + 11 * f.MIN)
+    assert s.rec("exit")["status"] == "ok" and s.rec("funding") is None
+    assert any(b["type"] == "fundingHistory" and t >= exit_ms + 10 * f.MIN
+               for t, b in s.hl.requests)
+    s.hl.funding["CARDS"] = full
+    s.run(exit_ms + 2 * f.H)
+    fund = s.rec("funding")
+    assert fund["status"] == "complete" and fund["n_boundaries"] == 24
+
+
+def test_a_rate_gap_is_frozen_missing_only_after_exit_plus_24_h(tmp_path):
+    s = started(tmp_path)
+    s.run(s.t0 + 5 * f.MIN + f.D - 10 * f.MIN)
+    s.hl.funding["CARDS"] = []
+    exit_ms = s.rec("entry")["obs_ms"] + f.D
+    s.run(exit_ms + f.D - f.MIN, every_ms=60_000)
+    assert s.rec("funding") is None
+    s.run(exit_ms + f.D + 3 * f.MIN, every_ms=60_000)
+    assert s.rec("funding")["status"] == "missing"
+
+
+# --- excursion: ok only with every minute -----------------------------------------------------
+
+def test_one_candle_of_the_hold_is_a_labelled_partial_excursion(tmp_path):
+    s = started(tmp_path)
+    s.run(s.t0 + 10 * f.MIN)
+    entry = s.rec("entry")["obs_ms"]
+    first = -(-entry // f.MIN) * f.MIN
+    s.hl.candle_keep = lambda t: t < first + f.MIN                # leak candles + 1 hold candle
+    exit_ms = entry + f.D
+    s.run(exit_ms + f.H, every_ms=60_000)
+    assert s.rec("excursion") is None                             # retried, not stored as ok
+    s.run(exit_ms + 2 * f.D + 3 * f.MIN, every_ms=60_000)
+    x = s.rec("excursion")
+    assert x["status"] == "partial" and x["candles"] == 1 and x["expected"] >= 1439
+    assert "mae" not in x and "mfe" not in x and x["partial_mae"] and x["partial_mfe"]
+    row = ur.summarize(s.mon.ledger, s.mon.markets, s.clock.ms)["closed"][0]
+    assert row["mae"] is None and row["excursion"].startswith("partial 1/%d" % x["expected"])
+    assert "excursion_partial" in ur._missing_actions(ur.view(s.mon.ledger, s.rec("event")))
+    exit_obs = s.rec("exit")["obs_ms"]
+    full = uv.excursion({first + k * f.MIN: ["1", "1.05", "0.9", "1"] for k in range(x["expected"])},
+                        entry, exit_obs, "1")
+    assert full["status"] == "ok" and full["candles"] == x["expected"]

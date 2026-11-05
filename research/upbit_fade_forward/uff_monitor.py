@@ -51,6 +51,8 @@ class Monitor:
         self._seen = {r["notice_id"]: r["content"] for r in self.ledger.kind("seen")}
         self._krw_pos = {}       # event id -> index of the next market_poll to check
         self._sets = {}          # market set hash -> set of market codes
+        for prev, poll in zip(polls, polls[1:]):   # a crash may have lost new_market records
+            self._new_markets(prev, poll)
 
     # --- plumbing ------------------------------------------------------------------------
 
@@ -147,7 +149,9 @@ class Monitor:
 
     def _event(self, conn, n, token, now):
         eid = "upbit:%s:%s" % (n.notice_id, token)
-        if "event:" + eid in self.ledger:
+        existing = self.ledger.get("event:" + eid)
+        if existing is not None:
+            self._evidence(n, token, existing, now)
             return
         t0, timing, why = ud.timing(n.published_at, n.received_at)
         start = ud.trading_start(n.body, token, t0, n.title)
@@ -168,6 +172,30 @@ class Monitor:
         self.log("event %s: t0 %s (%s), detected %s, krw_prior %s, excluded %s" % (
             eid, rec["t0"], timing, rec["detected_at"], krw, ur.detection_exclusions(rec) or "no"))
 
+    def _evidence(self, n, token, ev, now):
+        """A later observation of an existing event's notice (a duplicate Tree item or a
+        revision) that states a trading start: a versioned evidence record, never a second
+        event. It counts for selection only when received before the entry decision (no entry
+        record yet, received by the entry deadline): a start before t0 then excludes the
+        event, one at or after t0 makes the start known. Later evidence is descriptive."""
+        eid = ev["event_id"]
+        rid = "evidence:%s:%s" % (eid, n.ref)
+        if ev.get("pre_epoch") or n.ref == ev["ref"] or rid in self.ledger:
+            return
+        start = ud.trading_start(n.body, token, ev["t0_ms"], n.title)
+        if start is None:
+            return
+        deadline = ev["t0_ms"] + uc.ENTRY_OFFSET_MS + uc.DEADLINE_MS
+        before = (self.ledger.get("entry:" + eid) is None
+                  and uc.ms(n.received_at) <= deadline)
+        effect = (("began_before_notice" if start < ev["t0_ms"] else "start_known") if before
+                  else "descriptive")
+        self._append({"rid": rid, "kind": "evidence", "event_id": eid, "ref": n.ref,
+                      "version": len(ur.evidence(self.ledger, eid)) + 1, "title": n.title,
+                      "received_at": n.received_at, "detected_ms": now,
+                      "trading_start_ms": start, "before_entry": before, "effect": effect})
+        self.log("evidence for %s from %s: start %s, %s" % (eid, n.ref, uc.iso(start), effect))
+
     def _krw_prior(self, token, t0):
         """Whether KRW-<token> is in the last market/all snapshot before t0 (15 min at most)."""
         last = None
@@ -187,7 +215,8 @@ class Monitor:
             if self.ledger.get("hl:" + eid) is None:
                 self._hl_facts(ev)
             hl = self.ledger.get("hl:" + eid)
-            if hl is None or hl["status"] != "eligible" or ur.detection_exclusions(ev):
+            if (hl is None or hl["status"] != "eligible"
+                    or ur.detection_exclusions(ur.effective(self.ledger, ev))):
                 continue
             if self.ledger.get("entry:" + eid) is None:
                 self._entry(ev, hl)
@@ -405,8 +434,8 @@ class Monitor:
                               "reason": "fundingHistory unavailable"})
             return
         rates = uv.rates_by_hour(records)
-        if any(h not in rates for h in uv.boundaries(start, end)) and now < end + uc.FUNDING_SETTLE_MS:
-            return                           # the last settlement's record may not be out yet
+        if any(h not in rates for h in uv.boundaries(start, end)) and now <= end + uc.HISTORY_GIVEUP_MS:
+            return                           # a rate gap is retried until exit + 24 h (U12)
         coin = hl["coin"]
         oracle = {r["hour_ms"]: (r["obs_ms"], r["px"][coin]) for r in self.ledger.kind("oracle")
                   if coin in r["px"] and start < r["hour_ms"] <= end}
@@ -423,7 +452,7 @@ class Monitor:
             rec = uv.excursion(self.hl.candles(hl["coin"], start, end), start, end, entry["vwap"])
         except ValueError:
             rec = {"status": "missing", "reason": "candles unavailable"}
-        if rec["status"] == "ok" or give_up:
+        if rec["status"] == "ok" or give_up:     # partial or missing only at the give-up time
             self._append({"rid": "excursion:" + eid, "kind": "excursion", "event_id": eid, **rec})
 
     # --- audit and decision ----------------------------------------------------------------
@@ -448,12 +477,22 @@ class Monitor:
                 "n": len(markets), "n_krw": len(uv.krw_tokens(markets))}
         self.markets.append(poll)
         self._last_poll = poll
-        if prev is not None and prev["sha256"] != sha:
-            before = uv.krw_tokens(self.markets.get("set:" + prev["sha256"])["markets"])
-            for token in sorted(uv.krw_tokens(markets) - before):
-                self.markets.append({"rid": "new:KRW-%s:%d" % (token, obs), "kind": "new_market",
-                                     "market": "KRW-" + token, "token": token,
-                                     "first_seen_ms": obs, "prev_obs_ms": prev["obs_ms"]})
+        self._new_markets(prev, poll)
+
+    def _new_markets(self, prev, poll):
+        """new_market records for the KRW markets in `poll` that the durable poll before it
+        lacks. Idempotent (deterministic rids), so startup can rebuild what a crash between the
+        poll write and these writes lost."""
+        if prev is None or prev["sha256"] == poll["sha256"]:
+            return
+        sets = [self.markets.get("set:" + p["sha256"]) for p in (prev, poll)]
+        if None in sets:
+            return
+        obs = poll["obs_ms"]
+        for token in sorted(uv.krw_tokens(sets[1]["markets"]) - uv.krw_tokens(sets[0]["markets"])):
+            if self.markets.append({"rid": "new:KRW-%s:%d" % (token, obs), "kind": "new_market",
+                                    "market": "KRW-" + token, "token": token,
+                                    "first_seen_ms": obs, "prev_obs_ms": prev["obs_ms"]}):
                 self.log("new Upbit market KRW-%s (previous snapshot %s)" % (
                     token, uc.iso(prev["obs_ms"])))
 
