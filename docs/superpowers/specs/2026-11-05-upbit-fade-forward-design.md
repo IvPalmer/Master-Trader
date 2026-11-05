@@ -97,7 +97,8 @@ or container.
     a start never creates a second event; it is a versioned evidence record. Received before
     the entry decision, it counts: a start before t0 excludes the event
     (`began_before_notice`) and stops the entry, and one at or after t0 sets
-    `start_unknown = false`. Received after the entry decision, it is descriptive only.
+    `start_unknown = false`. The latest binding observation by receipt time sets the start,
+    not the processing order. Received after the entry decision, it is descriptive only.
   - *Descriptive only:* `krw_market_first_seen_ms`, the time of the first `market/all`
     snapshot after t0 that lists `KRW-<TOKEN>`. It never selects events.
   - `status` and every resolution report show the `start_unknown` and

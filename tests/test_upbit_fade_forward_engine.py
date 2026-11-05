@@ -302,6 +302,45 @@ def test_evidence_after_entry_is_descriptive_and_changes_nothing(tmp_path):
     assert len(s.mon.ledger.kind("evidence")) == 2
 
 
+def test_latest_receipt_wins_not_processing_order(tmp_path):
+    s = titled(tmp_path)
+    s.run(s.t0 + 2 * f.MIN)                                       # archive read at t0 + 120 s
+    observe(s, s.t0 + 121_000, BEFORE_BODY)                       # revision: start before t0
+    observe(s, s.t0 + 122_000, BODY, _id="1793858584912DUPL")     # duplicate item: corrects it
+    s.run(s.t0 + 20 * f.MIN)                                      # read together: item first
+    ev = s.mon.ledger.kind("evidence")
+    assert [r["ref"].split(":")[0] for r in ev] == ["items", "item_revisions"]
+    assert all(r["before_entry"] for r in ev)
+    v = ur.view(s.mon.ledger, s.rec("event"))
+    assert v["event"]["began_before_notice"] is False and v["event"]["start_unknown"] is False
+    assert v["event"]["start_from"] == ev[0]["rid"]
+    assert ur.classify(v) == ("comparable", []) and s.rec("entry")["status"] == "timely"
+
+
+def test_receipt_order_ties_and_the_events_own_start():
+    t0 = f.T0
+    ev = {"event_id": "e", "ref": "items:1", "received_at": f.uc.iso(t0 + 39_000),
+          "trading_start_ms": t0 + f.H, "t0_ms": t0, "began_before_notice": False,
+          "start_unknown": False}
+    led = {"evidence": [
+        {"rid": "a", "kind": "evidence", "event_id": "e", "ref": "item_revisions:3",
+         "received_at": f.uc.iso(t0 + 60_000), "trading_start_ms": t0 - f.H, "before_entry": True},
+        {"rid": "b", "kind": "evidence", "event_id": "e", "ref": "items:9",
+         "received_at": f.uc.iso(t0 + 60_000), "trading_start_ms": t0 + 2 * f.H, "before_entry": True},
+        {"rid": "c", "kind": "evidence", "event_id": "e", "ref": "items:12",
+         "received_at": f.uc.iso(t0 + 9 * f.MIN), "trading_start_ms": t0 - f.H, "before_entry": False}]}
+
+    class L:
+        def kind(self, k):
+            return led.get(k, [])
+    eff = ur.effective(L(), ev)                  # a tie at +60 s: the revision ranks after the item
+    assert eff["start_from"] == "a" and eff["began_before_notice"] is True
+    led["evidence"] = led["evidence"][1:]        # the event's own start (+39 s) is older than b's
+    assert ur.effective(L(), ev)["start_from"] == "b"
+    led["evidence"][0]["received_at"] = f.uc.iso(t0 + 30_000)    # now the event's own is latest
+    assert ur.effective(L(), ev)["start_from"] == "event:e"
+
+
 # --- crash between the market poll and its new_market records -------------------------------
 
 def test_new_market_records_lost_in_a_crash_are_rebuilt_on_restart(tmp_path):

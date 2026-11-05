@@ -24,16 +24,32 @@ def evidence(ledger, eid):
     return [r for r in ledger.kind("evidence") if r["event_id"] == eid]
 
 
+REF_RANK = {"items": 0, "item_revisions": 1}
+
+
+def _receipt_key(rec):
+    """Receipt order of an observation: received_at, then table (an item before a revision
+    received at the same instant), then pk. Not processing order: read_new returns every new
+    item before any revision."""
+    table, _, pk = rec["ref"].partition(":")
+    return (uc.ms(rec["received_at"]), REF_RANK.get(table, 2), int(pk or 0))
+
+
 def effective(ledger, ev):
-    """The event as the bot knew it at its entry decision: the latest evidence received before
-    that decision sets the trading start (a start before t0 excludes, one at or after t0 is
-    known). Evidence after the decision is descriptive and changes nothing."""
+    """The event as the bot knew it at its entry decision. Among the observations that state a
+    trading start and bind (the event's own, plus evidence received before that decision), the
+    latest by receipt sets the start: before t0 excludes, at or after t0 is known. Evidence
+    after the decision is descriptive and changes nothing."""
     usable = [r for r in evidence(ledger, ev["event_id"]) if r["before_entry"]]
     if not usable:
         return ev
-    start = usable[-1]["trading_start_ms"]
+    if ev["trading_start_ms"] is not None:
+        usable.append({"rid": "event:" + ev["event_id"], "ref": ev["ref"],
+                       "received_at": ev["received_at"], "trading_start_ms": ev["trading_start_ms"]})
+    last = max(usable, key=_receipt_key)
+    start = last["trading_start_ms"]
     return {**ev, "trading_start_ms": start, "began_before_notice": start < ev["t0_ms"],
-            "start_unknown": False, "start_from": usable[-1]["rid"]}
+            "start_unknown": False, "start_from": last["rid"]}
 
 
 def view(ledger, ev):
