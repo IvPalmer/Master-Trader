@@ -1,0 +1,23 @@
+# Upbit KRW listing fade paper forward monitor (#229). systemd USER unit, host-side research monitor.
+# PAPER ONLY: it places no orders and holds no keys. Install: research/upbit_fade_forward/README.md
+# ("Install"). Never copy it into the Dokploy checkout.
+[Unit]
+Description=Upbit KRW listing fade paper forward monitor (#229; paper only, no orders, no keys)
+After=network-online.target news-archive.service
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/master-trader/research/upbit_fade_forward
+ExecStart=/usr/bin/python3 /home/ubuntu/master-trader/research/upbit_fade_forward/upbit_fade_forward.py run
+Restart=always
+RestartSec=30
+MemoryMax=512M
+CPUQuota=25%
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=default.target
