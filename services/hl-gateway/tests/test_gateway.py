@@ -180,7 +180,7 @@ def test_upbit_pilot_client_routes_and_may_submit_exchange_actions():
     wallet; it may forward signed actions once live, like killers. `short`
     stays observation only."""
     assert 'upbit' in g.CLIENTS and g.EXCHANGE_CLIENTS == {'killers', 'upbit'}
-    assert g.priority('upbit', 'info', {'type': 'l2Book'}) == 1
+    assert g.priority('upbit', 'info', {'type': 'l2Book'}) == 2
     assert g.priority('upbit', 'info', {'type': 'candleSnapshot'}) == 2
 
     async def check():
@@ -196,4 +196,100 @@ def test_upbit_pilot_client_routes_and_may_submit_exchange_actions():
             raise AssertionError('observation client forwarded an exchange action')
         assert session.calls == 1
         assert 'upbit' in g.Gateway(Session()).health()['clients']
+    asyncio.run(check())
+
+
+# --- #252 review: the pilot can never take Killers' protected capacity -------------------
+
+KILLERS_PROTECTED = [('info', {'type': 'orderStatus'}), ('info', {'type': 'clearinghouseState'}),
+                     ('info', {'type': 'l2Book'}), ('exchange', {'action': {'type': 'order'}})]
+
+
+def test_upbit_reads_are_background_and_only_actions_and_order_status_use_its_slice():
+    assert g.priority('upbit', 'exchange', {}) == 0
+    assert g.priority('upbit', 'info', {'type': 'orderStatus'}) == 1
+    for kind in ('l2Book', 'clearinghouseState', 'allMids', 'metaAndAssetCtxs', 'meta',
+                 'frontendOpenOrders', 'openOrders', 'userFills', 'candleSnapshot'):
+        assert g.priority('upbit', 'info', {'type': kind}) == 2, kind
+    assert g.lane('upbit', 0) == g.lane('upbit', 1) == 'upbit' and g.lane('upbit', 2) is None
+    assert g.lane('killers', 0) is None and g.SLICES == {'upbit': 40}
+
+
+def test_maximum_upbit_load_never_rejects_killers_order_status_or_actions():
+    """Codex's case: 600 background units plus 250 upbit units used to leave Killers'
+    order-status read with nothing (the fleet's 850 tier-1 limit)."""
+    budget = g.Budget(lambda: 100)
+    assert budget.reserve(600, 2, 'short')
+    upbit = [(path, {'type': kind}) for kind in ('l2Book', 'clearinghouseState', 'orderStatus',
+                                                 'metaAndAssetCtxs') for path in ('info',)]
+    upbit.append(('exchange', {'action': {'type': 'order'}}))
+    for _ in range(250):
+        for path, body in upbit:
+            budget.reserve(g.cost(path, body), g.priority('upbit', path, body), 'upbit')
+    assert budget.lane_total('upbit') <= 40
+    for path, body in KILLERS_PROTECTED:
+        assert budget.reserve(g.cost(path, body), g.priority('killers', path, body), 'killers'), body
+    # Killers still has its whole 250 tier-1 and 50 action allowance.
+    assert budget.reserve(250 - 2 - 2 - 2 - 1, 1, 'killers')
+    assert budget.reserve(50, 0, 'killers')
+
+
+def test_an_upbit_waiter_on_its_spent_slice_never_holds_killers_back():
+    async def check():
+        budget = g.Budget()
+        assert budget.reserve(40, 0, 'upbit')
+        waiter = asyncio.ensure_future(budget.acquire(1, 0, timeout=1, client='upbit'))
+        await asyncio.sleep(.1)
+        assert budget.waiting == [0, 0, 0]
+        assert await budget.acquire(2, 1, timeout=.2, client='killers')
+        assert await budget.acquire(20, 2, timeout=.2, client='killers')
+        assert await waiter is None
+    asyncio.run(check())
+
+
+def test_killers_budget_is_unchanged_when_upbit_is_idle():
+    """The pre-#252 allowance sequence, client given or not."""
+    for client in (None, 'killers', 'short', 'accounting'):
+        now = [100.0]
+        budget = g.Budget(lambda: now[0])
+        assert budget.reserve(600, 2, client)
+        assert budget.reserve(1, 2, client) is None
+        assert budget.reserve(250, 1, client)
+        assert budget.reserve(1, 1, client) is None
+        assert budget.reserve(50, 0, client)
+        assert budget.reserve(1, 0, client) is None
+        now[0] += 61
+        assert budget.reserve(600, 2, client)
+    for kind in ('orderStatus', 'l2Book', 'metaAndAssetCtxs', 'candleSnapshot'):
+        assert g.priority('killers', 'info', {'type': kind}) == (2 if kind == 'candleSnapshot' else 1)
+    assert g.priority('killers', 'exchange', {}) == 0
+
+
+def test_a_restarted_gateway_assumes_the_last_minute_ran_at_the_cap():
+    now = [1000.0]
+    budget = g.Budget(lambda: now[0], cold_start=True)
+    assert round(budget.lane_total(None)) == 900 and round(budget.lane_total('upbit')) == 40
+    assert budget.reserve(1, 0, 'killers') is None          # nothing bursts at start
+    assert budget.reserve(2, 1, 'killers') is None
+    now[0] += 1
+    assert budget.reserve(1, 0, 'killers')                  # actions after ~1 s
+    assert budget.reserve(2, 1, 'killers') is None
+    now[0] += 3
+    assert budget.reserve(2, 1, 'killers')                  # exit reads after ~4 s
+    assert budget.reserve(20, 2, 'short') is None
+    now[0] += 17
+    assert budget.reserve(20, 2, 'short') is None
+    now[0] += 1
+    assert budget.reserve(20, 2, 'short')                   # background after ~22 s
+    now[0] += 48                                            # t = 70: the assumption is gone
+    assert budget.lane_total('upbit') == 0 and budget.lane_total(None) == 20
+    assert budget.reserve(581, 2, 'short') is None and budget.reserve(580, 2, 'short')
+
+
+def test_the_service_starts_with_the_cold_start_budget():
+    async def check():
+        async with g.lifespan(g.app):
+            budget = g.app.state.gateway.budget
+            assert round(budget.total()) == 940
+            assert budget.reserve(2, 1, 'killers') is None
     asyncio.run(check())
