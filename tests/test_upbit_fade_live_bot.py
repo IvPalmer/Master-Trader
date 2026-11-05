@@ -304,7 +304,9 @@ def test_service_copies_the_killers_pattern_on_its_own_account():
     assert env["FREQTRADE__EXCHANGE__WALLET_ADDRESS"] == "${HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS:-}"
     assert env["FREQTRADE__EXCHANGE__PRIVATE_KEY"] == "${HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY:-}"
     for side in ("public", "private"):
-        assert env["FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__" + side] == "http://hl-gateway:8080/upbit"
+        assert env["FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__" + side] == \
+            "http://hl-gateway:8080/${HL_UPBIT_GATEWAY_CLIENT:-short}"
+    assert env["HL_UPBIT_GATEWAY_CLIENT"] == "${HL_UPBIT_GATEWAY_CLIENT:-short}"
     for key in ("FREQTRADE__EXCHANGE__ENABLE_WS", "FREQTRADE__EXCHANGE__PAIR_WHITELIST",
                 "FREQTRADE__EXCHANGE___FT_HAS_PARAMS__ohlcv_candle_limit_per_timeframe__5m",
                 "FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout", "FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS",
@@ -361,8 +363,10 @@ def _run_entrypoint(tmp_path, env, guard_status=0):
                       '"${FREQTRADE__ORDER_TYPES__STOPLOSS_ON_EXCHANGE:-unset}"\n')
     trader.chmod(0o700)
     subs = 'python() { printf "guard\\n"; return "$GUARD_STATUS"; }\n'
+    # Compose always sets HL_UPBIT_GATEWAY_CLIENT (default short); live tests pass upbit.
     return subprocess.run(["/bin/sh", "-c", subs + script],
-                          env={"PATH": str(tmp_path), "GUARD_STATUS": str(guard_status), **env},
+                          env={"PATH": str(tmp_path), "GUARD_STATUS": str(guard_status),
+                               "HL_UPBIT_GATEWAY_CLIENT": "short", **env},
                           capture_output=True, text=True, timeout=5, check=False)
 
 
@@ -374,20 +378,43 @@ def test_entrypoint_dry_run_turns_the_exchange_stop_off(tmp_path):
 
 
 def test_entrypoint_live_turns_the_exchange_stop_on(tmp_path):
-    keys = {"FREQTRADE__EXCHANGE__WALLET_ADDRESS": "0xabc", "FREQTRADE__EXCHANGE__PRIVATE_KEY": "0xdef"}
+    keys = {"FREQTRADE__EXCHANGE__WALLET_ADDRESS": "0xabc", "FREQTRADE__EXCHANGE__PRIVATE_KEY": "0xdef",
+            "HL_UPBIT_GATEWAY_CLIENT": "upbit"}
     r = _run_entrypoint(tmp_path, {"FREQTRADE__DRY_RUN": "false", **keys})
     assert r.returncode == 0
     assert r.stdout.rstrip().endswith("tradesv3.live.UpbitFadeLiveV1.hyperliquid.sqlite true")
 
 
+KEYS = {"FREQTRADE__EXCHANGE__WALLET_ADDRESS": "0xabc", "FREQTRADE__EXCHANGE__PRIVATE_KEY": "0xdef"}
+
+
 @pytest.mark.parametrize("env,status", [
-    ({"FREQTRADE__DRY_RUN": "false"}, 64),                                   # live without keys
-    ({"FREQTRADE__DRY_RUN": "false", "FREQTRADE__EXCHANGE__WALLET_ADDRESS": "0xabc"}, 64),
+    ({"FREQTRADE__DRY_RUN": "false", "HL_UPBIT_GATEWAY_CLIENT": "upbit"}, 64),   # live, no keys
+    ({"FREQTRADE__DRY_RUN": "false", "HL_UPBIT_GATEWAY_CLIENT": "upbit",
+      "FREQTRADE__EXCHANGE__WALLET_ADDRESS": "0xabc"}, 64),
+    ({"FREQTRADE__DRY_RUN": "false", **KEYS}, 64),             # live on the observation client
+    ({"FREQTRADE__DRY_RUN": "false", "HL_UPBIT_GATEWAY_CLIENT": "killers", **KEYS}, 64),
+    ({"FREQTRADE__DRY_RUN": "true", "HL_UPBIT_GATEWAY_CLIENT": "killers"}, 64),
+    ({"FREQTRADE__DRY_RUN": "true", "HL_UPBIT_GATEWAY_CLIENT": ""}, 64),
     ({"FREQTRADE__DRY_RUN": "maybe"}, 64),
 ])
 def test_entrypoint_refuses_live_without_keys_or_an_invalid_mode(tmp_path, env, status):
     r = _run_entrypoint(tmp_path, env)
     assert r.returncode == status and "trader" not in r.stdout and "guard" not in r.stdout
+
+
+def test_dry_run_uses_the_deployed_short_client_and_needs_no_gateway_change(tmp_path):
+    """Round 3: the dry-run deploy is `up -d --no-deps ft-upbit-fade-hl` only. By default
+    the bot talks to the gateway's existing `short` client; `upbit` is for live."""
+    for client in ("short", "upbit"):
+        r = _run_entrypoint(tmp_path, {"FREQTRADE__DRY_RUN": "true", "HL_UPBIT_GATEWAY_CLIENT": client})
+        assert r.returncode == 0 and r.stdout.rstrip().endswith("dryrun.UpbitFadeLiveV1.hyperliquid.sqlite false")
+    import os
+    resolved = subprocess.run(
+        ["/bin/sh", "-c", 'printf %s "http://hl-gateway:8080/${HL_UPBIT_GATEWAY_CLIENT:-short}"'],
+        env={k: v for k, v in os.environ.items() if k != "HL_UPBIT_GATEWAY_CLIENT"},
+        capture_output=True, text=True, check=True).stdout
+    assert resolved == "http://hl-gateway:8080/short"
 
 
 def test_entrypoint_stops_when_the_db_guard_fails(tmp_path):

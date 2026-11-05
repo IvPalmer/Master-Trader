@@ -62,11 +62,6 @@ services:
     container_name: ft-hl-gateway
     environment:
       KILLERS_WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
-      # Rolling budget history kept across restarts (#252): HL keeps counting
-      # the last minute, so a restart must not start from an empty window.
-      BUDGET_STATE_PATH: /state/budget.json
-    volumes:
-      - hl_gateway_state:/state
     ports:
       - 127.0.0.1:8104:8080
     healthcheck:
@@ -428,8 +423,14 @@ services:
       # Pass-through strategy needs only 10 candles. Cap its 5m bootstrap feed;
       # Hyperliquid funding marks/rates use 1h and retain their native limits.
       FREQTRADE__EXCHANGE___FT_HAS_PARAMS__ohlcv_candle_limit_per_timeframe__5m: "100"
-      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/upbit"
-      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/upbit"
+      # Gateway client: `short` (the deployed gateway's observation client:
+      # background reads, no exchange actions) for dry-run, so the dry-run
+      # deploy never touches hl-gateway; `upbit` (its own budget slice, may
+      # submit actions) for live, once the gateway carries it. The entrypoint
+      # refuses live on any client but upbit.
+      HL_UPBIT_GATEWAY_CLIENT: ${HL_UPBIT_GATEWAY_CLIENT:-short}
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__public: "http://hl-gateway:8080/${HL_UPBIT_GATEWAY_CLIENT:-short}"
+      FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private: "http://hl-gateway:8080/${HL_UPBIT_GATEWAY_CLIENT:-short}"
       FREQTRADE__EXCHANGE__CCXT_CONFIG__timeout: "90000"
       FREQTRADE__INTERNALS__PROCESS_THROTTLE_SECS: "30"
       # Preserve the resting exchange stop through planned restarts.
@@ -463,10 +464,18 @@ services:
         set -e
         case "$${FREQTRADE__DRY_RUN}" in
           true|1|yes)
+            case "$${HL_UPBIT_GATEWAY_CLIENT}" in
+              short|upbit) ;;
+              *) echo "dry-run needs HL_UPBIT_GATEWAY_CLIENT short or upbit" >&2; exit 64 ;;
+            esac
             export FREQTRADE__DB_URL=sqlite:////freqtrade/user_data/tradesv3.dryrun.UpbitFadeLiveV1.hyperliquid.sqlite
             export FREQTRADE__ORDER_TYPES__STOPLOSS_ON_EXCHANGE=false
             ;;
           false|0|no)
+            if [ "$${HL_UPBIT_GATEWAY_CLIENT}" != upbit ]; then
+              echo "live mode needs HL_UPBIT_GATEWAY_CLIENT=upbit (the gateway's pilot slice)" >&2
+              exit 64
+            fi
             if [ -z "$${FREQTRADE__EXCHANGE__WALLET_ADDRESS}" ] || [ -z "$${FREQTRADE__EXCHANGE__PRIVATE_KEY}" ]; then
               echo "live mode needs HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS and HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY" >&2
               exit 64
@@ -647,7 +656,6 @@ volumes:
   ft_user_data: null
   ft_exporter_state: null
   killers_receiver_state: null
-  hl_gateway_state: null
   claude_auth:
     external: true
     name: claude-assistant_claude_auth
