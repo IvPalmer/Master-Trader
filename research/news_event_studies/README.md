@@ -53,6 +53,13 @@ The build from 89dfe17, after catalog 49 was harvested in full (4481 of 4481 art
 manifests were discarded before any freeze. Amendment `A2-o10-hour-clock` on both Upbit
 entries reads `H시` alone as minute 00; on the corpus it leaves 5 events with no start.
 
+## Manifest freeze (2026-11-05)
+
+The build from 52cb4a0 is frozen by amendment `A3-manifest-freeze` on all three entries:
+delisting-manifest.json `4f979113c7135a185898c06f0d69ae450f4b5d9bc603a7c49a7f5aa87a866c3c`,
+upbit-manifest.json `23a6b3541d5799bf2aa679bf4e1913d970a8af89de58d01c4e3f6e3236d77d00`.
+Phase 2 runs with these values as `--expect-sha256`, not before 2026-11-07.
+
 ## Quarantine
 
 The 2018–2022 exploratory results on the VPS (`research/news_exploratory_2026-11/`)
@@ -114,3 +121,4 @@ Raw harvests, manifests' inputs, klines and results stay on the VPS under `data/
 | 2026-11-04 | 0f29d85 (harvesters) | Claude (Part C session) |
 | 2026-11-04 | 3c77081 (main: first build, stopped by O17) | Claude (Part C session) |
 | 2026-11-05 | 89dfe17 (main: option A build, discarded for the O10 clock gap) | Claude (Part C session) |
+| 2026-11-05 | 52cb4a0 (main: O10 hour clock; frozen build, A3-manifest-freeze) | Claude (Part C session) |

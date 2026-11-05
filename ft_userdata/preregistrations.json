@@ -1028,6 +1028,51 @@
             "Catalog 49 supplies monitoring-tag titles only, so the one full-delisting title found only there (184419, removal of BUSD and conversion to FDUSD) is not an event."
           ],
           "outcome_blind": "Decided from notice titles, notice text, counts and dates only; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A3-manifest-freeze",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "manifest": "delisting-manifest.json",
+          "manifest_sha256": "4f979113c7135a185898c06f0d69ae450f4b5d9bc603a7c49a7f5aa87a866c3c",
+          "code_commit": "52cb4a0",
+          "counts": {
+            "candidates": 16,
+            "excluded": {
+              "no_hl": 251
+            },
+            "harvest_complete": true,
+            "harvest_shortfall": 0,
+            "missing": 0,
+            "unknown": 0
+          },
+          "harvest": {
+            "binance_from": "vps",
+            "upbit_from": "operator-mac",
+            "completeness": {
+              "binance:161": {
+                "shortfall": 0,
+                "total": 446,
+                "total_reported": true,
+                "unique": 446
+              },
+              "binance:48": {
+                "shortfall": 0,
+                "total": 2292,
+                "total_reported": true,
+                "unique": 2292
+              },
+              "binance:49": {
+                "shortfall": 0,
+                "total": 4481,
+                "total_reported": true,
+                "unique": 4481
+              }
+            },
+            "catalog_49_monitoring_titles": 27,
+            "catalog_49_note": "27 catalog-49 titles contain 'Monitoring Tag' and are not in catalog 161. 25 yield delisting-study events (137 token events); the other two name no added token: the 2023-07 tag introduction (excluded:tag_introduction) and 240714, which only removes tags."
+          },
+          "note": "Phase 1 complete; no return computed. Built by the nes-build unit on the VPS from main 52cb4a06f1752d15543a24485b43bd846bfabb3d (2026-11-05 08:14-12:27Z, exit 0)."
         }
       ],
       "resolution": null
@@ -1233,6 +1278,59 @@
           "rule": "O10 clocks also include `H시` alone, read as minute 00; `오전`/`오후` apply as before. `H시` must stand alone: it is not read inside a word (`H시간`, `H시점`, `H시작`), nor when minutes follow without `분` (`H시 MM`) or `반` follows. A range `H시 ~ H시` reads as its first time.",
           "corpus_effect": "On the harvested corpus 81 non-excluded events gain a start (no parseable start: 86 -> 5), as do 27 events already excluded as binance48_overlap. No start already read and no exclusion changes. Every new start is 0.2 to 12.7 h after t0, so none becomes began_before_notice.",
           "outcome_blind": "Decided from start-cell and body-line formats read with digits masked, counts, and start times against t0; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A3-manifest-freeze",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "manifest": "upbit-manifest.json",
+          "manifest_sha256": "23a6b3541d5799bf2aa679bf4e1913d970a8af89de58d01c4e3f6e3236d77d00",
+          "code_commit": "52cb4a0",
+          "counts": {
+            "candidates": 95,
+            "excluded": {
+              "binance48_overlap": 43,
+              "futures_only": 16,
+              "not_on_binance": 26
+            },
+            "harvest_complete": true,
+            "harvest_shortfall": 0,
+            "missing": 0,
+            "unknown": 5
+          },
+          "harvest": {
+            "binance_from": "vps",
+            "upbit_from": "operator-mac",
+            "completeness": {
+              "binance:161": {
+                "shortfall": 0,
+                "total": 446,
+                "total_reported": true,
+                "unique": 446
+              },
+              "binance:48": {
+                "shortfall": 0,
+                "total": 2292,
+                "total_reported": true,
+                "unique": 2292
+              },
+              "binance:49": {
+                "shortfall": 0,
+                "total": 4481,
+                "total_reported": true,
+                "unique": 4481
+              },
+              "upbit:list": {
+                "shortfall": 0,
+                "total": 806,
+                "total_reported": true,
+                "unique": 806
+              }
+            },
+            "catalog_49_monitoring_titles": 27,
+            "catalog_49_note": "27 catalog-49 titles contain 'Monitoring Tag' and are not in catalog 161. 25 yield delisting-study events (137 token events); the other two name no added token: the 2023-07 tag introduction (excluded:tag_introduction) and 240714, which only removes tags."
+          },
+          "note": "Phase 1 complete; no return computed. Built by the nes-build unit on the VPS from main 52cb4a06f1752d15543a24485b43bd846bfabb3d (2026-11-05 08:14-12:27Z, exit 0)."
         }
       ],
       "resolution": null
@@ -1447,6 +1545,60 @@
           "rule": "O10 clocks also include `H시` alone, read as minute 00; `오전`/`오후` apply as before. `H시` must stand alone: it is not read inside a word (`H시간`, `H시점`, `H시작`), nor when minutes follow without `분` (`H시 MM`) or `반` follows. A range `H시 ~ H시` reads as its first time.",
           "corpus_effect": "On the harvested corpus 81 non-excluded events gain a start (no parseable start: 86 -> 5), as do 27 events already excluded as binance48_overlap. No start already read and no exclusion changes. Every new start is 0.2 to 12.7 h after t0, so none becomes began_before_notice.",
           "outcome_blind": "Decided from start-cell and body-line formats read with digits masked, counts, and start times against t0; no price, return or outcome from the window was computed, printed or inspected."
+        },
+        {
+          "id": "A3-manifest-freeze",
+          "date": "2026-11-05",
+          "frozen_before_results": true,
+          "manifest": "upbit-manifest.json",
+          "manifest_sha256": "23a6b3541d5799bf2aa679bf4e1913d970a8af89de58d01c4e3f6e3236d77d00",
+          "code_commit": "52cb4a0",
+          "counts": {
+            "candidates": 55,
+            "excluded": {
+              "binance48_overlap": 43,
+              "no_hl": 16,
+              "not_on_binance": 26,
+              "spot_only": 40
+            },
+            "harvest_complete": true,
+            "harvest_shortfall": 0,
+            "missing": 0,
+            "unknown": 5
+          },
+          "harvest": {
+            "binance_from": "vps",
+            "upbit_from": "operator-mac",
+            "completeness": {
+              "binance:161": {
+                "shortfall": 0,
+                "total": 446,
+                "total_reported": true,
+                "unique": 446
+              },
+              "binance:48": {
+                "shortfall": 0,
+                "total": 2292,
+                "total_reported": true,
+                "unique": 2292
+              },
+              "binance:49": {
+                "shortfall": 0,
+                "total": 4481,
+                "total_reported": true,
+                "unique": 4481
+              },
+              "upbit:list": {
+                "shortfall": 0,
+                "total": 806,
+                "total_reported": true,
+                "unique": 806
+              }
+            },
+            "catalog_49_monitoring_titles": 27,
+            "catalog_49_note": "27 catalog-49 titles contain 'Monitoring Tag' and are not in catalog 161. 25 yield delisting-study events (137 token events); the other two name no added token: the 2023-07 tag introduction (excluded:tag_introduction) and 240714, which only removes tags."
+          },
+          "note": "Phase 1 complete; no return computed. Built by the nes-build unit on the VPS from main 52cb4a06f1752d15543a24485b43bd846bfabb3d (2026-11-05 08:14-12:27Z, exit 0)."
         }
       ],
       "resolution": null
