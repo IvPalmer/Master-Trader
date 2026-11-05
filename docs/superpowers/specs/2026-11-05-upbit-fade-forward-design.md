@@ -76,8 +76,8 @@ or container.
   - **a known trading start:** the notice body states a start time at or after t0, read with
     `nes_classify.upbit_trading_start_ms`. With no body, or no start in it, the event goes
     to the descriptive cohort;
-  - **a Binance market before t0:** Binance 1 m klines (spot `api/v3/klines`, else USDⓈ-M
-    `fapi/v1/klines`) show trading in [t0 − 10 min, t0). That is evidence from before t0,
+  - **a Binance market before t0:** Binance 1 m klines (USDⓈ-M `fapi/v1/klines` first, else spot
+    `api/v3/klines`, the Part C proxy order in `nes_venues.binance_candidates`) show trading in [t0 − 10 min, t0). That is evidence from before t0,
     not today's `exchangeInfo`;
   - **the Binance leak test passed:** |drift| ≤ 2% between those klines' closes at
     t0 − 10 min and t0 − 2 min, the Part C rule. The same test on Hyperliquid candles is
