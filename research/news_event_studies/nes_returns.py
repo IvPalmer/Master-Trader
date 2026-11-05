@@ -313,14 +313,15 @@ def missingness(results, horizon=PRIMARY, extra_missing=()):
 TIP_RANGE = (-10.0, 10.0)        # -1000% .. +1000% per missing token-event
 
 
-def tipping_point(results, cls, horizon=PRIMARY, extra_missing=()):
+def tipping_point(results, cls, horizon=PRIMARY, extra_missing=(), level=CI_LEVEL):
     """The common return v of every missing token-event at which `cls` would stop holding.
 
     Each announcement becomes (usable sum + missing * v) / (usable + missing), its intended token
     weights. Both percentile bounds are nondecreasing in v (every slope is >= 0). EDGE uses the
     stress-cost lower bound and holds while it is > 0, so it reverses below the crossing; NO EDGE
     uses the base-cost upper bound and holds while it is <= 0, so it reverses above it. None
-    when nothing is missing or the class has no bound."""
+    when nothing is missing or the class has no bound. `level` is the interval the class was
+    decided at (the forward monitor passes 95%)."""
     key, side = {"EDGE (proxy)": ("net_stress", 0), "NO EDGE": ("net", 1)}.get(cls, (None, None))
     if key is None:
         return None
@@ -328,7 +329,7 @@ def tipping_point(results, cls, horizon=PRIMARY, extra_missing=()):
     if not any(p[4] for p in parts):
         return None
     draws = _draws([(t0, s / (a + m), Fraction(m, a + m)) for t0, _aid, s, a, m in parts])
-    bound = lambda v: _interval(draws, v)[side]          # noqa: E731
+    bound = lambda v: _interval(draws, v, level)[side]   # noqa: E731
     lo, hi = TIP_RANGE
     if bound(lo) > 0:
         if side == 0:

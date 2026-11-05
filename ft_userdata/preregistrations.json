@@ -1371,6 +1371,162 @@
       "resolution": null
     },
     {
+      "id": "upbit-krw-fade-forward-2026-11",
+      "bot": null,
+      "status": "open",
+      "registered": "2026-11-05",
+      "review_by": "2027-11-05",
+      "issue": "#229",
+      "spec": "docs/superpowers/specs/2026-11-05-upbit-fade-forward-design.md @c7c1f9a (approved by Codex after three rounds; operator go-ahead 2026-11-05, \"Sim, monta o dry-run\"); comparable cohort without a known trading start @f40ec30 (Claude's call, 2026-11-05, implementation: no Upbit notice body is readable from the VPS); Codex code review round 1 fixes @93ac650 (Binance prior received by t0, versioned later start evidence, klines closed by t0, partial excursion)",
+      "code": "research/upbit_fade_forward/ (systemd user unit upbit-fade-forward)",
+      "hypothesis": "New hypothesis, forward only: a paper short of the Hyperliquid perp 5 min after an Upbit KRW-addition notice, held 24 h, earns a positive announcement-level mean net return with real book fills, the taker fee and real funding. Source: the Part C Phase 2 proxy result at +24 h (+7.4% mean net, n = 57; #248, main 9991e23; #229 comment 6664557105). That result used Binance proxy prices, no funding and assumed detection; it is the hypothesis source only and never counts as validation here. The +4 h hold, Part C's registered primary (not determinable), is descriptive only.",
+      "frozen": {
+        "measurement": "paper",
+        "places_orders": false,
+        "direction": "short",
+        "venue": "hyperliquid",
+        "unit": "announcement",
+        "t0_field": "tree.published_at",
+        "t0_clock": "Tree clock: checked for plausibility only, never for equivalence with Upbit's first_listed_at",
+        "detection": "research/news_archive tree items and item_revisions read with durable cursors over item_pk and rev_pk; url an upbit.com/service_center/notice page; one event per (notice id, token)",
+        "archive_poll_s": 15,
+        "classifiers": [
+          "nes_classify.upbit_addition",
+          "nes_classify.upbit_krw_membership",
+          "nes_classify.upbit_trading_start_ms",
+          "nes_classify.mentions_token"
+        ],
+        "tree_lag_max_s": 300,
+        "upbit_market_poll_s": 300,
+        "krw_snapshot_max_age_s": 900,
+        "binance_prior_window_s": [
+          -86400,
+          0
+        ],
+        "hl_evidence": "fundingHistory",
+        "hl_eligibility_window_s": [
+          86400,
+          3600
+        ],
+        "binance_market_window_s": [
+          -600,
+          0
+        ],
+        "binance_proxy_order": [
+          "binance_um_futures",
+          "binance_spot"
+        ],
+        "leak_window_s": [
+          -600,
+          -120
+        ],
+        "leak_abs_drift_le": "0.02",
+        "entry_offset_s": 300,
+        "timely_entry_s": 120,
+        "action_deadline_s": 600,
+        "hold_s": 86400,
+        "checkpoints_s": [
+          1800,
+          14400
+        ],
+        "notional_usdc": 100,
+        "book_max_age_s": 5,
+        "taker_fee_bps_per_side": 4.5,
+        "extra_slippage_bps": 0,
+        "oracle_tolerance_s": 60,
+        "primary_horizon_s": 86400,
+        "ci_level": "0.95",
+        "bootstrap": "calendar-month block (nes_returns.block_bootstrap_mean_ci, level passed explicitly)",
+        "bootstrap_resamples": 10000,
+        "bootstrap_seed": 229,
+        "decision_announcements": 40,
+        "decision_date_utc": "2027-11-05T00:00:00Z",
+        "descriptive_reports_at": [
+          20,
+          30
+        ],
+        "comparable_requires_known_start": false
+      },
+      "rules_verbatim": {
+        "detection": [
+          "Primary: the PIT news archive, read-only. Every 15 s, read with durable cursors over both items (item_pk) and item_revisions (rev_pk); a revised title can turn into a listing.",
+          "Take Tree items whose url is an upbit.com/service_center/notice page, and deduplicate them per notice id.",
+          "Classify with nes_classify.upbit_addition and upbit_krw_membership (title, plus the body when present), by import.",
+          "Upbit notices that mention 거래지원 or 마켓 but don't classify go to an unclassified queue in the status output and are never traded.",
+          "Audit: poll api.upbit.com/v1/market/all every 5 min and store each timestamped snapshot. A new KRW-* market with no matched notice is logged as a missed detection.",
+          "t0 is Tree's published_at, and received_at is kept too. This is a Tree-clock cohort, and every report says so.",
+          "Timing is flagged unverified when published_at is missing, is later than received_at, or lags it by more than 5 min. Unverified events are reported but left out of the comparable cohort."
+        ],
+        "eligibility": [
+          "Excluded when the token already trades on Upbit KRW: it is in the last market/all snapshot taken before t0 (no snapshot within 15 min before t0 -> unknown).",
+          "Excluded when a Binance new-listing notice for it falls within the 24 h before t0 (the archive's binance_listing source). A notice published after t0 never excludes. Only what the archive had received by t0 counts, revisions included; a notice or revision received later is recorded as descriptive (late) and never excludes.",
+          "Excluded when the notice body says trading began before the notice.",
+          "Hyperliquid eligibility is the Part C rule (nes_venues.hl_facts / hl_status): the perp is in meta and fundingHistory shows records in the 24 h before t0, including one in the last hour."
+        ],
+        "comparable_cohort": [
+          "No known trading start is required (Claude's call, 2026-11-05, implementation). Part C required one, but Tree carries no Upbit notice body and the VPS gets 403 from Upbit's announcements API, so the forward cohort is defined by what a deployable bot can know. This is one more stated difference from Part C, beside the Tree clock, book fills and funding.",
+          "When a body is present, the start is read with nes_classify.upbit_trading_start_ms. A start before t0 still excludes the event (began_before_notice); a start at or after t0 gives start_unknown = false. With no body, or no start in it, the event stays comparable with start_unknown = true.",
+          "A later observation of the same notice (a duplicate Tree item or a revision) that states a start never creates a second event; it is a versioned evidence record. Received before the entry decision, it counts: a start before t0 excludes the event (began_before_notice) and stops the entry, and one at or after t0 sets start_unknown = false. Received after the entry decision, it is descriptive only.",
+          "Descriptive only: krw_market_first_seen_ms, the time of the first market/all snapshot after t0 that lists KRW-<TOKEN>. It never selects events.",
+          "status and every resolution report show the start_unknown and krw_market_first_seen counts. The decision metric is over the whole comparable cohort; the subset with start_unknown = false is reported as descriptive only.",
+          "A Binance market before t0: Binance 1 m klines (USDⓈ-M fapi/v1/klines first, else spot api/v3/klines, the Part C proxy order) show trading in [t0 - 10 min, t0), counting only candles closed by t0 (open + 60 s <= t0).",
+          "The Binance leak test passed: |drift| <= 2% between those klines' closes at t0 - 10 min and t0 - 2 min. The same test on Hyperliquid candles is descriptive.",
+          "A timely entry: filled within 2 min of t0 + 5 min. Later entries, up to the 10 min deadline, are delayed and descriptive.",
+          "Every other Hyperliquid-eligible event is still measured and reported as the descriptive cohort."
+        ],
+        "paper_trade": [
+          "Entry at max(t0 + 5 min, detection): read l2Book and sell about 100 USDC into the bids, then freeze the exchange-valid quantity q (rounded to szDecimals). Record the VWAP, mid, best bid and ask, levels used, book time and any delay.",
+          "A book older than 5 s, or depth below q, is rejected for that attempt. Part C priced the close of the 1 m candle that contains t0 + 5 min; the difference is noted, not corrected.",
+          "Exit at entry + 24 h: buy back q from the asks, with the same checks. Checkpoints at +30 m and +4 h are book-walk marks of q only.",
+          "Fee: 4.5 bps taker on each leg's actual notional. No extra slippage term; the book walk is the slippage.",
+          "Funding: rates from finalized fundingHistory records for each hourly settlement during the hold; cashflow q x oraclePx x rate, positive funding pays a short; labelled estimated because oraclePx is observed through metaAndAssetCtxs within +-60 s of each boundary.",
+          "A boundary with no rate or no observation inside that tolerance makes the event's funding missing. The net is then incomplete: it stays out of the decision mean and counts as missing in the tipping point.",
+          "Excursion: MAE/MFE from 1 m candleSnapshot highs and lows, descriptive price excursion only. It is ok only when every minute of the hold has a candle; otherwise it is retried, then stored as partial with candle counts and labelled partial extrema.",
+          "Every scheduled action has a 10 min deadline, including after a restart. Missing the deadline makes the outcome missing; a later recovery is stored as late, never as the scheduled outcome.",
+          "Ledger: an append-only JSONL ledger with event ids, idempotent on replay. The resolution reports how many outcomes are missing and gives the A4 tipping point."
+        ],
+        "resolution": [
+          "Metric: the announcement-level mean net return of the comparable cohort, computed from book fills, fees and funding.",
+          "Interval: the A4 calendar-month block bootstrap, passed level=0.95 explicitly (the helper defaults to 98.33%).",
+          "One decision, at 40 events or on 2027-11-05, whichever comes first. The 20- and 30-event reports are descriptive only.",
+          "EDGE when the lower bound is above 0, NO EDGE when the upper bound is at or below 0, otherwise NOT DETERMINABLE. No interval (fewer than two months) -> NOT DETERMINABLE.",
+          "EDGE authorizes only a proposal for a small live pilot under the graduation gates. NO EDGE closes the lane.",
+          "Descriptive: +4 h marks, latency, missed and unclassified notices, MAE, and the non-comparable cohort; also the start_unknown = false subset and krw_market_first_seen_ms."
+        ]
+      },
+      "operationalization": [
+        "U1 Comparable requirements are each True, False or not established. Any False -> descriptive. Not established (Hyperliquid facts unknown, no market/all snapshot within 15 min, Binance klines unreadable for 24 h, a leak test that could not run, an entry never filled) -> the event stays in the comparable cohort with a missing outcome, so it counts in the tipping point rather than vanishing.",
+        "U2 The entry window is [max(t0 + 5 min, detection), t0 + 15 min] on the monitor's clock (book receipt time); timely when filled by t0 + 7 min. A notice detected after t0 + 15 min has a missing entry; a short is never opened late.",
+        "U3 Marks and the exit are scheduled from the entry's fill time; each has a 10 min deadline. A missed one is recorded missing, and at most one later book walk of q (within 6 h) is kept as a separate late record.",
+        "U4 q is the size whose sale into the bids raises 100 USDC, rounded half-even to szDecimals; q = 0 is rejected. A book is stale when the receipt time minus the book's time exceeds 5 s.",
+        "U5 Funding boundaries are the hours in (entry, exit]. A fundingHistory record belongs to its nearest hour. oraclePx is read once per hour in [hour, hour + 60 s] for every position open at that hour.",
+        "U6 The Binance-prior exclusion counts an archive item published in [t0 - 24 h, t0] only through a version naming the token that was received at or before t0: the item itself (items.received_at) or a revision (item_revisions.received_at). It is checked at detection and again at t0 + 1 h. A version received after t0 (a late item, or a later revision naming the token) is listed as late, descriptive only, and never excludes.",
+        "U7 'In meta': a perp that nes_venues.hl_facts finds eligible but that today's meta lacks, or flags delisted, is ineligible (not_in_meta).",
+        "U8 The unclassified queue holds notices that mention 거래지원 or 마켓 with neither an addition nor an end (nes_classify.upbit_end) classification, and additions whose KRW membership the notice does not state.",
+        "U9 The monitor's first start is the epoch: archive cursors start at the archive's current maxima, and events with t0 before the epoch are not part of the measurement.",
+        "U10 The decision set is the first 40 comparable announcements in t0 order whose token-events are all final (an earlier event still open delays it), or on 2027-11-05 every comparable announcement with t0 before that date once all are final. It is recorded once in the ledger and never recomputed.",
+        "U11 Missed-detection audit: a KRW-* market new in market/all with no detected notice for that token whose t0 lies in [first seen - 7 d, first seen + 24 h]. market/all snapshots store the sorted market codes (stored once per distinct set) and every poll's time and hash.",
+        "U12 History reads are retried, then recorded unknown or missing: Binance klines and Hyperliquid leak candles up to t0 + 24 h, funding records up to exit + 24 h, hold candles up to exit + 48 h (Hyperliquid keeps about 3.5 days of 1 m candles).",
+        "U13 MAE/MFE use the 1 m candles that lie wholly inside the hold. The excursion is ok only with every expected minute; with fewer it is retried until exit + 48 h and then stored as partial (candles and expected counts, extrema under partial_* names), or missing with none.",
+        "U14 The tipping point is nes_returns.tipping_point at the same 95% level (a level argument with the old default was added for this).",
+        "U15 start_unknown is a stored event flag: no trading start was read (no body, or none parseable in it). It is never a comparable requirement and never makes an outcome missing. krw_market_first_seen_ms is the time of the first market_poll with obs_ms > t0 whose market set lists KRW-<TOKEN>, recorded once per event with the previous snapshot's time and whether that snapshot listed it (true only when the token was already on KRW).",
+        "U16 Evidence: a later Tree observation (duplicate item or revision) of an existing event's notice whose body states a start is appended as evidence:<event>:<ref> with a version number; the event id never changes. It counts for selection when no entry record exists yet and it was received by the entry deadline (t0 + 15 min). Among those and the event's own observation when it states a start, the latest by receipt (received_at, then items before item_revisions, then pk), not by processing order, sets the start. Otherwise its effect is descriptive.",
+        "U17 Binance presence and the leak test use only 1 m klines closed by t0 (open + 60 s <= t0); a candle that contains t0 is no evidence of a market before t0, and the next proxy candidate is tried."
+      ],
+      "notes": [
+        "Stated differences from Part C: t0 on Tree's clock, Hyperliquid book fills, real funding, and no known-trading-start requirement. At registration (2026-11-05) the 3 Tree Upbit items in the VPS archive have an empty body (raw JSON: title, en, kind, url), and the VPS gets 403 from Upbit's announcements API.",
+        "If Upbit lists KRW-<token> in market/all before the notice's t0, the already-on-KRW rule excludes the event; the first real events must be checked for this."
+      ],
+      "rules": [
+        "Paper only: no orders and no keys; no deploy, config, sizing or allocation change follows from any result. EDGE authorizes only a proposal for a small live pilot under the graduation gates; NO EDGE closes the lane.",
+        "One decision, at 40 comparable announcements or on 2027-11-05, on the 95% A4 interval of the announcement-level mean net 24 h return; the 20- and 30-event reports are descriptive only.",
+        "Forward events never mix with the Part C retrospective sample; results are posted on #229 at each check."
+      ],
+      "triggers": [],
+      "amendments": [],
+      "resolution": null
+    },
+    {
       "id": "upbit-krw-listing-fade-2026-11",
       "bot": null,
       "status": "open",
