@@ -392,3 +392,9 @@ That is a known follow-up, not a fault of the pilot.
 `systemctl --user disable --now upbit-fade-live-trigger`, close positions, then
 `sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml stop ft-upbit-fade-hl`.
 The databases and the trigger's `data/` stay for the record.
+
+## Install log
+
+| date | source commit | by |
+|---|---|---|
+| 2026-11-05 21:44–21:49 UTC: Part 1 in dry-run. `ft-upbit-fade-hl` up at 21:44:13Z (`dry_run: true`, client `short`, no wallet or key), `metrics-exporter` recreated at 21:44:57Z with the breaker unchanged (`triggered: false`, same peak, no pending halts), trigger installed at 21:47:00Z (5 files hash-verified, unit enabled; `TRADE_WEBHOOK_NOTIFY_TOKEN` empty because the stack sets none). `ft-hl-gateway`, `ft-killers-scalp` and `killers-receiver` were not restarted (StartedAt unchanged). Step 7 passed. The cap, duplicate-pair, reused-event (closed and open trade), past-deadline, deadline-too-far and missing-tag entries were all refused, and the stop settings matched. ROI trade **4** (BTC, opened 21:47:35 UTC) is left open: check `exit_reason: "roi"` after 2026-11-06 21:47 UTC | vps-deploy 64fa527 (PR #258, cherry-pick of main efda7f5) | Claude |
