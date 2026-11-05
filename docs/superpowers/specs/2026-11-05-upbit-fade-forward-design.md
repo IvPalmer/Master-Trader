@@ -182,3 +182,143 @@ Network-free fixtures cover:
 - checkpoint scheduling across restarts;
 - the ledger replay;
 - the resolution rule.
+
+## Addendum: live pilot (#252)
+
+Added 2026-11-05. The sections above are unchanged and still describe the paper monitor,
+which keeps running unchanged as the preregistered shadow measurement.
+
+**Why.** At about 1.7 events a month the paper decision needs about a year. On 2026-11-05
+the operator chose not to wait: "if our backtests support it lets put it live with a bit of
+money". The authority is that decision and the Part C proxy result. No forward outcome
+exists yet, and the graduation gates are not met and not claimed. Recorded as an amendment
+of `upbit-krw-fade-forward-2026-11` and as the new prereg `upbit-krw-fade-live-pilot-2026-11`.
+
+**Shape.** Two parts, copying the Killers pattern (a pass-through Freqtrade bot driven by
+`/forceenter`):
+
+- **Bot** `ft-upbit-fade-hl` (`UpbitFadeLiveV1`, `127.0.0.1:8105`): Hyperliquid perps,
+  futures, isolated, leverage 1, `can_short`, stake 50 USDC, `max_open_trades` 2. It has no
+  signals of its own. The 24 h exit is `minimal_roi {"0": 100, "1440": -1}`, evaluated by
+  Freqtrade on every loop (no `custom_exit`, which the fleet showed is dead without exit
+  signals). The emergency stop is -0.60, above the worst Part C adverse move (+48.7%), so
+  it does not change the tested rule. The stop sits on the exchange when live and is off in
+  dry-run, set by the compose entrypoint from the dry-run flag. `HL_UPBIT_GATEWAY_CLIENT`
+  picks its `hl-gateway` client. In dry-run it is the deployed gateway's `short` client
+  (background reads, exchange actions refused; a dry-run Freqtrade sends none), so the
+  dry-run deploy does not touch the gateway. Live it is `upbit`, which may submit exchange
+  actions, and the entrypoint refuses live on any other client. Its keys come only from
+  Dokploy env vars; the repo holds none.
+  It starts in dry-run (`HYPERLIQUID_UPBIT_FADE_DRY_RUN` defaults to `true`), and the
+  entrypoint refuses to start live without both the wallet address and the key.
+- **Trigger** `research/upbit_fade_live/live_trigger.py` (user unit
+  `upbit-fade-live-trigger`): stdlib, host-side. It tails the paper ledger read-only and,
+  for each paper entry of an event that `uff_report.classify` puts in the comparable cohort
+  with every requirement established, sends one `POST /api/v1/forceenter` (short, stake 50,
+  leverage 1, market, entry tag `upbit-fade:<event id>`) to the local bot with HTTP Basic
+  auth. It talks only to a loopback URL; it never signs an order or calls Hyperliquid.
+
+**Selection.** Exactly the paper monitor's own: eligibility at t0 is unchanged and the paper
+entry (t0 + 5 min) is the trigger. An event whose requirements are not yet established
+waits, and is skipped if they are not established by t0 + 7 min. *Claude's call:* the paper
+keeps such an event comparable with a missing outcome, but the pilot does not trade
+something the paper could not judge.
+
+**Guards** (each decision is one record in the trigger's append-only, fsynced
+`data/decisions.jsonl`):
+
+- one decision per event id; the intent is written before the request, and the request is
+  sent once and never retried;
+- no entry after t0 + 7 min (`stale`);
+- the bot must answer for strategy `UpbitFadeLiveV1` and be running, with fewer than 2
+  open trades;
+- the pair must be an active perp in the bot's markets, else `unavailable_pair` (Freqtrade's
+  own "Symbol does not exist" rejection maps to the same status). `kPEPE` maps to
+  `KPEPE/USDC:USDC`, as ccxt names it;
+- kill-switch file `data/KILL`: while it exists, no entry is sent. *Claude's call:* the
+  trigger engages it itself when the cumulative realized P&L of the bot's database is
+  -75 USDC or worse (read on every loop, not only when a paper event arrives), when a
+  `/forceenter` outcome could not be observed (timeout, or an unexpected status), and when
+  the URL answers for another strategy. An intent without a result after a crash is
+  recorded `unknown` and engages it too;
+- an unknown outcome writes the pause file **before** the outcome record. While any
+  unknown outcome has no reconciliation record, the trigger stays paused and puts the file
+  back on every loop and at every start, so deleting it does not resume. The operator
+  checks the bot and Hyperliquid, then records the outcome with
+  `live_trigger.py reconcile <event id> --outcome entered|not_entered`, and only then
+  removes the file;
+- a failure to persist any record or the pause file stops every further entry from that
+  process (and writes the pause file if it can).
+
+**Bot-side guard** (`UpbitFadeLiveV1.confirm_trade_entry`, #252 review). Freqtrade 2026.7
+runs the `/forceenter` max-open and same-pair checks before it takes its entry lock, so two
+concurrent calls (the trigger and a manual call) could both pass them. `execute_entry` calls
+`confirm_trade_entry` under that lock, just before the order. The trigger's entry tag is
+`upbit-fade:<event id>@<t0 + 7 min in ms>`, and the strategy refuses unless the tag parses,
+the side is short, the time is not past the deadline (which may be at most 7 min ahead),
+fewer than 2 trades are open, the pair has no open trade, no trade (open or closed)
+carries the event id, and the realized P&L of the closed trades in the bot's database is
+above -75 USDC. Any error refuses: Freqtrade's wrapper treats an exception as "confirmed".
+
+**Timing rule** (amended; approved by the operator in chat, 2026-11-05 ('Approve it')).
+Admission is by t0 + 7 min, checked by the trigger and again by the bot under its entry
+lock. Submission is not bounded: after `confirm_trade_entry` Freqtrade prepares margin mode
+and leverage, with retries, before it submits, and ccxt 4.5.68 does not sign Hyperliquid's
+`expiresAfter` on ordinary orders (`create_orders_request` signs the action without it).
+So the delay is measured instead: for every entry the trigger reads the entry order back
+from the bot and records its submission (`order_timestamp`) and fill
+(`order_filled_timestamp`) times against t0 and the paper entry (`timing:` records). A fill
+after t0 + 10 min, or no timely fill confirmed by then (the trade unreadable, no entry
+order on it, or not filled), is an execution defect and writes the durable pause.
+Freqtrade takes those times from Hyperliquid's order data when ccxt provides them, else
+from its own clock when it saw the order.
+
+**Gateway allocation.** The `upbit` client's reads are background (tier 2) and share the
+600-unit background allowance. Only its exchange actions and `orderStatus` reads are
+priority, and those draw on its own slice of 40 weight per rolling minute, which is never
+counted against the fleet's priority capacity; a slice waiter never blocks a fleet waiter.
+Killers keeps its 250 + 50 units whatever the pilot does, and nothing changes for Killers
+while the pilot is idle. Worst case through the gateway is 940 per minute (HL allows 1200
+per IP). The paper monitor calls Hyperliquid directly from the same IP, at most one request
+a second and only around events.
+
+**Gateway restarts.** The gateway keeps no budget state: a recreated gateway starts with
+an empty rolling minute while Hyperliquid keeps counting the last one. The `upbit` client
+is added by one recreate at go-live, done only when Killers is flat (no open positions and
+no open orders on Hyperliquid, the same rule as the #188 flat restart) and the
+trailing-minute usage on `/healthz`, read just before, is under 300; Killers `/status` and
+the gateway logs are checked after, and the previous image is kept for rollback
+(GO-LIVE.md).
+
+**Epochs.** Dry-run trades are plumbing checks, not results. The live epoch starts at the
+first start with the dry-run flag false and is recorded in a prereg amendment. The live
+database is a separate file, so the realized P&L for the kill rule starts at zero then.
+Live results are reported per trade against the paper entry and exit of the same event and
+are never pooled with paper results or used in the paper decision.
+
+**Account.** *Claude's call:* a dedicated Hyperliquid master account with its own API
+(agent) wallet, funded with about 150 USDC, as Killers runs. Not a subaccount: ccxt 4.5.68
+sends orders with `vaultAddress` but reads balances and positions with
+`subAccountAddress`, and the Freqtrade subaccount setup is unverified here. An API wallet
+cannot withdraw.
+
+**Runbook:** `research/upbit_fade_live/GO-LIVE.md`.
+
+**Follow-ups, not in this change:** a valuation adapter for the `hyperliquid-upbit-fade`
+capital account in the metrics exporter (until then a live bot pages as outside the
+circuit breaker); listing the bot in the dashboard UI; per-trade live-versus-paper
+reporting.
+
+**Tests:** `tests/test_upbit_fade_live_trigger.py` and `tests/test_upbit_fade_live_bot.py`
+cover idempotency, crash and restart, max open, the kill switch and the P&L kill, stale
+records, unavailable pairs, auth headers and the loopback rule, the strategy and config
+settings, the compose entrypoint in both modes, `--no-deps` safety, unique ports and
+database and log files, and a pin of the code's constants to the prereg. Since the #252
+review they also cover the durable pause and `reconcile`, the halt on a failed write, the
+loss latch, the bot-side guard against Freqtrade's force-entry order (concurrent calls,
+same pair, same event, deadline, loss limit, fail closed), and in
+`services/hl-gateway/tests/` the pilot's contention with Killers, a gateway that keeps no
+budget state and the deployed `short` client serving the dry-run bot, plus the entry
+timing measurement and the pause when no timely fill can be confirmed. The
+ROI test reproduces Freqtrade's `min_roi_reached`; the real code is checked in dry-run on
+the VPS (GO-LIVE.md, Part 1).

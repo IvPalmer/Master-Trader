@@ -38,6 +38,7 @@ export_bot_creds FUNDINGFADE  ft-funding-fade
 export_bot_creds OITREND      ft-oi-trend-pullback
 export_bot_creds KILLERS      ft-killers-scalp
 export_bot_creds SHORTKELTNER ft-short-keltner-hl-live
+export_bot_creds UPBITFADE    ft-upbit-fade-hl
 
 # Shared pair as the fallback for anything not covered above.
 CREDS_CONTAINER="ft-keltner-bounce"

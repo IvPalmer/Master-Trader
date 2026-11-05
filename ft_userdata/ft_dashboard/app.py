@@ -606,6 +606,7 @@ SERVICE_API_SLUGS = {
     "oi-trend-pullback": "OITREND",
     "ft-killers-scalp": "KILLERS",
     "ft-short-keltner-hl-live": "SHORTKELTNER",
+    "ft-upbit-fade-hl": "UPBITFADE",
 }
 
 
