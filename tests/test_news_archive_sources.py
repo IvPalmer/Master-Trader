@@ -203,6 +203,9 @@ def test_timestamp_edge_cases(value, kind, expected):
     ("px_es", b"<html>Too Many Requests</html>"),
     ("px_vix", load("cboe_access_denied.xml")),
     ("px_vix", b'{"timestamp":"2026-11-05 19:45:38","data":{"symbol":"^VIX"}}'),
+    ("px_vix", b'{"data":{"symbol":"^VIX","current_price":26.3,"last_trade_time":"not-a-date"}}'),
+    ("px_es", b'{"chart":{"result":[{"meta":{"symbol":"ES=F","regularMarketTime":-1,'
+              b'"regularMarketPrice":7412.0}}],"error":null}}'),
     ("rss_ft_markets", b"<html><body>Just a moment...</body></html>"),
 ])
 def test_error_payloads_raise_not_return_empty(key, payload):

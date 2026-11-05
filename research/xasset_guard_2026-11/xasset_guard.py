@@ -20,6 +20,11 @@ trigger <= entry < trigger + N h, for N in HOURS (VIXD: VIXD_HOURS).
 Per trade list x variant: n, n blocked, net P&L without / with the guard (first order: freed
 slots are not refilled), month-block bootstrap CIs, a date-shift placebo, and the frozen verdict
 on the primary cell. Stdlib only; reads inputs in place and verifies their sha256 first.
+
+Amendment A1 (before any result, from Codex review round 1): triggers are taken only inside the
+variant's window; the placebo enumerates every whole-day shift in +/-1..30 days, applied
+circularly within that window, with an exact one-sided rank p; a verdict needs blocked trades
+in >= 3 calendar months; secondary cells are descriptive only.
 """
 import argparse
 import bisect
@@ -53,12 +58,15 @@ WINDOW_INTRADAY = ("2024-06-15T00:00:00Z", "2026-11-01T00:00:00Z")
 WINDOW_DAILY = ("2023-01-01T00:00:00Z", "2026-11-01T00:00:00Z")
 BOOT_N = 10000
 SEED = 2291105
-N_PLACEBO = 1000
 PLACEBO_MAX_DAYS = 30
 CI_LEVEL = 0.95
 MIN_BLOCKED_FOR_PASS = 10
 N_VARIANTS = len(INTRADAY_GUARDS) * len(HOURS) + len(VIXD_HOURS)
-SECONDARY_PLACEBO_PCTILE = 100.0 * (1 - 0.05 / N_VARIANTS)
+PLACEBO_OFFSETS = tuple(sign * d * 86400 for d in range(1, PLACEBO_MAX_DAYS + 1)
+                        for sign in (1, -1))   # A1: enumerated, no random draw
+N_PLACEBO = len(PLACEBO_OFFSETS)
+P_MAX = 0.05
+MIN_BLOCKED_MONTHS = 3                          # A1
 
 R = "/home/ubuntu/master-trader/research"
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -207,6 +215,19 @@ def vixd_triggers(closes, rise=VIXD_RISE):
     return out
 
 
+def in_window(times, window):
+    lo, hi = window
+    return [t for t in times if lo <= t < hi]
+
+
+def circular(times, shift, window):
+    """Shift trigger times by `shift`, wrapping inside [lo, hi) so no placebo trigger falls
+    where the data have no coverage (A1). Whole-day shifts of a whole-day window keep the
+    hour of day."""
+    lo, hi = window
+    return [lo + (t - lo + shift) % (hi - lo) for t in times]
+
+
 def intervals(times, hours, shift=0):
     """Merged [start, end) guard intervals."""
     span = hours * 3600
@@ -339,37 +360,40 @@ def block_bootstrap(trades, flags, rng, n_boot=BOOT_N, level=CI_LEVEL):
                 diff_mean=ci(diff), diff_skipped=skipped)
 
 
-def placebo_offsets(rng, n=N_PLACEBO, max_days=PLACEBO_MAX_DAYS):
-    return [rng.choice((-1, 1)) * rng.randint(1, max_days) * 86400 for _ in range(n)]
-
-
-def placebo(trades, times, hours, offsets, real_delta, longs_only=False):
+def placebo(trades, times, hours, window, real_delta, longs_only=False, offsets=PLACEBO_OFFSETS):
+    """Exact rank test over every enumerated shift (A1). p_helps = (1 + #placebo >= real) /
+    (1 + N); p_hurts = (1 + #placebo <= real) / (1 + N); ties count against the real guard."""
     deltas = []
     for off in offsets:
-        ivs = intervals(times, hours, off)
+        ivs = intervals(circular(times, off, window), hours)
         st = [a for a, _ in ivs]
         deltas.append(-sum(t["abs"] for t in trades
                            if not (longs_only and t["is_short"]) and blocked(t["entry_s"], ivs, st)))
+    n = len(deltas)
     below = sum(1 for x in deltas if x < real_delta)
     ties = sum(1 for x in deltas if x == real_delta)
-    return dict(pctile=100.0 * (below + 0.5 * ties) / len(deltas), mean=mean(deltas),
-                p05=pct(deltas, 0.05), p95=pct(deltas, 0.95),
-                share_nonzero=sum(1 for x in deltas if x != 0) / len(deltas))
+    above = n - below - ties
+    return dict(n=n, pctile=100.0 * (below + 0.5 * ties) / n,
+                p_helps=(1 + above + ties) / (1 + n), p_hurts=(1 + below + ties) / (1 + n),
+                mean=mean(deltas), p05=pct(deltas, 0.05), p95=pct(deltas, 0.95),
+                share_nonzero=sum(1 for x in deltas if x != 0) / n)
 
 
 def verdict(cell):
-    """Frozen decision rule (primary cell only)."""
-    d, ci, pl, nb = cell["delta"], cell["boot"]["delta"], cell["placebo"]["pctile"], cell["n_blocked"]
-    if nb >= MIN_BLOCKED_FOR_PASS and d > 0 and ci and ci["lo"] > 0 and pl >= 95:
+    """Frozen decision rule as amended by A1 (primary cell only)."""
+    d, ci, pl, nb = cell["delta"], cell["boot"]["delta"], cell["placebo"], cell["n_blocked"]
+    enough = nb >= MIN_BLOCKED_FOR_PASS and cell["blocked_months"] >= MIN_BLOCKED_MONTHS
+    if enough and d > 0 and ci and ci["lo"] > 0 and pl["p_helps"] <= P_MAX:
         return "helps"
-    if nb >= MIN_BLOCKED_FOR_PASS and d < 0 and ci and ci["hi"] < 0 and pl <= 5:
+    if enough and d < 0 and ci and ci["hi"] < 0 and pl["p_hurts"] <= P_MAX:
         return "hurts"
     return "inconclusive"
 
 
-def evaluate(trades, times, hours, window, offsets, rng, longs_only=False):
+def evaluate(trades, times, hours, window, rng, longs_only=False):
     lo, hi = window
     tr = [t for t in trades if lo <= t["entry_s"] < hi]
+    times = in_window(times, window)
     ivs = intervals(times, hours)
     st = [a for a, _ in ivs]
     flags = [not (longs_only and t["is_short"]) and blocked(t["entry_s"], ivs, st) for t in tr]
@@ -377,9 +401,10 @@ def evaluate(trades, times, hours, window, offsets, rng, longs_only=False):
     net_without = sum(t["abs"] for t in tr)
     delta = -sv["sum_abs"]
     return dict(n=len(tr), n_blocked=sv["n"], net_without=net_without, net_with=net_without + delta,
-                delta=delta, blocked=sv, kept=sk,
+                delta=delta, blocked=sv, kept=sk, n_triggers=len(times),
+                blocked_months=len({month(t["entry_s"]) for t, f in zip(tr, flags) if f}),
                 boot=block_bootstrap(tr, flags, rng) if tr else None,
-                placebo=placebo(tr, times, hours, offsets, delta, longs_only) if tr else None,
+                placebo=placebo(tr, times, hours, window, delta, longs_only) if tr else None,
                 guarded_share=guarded_share(ivs, lo, hi),
                 blocked_rows=[t for t, f in zip(tr, flags) if f])
 
@@ -491,14 +516,13 @@ def run(root, data, out_dir):
     es, vix, closes, lists = load_inputs(root, data)
     trig, var = variants(es, vix, closes)
     rng = random.Random(SEED)
-    offsets = placebo_offsets(rng)
     results, blocked_rows = [], []
     for label, L in lists.items():
         modes = [False, True] if label in SHORT_LISTS else [False]
         for g, h, win in var:
             times = [t for t, _, _ in trig[g]]
             for longs_only in modes:
-                cell = evaluate(L["trades"], times, h, win, offsets, rng, longs_only)
+                cell = evaluate(L["trades"], times, h, win, rng, longs_only)
                 rows = cell.pop("blocked_rows")
                 cell.update(list=label, guard=g, hours=h, unit=L["unit"], longs_only=longs_only,
                             window=[iso(win[0]), iso(win[1])])
@@ -544,17 +568,20 @@ def _ci(c, fmt="%+.2f"):
 
 
 def tables(summary):
-    L = ["| list | guard | N h | longs only | n | blocked | net without | net with | change "
-         "(95% CI) | blocked mean / kept mean | placebo pct | guarded time |",
-         "|---|---|---:|---|---:|---:|---:|---:|---|---|---:|---:|"]
+    L = ["| list | guard | N h | longs only | n | blocked (months) | net without | net with | "
+         "change (95% CI) | blocked mean / kept mean | placebo pct | p helps / p hurts | "
+         "guarded time |",
+         "|---|---|---:|---|---:|---:|---:|---:|---|---|---:|---|---:|"]
     for r in summary["results"]:
-        b = r["boot"] or {}
-        L.append("| %s | %s | %d | %s | %d | %d | %+.2f | %+.2f | %+.2f %s | %s / %s | %s | %.1f%% |%s" % (
-            r["list"], r["guard"], r["hours"], "yes" if r["longs_only"] else "no", r["n"],
-            r["n_blocked"], r["net_without"], r["net_with"], r["delta"], _ci(b.get("delta")),
-            _p(r["blocked"]["mean_ratio"]), _p(r["kept"]["mean_ratio"]),
-            "-" if not r["placebo"] else "%.0f" % r["placebo"]["pctile"],
-            100 * r["guarded_share"], " **%s**" % r["verdict"] if "verdict" in r else ""))
+        b, pl = r["boot"] or {}, r["placebo"]
+        L.append("| %s | %s | %d | %s | %d | %d (%d) | %+.2f | %+.2f | %+.2f %s | %s / %s | %s | %s "
+                 "| %.1f%% |%s" % (
+                     r["list"], r["guard"], r["hours"], "yes" if r["longs_only"] else "no", r["n"],
+                     r["n_blocked"], r["blocked_months"], r["net_without"], r["net_with"],
+                     r["delta"], _ci(b.get("delta")), _p(r["blocked"]["mean_ratio"]),
+                     _p(r["kept"]["mean_ratio"]), "-" if not pl else "%.0f" % pl["pctile"],
+                     "-" if not pl else "%.3f / %.3f" % (pl["p_helps"], pl["p_hurts"]),
+                     100 * r["guarded_share"], " **%s**" % r["verdict"] if "verdict" in r else ""))
     L += ["", "Triggers: %s" % json.dumps(summary["n_triggers"]), "",
           "2026-11-05 timeline (descriptive):", "```",
           json.dumps(summary["timeline_2026_11_05"], indent=1), "```"]

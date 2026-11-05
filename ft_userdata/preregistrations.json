@@ -2034,7 +2034,33 @@
         "2026-11-05 itself, from the #254 brief and probes: VIX 25.2 against a 16.61 prior close and ES 7419 against 7720 at about 19:20Z, so VIX20 and probably ES60 fire that day. That day is outside every trade list."
       ],
       "triggers": [],
-      "amendments": [],
+      "amendments": [
+        {
+          "id": "A1-codex-pre-run",
+          "date": "2026-11-05",
+          "by": "Claude, from Codex Sol/high review round 1 (thread 01a1ad42-6a18-7d53-bb29-4aee8f822406)",
+          "frozen_before_results": true,
+          "note": "Made before the study was run: no trigger had been joined to any trade and no trigger list had been computed.",
+          "reasons": [
+            "Placebo coverage: shifting triggers by up to 30 days pulled them across the ends of the data (ES history starts 2024-06-14, the fetch ends 2026-11-05), so shifted guards saw fewer triggers near the window edges and could inflate the real guard's rank.",
+            "Resolution: +/-1..30 whole days gives only 60 distinct shifts, so 1,000 random draws repeat them and no rank test can reach the 0.5% tail the secondary Bonferroni rule asked for.",
+            "Clustering: blocked trades from one month give a degenerate month-block CI, so a single event could pass the verdict."
+          ],
+          "changes": {
+            "trigger_scope": "triggers are used only inside the variant's window (window_intraday_utc or window_daily_utc), for the real guard and the placebos alike",
+            "placebo": "each of the 60 whole-day shifts in +/-1..placebo_max_days applied to every in-window trigger, wrapping circularly within the window (whole-day shifts of a whole-day window keep the hour of day); enumerated, no random draw. Exact one-sided rank p: p_helps = (1 + #placebo changes >= real) / 61, p_hurts = (1 + #placebo changes <= real) / 61; the percentile (ties half) is reported for continuity",
+            "placebo_draws": 60,
+            "placebo_seed": null,
+            "p_max": "0.05",
+            "min_blocked_months_for_verdict": 3,
+            "secondary_placebo_pctile": null,
+            "pass_criteria": "helps: on the primary cell (OR, 12 h, FF_V2_current, all entries), n blocked >= 10 from >= 3 calendar months, change > 0, the change's 95% CI lower bound > 0 and p_helps <= 0.05.",
+            "kill": "hurts: on the primary cell, n blocked >= 10 from >= 3 calendar months, change < 0, the CI upper bound < 0 and p_hurts <= 0.05.",
+            "secondary": "Cells other than the primary are descriptive only and support nothing, replacing the Bonferroni support rule.",
+            "snapshot_sources": "unrelated to the study: the #254 archive snapshot parsers now fail the poll when the quote time cannot be normalized"
+          }
+        }
+      ],
       "resolution": null,
       "resolution_note": null
     }

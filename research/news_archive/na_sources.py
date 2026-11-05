@@ -373,9 +373,12 @@ def parse_yahoo_chart(body):
         vals = [c[i] if i < len(c) else None for c in cols]
         if vals[3] is not None:
             rows.append([ti] + vals)
+    published = to_utc(t, "s")
+    if published is None:
+        raise ValueError("yahoo chart: unusable regularMarketTime %r" % t)
     prev = meta.get("previousClose", meta.get("chartPreviousClose"))
     raw = {"meta": meta, "bars_1m": rows[-YAHOO_BARS_KEPT:]}
-    return [Item("%s:%d" % (symbol, t), to_utc(t, "s"), _pct_title(symbol, price, prev), None,
+    return [Item("%s:%d" % (symbol, t), published, _pct_title(symbol, price, prev), None,
                  None, None, raw)]
 
 
@@ -393,7 +396,10 @@ def parse_cboe_quote(body):
         _text(d.get("last_trade_time"))
     if not symbol or not _num(price) or not ltt:
         raise ValueError("cboe quote: data lacks symbol, current_price or last_trade_time")
-    return [Item("%s:%s" % (symbol, ltt), to_utc(ltt, "et"),
+    published = to_utc(ltt, "et")
+    if published is None:
+        raise ValueError("cboe quote: unusable last_trade_time %r" % ltt)
+    return [Item("%s:%s" % (symbol, ltt), published,
                  _pct_title(symbol, price, d.get("prev_day_close")), None, None, None, d)]
 
 

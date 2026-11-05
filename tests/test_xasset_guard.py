@@ -38,16 +38,27 @@ def trade(entry_iso, pnl, short=False, ratio=None):
 
 # ---- preregistration ---------------------------------------------------------------------
 
+def effective():
+    """The frozen block with every amendment's changes applied, in order."""
+    e = entry()
+    fr = dict(e["frozen"])
+    for a in e["amendments"]:
+        fr.update(a["changes"])
+    return fr
+
+
 def test_entry_is_open_research_only_and_unresolved():
     e = entry()
     assert e["status"] == "open" and e["bot"] is None and e["resolution"] is None
-    assert e["issue"] == "#254" and e["triggers"] == [] and e["amendments"] == []
+    assert e["issue"] == "#254" and e["triggers"] == []
     assert e["frozen"]["places_orders"] is False
     assert "allocation" in " ".join(e["rules"])
+    assert [a["id"] for a in e["amendments"]] == ["A1-codex-pre-run"]
+    assert all(a["frozen_before_results"] is True for a in e["amendments"])
 
 
 def test_frozen_block_matches_the_code():
-    fr = entry()["frozen"]
+    fr = effective()
     assert float(fr["es_drop"]) == xg.ES_DROP and float(fr["vix_rise"]) == xg.VIX_RISE
     assert float(fr["vixd_rise"]) == xg.VIXD_RISE
     assert fr["bar_s"] == xg.BAR_S and fr["latency_s"] == xg.LATENCY_S
@@ -61,9 +72,12 @@ def test_frozen_block_matches_the_code():
     assert tuple(fr["window_daily_utc"]) == xg.WINDOW_DAILY
     assert fr["bootstrap_resamples"] == xg.BOOT_N and fr["bootstrap_seed"] == xg.SEED
     assert float(fr["ci_level"]) == xg.CI_LEVEL
-    assert fr["placebo_draws"] == xg.N_PLACEBO and fr["placebo_max_days"] == xg.PLACEBO_MAX_DAYS
+    assert fr["placebo_draws"] == xg.N_PLACEBO == 60
+    assert fr["placebo_max_days"] == xg.PLACEBO_MAX_DAYS and fr["placebo_seed"] is None
     assert fr["min_blocked_for_pass"] == xg.MIN_BLOCKED_FOR_PASS
-    assert float(fr["secondary_placebo_pctile"]) == pytest.approx(xg.SECONDARY_PLACEBO_PCTILE)
+    assert fr["min_blocked_months_for_verdict"] == xg.MIN_BLOCKED_MONTHS
+    assert float(fr["p_max"]) == xg.P_MAX and fr["secondary_placebo_pctile"] is None
+    assert "/ 61" in fr["placebo"] and ">= 3 calendar months" in fr["pass_criteria"]
     assert fr["raw_sha256"] == xg.RAW and fr["fetched_at_utc"] == xg.FETCHED_AT
     assert set(fr["longs_only_sensitivity"]) == xg.SHORT_LISTS
 
@@ -180,12 +194,11 @@ def test_evaluate_first_order_change_window_and_longs_only():
               trade("2025-01-20T00:00:00Z", 2.0),
               trade("2025-03-01T00:00:00Z", 100.0)]              # outside the window
     rng = random.Random(1)
-    offs = xg.placebo_offsets(rng, n=50)
-    c = xg.evaluate(trades, trig, 12, win, offs, rng)
-    assert (c["n"], c["n_blocked"]) == (4, 2)
+    c = xg.evaluate(trades, trig + [t("2024-12-31T23:00:00Z")], 12, win, rng)  # out of window
+    assert (c["n"], c["n_blocked"], c["n_triggers"], c["blocked_months"]) == (4, 2, 1, 1)
     assert c["net_without"] == 3.0 and c["delta"] == 4.0 and c["net_with"] == 7.0
     assert c["blocked"]["sum_abs"] == -4.0 and c["kept"]["n"] == 2
-    lo = xg.evaluate(trades, trig, 12, win, offs, rng, longs_only=True)
+    lo = xg.evaluate(trades, trig, 12, win, rng, longs_only=True)
     assert lo["n_blocked"] == 1 and lo["delta"] == 3.0
 
 
@@ -206,33 +219,47 @@ def test_bootstrap_counts_draws_without_blocked_trades():
     assert b["delta"]["lo"] == 0.0 and b["delta"]["hi"] == 2.0
 
 
-def test_placebo_percentile_counts_ties_half():
+def test_placebo_rank_p_counts_ties_against_the_real_guard():
     trades = [trade("2025-01-10T12:00:00Z", -2.0)]
+    win = (t("2025-01-01T00:00:00Z"), t("2025-02-01T00:00:00Z"))
     real = 2.0   # the real guard blocks the loser
-    p = xg.placebo(trades, [t("2025-01-10T11:00:00Z")], 4, [86400, -86400, 0], real)
-    # shifted draws block nothing (change 0 < 2); the zero shift ties
-    assert p["pctile"] == pytest.approx(100 * (2 + 0.5) / 3)
+    p = xg.placebo(trades, [t("2025-01-10T11:00:00Z")], 4, win, real, offsets=(86400, -86400, 0))
+    # shifted placebos block nothing (change 0 < 2); the zero shift ties
+    assert p["n"] == 3 and p["pctile"] == pytest.approx(100 * (2 + 0.5) / 3)
+    assert p["p_helps"] == pytest.approx((1 + 1) / 4) and p["p_hurts"] == pytest.approx(1.0)
     assert p["share_nonzero"] == pytest.approx(1 / 3)
 
 
-def test_placebo_offsets_are_whole_days_within_30():
-    offs = xg.placebo_offsets(random.Random(xg.SEED))
-    assert len(offs) == xg.N_PLACEBO
-    assert all(o % 86400 == 0 and 1 <= abs(o) // 86400 <= 30 for o in offs)
-    assert {o > 0 for o in offs} == {True, False}
+def test_placebo_offsets_enumerate_every_whole_day_shift_once():
+    offs = xg.PLACEBO_OFFSETS
+    assert len(offs) == len(set(offs)) == 60
+    assert sorted(abs(o) // 86400 for o in offs) == sorted(list(range(1, 31)) * 2)
+    assert all(o % 86400 == 0 for o in offs)
 
 
-@pytest.mark.parametrize("nb,delta,ci,pl,expected", [
-    (12, 5.0, (0.5, 9.0), 97, "helps"),
-    (12, 5.0, (-0.5, 9.0), 97, "inconclusive"),
-    (12, 5.0, (0.5, 9.0), 94, "inconclusive"),
-    (9, 5.0, (0.5, 9.0), 99, "inconclusive"),
-    (12, -5.0, (-9.0, -0.5), 3, "hurts"),
-    (12, -5.0, (-9.0, 0.5), 3, "inconclusive"),
+def test_circular_shift_wraps_inside_the_window_and_keeps_the_hour():
+    win = (t("2025-01-01T00:00:00Z"), t("2025-02-01T00:00:00Z"))
+    assert xg.circular([t("2025-01-30T15:05:00Z")], 5 * 86400, win) == [t("2025-01-04T15:05:00Z")]
+    assert xg.circular([t("2025-01-02T15:05:00Z")], -3 * 86400, win) == [t("2025-01-30T15:05:00Z")]
+    # a wrapped trigger still blocks trades inside the window, so no placebo loses coverage
+    trades = [trade("2025-01-04T16:00:00Z", -1.0)]
+    p = xg.placebo(trades, [t("2025-01-30T15:05:00Z")], 4, win, 0.0, offsets=(5 * 86400,))
+    assert p["mean"] == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("nb,months,delta,ci,ph,pu,expected", [
+    (12, 3, 5.0, (0.5, 9.0), 0.04, 0.99, "helps"),
+    (12, 3, 5.0, (-0.5, 9.0), 0.04, 0.99, "inconclusive"),
+    (12, 3, 5.0, (0.5, 9.0), 0.06, 0.99, "inconclusive"),
+    (9, 3, 5.0, (0.5, 9.0), 0.02, 0.99, "inconclusive"),
+    (12, 2, 5.0, (0.5, 9.0), 0.02, 0.99, "inconclusive"),     # one or two events only
+    (12, 3, -5.0, (-9.0, -0.5), 0.99, 0.03, "hurts"),
+    (12, 3, -5.0, (-9.0, 0.5), 0.99, 0.03, "inconclusive"),
+    (12, 3, -5.0, (-9.0, -0.5), 0.99, 0.07, "inconclusive"),
 ])
-def test_verdict_is_the_frozen_rule(nb, delta, ci, pl, expected):
-    cell = dict(n_blocked=nb, delta=delta, boot=dict(delta=dict(lo=ci[0], hi=ci[1])),
-                placebo=dict(pctile=pl))
+def test_verdict_is_the_amended_rule(nb, months, delta, ci, ph, pu, expected):
+    cell = dict(n_blocked=nb, blocked_months=months, delta=delta,
+                boot=dict(delta=dict(lo=ci[0], hi=ci[1])), placebo=dict(p_helps=ph, p_hurts=pu))
     assert xg.verdict(cell) == expected
 
 
@@ -288,8 +315,6 @@ def test_run_end_to_end_on_synthetic_inputs(tmp_path, monkeypatch):
     monkeypatch.setattr(xg, "STRATS", [("Killers_dry", "kd.json", None, "kdry", "USDT",
                                         sha(root / "kd.json"))])
     monkeypatch.setattr(xg, "PRIMARY", ("OR", 12, "Killers_dry"))
-    monkeypatch.setattr(xg, "BOOT_N", 50)
-    monkeypatch.setattr(xg, "N_PLACEBO", 20)
     s = xg.run(str(root), str(data), str(out))
     assert s["n_triggers"] == {"ES60": 1, "VIX20": 1, "OR": 2, "VIXD": 1}
     cells = {(r["guard"], r["hours"], r["longs_only"]): r for r in s["results"]}
