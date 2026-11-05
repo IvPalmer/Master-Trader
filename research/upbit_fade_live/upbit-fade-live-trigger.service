@@ -1,0 +1,28 @@
+# Upbit KRW listing fade live-pilot trigger (#252). systemd USER unit, host side.
+# Reads the paper monitor's ledger read only and calls /forceenter on the local bot
+# ft-upbit-fade-hl (127.0.0.1:8105). It never signs orders and never talks to Hyperliquid.
+# Install and go-live: research/upbit_fade_live/GO-LIVE.md. Never copy it into the Dokploy checkout.
+[Unit]
+Description=Upbit KRW listing fade live-pilot trigger (#252; local Freqtrade /forceenter only)
+After=network-online.target upbit-fade-forward.service
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/master-trader/research/upbit_fade_live
+Environment=PYTHONDONTWRITEBYTECODE=1
+# FT_API_URL, FT_API_USER, FT_API_PASS, NOTIFY_URL, TRADE_WEBHOOK_NOTIFY_TOKEN.
+# Not committed; mode 600. Template: trigger.env.example.
+EnvironmentFile=%h/.config/upbit-fade-live/trigger.env
+ExecStart=/usr/bin/python3 -B /home/ubuntu/master-trader/research/upbit_fade_live/live_trigger.py run
+Restart=always
+RestartSec=30
+MemoryMax=512M
+CPUQuota=25%
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=default.target
