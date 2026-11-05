@@ -125,8 +125,11 @@ def test_compute_end_to_end_fixture(tmp_path):
     nets = {e["token"]: e["horizons"]["4h"]["net"] for e in out["events"]}
     assert nets == {"AAA": pytest.approx(0.0171), "BBB": pytest.approx(-0.0129),
                     "CCC": pytest.approx(-0.0029)}
-    assert out["verdict"] == "INCONCLUSIVE-by-data"
-    assert any("n 2 < 20" in r for r in out["reasons"])
+    # A4: both announcements fall in one calendar month, so no interval can be formed.
+    assert out["verdict"] == "NOT DETERMINABLE"
+    assert out["legacy_gates"]["verdict"] == "INCONCLUSIVE-by-data"
+    assert any("n 2 < 20" in r for r in out["legacy_gates"]["reasons"])
+    assert out["estimates"]["base"]["4h"]["n"] == 2 and out["estimates"]["base"]["4h"]["ci"] == [None, None]
     assert out["primary"]["4h"]["median"] == pytest.approx((0.0021 - 0.0029) / 2)
     allowed = {nv.kline_url("um", s, d) for s in ("AAAUSDT", "BBBUSDT", "CCCUSDT", "BTCUSDT")
                for d in [nu.utc_date(t + k * D) for t in (T1, T2) for k in range(-1, 6)]}
@@ -139,12 +142,14 @@ def test_stored_break_even_results_resolve_exactly(tmp_path):
     toks = ["T%02d" % i for i in range(20)]
     m = manifest([DEL], [ev("binance:%d" % i, T1, t) for i, t in enumerate(toks)])
     out = run(tmp_path, m, Market({(t + "USDT", exit4h(T1)): "99.71" for t in toks}))[DEL]
-    assert out["verdict"] == "FAIL" and out["primary"]["4h"]["median"] == 0.0
+    assert out["legacy_gates"]["verdict"] == "FAIL" and out["primary"]["4h"]["median"] == 0.0
+    assert out["verdict"] == "NOT DETERMINABLE"       # one calendar month
     stored = json.loads((tmp_path / "out" / ("results-%s.json" % DEL)).read_text(encoding="utf-8"))
     assert {e["horizons"]["4h"]["net"] for e in stored["events"]} == {"0"}
     assert {e["horizons"]["30m"]["net"] for e in stored["events"]} == {"-29/10000"}
     assert isinstance(stored["primary"]["4h"]["median"], float) and isinstance(stored["coverage"], float)
-    assert stored["verdict"] == "FAIL" and rp.resolution(stored)["verdict"] == "FAIL"
+    assert stored["legacy_gates"]["verdict"] == "FAIL"
+    assert rp.resolution(stored)["verdict"] == stored["verdict"] == "NOT DETERMINABLE"
 
 
 def test_upbit_manifest_yields_long_and_fade_from_same_rows(tmp_path):
@@ -178,7 +183,7 @@ def test_resolution_from_results_only_and_verify_detects_edit(tmp_path):
     res = rp.resolution(out)
     assert res["verdict"] == out["verdict"] and res["label"] == "proxy result"
     assert res["code_commit"] == "p2commit" and res["manifest_sha256"] == out["manifest_sha256"]
-    assert set(res["primary_4h"]) == {"n", "median", "half_medians", "top_decile_share"}
+    assert set(res["primary_4h"]) == {"n", "mean", "ci", "median", "win_rate"}
     prereg = json.loads((ROOT / "ft_userdata" / "preregistrations.json").read_text(encoding="utf-8"))
     for e in prereg["preregistrations"]:
         if e.get("id") == DEL:
@@ -192,3 +197,54 @@ def test_resolution_from_results_only_and_verify_detects_edit(tmp_path):
     pp.write_text(json.dumps(prereg, ensure_ascii=False), encoding="utf-8")
     assert rp.verify_resolution(pp, tmp_path / "out")
     assert rp.main(["verify-resolution", "--prereg", str(pp), "--results", str(tmp_path / "out")]) == 1
+
+
+# --- A4 supplement: O11 exclusions that relied on a later Binance notice -----------------
+
+import nes_supplement as ns  # noqa: E402
+
+
+def _overlap(aid, t0, token, ref, start=None):
+    e = {**ev(aid, t0, token, kind="krw_addition"), "exclusion": "binance48_overlap",
+         "exclusion_ref": ref, "binance": None, "hl": None}
+    if start is not None:
+        e["trading_start_ms"] = start
+    return e
+
+
+def test_supplement_readds_only_overlaps_announced_after_t0():
+    cms48 = [{"id": 10, "releaseDate": T1 + 2 * H}, {"id": 11, "releaseDate": T1 - 2 * H},
+             {"id": 12, "releaseDate": T1 + 5 * H}]
+    m = manifest([LONG, FADE], [_overlap("upbit:1", T1, "AFT", "binance:10"),
+                                _overlap("upbit:2", T1, "BEF", "binance:11"),
+                                _overlap("upbit:3", T1, "EAR", "binance:12", start=T1 - H),
+                                ev("upbit:4", T1, "KEPT", kind="krw_addition")])
+    out = ns.readded(m, cms48)
+    assert [e["token"] for e in out] == ["AFT", "EAR"]
+    aft, ear = out
+    assert aft["exclusion"] is None and aft["a4_readded_from"] == "binance:10"
+    assert aft["binance"] is None and aft["hl"] is None          # resolved again by Phase 1 code
+    assert ear["exclusion"] == "began_before_notice"
+    with pytest.raises(ValueError):
+        ns.readded(manifest([LONG], [_overlap("upbit:9", T1, "X", "binance:99")]), cms48)
+
+
+def test_compute_merges_supplement_and_reports_frozen_only(tmp_path):
+    base = manifest([LONG, FADE], [ev("upbit:1", T1, "TST", kind="krw_addition", spot="TSTUSDT")])
+    supp = {**manifest([LONG, FADE], [ev("upbit:2", T2, "SUP", kind="krw_addition", spot="SUPUSDT")]),
+            "a4_supplement": True}
+    p, sha = write(tmp_path, base)
+    sp, ssha = write(tmp_path, supp, name="s.json")
+    with pytest.raises(ValueError):
+        rp.compute(p, sha, tmp_path / "out", Market(), tmp_path / "work", lambda: True,
+                   code_commit="x", wall=LATER, sleep=lambda s: None, supplement=(sp, "0" * 64))
+    out = rp.compute(p, sha, tmp_path / "out", Market(), tmp_path / "work", lambda: True,
+                     code_commit="x", wall=LATER, sleep=lambda s: None, supplement=(sp, ssha))
+    for study in (LONG, FADE):
+        doc = out[study]
+        assert {e["token"]: bool(e.get("supplement")) for e in doc["events"]} == {"TST": False, "SUP": True}
+        assert doc["supplement_sha256"] == ssha and doc["supplement_events"] == 1
+        assert doc["frozen_only"]["estimate_4h"]["n"] == 1
+        assert rp.resolution(json.loads(json.dumps(doc, default=str)))["verdict"] == doc["verdict"]
+    md = (tmp_path / "out" / ("report-%s.md" % FADE)).read_text(encoding="utf-8")
+    assert "frozen candidates only" in md and "legacy gates" in md and "By year" in md

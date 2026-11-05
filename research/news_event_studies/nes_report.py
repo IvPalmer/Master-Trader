@@ -1,6 +1,7 @@
 """Part C Phase 2 (#229): returns from a frozen manifest, reports and the mechanical resolution.
 
     python3 nes_report.py compute --manifest PATH --expect-sha256 HEX --out DIR --code-commit SHA
+        [--supplement PATH --supplement-sha256 HEX]
     python3 nes_report.py resolution --results DIR
     python3 nes_report.py verify-resolution --prereg PATH --results DIR
 
@@ -110,10 +111,26 @@ def _pct(values, q):
     return vs[max(0, math.ceil(q * len(vs)) - 1)] if vs else None
 
 
+def _estimates(events):
+    est = lambda **kw: {h: nr.estimate(nr.announcements(events, h, **kw)) for h in nr.HORIZONS_MS}  # noqa: E731
+    return {"base": est(), "stress": est(key="net_stress"), "no_halt": est(allow_halted=False),
+            "leak_included": est(include_leaked=True), "btc_adjusted": est(key="btc_adj_net")}
+
+
+def _by_year(events, horizon=nr.PRIMARY):
+    anns = nr.announcements(events, horizon)
+    years = sorted({nu.utc_date(a[0])[:4] for a in anns})
+    return {y: nr.estimate([a for a in anns if nu.utc_date(a[0])[:4] == y]) for y in years}
+
+
 def _summary(results, study, manifest, counts):
     events = results
     primary = {h: _crit(nr.announcements(events, h)) for h in nr.HORIZONS_MS}
-    out = {"primary": primary,
+    cls, cls_reasons = nr.classify(events)
+    out = {"classification": cls, "classification_reasons": cls_reasons,
+           "estimates": _estimates(events), "by_year_4h": _by_year(events),
+           "missing_announcements_4h": len(nr.missing_announcements(events)),
+           "primary": primary,
            "leak_included": {h: _crit(nr.announcements(events, h, include_leaked=True))
                              for h in nr.HORIZONS_MS},
            "stress": {h: _crit(nr.announcements(events, h, key="net_stress"))
@@ -129,7 +146,8 @@ def _summary(results, study, manifest, counts):
         out["by_" + group_key] = {g: {h: _crit(nr.announcements(
             [r for r in events if r[group_key] == g], h)) for h in nr.HORIZONS_MS} for g in groups}
     for h in nr.HORIZONS_MS:
-        t60 = [{**r, "horizons": {h: {"net": r["t60"].get(h)}}} for r in events if r["t60"]]
+        t60 = [{**r, "horizons": {h: {"net": r["t60"].get(h), "exit_status": "ok"}}}
+               for r in events if r["t60"]]
         out["t60_median"][h] = _crit(nr.announcements(t60, h))["median"]
     if DIRECTION[study] == "short":
         out["mae"] = {}
@@ -138,21 +156,38 @@ def _summary(results, study, manifest, counts):
                     and r["horizons"][h]["mae"] is not None]
             out["mae"][h] = {"n": len(vals), "p50": _pct(vals, 0.5), "p90": _pct(vals, 0.9),
                              "max": max(vals) if vals else None}
+    if any(r.get("supplement") for r in events):
+        frozen = [r for r in events if not r.get("supplement")]
+        fcls, freasons = nr.classify(frozen)
+        out["frozen_only"] = {"classification": fcls, "classification_reasons": freasons,
+                              "estimate_4h": nr.estimate(nr.announcements(frozen, nr.PRIMARY))}
+        out["supplement_events"] = sum(bool(r.get("supplement")) for r in events)
     statuses = [r["status"] for r in events]
     out["status_counts"] = {s: statuses.count(s) for s in ("ok", "halted", "missing", "unresolved")}
     out["status_counts"]["leaked"] = sum(bool(r["leaked"]) for r in events)
     return out
 
 
-def compute(manifest_path, expect_sha256, out_dir, fetcher, work_dir, disk_ok, code_commit,
-            wall=time.time, sleep=time.sleep):
-    body = Path(manifest_path).read_bytes()
+def _load_checked(path, expect_sha256):
+    body = Path(path).read_bytes()
     sha = nu.sha256_bytes(body)
     if sha != expect_sha256:
-        raise ValueError("manifest sha256 %s != expected %s" % (sha, expect_sha256))
-    manifest = json.loads(body)
+        raise ValueError("%s sha256 %s != expected %s" % (Path(path).name, sha, expect_sha256))
+    return json.loads(body), sha
+
+
+def compute(manifest_path, expect_sha256, out_dir, fetcher, work_dir, disk_ok, code_commit,
+            wall=time.time, sleep=time.sleep, supplement=None):
+    """`supplement` = (path, sha256) of the A4 Upbit supplement manifest: events O11 excluded
+    only through a Binance notice published after t0. They join the Upbit decision sets."""
+    manifest, sha = _load_checked(manifest_path, expect_sha256)
+    supp, supp_sha = _load_checked(*supplement) if supplement else (None, None)
     out_dir, work_dir = Path(out_dir), Path(work_dir)
     per_study = {s: _candidates(manifest, s) for s in manifest["studies"]}
+    if supp:
+        for s in per_study:
+            if s in supp["studies"]:
+                per_study[s] += [({**e, "supplement": True}, v) for e, v in _candidates(supp, s)]
     t0s = {e["t0_ms"] for c in per_study.values() for e, _ in c}
     memo = _Memo(fetcher)
     _guard(memo, t0s, wall)
@@ -171,12 +206,16 @@ def compute(manifest_path, expect_sha256, out_dir, fetcher, work_dir, disk_ok, c
             events.append(nr.evaluate(e, loaded[(p["market"], p["symbol"], e["t0_ms"])],
                                       loaded[("um", "BTCUSDT", e["t0_ms"])], DIRECTION[study], venue))
         counts = nm.manifest_counts(manifest, study)
-        verdict, reasons = nr.verdict(counts, events)
-        doc = {"study": study, "label": LABEL, "direction": DIRECTION[study], "verdict": verdict,
-               "reasons": reasons, "counts": counts, "coverage": float(nr.coverage(counts, events)),
-               "manifest_sha256": sha, "manifest_code_commit": manifest.get("code_commit"),
+        legacy, legacy_reasons = nr.verdict(counts, events)
+        summary = _summary(events, study, manifest, counts)
+        doc = {"study": study, "label": LABEL, "direction": DIRECTION[study],
+               "verdict": summary["classification"], "reasons": summary["classification_reasons"],
+               "legacy_gates": {"verdict": legacy, "reasons": legacy_reasons},
+               "counts": counts, "coverage": float(nr.coverage(counts, events)),
+               "manifest_sha256": sha, "supplement_sha256": supp_sha,
+               "manifest_code_commit": manifest.get("code_commit"),
                "code_commit": code_commit, "computed_at": computed_at,
-               **_summary(events, study, manifest, counts), "events": events}
+               **summary, "events": events}
         nu.write_atomic(out_dir / ("results-%s.json" % study), nu.canonical_bytes(_stored(doc)))
         nu.write_atomic(out_dir / ("report-%s.md" % study), report_md(doc).encode("utf-8"))
         docs[study] = doc
@@ -198,8 +237,29 @@ def _crit_line(name, c):
 def report_md(doc):
     study = doc["study"]
     L = ["# %s: %s" % (study, LABEL), "",
-         "**Verdict (%s): %s**" % (LABEL, doc["verdict"]), ""]
-    L += ["- %s" % r for r in doc["reasons"]] + [""]
+         "**Verdict (%s, A4): %s**" % (LABEL, doc["verdict"]), ""]
+    L += ["- %s" % r for r in doc["reasons"]]
+    L += ["- legacy gates (diagnostic only, A4): %s (%s)" % (doc["legacy_gates"]["verdict"],
+                                                         "; ".join(doc["legacy_gates"]["reasons"]))]
+    if "frozen_only" in doc:
+        fo = doc["frozen_only"]
+        L += ["- frozen candidates only (without the %d supplement events): %s, +4h mean %s"
+              % (doc["supplement_events"], fo["classification"], _f(fo["estimate_4h"]["mean"]))]
+    L += ["", "## Announcement-level mean net return (A4; interval %.2f%%, calendar-month blocks)"
+          % (100 * float(nr.CI_LEVEL)), "",
+          "| set | horizon | n | months | mean | interval | median | win rate |",
+          "|---|---|---|---|---|---|---|---|"]
+    for name, by_h in doc["estimates"].items():
+        for h, e in by_h.items():
+            L.append("| %s | +%s | %d | %d | %s | [%s, %s] | %s | %s |" % (
+                name, h, e["n"], e["months"], _f(e["mean"]), _f(e["ci"][0]), _f(e["ci"][1]),
+                _f(e["median"]), "n/a" if e["win_rate"] is None else "%.0f%%" % (100 * e["win_rate"])))
+    L += ["", "## By year (+4h, base cost)", "", "| year | n | mean | median | win rate |",
+          "|---|---|---|---|---|"]
+    for y, e in doc["by_year_4h"].items():
+        L.append("| %s | %d | %s | %s | %.0f%% |" % (y, e["n"], _f(e["mean"]), _f(e["median"]),
+                                                     100 * e["win_rate"]))
+    L += ["", "- announcements with no usable +4h return: %d" % doc["missing_announcements_4h"], ""]
     c, sc = doc["counts"], doc["status_counts"]
     L += ["## Counts", "",
           "- candidates %d; unknown %d; Phase 1 missing %d; harvest shortfall %d; harvest complete %s"
@@ -234,6 +294,9 @@ def report_md(doc):
     L += ["## Limitations", "",
           "- Events come from notice titles, read from the current CMS versions; later edits cannot be ruled out.",
           "- Hyperliquid funding is not modelled.",
+          "- An intra-file candle gap is read as a halt; the no_halt row drops those exits.",
+          "- Binance proxies are chosen by which day files exist through t0+2 d (measurement source,"
+          " not event selection).",
           "- Returns are Binance proxy prices, not Hyperliquid or venue fills: a %s." % LABEL,
           "- The Upbit notices were harvested from the operator's Mac."]
     if study in (nm.LONG, nm.FADE):
@@ -246,12 +309,12 @@ def report_md(doc):
 # --- resolution ----------------------------------------------------------------------
 
 def resolution(results):
-    """Recomputed from the stored events and counts only (the mechanical resolution)."""
+    """Recomputed from the stored events only (the mechanical resolution, A4 rule)."""
     events = results["events"]
-    verdict, reasons = nr.verdict(results["counts"], events)
-    c = _crit(nr.announcements(events, nr.PRIMARY))
+    verdict, reasons = nr.classify(events)
+    e = nr.estimate(nr.announcements(events, nr.PRIMARY))
     return {"verdict": verdict, "reasons": reasons, "label": LABEL,
-            "primary_4h": {k: c[k] for k in ("n", "median", "half_medians", "top_decile_share")},
+            "primary_4h": {k: e[k] for k in ("n", "mean", "ci", "median", "win_rate")},
             "manifest_sha256": results["manifest_sha256"], "code_commit": results["code_commit"],
             "computed_at": results["computed_at"]}
 
@@ -291,6 +354,8 @@ def main(argv=None, fetcher=None, wall=time.time, sleep=time.sleep):
     for flag in ("--manifest", "--expect-sha256", "--out", "--code-commit"):
         c.add_argument(flag, required=True)
     c.add_argument("--work")
+    c.add_argument("--supplement")
+    c.add_argument("--supplement-sha256")
     r = sub.add_parser("resolution")
     r.add_argument("--results", required=True)
     v = sub.add_parser("verify-resolution")
@@ -302,7 +367,9 @@ def main(argv=None, fetcher=None, wall=time.time, sleep=time.sleep):
         try:
             docs = compute(Path(args.manifest), args.expect_sha256, Path(args.out),
                            fetcher or nk.kline_fetch, work, lambda: nu.disk_ok(work),
-                           args.code_commit, wall=wall, sleep=sleep)
+                           args.code_commit, wall=wall, sleep=sleep,
+                           supplement=((args.supplement, args.supplement_sha256)
+                                       if args.supplement else None))
         except ValueError as e:
             print("refusing: %s" % e, file=sys.stderr)
             return 2

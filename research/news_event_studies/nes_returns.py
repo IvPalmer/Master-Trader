@@ -29,6 +29,9 @@ TOP_DECILE_LT = 0.6
 COVERAGE_GT = 0.2
 BOOT_N = 10_000
 BOOT_SEED = 229
+# A4 (operator directive, 2026-11-05): every study reports estimates; no gate voids one.
+HYPOTHESES = 3                     # the three studies; Bonferroni-adjusted two-sided intervals
+CI_LEVEL = 1 - Fraction(5, 100) / HYPOTHESES
 
 _STRENGTH = {"unresolved": 3, "missing": 2, "halted": 1, "ok": 0}   # O4, strongest first
 
@@ -94,7 +97,7 @@ def mae_short(rows, entry_ms, exit_candle_ms, entry):
         if k not in rows:
             return None
         highs.append(float(rows[k][1]))
-    return max(highs) / float(entry) - 1 if highs else 0.0
+    return max(0.0, max(highs) / float(entry) - 1) if highs else 0.0
 
 
 def _horizons(rows, absent, btc_rows, start_ms, entry, direction, venue, with_paths):
@@ -122,7 +125,7 @@ def evaluate(event, series, btc_series, direction, venue):
     """One token-event. `venue` is the suffix of its `candidate:<venue>` status."""
     rows, absent = series["rows"], series["absent_dates"]
     t0 = event["t0_ms"]
-    base = {k: event[k] for k in ("announcement_id", "t0_ms", "token", "kind") if k in event}
+    base = {k: event[k] for k in ("announcement_id", "t0_ms", "token", "kind", "supplement") if k in event}
     base.update(direction=direction, venue=venue)
     leak = leaked(rows, t0)
     start = t0 + ENTRY_OFFSET_MS
@@ -144,13 +147,17 @@ def _usable(r):
     return r["status"] in ("ok", "halted")
 
 
-def announcements(results, horizon, include_leaked=False, key="net"):
+def announcements(results, horizon, include_leaked=False, key="net", allow_halted=True):
+    """Eligibility is per horizon (A4): an unresolved 24 h exit no longer drops a valid 4 h return.
+    The primary set needs the leak test to have run and passed; `include_leaked` takes every event."""
+    ok = ("ok", "halted") if allow_halted else ("ok",)
     groups = {}
     for r in results:
-        if not _usable(r) or (r["leaked"] and not include_leaked):
+        if not include_leaked and r["leaked"] is not False:
             continue
-        v = r["horizons"].get(horizon, {}).get(key)
-        if v is None:
+        hz = r["horizons"].get(horizon, {})
+        v = hz.get(key)
+        if hz.get("exit_status") not in ok or v is None:
             continue
         groups.setdefault((r["t0_ms"], r["announcement_id"]), []).append(Fraction(v))  # str when stored
     return [(t0, aid, sum(vs) / len(vs)) for (t0, aid), vs in sorted(groups.items())]
@@ -217,3 +224,83 @@ def bootstrap_median_ci(values, n=BOOT_N, seed=BOOT_SEED):
     rng = random.Random(seed)
     meds = sorted(statistics.median(rng.choices(values, k=len(values))) for _ in range(n))
     return meds[math.ceil(0.025 * n) - 1], meds[math.ceil(0.975 * n) - 1]
+
+
+# --- A4 estimates (operator directive, 2026-11-05) ------------------------------------
+
+def _month(t0_ms):
+    return nu.utc_date(t0_ms)[:7]
+
+
+def block_bootstrap_mean_ci(anns, level=CI_LEVEL, n=BOOT_N, seed=BOOT_SEED):
+    """Percentile interval of the announcement-level mean, resampling whole UTC calendar months
+    (announcements in one month share a market regime). None with fewer than two months."""
+    blocks = {}
+    for t0, _aid, v in anns:
+        blocks.setdefault(_month(t0), []).append(float(v))
+    bl = [blocks[k] for k in sorted(blocks)]
+    if len(bl) < 2:
+        return None, None
+    rng = random.Random(seed)
+    means = []
+    for _ in range(n):
+        pick = [x for b in rng.choices(bl, k=len(bl)) for x in b]
+        means.append(sum(pick) / len(pick))
+    means.sort()
+    tail = float((1 - Fraction(level)) / 2)
+    return means[max(0, math.ceil(tail * n) - 1)], means[min(n - 1, math.ceil((1 - tail) * n) - 1)]
+
+
+def estimate(anns):
+    values = [float(a[2]) for a in anns]
+    lo, hi = block_bootstrap_mean_ci(anns)
+    return {"n": len(values), "months": len({_month(a[0]) for a in anns}),
+            "mean": statistics.fmean(values) if values else None,
+            "median": statistics.median(values) if values else None,
+            "win_rate": sum(v > 0 for v in values) / len(values) if values else None,
+            "ci": [lo, hi]}
+
+
+def missing_announcements(results, horizon=PRIMARY):
+    """Announcements in the primary population with no usable value at `horizon`: at least one
+    token-event passed the leak test or could not be tested, and none yields a return."""
+    have = {(a[0], a[1]) for a in announcements(results, horizon)}
+    seen = {}
+    for r in results:
+        if r["leaked"] is not True:
+            seen[(r["t0_ms"], r["announcement_id"])] = True
+    return sorted(k for k in seen if k not in have)
+
+
+def classify(results, horizon=PRIMARY):
+    """A4 decision on the announcement-level mean net return at the primary horizon.
+
+    EDGE (proxy): the adjusted interval of the stress-cost mean lies above zero.
+    NO EDGE: the adjusted interval of the base-cost mean lies at or below zero.
+    Otherwise NOT DETERMINABLE. A conclusion that flips when every missing announcement takes
+    the worst observed value for it (min for EDGE, max for NO EDGE) is NOT DETERMINABLE too."""
+    base, stress = announcements(results, horizon), announcements(results, horizon, key="net_stress")
+    lo, _ = block_bootstrap_mean_ci(stress)
+    _, hi = block_bootstrap_mean_ci(base)
+    if lo is None or hi is None:
+        return "NOT DETERMINABLE", ["fewer than two calendar months with a %s return" % horizon]
+    missing = missing_announcements(results, horizon)
+    if lo > 0:
+        cls, check, key, pick = "EDGE (proxy)", lambda b: b[0] > 0, "net_stress", min
+        anns = stress
+    elif hi <= 0:
+        cls, check, key, pick = "NO EDGE", lambda b: b[1] <= 0, "net", max
+        anns = base
+    else:
+        return "NOT DETERMINABLE", ["%s mean interval spans zero (stress low %+.4f, base high %+.4f)"
+                                    % (horizon, lo, hi)]
+    reasons = ["%s mean interval: stress low %+.4f, base high %+.4f" % (horizon, lo, hi)]
+    if missing:
+        worst = pick(a[2] for a in anns)
+        bound = block_bootstrap_mean_ci(anns + [(t0, aid, worst) for t0, aid in missing])
+        if not check(bound):
+            return "NOT DETERMINABLE", reasons + ["%d missing announcement(s) at the worst observed"
+                                                  " value would reverse %s" % (len(missing), cls)]
+        reasons.append("holds with %d missing announcement(s) at the worst observed value"
+                       % len(missing))
+    return cls, reasons
