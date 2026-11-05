@@ -8,8 +8,10 @@ import json
 import re
 import subprocess
 import sys
+import threading
 import types
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -26,10 +28,12 @@ PREREG_ID = "upbit-krw-fade-live-pilot-2026-11"
 
 @contextmanager
 def _stubs():
-    saved = {n: sys.modules.get(n) for n in ("freqtrade", "freqtrade.strategy")}
-    ft, st = types.ModuleType("freqtrade"), types.ModuleType("freqtrade.strategy")
+    names = ("freqtrade", "freqtrade.strategy", "freqtrade.persistence")
+    saved = {n: sys.modules.get(n) for n in names}
+    ft, st, pe = (types.ModuleType(n) for n in names)
     st.IStrategy = object
-    sys.modules.update({"freqtrade": ft, "freqtrade.strategy": st})
+    pe.Trade = None                     # replaced per test by a fake trade store
+    sys.modules.update(dict(zip(names, (ft, st, pe))))
     try:
         yield
     finally:
@@ -40,12 +44,16 @@ def _stubs():
                 sys.modules[n] = m
 
 
-def strategy():
+def strategy_module():
     with _stubs():
         spec = importlib.util.spec_from_file_location("upbit_fade_live_strategy", STRATEGY)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-    return mod.UpbitFadeLiveV1
+    return mod
+
+
+def strategy():
+    return strategy_module().UpbitFadeLiveV1
 
 
 def config():
@@ -96,6 +104,151 @@ def test_roi_exits_at_24h_whatever_the_profit_and_never_before():
         assert ft_roi_exit(roi, 1440, profit) and ft_roi_exit(roi, 2000, profit)
     for minutes in (0, 5, 600, 1439):
         assert not ft_roi_exit(roi, minutes, 0.9)       # +90% is still below the 100x bar
+
+
+# --- the entry guard (#252 review, P1 2-4) -------------------------------------------------
+
+EID = "upbit:1793858584730:CARDS"
+T0_MS = 1_794_290_584_912
+NOW = datetime.fromtimestamp((T0_MS + 5 * 60_000) / 1000, tz=timezone.utc)     # t0 + 5 min
+
+
+def tag(eid=EID, deadline_ms=T0_MS + 7 * 60_000):
+    return "upbit-fade:%s@%d" % (eid, deadline_ms)
+
+
+class Row:
+    """The fields of a Freqtrade Trade row the guard reads."""
+    _n = 0
+
+    def __init__(self, pair, enter_tag, is_open=True, close_profit_abs=None):
+        Row._n += 1
+        self.id, self.pair, self.enter_tag = Row._n, pair, enter_tag
+        self.is_open, self.close_profit_abs = is_open, close_profit_abs
+
+
+class FtForceEntry:
+    """Freqtrade 2026.7's /forceenter path, reduced to its order of checks
+    (freqtrade/rpc/rpc.py `_rpc_force_entry`, freqtrade/freqtradebot.py `execute_entry`):
+    the same-pair and max-open checks run before `_exit_lock`; under the lock
+    `execute_entry` calls `confirm_trade_entry` (IStrategy's default returns True), then
+    creates the order and commits the trade row. `trades` is the bot's database."""
+
+    def __init__(self, mod, trades=None, max_open_trades=2):
+        self.mod, self.trades, self.max_open = mod, list(trades or []), max_open_trades
+        self.exit_lock = threading.Lock()
+        mod.Trade = types.SimpleNamespace(get_trades_proxy=lambda: list(self.trades))
+        self.strategy = mod.UpbitFadeLiveV1.__new__(mod.UpbitFadeLiveV1)
+
+    def pre_lock_checks(self, pair):
+        open_trades = [t for t in self.trades if t.is_open]
+        if any(t.pair == pair for t in open_trades):
+            return "position for %s already open" % pair
+        if len(open_trades) >= self.max_open:
+            return "Maximum number of trades is reached."
+        return None
+
+    def under_lock(self, pair, entry_tag, now=NOW, side="short"):
+        with self.exit_lock:
+            confirm = getattr(self.strategy, "confirm_trade_entry", None)
+            ok = True if confirm is None else confirm(
+                pair=pair, order_type="market", amount=50.0, rate=1.0, time_in_force="GTC",
+                current_time=now, entry_tag=entry_tag, side=side)
+            if ok:
+                self.trades.append(Row(pair, entry_tag))
+            return ok
+
+    def concurrent(self, requests):
+        """Every request passes the pre-lock checks before any takes the lock (two
+        API threads at once), then each runs `execute_entry` under the lock."""
+        barrier, results = threading.Barrier(len(requests)), {}
+
+        def call(i, pair, entry_tag):
+            refused = self.pre_lock_checks(pair)
+            barrier.wait()
+            results[i] = refused or self.under_lock(pair, entry_tag)
+
+        threads = [threading.Thread(target=call, args=(i, *r)) for i, r in enumerate(requests)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(5)
+        return [results[i] for i in range(len(requests))]
+
+
+def test_concurrent_forceenters_never_open_a_third_trade():
+    ft = FtForceEntry(strategy_module())
+    out = ft.concurrent([("AAA/USDC:USDC", tag("upbit:1:AAA")), ("BBB/USDC:USDC", tag("upbit:1:BBB")),
+                         ("CCC/USDC:USDC", tag("upbit:1:CCC"))])
+    assert out.count(True) == 2 and out.count(False) == 1
+    assert sum(t.is_open for t in ft.trades) == 2
+
+
+def test_concurrent_forceenters_on_one_pair_open_one_trade():
+    ft = FtForceEntry(strategy_module())
+    out = ft.concurrent([("CARDS/USDC:USDC", tag()), ("CARDS/USDC:USDC", tag("upbit:2:CARDS"))])
+    assert sorted(out, key=str) == [False, True] and len(ft.trades) == 1
+
+
+def test_an_event_is_never_traded_twice_even_after_its_trade_closed():
+    ft = FtForceEntry(strategy_module(), [Row("CARDS/USDC:USDC", tag(), is_open=False,
+                                              close_profit_abs=3.5)])
+    assert ft.pre_lock_checks("CARDS/USDC:USDC") is None
+    assert ft.under_lock("CARDS/USDC:USDC", tag()) is False
+    assert ft.under_lock("CARDS/USDC:USDC", tag("upbit:9:CARDS")) is True
+
+
+def test_the_deadline_is_checked_just_before_the_order():
+    ft = FtForceEntry(strategy_module())
+    late = datetime.fromtimestamp((T0_MS + 7 * 60_000 + 1) / 1000, tz=timezone.utc)
+    assert ft.under_lock("CARDS/USDC:USDC", tag(), now=late) is False
+    on_time = datetime.fromtimestamp((T0_MS + 7 * 60_000) / 1000, tz=timezone.utc)
+    assert ft.under_lock("CARDS/USDC:USDC", tag(), now=on_time) is True
+
+
+@pytest.mark.parametrize("entry_tag,side", [
+    (None, "short"),
+    ("force_entry", "short"),                                   # Freqtrade's default tag
+    ("upbit-fade:" + EID, "short"),                             # no deadline
+    ("upbit-fade:%s@%d" % (EID, T0_MS + 13 * 60_000), "short"),  # > 7 min ahead of now
+    (tag(), "long"),
+])
+def test_entries_the_trigger_would_never_send_are_refused(entry_tag, side):
+    ft = FtForceEntry(strategy_module())
+    assert ft.under_lock("CARDS/USDC:USDC", entry_tag, side=side) is False
+    assert ft.trades == []
+
+
+def test_the_bot_refuses_entries_at_the_realized_loss_limit():
+    closed = [Row("AAA/USDC:USDC", tag("upbit:1:AAA"), False, -40.0),
+              Row("BBB/USDC:USDC", tag("upbit:1:BBB"), False, -35.0)]
+    assert FtForceEntry(strategy_module(), closed).under_lock("CARDS/USDC:USDC", tag()) is False
+    closed[1].close_profit_abs = -34.99
+    assert FtForceEntry(strategy_module(), closed).under_lock("CARDS/USDC:USDC", tag()) is True
+
+
+def test_the_guard_fails_closed():
+    """Freqtrade's strategy_safe_wrapper returns default_retval=True when the callback
+    raises: an error inside the guard must refuse, not confirm."""
+    mod = strategy_module()
+    ft = FtForceEntry(mod)
+
+    def broken():
+        raise RuntimeError("database is locked")
+
+    mod.Trade = types.SimpleNamespace(get_trades_proxy=broken)
+    assert ft.under_lock("CARDS/USDC:USDC", tag()) is False
+
+
+def test_the_bot_parses_the_tag_the_trigger_sends():
+    sys.path.insert(0, str(ROOT / "tests"))
+    import importlib
+    lt = importlib.import_module("test_upbit_fade_live_trigger").lt
+    mod = strategy_module()
+    assert mod.parse_entry_tag(lt.entry_tag(EID, T0_MS + lt.LATEST_ENTRY_MS)) == (
+        EID, T0_MS + 7 * 60_000)
+    assert (mod.TAG_PREFIX, mod.MAX_OPEN, mod.LATEST_ENTRY_MS, mod.KILL_REALIZED_PNL_USD) == (
+        lt.TAG_PREFIX, lt.MAX_OPEN, lt.LATEST_ENTRY_MS, lt.KILL_REALIZED_PNL_USD)
 
 
 # --- config -------------------------------------------------------------------------------
