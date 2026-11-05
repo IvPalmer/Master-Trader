@@ -1876,6 +1876,167 @@
         "computed_at": "2026-11-05T17:21:09.639000+00:00"
       },
       "resolution_note": "Mechanical A4 resolution from the VPS results (code 9991e23), recorded 2026-11-05. Registered primary (+4 h) NOT DETERMINABLE, n 57. Descriptive, base cost, 98.33% interval, not the registered primary: +24 h +7.4% [+2.9%, +11.4%], win rate 81%. That secondary result is tested forward as a new hypothesis under upbit-krw-fade-forward-2026-11 (paper monitor, #249). No bot, live order or allocation follows from this entry."
+    },
+    {
+      "id": "xasset-riskoff-guard-2026-11",
+      "bot": null,
+      "status": "open",
+      "registered": "2026-11-05",
+      "review_by": "2026-11-20",
+      "issue": "#254",
+      "code": "research/xasset_guard_2026-11/xasset_guard.py; tests/test_xasset_guard.py",
+      "hypothesis": "A price-based cross-asset risk-off guard (an ES=F drop or a VIX spike) that blocks new entries for N hours would have raised the first-order net P&L of the existing FF, Keltner and Killers closed-trade lists: the blocked trades do worse than the kept ones, and the real trigger times beat date-shifted ones. Motivation: on 2026-11-05 a market-wide risk-off move (S&P 500 -3.8%, VIX 16.6 -> 26.9) hit crypto, and no archived headline came before it (#254). The headline/macro vetoes of research/news_veto_2026-11 did not help; this tests whether prices do better than headlines.",
+      "frozen": {
+        "measurement": "historical, first order: blocked trades are removed and freed slots are not refilled",
+        "places_orders": false,
+        "fetched_at_utc": "2026-11-05T19:36:00Z",
+        "raw_sha256": {
+          "yahoo_1h_ES_F.json": "fb1848c1dc37dbf943588a7b4e28b3109d5cd40336844bdf4e8fb5210a826426",
+          "yahoo_1h__VIX.json": "60b146a805331f42d32c42b874be28e12c7777a8aa8985c48c8a49b83ce1e06d",
+          "cboe_VIX_History.csv": "50731d77d6723344b67789e2fafe65c32bf005710d5918e693da5f1f62e231e8"
+        },
+        "data": {
+          "es": "Yahoo chart API ES=F, interval=1h, range=730d (first bar 2024-06-14 04:00Z); bars with a null high/close, a start not on a half hour, or ending after fetched_at_utc are dropped",
+          "vix_intraday": "Yahoo chart API ^VIX, interval=1h, range=730d (first bar 2024-01-19); same filters",
+          "vix_daily": "CBOE VIX_History.csv (cdn-api.cboe.com), daily CLOSE",
+          "stored": "VPS research/xasset_guard_2026-11/data/raw/ (not in git)"
+        },
+        "es_drop": "0.010",
+        "vix_rise": "0.20",
+        "vixd_rise": "0.20",
+        "bar_s": 3600,
+        "latency_s": 300,
+        "vix_close_et": "16:15",
+        "guards": {
+          "ES60": "two consecutive ES=F hourly bars (starts exactly 3600 s apart): close / previous close - 1 <= -es_drop; effective at the second bar's start + bar_s + latency_s",
+          "VIX20": "the first ^VIX hourly bar of an America/New_York date whose close (not high: VIX opening prints are erratic) >= (1 + vix_rise) x the CBOE close of the most recent earlier CBOE date; at most one per ET date; effective at bar start + bar_s + latency_s",
+          "OR": "the union of ES60 and VIX20 trigger times",
+          "VIXD": "secondary, full window: CBOE close >= (1 + vixd_rise) x the previous CBOE close; effective at vix_close_et on that date + latency_s"
+        },
+        "block": "a new entry with trigger <= entry_time < trigger + N h for any trigger of the variant (intervals merged); every entry, long or short",
+        "hours": [
+          4,
+          12,
+          24
+        ],
+        "vixd_hours": [
+          24
+        ],
+        "variants": "ES60, VIX20, OR x hours (9) + VIXD x vixd_hours (1)",
+        "n_variants": 10,
+        "primary": {
+          "guard": "OR",
+          "hours": 12,
+          "list": "FF_V2_current"
+        },
+        "window_intraday_utc": [
+          "2024-06-15T00:00:00Z",
+          "2026-11-01T00:00:00Z"
+        ],
+        "window_daily_utc": [
+          "2023-01-01T00:00:00Z",
+          "2026-11-01T00:00:00Z"
+        ],
+        "trade_lists": {
+          "FF_V2_current": {
+            "file": "ff_roi_2026-09-30/user_data/backtest_results/backtest-result-2026-09-30_23-45-13.zip",
+            "strategy": "FFX_V0_current",
+            "sha256": "22f8ad2f72dcdf61a92abcfaca0cb4a958cc12feb6c540b35bd4f40011f4ac54",
+            "unit": "USDT"
+          },
+          "FF_PreV2_sens": {
+            "file": "ff_entry_ablation_2026-10-01/user_data/backtest_results/backtest-result-2026-10-01_03-28-54.zip",
+            "strategy": "FFA_PreV2",
+            "sha256": "00203e8b90fc60bb44b897c34da6479756f1fd943e034645a331bc6107d22a67",
+            "unit": "USDT"
+          },
+          "Keltner_R4_live18": {
+            "file": "oos_retest_2026-07/results/R4.zip",
+            "strategy": "KeltnerBounceV1",
+            "sha256": "7dcf76de167b4bc86d9954c59deacba0ddba47d6f5c171bcd7d19445435346f5",
+            "unit": "USDT"
+          },
+          "Keltner_R5_wl60": {
+            "file": "oos_retest_2026-07/results/R5.zip",
+            "strategy": "KeltnerBounceV1",
+            "sha256": "b1fe233a730d2a850175fc7e3482b121e7a37c04e9ed86b3056c851e2a75ee37",
+            "unit": "USDT"
+          },
+          "Killers_channel": {
+            "file": "copier-validation/killers/killers_signals.json",
+            "sha256": "b384b724b721d89424b9a3ea10782a5cabef80770fefbf843338b0bffc594d79",
+            "unit": "margin units (channel-reported)"
+          },
+          "Killers_dry": {
+            "file": "tg_bots_audit_2026-07/killers_trades_full.json",
+            "sha256": "901f0ad3841abe644223bb807cbf26eccd3be2b56a5c885a654c31cbabc78000",
+            "unit": "USDT"
+          },
+          "FF_live": {
+            "file": [
+              "tradesv3.live.FundingFadeV1.sqlite",
+              "tradesv3.live.FundingFadeV1.v2.sqlite"
+            ],
+            "sha256": [
+              "11d2961b81a408fc338b149c93fbdaed06f0f0624860a1c2b4e0ae1d6fe44329",
+              "629ee69f451dd0e5accbcf02243b7aa1a1d680ec2a76211e26542bf94ee2b229"
+            ],
+            "unit": "USDT"
+          },
+          "Keltner_live": {
+            "file": "tradesv3.live.KeltnerBounceV1.sqlite",
+            "sha256": "12d79033b5f1642c016dbcf916d5faee1f0d83a4bd825bdb05972e765416cf86",
+            "unit": "USDT"
+          },
+          "Killers_live": {
+            "file": "tradesv3.live.KillersScalpV1.hyperliquid.sqlite",
+            "sha256": "e44060bad68dede35db57032a3b68fc378f79a707b2b5573a98140a9e0cbd7c0",
+            "unit": "USDC"
+          }
+        },
+        "live_source": "the 2026-11-05T03:15Z nightly backup (/home/ubuntu/backups/master-trader/20261105T031501Z), gunzipped read-only copies; closed trades (is_open = 0) only",
+        "entry_time": "open_timestamp (backtests, Killers dry), signal post time (Killers channel), open_date as UTC (live)",
+        "pnl": "profit_abs after backtest fees (backtests, Killers dry); channel-reported margin units (Killers channel); close_profit_abs, which includes partial exits (live)",
+        "longs_only_sensitivity": [
+          "Killers_channel",
+          "Killers_dry",
+          "Killers_live"
+        ],
+        "metrics": "per list x variant: n and n blocked in the variant's window, net P&L without and with the guard, change = -(sum of blocked P&L), blocked and kept mean profit ratio and win rate, share of window time guarded",
+        "bootstrap": "calendar-month blocks of the list's in-window trades, resampled with replacement: percentile CIs for net without, net with, change, and blocked-minus-kept mean ratio (draws with an empty group skipped and counted)",
+        "bootstrap_resamples": 10000,
+        "bootstrap_seed": 2291105,
+        "ci_level": "0.95",
+        "placebo": "every trigger time of the variant shifted by one common offset of +/-1..placebo_max_days whole days (sign and size uniform); percentile = share of placebo changes below the real change, ties counted half",
+        "placebo_draws": 1000,
+        "placebo_max_days": 30,
+        "placebo_seed": "the bootstrap_seed stream; the offsets are drawn first, once, and shared by every cell",
+        "min_blocked_for_pass": 10,
+        "secondary_placebo_pctile": "99.5",
+        "descriptive_timeline": "2026-11-05 only, not a test: first minute of a 30-min drop >= 1% and of a 1% fall below the 12:00Z level for ES=F, NQ=F (Yahoo 1m) and Binance spot BTCUSDT (1m); first ^VIX 1m close >= 1.20 x the prior CBOE close; hourly rule times that day"
+      },
+      "pass_criteria": "helps: on the primary cell (OR, 12 h, FF_V2_current, all entries), n blocked >= 10, change > 0, the change's 95% CI lower bound > 0 and placebo percentile >= 95.",
+      "kill": "hurts: on the primary cell, n blocked >= 10, change < 0, the CI upper bound < 0 and placebo percentile <= 5.",
+      "inconclusive": "anything else, including fewer than 10 blocked trades.",
+      "rules": [
+        "Research only: no bot, config, container or allocation change follows from any result. A 'helps' verdict justifies only proposing a forward shadow (guard logged, never enforced) on the archive's 5-min cross-asset snapshots, under its own entry.",
+        "Every list x variant cell is reported, failures included. No threshold, window, N, list or statistic changes after results; a change is an amendment with its reason.",
+        "Cells other than the primary are descriptive. One supports the hypothesis only with placebo percentile >= 99.5 (Bonferroni over the 10 variants) and a change CI excluding 0.",
+        "Hourly stand-in: the task's 'ES -1% in 30 min' is tested as ES60, one hourly bar -1%. No free keyless sub-hour ES history covers the trade windows (Yahoo serves <= 60 days below 1 h; Dukascopy timed out on 2 of 3 requests from the VPS; FRED is unreachable from the VPS and daily). The exact 30-min rule becomes testable forward from the archive's 1m snapshots.",
+        "Hindsight: the thresholds were suggested on 2026-11-05 after watching that day's move. 2026-11-05 is after every trade list ends, so it counts neither for nor against the guard; its timeline is descriptive.",
+        "Killers_channel outcomes are channel-reported (no costs; unreported losers count 0 or their best partial). The 2026-05-28 real-price replay found these signals lose money. Those rows are timing checks, never P&L evidence.",
+        "Live lists are small (FF 35, Keltner 5, Killers 20 closed trades in the backup) and descriptive. Per-trade live rows stay on the VPS; only aggregates are published.",
+        "First order only: a block frees a slot (FF max_open 2, Keltner 3) that another signal might have filled; those trades are not simulated."
+      ],
+      "seen_before_freeze": [
+        "research/news_veto_2026-11/RESULTS.md: no headline or macro veto helped; the CPI/FOMC blackout removed FF winners.",
+        "Guard data coverage only: bar counts, first and last timestamps, null counts, bar spacing. Live DB closed-trade counts and date ranges. No trigger list had been computed and no trigger had been joined to any trade.",
+        "2026-11-05 itself, from the #254 brief and probes: VIX 25.2 against a 16.61 prior close and ES 7419 against 7720 at about 19:20Z, so VIX20 and probably ES60 fire that day. That day is outside every trade list."
+      ],
+      "triggers": [],
+      "amendments": [],
+      "resolution": null,
+      "resolution_note": null
     }
   ]
 }
