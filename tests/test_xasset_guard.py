@@ -3,6 +3,7 @@ statistics code, and of the preregistration freezing the constants the code runs
 
     python3 -m pytest tests/test_xasset_guard.py -q
 """
+import hashlib
 import json
 import random
 import sqlite3
@@ -47,9 +48,21 @@ def effective():
     return fr
 
 
-def test_entry_is_open_research_only_and_unresolved():
+def test_entry_is_research_only_and_resolved_from_the_committed_results():
     e = entry()
-    assert e["status"] == "open" and e["bot"] is None and e["resolution"] is None
+    assert e["status"] == "closed" and e["bot"] is None
+    res = e["resolution"]
+    path = ROOT / "research" / "xasset_guard_2026-11" / "results" / "guard_results.json"
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == res["results_sha256"]
+    g, h, lst = xg.PRIMARY
+    cell = [c for c in json.loads(path.read_text())["results"]
+            if (c["guard"], c["hours"], c["list"], c["longs_only"]) == (g, h, lst, False)]
+    assert len(cell) == 1 and res["verdict"] == cell[0]["verdict"].upper() == "INCONCLUSIVE"
+    p = res["primary"]
+    assert (p["guard"], p["hours"], p["list"]) == (g, h, lst)
+    assert (p["n"], p["n_blocked"], p["blocked_months"]) == (
+        cell[0]["n"], cell[0]["n_blocked"], cell[0]["blocked_months"])
+    assert p["change"] == pytest.approx(cell[0]["delta"], abs=1e-4)
     assert e["issue"] == "#254" and e["triggers"] == []
     assert e["frozen"]["places_orders"] is False
     assert "allocation" in " ".join(e["rules"])

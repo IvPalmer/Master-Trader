@@ -1880,7 +1880,7 @@
     {
       "id": "xasset-riskoff-guard-2026-11",
       "bot": null,
-      "status": "open",
+      "status": "closed",
       "registered": "2026-11-05",
       "review_by": "2026-11-20",
       "issue": "#254",
@@ -2078,8 +2078,8 @@
           }
         }
       ],
-      "resolution": null,
-      "resolution_note": null
+      "resolution": {"verdict": "INCONCLUSIVE", "reasons": ["2 blocked trades from 2 months, below the frozen floor of 10 from at least 3 months (A1)"], "label": "historical, first order", "primary": {"guard": "OR", "hours": 12, "list": "FF_V2_current", "n": 158, "n_blocked": 2, "blocked_months": 2, "net_without": 19.4478, "net_with": 17.5071, "change": -1.9407, "change_ci95": [-5.0767, 0.0], "p_helps": 0.809, "p_hurts": 0.1922, "rotations": 868}, "results_sha256": "2cfbc6874ce320a61c8779dc9ee075b0c9274391b9464af0cedb83f148d03c74", "code_commit": "f1334c7", "run_utc": "2026-11-05 20:00-20:01"},
+      "resolution_note": "Mechanical resolution from the VPS run of f1334c7, recorded 2026-11-05. Primary (OR, 12 h, FF_V2_current) INCONCLUSIVE: 2 blocked trades, both winners (HBAR +8.00% on 2024-11-16, NEAR +4.99% on 2026-03-02); change -1.94 USDT, 95% CI [-5.08, 0.00]. No cell has a positive point estimate; on FF the guard removes winners. Other cells are descriptive only (A1). The exact 30-min ES rule can be tested forward from the archive's px_es and px_vix snapshots (installed from be5bad3); no forward test is registered. No bot, config or allocation follows from this entry."
     }
   ]
 }
