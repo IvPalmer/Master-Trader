@@ -21,10 +21,12 @@ Per trade list x variant: n, n blocked, net P&L without / with the guard (first 
 slots are not refilled), month-block bootstrap CIs, a date-shift placebo, and the frozen verdict
 on the primary cell. Stdlib only; reads inputs in place and verifies their sha256 first.
 
-Amendment A1 (before any result, from Codex review round 1): triggers are taken only inside the
-variant's window; the placebo enumerates every whole-day shift in +/-1..30 days, applied
-circularly within that window, with an exact one-sided rank p; a verdict needs blocked trades
-in >= 3 calendar months; secondary cells are descriptive only.
+Amendments before any result (Codex review rounds 1-2): triggers are taken only inside the
+variant's window (A1); a verdict needs blocked trades in >= 3 calendar months (A1); secondary
+cells are descriptive only (A1). The verdict's placebo is the full group of whole-day circular
+rotations of the real guard mask (merged, clipped to the window; a piece crossing the window
+end wraps to its start), with an exact one-sided rank p (A2). The +/-1..30-day rotations are
+kept as a descriptive local placebo (A2).
 """
 import argparse
 import bisect
@@ -62,9 +64,9 @@ PLACEBO_MAX_DAYS = 30
 CI_LEVEL = 0.95
 MIN_BLOCKED_FOR_PASS = 10
 N_VARIANTS = len(INTRADAY_GUARDS) * len(HOURS) + len(VIXD_HOURS)
-PLACEBO_OFFSETS = tuple(sign * d * 86400 for d in range(1, PLACEBO_MAX_DAYS + 1)
-                        for sign in (1, -1))   # A1: enumerated, no random draw
-N_PLACEBO = len(PLACEBO_OFFSETS)
+LOCAL_OFFSETS = tuple(sign * d * 86400 for d in range(1, PLACEBO_MAX_DAYS + 1)
+                      for sign in (1, -1))     # A2: descriptive local placebo, 60 rotations
+N_LOCAL = len(LOCAL_OFFSETS)
 P_MAX = 0.05
 MIN_BLOCKED_MONTHS = 3                          # A1
 
@@ -220,12 +222,44 @@ def in_window(times, window):
     return [t for t in times if lo <= t < hi]
 
 
-def circular(times, shift, window):
-    """Shift trigger times by `shift`, wrapping inside [lo, hi) so no placebo trigger falls
-    where the data have no coverage (A1). Whole-day shifts of a whole-day window keep the
-    hour of day."""
+def full_offsets(window):
+    """A2: every nonzero whole-day circular rotation of a whole-day window."""
     lo, hi = window
-    return [lo + (t - lo + shift) % (hi - lo) for t in times]
+    days, rem = divmod(hi - lo, 86400)
+    assert rem == 0, "window must be whole days"
+    return tuple(d * 86400 for d in range(1, days))
+
+
+def merge(ivs):
+    out = []
+    for a, b in sorted(ivs):
+        if out and a <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], b)
+        else:
+            out.append([a, b])
+    return [tuple(iv) for iv in out]
+
+
+def clip(ivs, window):
+    lo, hi = window
+    return [(max(a, lo), min(b, hi)) for a, b in ivs if b > lo and a < hi]
+
+
+def rotate(mask, shift, window):
+    """A2: rotate a clipped guard mask circularly inside [lo, hi); a piece crossing hi is split
+    and continues at lo, so the guarded time is identical under every rotation. Whole-day
+    rotations of a whole-day window keep the hour of day."""
+    lo, hi = window
+    span = hi - lo
+    out = []
+    for a, b in mask:
+        a2 = lo + (a - lo + shift) % span
+        b2 = a2 + (b - a)
+        if b2 <= hi:
+            out.append((a2, b2))
+        else:
+            out += [(a2, hi), (lo, lo + b2 - hi)]
+    return merge(out)
 
 
 def intervals(times, hours, shift=0):
@@ -360,12 +394,13 @@ def block_bootstrap(trades, flags, rng, n_boot=BOOT_N, level=CI_LEVEL):
                 diff_mean=ci(diff), diff_skipped=skipped)
 
 
-def placebo(trades, times, hours, window, real_delta, longs_only=False, offsets=PLACEBO_OFFSETS):
-    """Exact rank test over every enumerated shift (A1). p_helps = (1 + #placebo >= real) /
-    (1 + N); p_hurts = (1 + #placebo <= real) / (1 + N); ties count against the real guard."""
+def placebo(trades, mask, window, real_delta, offsets, longs_only=False):
+    """Rank test of the real guard mask against its rotations. With `offsets` = the full group
+    (full_offsets), p_helps = (1 + #placebo >= real) / (1 + N) and p_hurts = (1 + #placebo <=
+    real) / (1 + N) are exact under a random-phase null; ties count against the real guard."""
     deltas = []
     for off in offsets:
-        ivs = intervals(circular(times, off, window), hours)
+        ivs = rotate(mask, off, window)
         st = [a for a, _ in ivs]
         deltas.append(-sum(t["abs"] for t in trades
                            if not (longs_only and t["is_short"]) and blocked(t["entry_s"], ivs, st)))
@@ -394,7 +429,7 @@ def evaluate(trades, times, hours, window, rng, longs_only=False):
     lo, hi = window
     tr = [t for t in trades if lo <= t["entry_s"] < hi]
     times = in_window(times, window)
-    ivs = intervals(times, hours)
+    ivs = clip(intervals(times, hours), window)
     st = [a for a, _ in ivs]
     flags = [not (longs_only and t["is_short"]) and blocked(t["entry_s"], ivs, st) for t in tr]
     sv, sk = summarize(tr, flags)
@@ -404,7 +439,10 @@ def evaluate(trades, times, hours, window, rng, longs_only=False):
                 delta=delta, blocked=sv, kept=sk, n_triggers=len(times),
                 blocked_months=len({month(t["entry_s"]) for t, f in zip(tr, flags) if f}),
                 boot=block_bootstrap(tr, flags, rng) if tr else None,
-                placebo=placebo(tr, times, hours, window, delta, longs_only) if tr else None,
+                placebo=placebo(tr, ivs, window, delta, full_offsets(window), longs_only)
+                if tr else None,
+                placebo_local=placebo(tr, ivs, window, delta, LOCAL_OFFSETS, longs_only)
+                if tr else None,
                 guarded_share=guarded_share(ivs, lo, hi),
                 blocked_rows=[t for t, f in zip(tr, flags) if f])
 
@@ -548,7 +586,7 @@ def run(root, data, out_dir):
                    n_triggers={g: len(v) for g, v in trig.items()},
                    es_bars=[iso(es[0][0]), iso(es[-1][0]), len(es)],
                    vix_bars=[iso(vix[0][0]), iso(vix[-1][0]), len(vix)],
-                   seed=SEED, n_placebo=N_PLACEBO, n_boot=BOOT_N,
+                   seed=SEED, n_local_placebo=N_LOCAL, n_boot=BOOT_N,
                    timeline_2026_11_05=timeline(data, es, vix, closes))
     json.dump(summary, open(os.path.join(out_dir, "guard_results.json"), "w"), indent=1)
     json.dump(blocked_rows, open(os.path.join(out_dir, "blocked_backtest_trades.json"), "w"),
@@ -569,19 +607,19 @@ def _ci(c, fmt="%+.2f"):
 
 def tables(summary):
     L = ["| list | guard | N h | longs only | n | blocked (months) | net without | net with | "
-         "change (95% CI) | blocked mean / kept mean | placebo pct | p helps / p hurts | "
-         "guarded time |",
-         "|---|---|---:|---|---:|---:|---:|---:|---|---|---:|---|---:|"]
+         "change (95% CI) | blocked mean / kept mean | rotation pct | p helps / p hurts | "
+         "local pct (+/-30 d) | guarded time |",
+         "|---|---|---:|---|---:|---:|---:|---:|---|---|---:|---|---:|---:|"]
     for r in summary["results"]:
-        b, pl = r["boot"] or {}, r["placebo"]
+        b, pl, loc = r["boot"] or {}, r["placebo"], r["placebo_local"]
         L.append("| %s | %s | %d | %s | %d | %d (%d) | %+.2f | %+.2f | %+.2f %s | %s / %s | %s | %s "
-                 "| %.1f%% |%s" % (
+                 "| %s | %.1f%% |%s" % (
                      r["list"], r["guard"], r["hours"], "yes" if r["longs_only"] else "no", r["n"],
                      r["n_blocked"], r["blocked_months"], r["net_without"], r["net_with"],
                      r["delta"], _ci(b.get("delta")), _p(r["blocked"]["mean_ratio"]),
                      _p(r["kept"]["mean_ratio"]), "-" if not pl else "%.0f" % pl["pctile"],
                      "-" if not pl else "%.3f / %.3f" % (pl["p_helps"], pl["p_hurts"]),
-                     100 * r["guarded_share"], " **%s**" % r["verdict"] if "verdict" in r else ""))
+                     "-" if not loc else "%.0f" % loc["pctile"], 100 * r["guarded_share"], " **%s**" % r["verdict"] if "verdict" in r else ""))
     L += ["", "Triggers: %s" % json.dumps(summary["n_triggers"]), "",
           "2026-11-05 timeline (descriptive):", "```",
           json.dumps(summary["timeline_2026_11_05"], indent=1), "```"]

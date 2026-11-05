@@ -2059,6 +2059,23 @@
             "secondary": "Cells other than the primary are descriptive only and support nothing, replacing the Bonferroni support rule.",
             "snapshot_sources": "unrelated to the study: the #254 archive snapshot parsers now fail the poll when the quote time cannot be normalized"
           }
+        },
+        {
+          "id": "A2-codex-pre-run",
+          "date": "2026-11-05",
+          "by": "Claude, from Codex Sol/high review round 2 (same thread)",
+          "frozen_before_results": true,
+          "note": "Made before the study was run: no trigger had been joined to any trade and no trigger list had been computed.",
+          "reasons": [
+            "The +/-1..30-day rotations of A1 are not the complete rotation group, so under a random-phase null the observed phase is not exchangeable with them and the rank p is not exact (Codex: a periodic synthetic case rejects 6.45% at nominal 5%).",
+            "Wrapping trigger starts alone loses guard exposure at the window end: a tail past the end vanished instead of continuing at the start, so placebo exposure varied."
+          ],
+          "changes": {
+            "placebo": "the real guard mask (merged intervals clipped to the variant's window) rotated circularly by every nonzero whole-day offset of that whole-day window; a piece crossing the window end is split and continues at its start, so guarded time is identical under every rotation and the hour of day is kept. Exact one-sided rank p over the full group: p_helps = (1 + #rotations with change >= real) / (1 + N), p_hurts = (1 + #rotations with change <= real) / (1 + N), ties against the real guard; N = 868 (intraday window) or 1399 (daily window)",
+            "placebo_draws": "full whole-day rotation group: 868 (intraday window), 1399 (daily window)",
+            "local_placebo": "descriptive only: the same mask rotation restricted to +/-1..placebo_max_days (60 rotations), reported as a percentile for comparison with research/news_veto_2026-11",
+            "local_placebo_draws": 60
+          }
         }
       ],
       "resolution": null,

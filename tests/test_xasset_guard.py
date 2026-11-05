@@ -53,7 +53,7 @@ def test_entry_is_open_research_only_and_unresolved():
     assert e["issue"] == "#254" and e["triggers"] == []
     assert e["frozen"]["places_orders"] is False
     assert "allocation" in " ".join(e["rules"])
-    assert [a["id"] for a in e["amendments"]] == ["A1-codex-pre-run"]
+    assert [a["id"] for a in e["amendments"]] == ["A1-codex-pre-run", "A2-codex-pre-run"]
     assert all(a["frozen_before_results"] is True for a in e["amendments"])
 
 
@@ -72,12 +72,18 @@ def test_frozen_block_matches_the_code():
     assert tuple(fr["window_daily_utc"]) == xg.WINDOW_DAILY
     assert fr["bootstrap_resamples"] == xg.BOOT_N and fr["bootstrap_seed"] == xg.SEED
     assert float(fr["ci_level"]) == xg.CI_LEVEL
-    assert fr["placebo_draws"] == xg.N_PLACEBO == 60
+    win_i = tuple(t(x) for x in xg.WINDOW_INTRADAY)
+    win_d = tuple(t(x) for x in xg.WINDOW_DAILY)
+    n_i, n_d = len(xg.full_offsets(win_i)), len(xg.full_offsets(win_d))
+    assert fr["placebo_draws"] == ("full whole-day rotation group: %d (intraday window), %d "
+                                   "(daily window)" % (n_i, n_d))
+    assert "N = %d (intraday window) or %d (daily window)" % (n_i, n_d) in fr["placebo"]
+    assert fr["local_placebo_draws"] == xg.N_LOCAL == 60
     assert fr["placebo_max_days"] == xg.PLACEBO_MAX_DAYS and fr["placebo_seed"] is None
     assert fr["min_blocked_for_pass"] == xg.MIN_BLOCKED_FOR_PASS
     assert fr["min_blocked_months_for_verdict"] == xg.MIN_BLOCKED_MONTHS
     assert float(fr["p_max"]) == xg.P_MAX and fr["secondary_placebo_pctile"] is None
-    assert "/ 61" in fr["placebo"] and ">= 3 calendar months" in fr["pass_criteria"]
+    assert ">= 3 calendar months" in fr["pass_criteria"]
     assert fr["raw_sha256"] == xg.RAW and fr["fetched_at_utc"] == xg.FETCHED_AT
     assert set(fr["longs_only_sensitivity"]) == xg.SHORT_LISTS
 
@@ -223,28 +229,51 @@ def test_placebo_rank_p_counts_ties_against_the_real_guard():
     trades = [trade("2025-01-10T12:00:00Z", -2.0)]
     win = (t("2025-01-01T00:00:00Z"), t("2025-02-01T00:00:00Z"))
     real = 2.0   # the real guard blocks the loser
-    p = xg.placebo(trades, [t("2025-01-10T11:00:00Z")], 4, win, real, offsets=(86400, -86400, 0))
+    mask = xg.clip(xg.intervals([t("2025-01-10T11:00:00Z")], 4), win)
+    p = xg.placebo(trades, mask, win, real, offsets=(86400, -86400, 0))
     # shifted placebos block nothing (change 0 < 2); the zero shift ties
     assert p["n"] == 3 and p["pctile"] == pytest.approx(100 * (2 + 0.5) / 3)
     assert p["p_helps"] == pytest.approx((1 + 1) / 4) and p["p_hurts"] == pytest.approx(1.0)
     assert p["share_nonzero"] == pytest.approx(1 / 3)
 
 
-def test_placebo_offsets_enumerate_every_whole_day_shift_once():
-    offs = xg.PLACEBO_OFFSETS
+def test_offsets_full_group_and_local():
+    win = (t("2025-01-01T00:00:00Z"), t("2025-02-01T00:00:00Z"))
+    assert xg.full_offsets(win) == tuple(d * 86400 for d in range(1, 31))
+    with pytest.raises(AssertionError):
+        xg.full_offsets((0, 86400 + 1))
+    offs = xg.LOCAL_OFFSETS
     assert len(offs) == len(set(offs)) == 60
     assert sorted(abs(o) // 86400 for o in offs) == sorted(list(range(1, 31)) * 2)
-    assert all(o % 86400 == 0 for o in offs)
 
 
-def test_circular_shift_wraps_inside_the_window_and_keeps_the_hour():
-    win = (t("2025-01-01T00:00:00Z"), t("2025-02-01T00:00:00Z"))
-    assert xg.circular([t("2025-01-30T15:05:00Z")], 5 * 86400, win) == [t("2025-01-04T15:05:00Z")]
-    assert xg.circular([t("2025-01-02T15:05:00Z")], -3 * 86400, win) == [t("2025-01-30T15:05:00Z")]
-    # a wrapped trigger still blocks trades inside the window, so no placebo loses coverage
-    trades = [trade("2025-01-04T16:00:00Z", -1.0)]
-    p = xg.placebo(trades, [t("2025-01-30T15:05:00Z")], 4, win, 0.0, offsets=(5 * 86400,))
-    assert p["mean"] == pytest.approx(1.0)
+def test_rotation_keeps_guarded_time_splits_at_the_seam_and_keeps_the_hour():
+    win = (t("2025-01-01T00:00:00Z"), t("2025-01-11T00:00:00Z"))      # ten days
+    mask = xg.clip(xg.intervals([t("2025-01-01T12:00:00Z")], 24), win)
+    rot = xg.rotate(mask, -86400, win)                                 # crosses the seam
+    assert rot == [(t("2025-01-01T00:00:00Z"), t("2025-01-01T12:00:00Z")),
+                   (t("2025-01-10T12:00:00Z"), t("2025-01-11T00:00:00Z"))]
+    assert xg.rotate(mask, -2 * 86400, win) == [(t("2025-01-09T12:00:00Z"),
+                                                 t("2025-01-10T12:00:00Z"))]
+    for off in xg.full_offsets(win):
+        assert xg.guarded_share(xg.rotate(mask, off, win), *win) == pytest.approx(0.10)
+    # a tail clipped at the window end is not resurrected by the identity
+    end = xg.clip(xg.intervals([t("2025-01-10T12:00:00Z")], 24), win)
+    assert end == [(t("2025-01-10T12:00:00Z"), t("2025-01-11T00:00:00Z"))]
+    assert xg.rotate(end, 3 * 86400, win) == [(t("2025-01-03T12:00:00Z"), t("2025-01-04T00:00:00Z"))]
+    # merged real intervals rotate as one block
+    two = xg.clip(xg.intervals([t("2025-01-05T00:00:00Z"), t("2025-01-05T10:00:00Z")], 12), win)
+    assert two == [(t("2025-01-05T00:00:00Z"), t("2025-01-05T22:00:00Z"))]
+    assert xg.rotate(two, 86400, win) == [(t("2025-01-06T00:00:00Z"), t("2025-01-06T22:00:00Z"))]
+
+
+def test_full_group_p_is_exact_for_a_unique_best_phase():
+    win = (t("2025-01-01T00:00:00Z"), t("2025-01-11T00:00:00Z"))
+    trades = [trade("2025-01-0%dT12:00:00Z" % d, -1.0 if d == 3 else 0.5) for d in range(1, 10)]
+    mask = xg.clip(xg.intervals([t("2025-01-03T11:00:00Z")], 4), win)
+    p = xg.placebo(trades, mask, win, 1.0, xg.full_offsets(win))
+    # only the identity blocks the loser: p_helps = 1 / 10, the smallest possible
+    assert p["n"] == 9 and p["p_helps"] == pytest.approx(1 / 10)
 
 
 @pytest.mark.parametrize("nb,months,delta,ci,ph,pu,expected", [
