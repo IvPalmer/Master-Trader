@@ -58,7 +58,26 @@ entries reads `H시` alone as minute 00; on the corpus it leaves 5 events with n
 The build from 52cb4a0 is frozen by amendment `A3-manifest-freeze` on all three entries:
 delisting-manifest.json `4f979113c7135a185898c06f0d69ae450f4b5d9bc603a7c49a7f5aa87a866c3c`,
 upbit-manifest.json `23a6b3541d5799bf2aa679bf4e1913d970a8af89de58d01c4e3f6e3236d77d00`.
-Phase 2 runs with these values as `--expect-sha256`, not before 2026-11-07.
+Phase 2 runs with these values as `--expect-sha256`.
+
+## A4: estimates instead of voids (2026-11-05)
+
+The operator directed that no study waits for a date or is voided by a gate. Amendment
+`A4-operator-directive-estimates` (all three entries, made before any return was computed,
+reviewed by Codex gpt-6.1-sol) replaces the verdict:
+
+- **Decision:** the announcement-level mean net return at +4 h. EDGE (proxy) when the
+  Bonferroni-adjusted (98.33%) calendar-month block-bootstrap interval of the stress-cost mean
+  is above zero; NO EDGE when that interval of the base-cost mean is at or below zero;
+  otherwise NOT DETERMINABLE. Missing announcements imputed at the worst observed value must
+  not reverse the conclusion.
+- **Old gates** (N >= 20, both halves, concentration, coverage, any unresolved event) are
+  reported as `legacy_gates`, diagnostics only.
+- **Per-horizon eligibility:** an unresolved 24 h exit no longer drops the 30 m and 4 h returns.
+- **Upbit supplement:** 26 of the 43 O11 overlap exclusions relied on a Binance notice published
+  after t0, which a bot at t0 cannot know. `nes_supplement.py` re-adds them with Phase 1 venue
+  resolution (no price read); its manifest SHA-256 is in A4 and its candidates join both Upbit
+  decision sets. The frozen-candidates-only result is reported alongside.
 
 ## Quarantine
 
@@ -99,8 +118,18 @@ systemd-run --user --unit=nes-build --collect -p MemoryMax=1G -p CPUQuota=50% -p
   /usr/bin/python3 nes_manifest.py build --cms data/binance_raw --upbit data/upbit_raw --out data/manifests --code-commit SHA
 ```
 
+A4 Upbit supplement (VPS, outcome-blind; exit 2 = base manifest SHA mismatch):
+
+```bash
+systemd-run --user --unit=nes-supplement --collect -p MemoryMax=1G -p CPUQuota=50% -p Nice=10 \
+  -p IOSchedulingClass=idle --working-directory="$PWD" \
+  /usr/bin/python3 nes_supplement.py build --manifest data/manifests/upbit-manifest.json \
+  --expect-sha256 HEX --cms data/binance_raw --out data/manifests --code-commit SHA
+```
+
 Phase 2, one unit per manifest, only after the freeze amendment is merged (exit 2 = SHA
-mismatch, exit 3 = files not yet published):
+mismatch, exit 3 = files not yet published). The Upbit run adds
+`--supplement data/manifests/upbit-supplement-manifest.json --supplement-sha256 HEX`:
 
 ```bash
 systemd-run --user --unit=nes-phase2-delisting --collect -p MemoryMax=1G -p CPUQuota=50% -p Nice=10 \
