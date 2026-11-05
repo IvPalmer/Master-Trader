@@ -203,9 +203,12 @@ of `upbit-krw-fade-forward-2026-11` and as the new prereg `upbit-krw-fade-live-p
   Freqtrade on every loop (no `custom_exit`, which the fleet showed is dead without exit
   signals). The emergency stop is -0.60, above the worst Part C adverse move (+48.7%), so
   it does not change the tested rule. The stop sits on the exchange when live and is off in
-  dry-run, set by the compose entrypoint from the dry-run flag. It trades through
-  `hl-gateway` as client `upbit`, which may submit exchange actions, so its requests share
-  the fleet's rate budget. Its keys come only from Dokploy env vars; the repo holds none.
+  dry-run, set by the compose entrypoint from the dry-run flag. `HL_UPBIT_GATEWAY_CLIENT`
+  picks its `hl-gateway` client. In dry-run it is the deployed gateway's `short` client
+  (background reads, exchange actions refused; a dry-run Freqtrade sends none), so the
+  dry-run deploy does not touch the gateway. Live it is `upbit`, which may submit exchange
+  actions, and the entrypoint refuses live on any other client. Its keys come only from
+  Dokploy env vars; the repo holds none.
   It starts in dry-run (`HYPERLIQUID_UPBIT_FADE_DRY_RUN` defaults to `true`), and the
   entrypoint refuses to start live without both the wallet address and the key.
 - **Trigger** `research/upbit_fade_live/live_trigger.py` (user unit
@@ -265,7 +268,8 @@ and leverage, with retries, before it submits, and ccxt 4.5.68 does not sign Hyp
 So the delay is measured instead: for every entry the trigger reads the entry order back
 from the bot and records its submission (`order_timestamp`) and fill
 (`order_filled_timestamp`) times against t0 and the paper entry (`timing:` records). A fill
-after t0 + 10 min, or no fill by then, is an execution defect and writes the durable pause.
+after t0 + 10 min, or no timely fill confirmed by then (the trade unreadable, no entry
+order on it, or not filled), is an execution defect and writes the durable pause.
 Freqtrade takes those times from Hyperliquid's order data when ccxt provides them, else
 from its own clock when it saw the order.
 
@@ -274,15 +278,17 @@ from its own clock when it saw the order.
 priority, and those draw on its own slice of 40 weight per rolling minute, which is never
 counted against the fleet's priority capacity; a slice waiter never blocks a fleet waiter.
 Killers keeps its 250 + 50 units whatever the pilot does, and nothing changes for Killers
-while the pilot is idle. Worst case on the VPS IP is 940 per minute (HL allows 1200).
+while the pilot is idle. Worst case through the gateway is 940 per minute (HL allows 1200
+per IP). The paper monitor calls Hyperliquid directly from the same IP, at most one request
+a second and only around events.
 
-**Gateway restarts.** Hyperliquid keeps counting the last minute across a restart, so the
-gateway persists its rolling history (wall-clock timestamps, atomic writes about once a
-second and on shutdown) to `/state/budget.json` on the `hl_gateway_state` volume and
-restores it at start, dropping rows older than the window. A missing or unreadable file
-starts empty, as before, logged and shown on `/healthz` (`budget_history`); that includes
-the first deploy of this change, which the runbook only does when the trailing-minute usage
-is low.
+**Gateway restarts.** The gateway keeps no budget state: a recreated gateway starts with
+an empty rolling minute while Hyperliquid keeps counting the last one. The `upbit` client
+is added by one recreate at go-live, done only when Killers is flat (no open positions and
+no open orders on Hyperliquid, the same rule as the #188 flat restart) and the
+trailing-minute usage on `/healthz`, read just before, is under 300; Killers `/status` and
+the gateway logs are checked after, and the previous image is kept for rollback
+(GO-LIVE.md).
 
 **Epochs.** Dry-run trades are plumbing checks, not results. The live epoch starts at the
 first start with the dry-run flag false and is recorded in a prereg amendment. The live
@@ -311,7 +317,8 @@ database and log files, and a pin of the code's constants to the prereg. Since t
 review they also cover the durable pause and `reconcile`, the halt on a failed write, the
 loss latch, the bot-side guard against Freqtrade's force-entry order (concurrent calls,
 same pair, same event, deadline, loss limit, fail closed), and in
-`services/hl-gateway/tests/` the pilot's contention with Killers and the restored budget
-history across a restart, plus the entry timing measurement. The
+`services/hl-gateway/tests/` the pilot's contention with Killers, a gateway that keeps no
+budget state and the deployed `short` client serving the dry-run bot, plus the entry
+timing measurement and the pause when no timely fill can be confirmed. The
 ROI test reproduces Freqtrade's `min_roi_reached`; the real code is checked in dry-run on
 the VPS (GO-LIVE.md, Part 1).

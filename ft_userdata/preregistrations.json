@@ -1605,7 +1605,7 @@
           "submission": "not bounded: after confirm_trade_entry Freqtrade prepares margin mode and leverage, with retries, before it submits the order, and ccxt 4.5.68 does not sign Hyperliquid's expiresAfter on ordinary orders, so no exchange-side expiry is set",
           "measurement": "for every entry the trigger reads the entry order back from the bot and records its submission time (order_timestamp) and fill time (order_filled_timestamp) against t0 and against the paper entry; reported per trade",
           "fill_defect_after_t0_s": 600,
-          "defect": "a fill after t0 + 10 min, or no fill by then, is an execution defect: the trigger writes the durable pause"
+          "defect": "a fill after t0 + 10 min, or no timely fill confirmed by then (the trade unreadable, no entry order on it, or not filled), is an execution defect: the trigger writes the durable pause before its record"
         },
         "latest_entry_after_t0_s": 420,
         "direction": "short",
@@ -1623,7 +1623,7 @@
         "kill_realized_pnl_usdc": -75,
         "kill_latch": "the trigger reads the bot's realized P&L every loop and writes its pause file at -75 USDC or worse; the bot refuses entries at that level by itself",
         "unknown_outcome_pause": "an unobserved /forceenter outcome writes the pause file before the outcome record; while any unknown outcome has no reconciliation record (live_trigger.py reconcile, after the operator checks the bot and Hyperliquid) the trigger stays paused and re-creates the file every loop and at every start; a failure to persist any state stops further entries",
-        "gateway": "hl-gateway client upbit: reads at the background tier; exchange actions and orderStatus reads in its own slice of 40 weight per minute, outside the fleet's priority capacity",
+        "gateway": "dry-run: the deployed hl-gateway client short (reads at the background tier, exchange actions refused), so the dry-run deploy does not change the gateway; live: hl-gateway client upbit (reads at the background tier; exchange actions and orderStatus reads in its own slice of 40 weight per minute, outside the fleet's priority capacity), added by one gateway recreate only when Killers is flat (no open positions and no open orders on Hyperliquid) and the trailing-minute usage read just before is under 300; the gateway keeps no budget state",
         "epoch_start": null
       },
       "rules": [
