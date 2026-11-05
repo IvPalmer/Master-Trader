@@ -110,7 +110,7 @@ and a dry-run Freqtrade never sends one). The gateway changes only at go-live (P
    - remove `data/KILL` and leave the trigger running until at least one real paper event
      has passed through it (`python3 -B live_trigger.py status`).
 
-## Gateway deploy (go-live only, Killers flat)
+## Gateway deploy (go-live only, Killers held flat)
 
 Live trading needs the gateway's `upbit` client: reads at the background tier, plus the
 pilot's own slice of 40 weight a minute for exchange actions and `orderStatus`, outside the
@@ -123,7 +123,32 @@ with an empty rolling minute while Hyperliquid keeps counting the last one. Recr
 only when **Killers is flat: no open positions and no open orders on Hyperliquid** (the
 same rule as the #188 flat restart), and only while the trailing-minute usage, read
 immediately before the recreate, is **under 300** (of the gateway's 900 fleet cap;
-Hyperliquid allows 1200 per IP).
+Hyperliquid allows 1200 per IP). Killers is not only checked flat but **held** flat: its
+entries are paused and any entry already in flight is drained **before** the final flat
+checks, and they stay paused through the recreate, the verification and the 60 s after the
+recreate that Hyperliquid still counts. Then the previous entry state is restored. If the
+procedure stops anywhere in between, Killers stays paused (the safe side) until step 7.
+Only a restart of `ft-killers-scalp` would resume it (a live config starts `running`), and
+nothing in this procedure restarts it: every recreate here is `--no-deps`.
+
+How entries are held, checked in the pinned Freqtrade 2026.7 source and in the receiver:
+
+- `POST /api/v1/stopentry` is the same handler as `/pause` (`_rpc_pause`): it sets the bot
+  to `paused`. Every `/forceenter` then fails its first check
+  (`_force_entry_validations`: "trader is not running", HTTP 502), and the bot's own loop
+  enters only while `running`. Exits, stops and order handling go on.
+- `killers-receiver` has no pause flag of its own. It is the only code in the repo that
+  sends `/forceenter` to Killers: it records a refused open as `failed` and never sends it
+  again (a redelivered signal is deduplicated on its message id), so a signal that arrives
+  in the window is skipped, not deferred. The circuit breaker only ever posts
+  `/stopentry`; no code in the repo posts `/start`.
+- A `/forceenter` that passed the state check just before the pause still runs to its end
+  (margin mode, leverage with retries, then the order) while holding Freqtrade's
+  `_exit_lock`. Between the check and the lock it does only local work (the receiver
+  always sends a stake). `DELETE /api/v1/trades/0/open-order` (`_rpc_cancel_open_order`)
+  takes the same lock before it looks the trade up, so it answers "Invalid trade_id." only
+  once no entry holds the lock. Two such probes, 15 s after the pause and 5 s apart, are
+  the drain.
 
 The gateway's figure does not count the paper monitor (`research/upbit_fade_forward/`). It
 calls Hyperliquid directly from the same VPS address, at most one request a second, and
@@ -141,15 +166,42 @@ sudo docker tag "$(sudo docker inspect -f '{{.Image}}' ft-hl-gateway)" "$IMG:pre
 sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml build hl-gateway
 ```
 
-**2. Pre-checks, immediately before the recreate** (stop if any fails):
+**2. Pause Killers entries** and keep the state to restore:
 
 ```bash
 KU=$(sudo docker exec ft-killers-scalp printenv FREQTRADE__API_SERVER__USERNAME)
 KP=$(sudo docker exec ft-killers-scalp printenv FREQTRADE__API_SERVER__PASSWORD)
 KW=$(sudo docker exec ft-killers-scalp printenv FREQTRADE__EXCHANGE__WALLET_ADDRESS)
+K=http://127.0.0.1:8099/api/v1
 cd ~/backups/gateway-$T
+curl -s -u "$KU:$KP" $K/show_config | jq -r .state | tee killers-state-before.txt
+sudo docker exec ft-metrics-exporter cat /state/portfolio_peak.json | jq .triggered | tee breaker-before.txt
+curl -s -u "$KU:$KP" -X POST $K/stopentry; echo
+curl -s -u "$KU:$KP" $K/show_config | jq -r .state
+```
+
+`killers-state-before.txt` is normally `running`; the last line must print `paused`.
+
+**3. Drain what was already in flight**, then check:
+
+```bash
+sleep 15
+for i in 1 2; do curl -s -m 900 -u "$KU:$KP" -X DELETE $K/trades/0/open-order; echo; sleep 5; done
+sudo docker exec killers-receiver python -c "import os,sqlite3; c=sqlite3.connect('file:'+os.environ['KILLERS_DB']+'?mode=ro',uri=True,timeout=10); print(c.execute(\"SELECT count(*) FROM positions WHERE state='requested'\").fetchone()[0])"
+```
+
+- both probes answer `{"error": "Error querying /api/v1/trades/0/open-order: Invalid trade_id."}`
+  (a probe that waits is an entry finishing; let it);
+- the receiver has `0` positions `requested` (a `/forceenter` sent and not yet answered).
+  One left by a transport failure is marked `failed` by the receiver within 10 min: wait
+  and run the line again.
+
+**4. Final checks, immediately before the recreate** (if any fails: do not recreate, go
+to step 7):
+
+```bash
 hl() { curl -s https://api.hyperliquid.xyz/info -H 'Content-Type: application/json' -d "$1"; }
-curl -s -u "$KU:$KP" http://127.0.0.1:8099/api/v1/status | tee killers-status-before.json | jq 'length'
+curl -s -u "$KU:$KP" $K/status | tee killers-status-before.json | jq 'length'
 hl "{\"type\":\"clearinghouseState\",\"user\":\"$KW\"}" | jq '.assetPositions' | tee hl-positions-before.json | jq 'length'
 hl "{\"type\":\"frontendOpenOrders\",\"user\":\"$KW\"}" | tee hl-orders-before.json | jq 'length'
 sudo docker logs killers-receiver --since 10m 2>&1 | tail -20
@@ -158,27 +210,29 @@ curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, qu
 ```
 
 - Killers is flat: all three counts are `0` (Killers `/status` is `[]`, no position and no
-  open order, stops and TPs included, on its Hyperliquid account). If anything is open,
-  wait until it closes; never close a Killers position for this deploy;
+  open order, stops and TPs included, on its Hyperliquid account). If anything is open, go
+  to step 7 and try again once it has closed; never close a Killers position for this
+  deploy;
 - the receiver log shows no signal being handled and the paper monitor's log no event;
   avoid the US open (13:30 UTC) and news;
-- `weight_last_minute` is under 300. If not, wait (it is a rolling minute) and read it
-  again. Record the value and time on #252 with the deploy.
+- `weight_last_minute` is under 300. If not, wait (it is a rolling minute; entries stay
+  paused) and read it again. Record the value and time on #252 with the deploy.
 
-**3. Recreate** right after the reading:
+**5. Recreate** right after the reading:
 
 ```bash
 cd /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/ft_userdata
 sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml up -d --no-deps hl-gateway
+R=$(date +%s)
 until curl -sf http://127.0.0.1:8104/healthz >/dev/null; do sleep 2; done
 ```
 
-**4. Verify** (within a few minutes):
+**6. Verify**, with Killers entries still paused:
 
 ```bash
 curl -s http://127.0.0.1:8104/healthz | jq '{status, weight_last_minute, slice_weight_last_minute, killers: .clients.killers, upbit: .clients.upbit, short: .clients.short}'
-curl -s -u "$KU:$KP" http://127.0.0.1:8099/api/v1/status | jq 'length'
-curl -s -u "$KU:$KP" http://127.0.0.1:8099/api/v1/show_config | jq '{state, dry_run}'
+curl -s -u "$KU:$KP" $K/status | jq 'length'
+curl -s -u "$KU:$KP" $K/show_config | jq '{state, dry_run}'
 sudo docker logs ft-killers-scalp --since 5m 2>&1 | grep -iE "error|429|timeout|exception" | tail
 sudo docker logs ft-hl-gateway --since 5m 2>&1 | tail -20
 hl "{\"type\":\"clearinghouseState\",\"user\":\"$KW\"}" | jq '.assetPositions | length'
@@ -187,22 +241,46 @@ hl "{\"type\":\"frontendOpenOrders\",\"user\":\"$KW\"}" | jq 'length'
 
 - `healthz` lists `upbit` and `slice_weight_last_minute`, and `clients.killers` counts `ok`
   reads with no `queue_timeout` or `rate_limited`;
-- Killers `/status` answers (still `[]`), `state` is `running`, and its log has no new
+- Killers `/status` answers (still `[]`), `state` is `paused`, and its log has no new
   errors; the gateway log shows no errors or 429s;
 - Killers still has no position and no open order on Hyperliquid.
 
-**Rollback to the old image**, under the same pre-checks (Killers flat, usage under 300).
-Stop the live pilot first: the old image has no `upbit` client. Close its positions, set
-`HL_UPBIT_GATEWAY_CLIENT=short` (or remove it) and `HYPERLIQUID_UPBIT_FADE_DRY_RUN=true`,
-and recreate the bot as in **Back to dry-run** below. Then:
+If the verification fails, keep Killers paused and roll back (below).
+
+**7. Restore the entry state**, only after the verification passed (or after a stop before
+the recreate) and at least 60 s after the recreate:
+
+```bash
+cd ~/backups/gateway-$T
+while [ -n "$R" ] && [ $(( $(date +%s) - R )) -lt 60 ]; do sleep 5; done
+B=$(sudo docker exec ft-metrics-exporter cat /state/portfolio_peak.json | jq .triggered)
+if [ "$(cat killers-state-before.txt)" = running ] && [ "$B" = false ]; then
+  curl -s -u "$KU:$KP" -X POST $K/start; echo
+fi
+curl -s -u "$KU:$KP" $K/show_config | jq -r .state
+```
+
+The last line prints the state in `killers-state-before.txt`. A bot that was `paused`
+before stays paused, and so does one whose circuit breaker has triggered since (`B` not
+`false`): resuming it then is the operator's decision under the breaker rules in
+`docs/ops/UPDATING-WITHOUT-BREAKING-BOTS.md`.
+
+**Rollback to the old image** follows the same procedure, steps 2 to 7 (entries paused,
+in-flight drained, Killers flat, usage under 300, verify, 60 s, restore), with step 5's
+command replaced. Stop the live pilot first: the old image has no `upbit` client. Close its
+positions, set `HL_UPBIT_GATEWAY_CLIENT=short` (or remove it) and
+`HYPERLIQUID_UPBIT_FADE_DRY_RUN=true`, and recreate the bot as in **Back to dry-run**
+below. Step 5 for the rollback:
 
 ```bash
 cd /etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/ft_userdata
 sudo docker tag "$IMG:pre-252" "$IMG:latest"
 sudo docker compose -p compose-bypass-mobile-port-fbk1m6 -f docker-compose.prod.yml up -d --no-deps --force-recreate hl-gateway
+R=$(date +%s)
+until curl -sf http://127.0.0.1:8104/healthz >/dev/null; do sleep 2; done
 ```
 
-Then repeat the verification (without `upbit`).
+In step 6 of a rollback, `healthz` has no `upbit` and no `slice_weight_last_minute`.
 
 ## Part 2: account and keys (operator only)
 
@@ -235,8 +313,8 @@ an execution defect that pauses the pilot. Freqtrade prepares margin mode and
 leverage, with retries, after the admission check, so submission itself is not bounded.
 
 1. Pause the trigger while you check: `touch /home/ubuntu/master-trader/research/upbit_fade_live/data/KILL`.
-2. Gateway: follow **Gateway deploy (go-live only, Killers flat)** above, which adds the
-   `upbit` client. Do not go on until its verification passes.
+2. Gateway: follow **Gateway deploy (go-live only, Killers held flat)** above, which adds
+   the `upbit` client. Do not go on until its verification passes and step 7 is done.
 3. In the stack `.env`, set `HL_UPBIT_GATEWAY_CLIENT=upbit` and
    `HYPERLIQUID_UPBIT_FADE_DRY_RUN=false`, with the keys from Part 2.
 4. The one command:
