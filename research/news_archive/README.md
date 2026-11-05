@@ -32,6 +32,9 @@ the transition (A→B→B→A stores two). The `items` row keeps the first versi
 | `rss_coindesk`, `rss_theblock`, `rss_decrypt`, `rss_blockworks`, `rss_cointelegraph`, `rss_fed` | RSS 2.0 / Atom feeds (`na_sources.RSS_FEEDS`) | 300 s | `guid` / Atom `id`, else link | `pubDate` / `published`, else `updated` |
 | `ff_calendar` | `nfs.faireconomy.media/ff_calendar_thisweek.json` | 6 h | `sha1(title|country|date)` | `date` (event time) |
 | `fear_greed` | `api.alternative.me/fng/?limit=1` | 1 h | `timestamp` | `timestamp` (s) |
+| `rss_cnbc_top`, `rss_cnbc_economy`, `rss_cnbc_finance`, `rss_mw_topstories`, `rss_mw_bulletins`, `rss_wsj_markets`, `rss_ft_markets`, `rss_ft_world`, `rss_bloomberg_markets` | market-wide RSS 2.0 feeds (#254, `na_sources.RSS_FEEDS`) | 300 s | `guid`, else link | `pubDate` |
+| `px_es`, `px_nq`, `px_dxy` | Yahoo chart API `query1.finance.yahoo.com/v8/finance/chart/<sym>?interval=1m&range=1d` (ES=F, NQ=F, DX-Y.NYB) | 300 s | `<symbol>:<regularMarketTime>` | `regularMarketTime` (s) |
+| `px_vix`, `px_tnx` | CBOE delayed quotes `cdn-api.cboe.com/api/global/delayed_quotes/quotes/_VIX.json`, `_TNX.json` | 300 s | `<symbol>:<last_trade_time>` | `last_trade_time` (naive = US Eastern) |
 
 **Binance budget.** At most one CMS request every 180 s across *every* caller (this
 service, `once`, the Part C harvester), through the file-locked limiter in
@@ -63,6 +66,23 @@ forward wall-clock step cannot shorten them.
   the locale segment so a locale change cannot duplicate items.
 - CoinDesk and Blockworks redirect (308); the source table uses the final URLs.
   Blockworks is Atom, the other five feeds are RSS 2.0.
+
+**Market-wide sources (#254, checked from the VPS on 2026-11-05):**
+
+- The snapshot sources store one item per last-trade time: when the market is shut, polls
+  succeed and store nothing new. A Yahoo item's raw holds the `meta` block and the last 35
+  1m bars (`[t, o, h, l, c, v]`, null minutes skipped), enough for a 30-min change from one
+  snapshot. A CBOE item's raw is the quote's `data` block; the top-level server `timestamp`
+  changes on every request and is dropped. Index quotes are delayed about 15 min, so
+  `received_at - published_at` measures the delay.
+- CBOE: `cdn.cboe.com` answers 307 to `cdn-api.cboe.com`, so the source uses the final host.
+  VIX's `last_trade_time` is naive US Eastern (14:30:31 at server time 19:45:38 UTC);
+  TNX's carries an offset (`-06:00`). `^TNX` is 10 x the 10-year yield.
+- Not added: AP (`apnews.com` returns 403 to the VPS, also with a browser UA); FRED
+  (connection refused from the VPS, and daily only); MarketWatch `mw_realtimeheadlines` and
+  `mw_marketpulse` (reachable but stale, newest items 2025-06 and 2025-07); investing.com
+  (Cloudflare-fronted). CNBC's `pubDate` follows article updates, so `received_at` is the
+  first-seen time and later changes are revisions.
 
 ## Coverage holes and the PIT rule
 
@@ -124,7 +144,8 @@ while the service holds the writer lock (exit 3); stop the unit first.
   stale source (no OK poll for `3 × interval + 10 min`), open gaps, gaps closed in 24 h and
   unrecovered overflow in 7 d, plus the backup state. Only liveness counts, so a feed that
   polls OK but publishes nothing (as `rss_blockworks` did) reports OK. Non-list feeds
-  (`fear_greed`, `ff_calendar`, `hyperliquid_universe`) have no loss detector.
+  (`fear_greed`, `ff_calendar`, `hyperliquid_universe`, the `px_*` snapshots) have no loss
+  detector.
 - **Backup.** A separate root job, `deploy/vps/backup_news_archive.py`, snapshots this
   database daily to `/home/ubuntu/backups/news-archive/`; off-host upload and restore
   drills are opt-in. Contract, install and rollback:

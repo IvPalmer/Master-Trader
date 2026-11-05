@@ -1,4 +1,5 @@
-"""PIT news archive source parsers (issue #229, Part A): network-free, fixture-based."""
+"""PIT news archive source parsers (#229 Part A; market feeds and snapshots #254):
+network-free, fixture-based."""
 import hashlib
 import json
 import sys
@@ -31,6 +32,13 @@ def load(name):
     ("ff_calendar", "ff_calendar.json", 2),
     ("fear_greed", "fear_greed.json", 1),
     ("hyperliquid_universe", "hl_meta_a.json", 1),
+    ("rss_cnbc_top", "rss_cnbc.xml", 2),
+    ("rss_wsj_markets", "rss_wsj.xml", 2),
+    ("rss_ft_markets", "rss_ft.xml", 2),
+    ("rss_bloomberg_markets", "rss_bloomberg.xml", 2),
+    ("px_es", "yahoo_chart_es.json", 1),
+    ("px_vix", "cboe_quote_vix.json", 1),
+    ("px_tnx", "cboe_quote_tnx.json", 1),
 ])
 def test_parser_yields_items_with_ids_and_utc(key, fixture, n):
     items = SOURCES[key].parse(load(fixture))
@@ -45,11 +53,22 @@ def test_sources_cover_spec_table_and_flags():
     expected = {"tree", "binance_listing", "binance_delisting", "upbit", "okx_listings",
                 "okx_delistings", "hyperliquid_universe", "rss_coindesk", "rss_theblock",
                 "rss_decrypt", "rss_blockworks", "rss_cointelegraph", "rss_fed",
-                "ff_calendar", "fear_greed"}
+                "ff_calendar", "fear_greed",
+                # #254: market-wide headlines and cross-asset snapshots
+                "rss_cnbc_top", "rss_cnbc_economy", "rss_cnbc_finance", "rss_mw_topstories",
+                "rss_mw_bulletins", "rss_wsj_markets", "rss_ft_markets", "rss_ft_world",
+                "rss_bloomberg_markets", "px_es", "px_nq", "px_dxy", "px_vix", "px_tnx"}
     assert set(SOURCES) == expected
     assert {k for k, s in SOURCES.items() if s.binance} == {"binance_listing", "binance_delisting"}
     assert {k for k, s in SOURCES.items() if not s.list_feed} == {
-        "hyperliquid_universe", "ff_calendar", "fear_greed"}
+        "hyperliquid_universe", "ff_calendar", "fear_greed",
+        "px_es", "px_nq", "px_dxy", "px_vix", "px_tnx"}
+    for k in ("px_es", "px_nq", "px_dxy", "px_vix", "px_tnx"):
+        assert SOURCES[k].interval_s == 300 and SOURCES[k].method == "GET"
+    assert SOURCES["px_es"].url.endswith("/chart/ES%3DF?interval=1m&range=1d")
+    assert SOURCES["px_vix"].url == ("https://cdn-api.cboe.com/api/global/delayed_quotes/quotes/"
+                                     "_VIX.json")
+    assert all(s.url.startswith("https://") for s in SOURCES.values())
     assert SOURCES["tree"].interval_s == 60 and SOURCES["upbit"].interval_s == 120
     assert SOURCES["ff_calendar"].interval_s == 6 * 3600
     assert SOURCES["fear_greed"].interval_s == 3600
@@ -179,7 +198,72 @@ def test_timestamp_edge_cases(value, kind, expected):
     ("okx_listings", b'{"code":"50011","msg":"Too Many Requests","data":[]}'),
     ("rss_coindesk", b"<html><body>Just a moment...</body></html>"),
     ("fear_greed", b'{"data":[],"metadata":{"error":"down"}}'),
+    ("px_es", load("yahoo_chart_error.json")),
+    ("px_es", b'{"chart":{"result":[{"meta":{"symbol":"ES=F"}}],"error":null}}'),
+    ("px_es", b"<html>Too Many Requests</html>"),
+    ("px_vix", load("cboe_access_denied.xml")),
+    ("px_vix", b'{"timestamp":"2026-11-05 19:45:38","data":{"symbol":"^VIX"}}'),
+    ("px_vix", b'{"data":{"symbol":"^VIX","current_price":26.3,"last_trade_time":"not-a-date"}}'),
+    ("px_es", b'{"chart":{"result":[{"meta":{"symbol":"ES=F","regularMarketTime":-1,'
+              b'"regularMarketPrice":7412.0}}],"error":null}}'),
+    ("rss_ft_markets", b"<html><body>Just a moment...</body></html>"),
 ])
 def test_error_payloads_raise_not_return_empty(key, payload):
     with pytest.raises(Exception):
         SOURCES[key].parse(payload)
+
+
+# ---- #254 cross-asset snapshots --------------------------------------------------------------
+
+def test_yahoo_snapshot_id_time_and_last_bars():
+    [it] = SOURCES["px_es"].parse(load("yahoo_chart_es.json"))
+    raw = json.loads(load("yahoo_chart_es.json"))["chart"]["result"][0]
+    t = raw["meta"]["regularMarketTime"]
+    assert it.source_item_id == "ES=F:%d" % t
+    assert it.published_at == "2026-11-05T19:36:03.000000+00:00"
+    bars = it.raw["bars_1m"]
+    assert len(bars) == na_sources.YAHOO_BARS_KEPT
+    assert bars[-1][0] == raw["timestamp"][-1]
+    assert raw["timestamp"][-5] not in [b[0] for b in bars]   # the null minute is skipped
+    assert all(len(b) == 6 and b[4] is not None for b in bars)
+    assert it.raw["meta"]["symbol"] == "ES=F" and it.title.startswith("ES=F 7412 (-4.00%")
+    json.dumps(it.raw)
+
+
+def test_yahoo_snapshot_without_bars_still_records_the_quote():
+    body = json.dumps({"chart": {"result": [{"meta": {
+        "symbol": "DX-Y.NYB", "regularMarketTime": 1793906432, "regularMarketPrice": 101.567}}],
+        "error": None}}).encode()
+    [it] = SOURCES["px_dxy"].parse(body)
+    assert it.source_item_id == "DX-Y.NYB:1793906432" and it.raw["bars_1m"] == []
+    assert it.title == "DX-Y.NYB 101.567"
+
+
+def test_cboe_naive_time_is_us_eastern_and_server_stamp_dropped():
+    [vix] = SOURCES["px_vix"].parse(load("cboe_quote_vix.json"))
+    assert vix.source_item_id == "^VIX:2026-11-05T14:30:31"
+    assert vix.published_at == "2026-11-05T19:30:31.000000+00:00"      # EST, UTC-5
+    assert "timestamp" not in vix.raw and vix.raw["prev_day_close"] == 16.61
+    [tnx] = SOURCES["px_tnx"].parse(load("cboe_quote_tnx.json"))     # explicit -06:00 offset
+    assert tnx.published_at == "2026-11-05T19:45:04.138000+00:00"
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("2026-07-01T10:00:00", "2026-07-01T14:00:00.000000+00:00"),      # EDT
+    ("2026-01-05T16:15:00", "2026-01-05T21:15:00.000000+00:00"),      # EST
+    ("2026-11-01T01:30:00", "2026-11-01T05:30:00.000000+00:00"),      # repeated hour: EDT
+    ("2026-11-05T13:45:04.138000-06:00", "2026-11-05T19:45:04.138000+00:00"),
+    ("", None),
+])
+def test_et_timestamps(value, expected):
+    assert to_utc(value, "et") == expected
+
+
+def test_market_rss_ids_are_guids():
+    cnbc = SOURCES["rss_cnbc_top"].parse(load("rss_cnbc.xml"))
+    assert cnbc[0].source_item_id == "108520614"
+    assert cnbc[0].published_at == "2026-11-05T19:40:43.000000+00:00"
+    ft = SOURCES["rss_ft_markets"].parse(load("rss_ft.xml"))
+    assert ft[0].source_item_id == "6553ec40-00a8-4832-8ca5-c528b9da224a"
+    bbg = SOURCES["rss_bloomberg_markets"].parse(load("rss_bloomberg.xml"))
+    assert bbg[0].source_item_id == "TO1O1WKIP3K800"
