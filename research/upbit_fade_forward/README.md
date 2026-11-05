@@ -148,3 +148,4 @@ is idle between events (one `market/all` request every 5 min, one archive read e
 
 | date | source commit | by |
 |---|---|---|
+| 2026-11-05 18:54 UTC: installed, epoch 2026-11-05T18:54:28.399Z, archive cursors items_pk 1681 / rev_pk 2383, first market/all snapshot 300 KRW markets; 21 files hash-verified; code backup `~/backups/news_event_studies-code-pre249-20261105T1854Z.tgz` | main dcba075 (PR #249) | Claude |
