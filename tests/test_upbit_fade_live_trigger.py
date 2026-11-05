@@ -59,6 +59,7 @@ class FakeFt:
         self.clock = None               # wall ms; set by trigger()
         self.fill_after_ms = 400        # the entry order fills this long after submission
         self.trades = {}                # trade id -> /trade/<id> answer
+        self.trade_error = None         # an exception or HTTP status for /trade/<id> reads
 
     def __call__(self, req, timeout):
         url = urllib.parse.urlsplit(req.full_url)
@@ -99,6 +100,11 @@ class FakeFt:
                  "order_filled_timestamp": None}]}
             return Resp(200, payload)
         if path.startswith("trade/"):
+            if isinstance(self.trade_error, BaseException):
+                raise self.trade_error
+            if self.trade_error is not None:
+                raise urllib.error.HTTPError(req.full_url, self.trade_error, "err", {},
+                                             io.BytesIO(b'{"detail": "Trade not found."}'))
             return Resp(200, self.trades[int(path.split("/")[1])])
         raise AssertionError("unexpected request %s" % path)
 
@@ -341,6 +347,37 @@ def test_no_fill_by_t0_plus_10_min_pauses_the_pilot(tmp_path):
     t = trig.decisions.get("timing:" + s.eid())
     assert t["defect"] is True and t["filled_ms"] is None and t["order_status"] == "open"
     assert trig.killed()
+
+
+@pytest.mark.parametrize("error", [500, 404, urllib.error.URLError(socket.timeout("timed out"))])
+def test_an_unreadable_trade_past_t0_plus_10_min_pauses_the_pilot(tmp_path, error):
+    """Codex round 3: with every trade-detail read failing, nothing paused at t0 + 700 s."""
+    s = paper(tmp_path)
+    ft = FakeFt()
+    ft.trade_error = error
+    trig, _, notes = trigger(s, tmp_path, ft)
+    trig.tick()                                  # enters; the read-back fails
+    trig.tick()
+    assert "timing:" + s.eid() not in trig.decisions and not trig.killed()   # still in time
+    s.clock.to(s.t0 + 700_000)
+    trig.tick()
+    t = trig.decisions.get("timing:" + s.eid())
+    assert t["defect"] is True and t["filled_ms"] is None and t["read_error"]
+    assert trig.killed() and trig.kill_path.exists()
+    assert "trade unreadable" in json.loads(trig.kill_path.read_text())["reason"]
+    assert any("execution defect" in n for n in notes)
+
+
+def test_a_trade_without_its_entry_order_past_t0_plus_10_min_pauses_the_pilot(tmp_path):
+    s = paper(tmp_path)
+    trig, ft, _ = trigger(s, tmp_path)
+    trig.tick()
+    ft.trades[7]["orders"] = [o for o in ft.trades[7]["orders"] if o["ft_order_side"] == "stoploss"]
+    s.clock.to(s.t0 + 700_000)
+    trig.tick()
+    t = trig.decisions.get("timing:" + s.eid())
+    assert t["defect"] is True and t["order_id"] is None and trig.killed()
+    assert "no entry order" in json.loads(trig.kill_path.read_text())["reason"]
 
 
 def test_a_reconciled_entry_is_measured_too(tmp_path):

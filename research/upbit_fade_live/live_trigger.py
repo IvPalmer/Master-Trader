@@ -335,26 +335,28 @@ class Trigger:
         return mine[0] if mine else None
 
     def measure(self):
-        """Record each entry order's submission and fill time against t0; a fill after
-        t0 + 10 min (or none by then) pauses the pilot."""
+        """Record each entry order's submission and fill time against t0. Once t0 + 10 min
+        has passed without a confirmed timely fill (the trade unreadable, no entry order,
+        not filled, or filled late) the pilot is paused, the durable pause first."""
         for eid, trade_id, tag in self._measurable():
             intent = self.decisions.get("intent:" + eid) or {}
             t0 = intent.get("t0_ms")
             if t0 is None:
                 continue
+            limit = t0 + FILL_DEFECT_MS
+            read_error = None
             try:
                 trade = self.api.get("trade/%d" % int(trade_id))
             except (FtError, TypeError, ValueError) as e:
-                if self._timing_seen.get(eid) != str(e):
-                    LOG.warning("timing %s: cannot read trade %s: %s", eid, trade_id, e)
-                    self._timing_seen[eid] = str(e)
-                continue
+                trade, read_error = None, "%s: %s" % (type(e).__name__, e)
+                if self._timing_seen.get(eid) != read_error:
+                    LOG.warning("timing %s: cannot read trade %s: %s", eid, trade_id, read_error)
+                    self._timing_seen[eid] = read_error
             order = self._entry_order(trade if isinstance(trade, dict) else {}, tag)
             filled = order is not None and (order.get("filled") or 0) > 0 \
                 and order.get("order_filled_timestamp") is not None
-            limit = t0 + FILL_DEFECT_MS
             if not filled and self.wall_ms() <= limit:
-                continue                                   # not filled yet; still in time
+                continue                                   # not confirmed yet; still in time
             submitted_ms = order.get("order_timestamp") if order else None
             filled_ms = order.get("order_filled_timestamp") if filled else None
             defect = filled_ms is None or filled_ms > limit
@@ -371,13 +373,18 @@ class Trigger:
                    "filled_ms": filled_ms, "submit_after_t0_s": after(submitted_ms, t0),
                    "fill_after_t0_s": after(filled_ms, t0),
                    "fill_after_paper_entry_s": after(filled_ms, intent.get("paper_entry_obs_ms")),
-                   "fill_limit_ms": limit, "defect": defect}
+                   "fill_limit_ms": limit, "read_error": read_error, "defect": defect}
             if defect:
+                if filled_ms is not None:
+                    why = "filled %.1f s after t0, later than t0 + 10 min" % ((filled_ms - t0) / 1000)
+                elif read_error is not None:
+                    why = "no timely fill confirmed by t0 + 10 min (trade unreadable: %s)" % read_error
+                elif order is None:
+                    why = "no timely fill confirmed by t0 + 10 min (no entry order on the trade)"
+                else:
+                    why = "not filled by t0 + 10 min"
                 # The durable pause before the record, as for an unknown outcome.
-                self.engage_kill("execution defect: entry %s (trade %s) %s" % (
-                    eid, trade_id, "filled %.1f s after t0, later than t0 + 10 min" % (
-                        (filled_ms - t0) / 1000) if filled_ms is not None
-                    else "not filled by t0 + 10 min"))
+                self.engage_kill("execution defect: entry %s (trade %s) %s" % (eid, trade_id, why))
             self._append(rec)
             LOG.info("timing %s: submitted %+.1f s, filled %s after t0%s", eid,
                      rec["submit_after_t0_s"] or 0.0,
