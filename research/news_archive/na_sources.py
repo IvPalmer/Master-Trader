@@ -1,4 +1,5 @@
-"""v1 sources of the PIT news archive (#229, spec §4.2): fetch specs and pure parsers.
+"""Sources of the PIT news archive (#229 spec §4.2; market-wide feeds and cross-asset
+snapshots #254): fetch specs and pure parsers.
 
 Each parser takes the raw response body and returns a list of na_store.Item. A payload
 that is not what the source normally sends (an HTML error page, success=false, an API
@@ -15,6 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import Callable, Optional
+from zoneinfo import ZoneInfo
 
 from na_store import Item, iso
 
@@ -28,6 +30,7 @@ FEED_HEADERS = {"User-Agent": UA,
 BINANCE_HEADERS = {"User-Agent": BROWSER_UA, "Accept": "application/json", "lang": "en"}
 
 KST = timezone(timedelta(hours=9))
+US_EASTERN = ZoneInfo("America/New_York")
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 SANE_MIN = datetime(2000, 1, 1, tzinfo=timezone.utc)
 SANE_MAX = datetime(2100, 1, 1, tzinfo=timezone.utc)
@@ -104,14 +107,17 @@ def to_utc(value, kind):
 
     kind: "ms" / "s" (epoch numbers or digit strings; the magnitude decides between the
     two, so seconds sent where ms were expected still convert correctly), "kst"
-    (ISO, naive means KST), "iso" (ISO with an offset; naive is ambiguous -> None),
-    "rfc822" (RSS pubDate, with an ISO fallback). Never raises.
+    (ISO, naive means KST), "et" (ISO, naive means America/New_York; in the repeated
+    fall-back hour the first, EDT, reading is taken), "iso" (ISO with an offset; naive is
+    ambiguous -> None), "rfc822" (RSS pubDate, with an ISO fallback). Never raises.
     """
     try:
         if kind in ("ms", "s"):
             dt = _epoch(value)
         elif kind == "kst":
             dt = _iso(value, KST)
+        elif kind == "et":
+            dt = _iso(value, US_EASTERN)
         elif kind == "iso":
             dt = _iso(value, None)
         elif kind == "rfc822":
@@ -323,6 +329,74 @@ def parse_fear_greed(body):
     return out
 
 
+YAHOO_BARS_KEPT = 35   # enough 1m bars for a 30-min change at every 5-min snapshot
+
+
+def _num(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _pct_title(symbol, price, prev):
+    if _num(prev) and prev:
+        return "%s %.6g (%+.2f%% vs prev close %.6g)" % (symbol, price, 100 * (price / prev - 1), prev)
+    return "%s %.6g" % (symbol, price)
+
+
+def parse_yahoo_chart(body):
+    """Yahoo chart API (interval=1m, range=1d): one snapshot per last-trade time.
+
+    Item id "<symbol>:<regularMarketTime>"; published_at = regularMarketTime. raw = the meta
+    block plus the last YAHOO_BARS_KEPT 1m bars with a close, as [t, o, h, l, c, v] rows, so a
+    reader can compute a 30-min change point-in-time from any one snapshot.
+    """
+    j = json.loads(body)
+    chart = j.get("chart") if isinstance(j, dict) else None
+    if not isinstance(chart, dict) or chart.get("error"):
+        raise ValueError("yahoo chart: error=%r" % (
+            chart.get("error") if isinstance(chart, dict) else None))
+    res = chart.get("result")
+    if not isinstance(res, list) or not res or not isinstance(res[0], dict):
+        raise ValueError("yahoo chart: no result")
+    r = res[0]
+    meta = r.get("meta")
+    if not isinstance(meta, dict):
+        raise ValueError("yahoo chart: no meta")
+    symbol, t, price = _text(meta.get("symbol")), meta.get("regularMarketTime"), \
+        meta.get("regularMarketPrice")
+    if not symbol or not isinstance(t, int) or isinstance(t, bool) or not _num(price):
+        raise ValueError("yahoo chart: meta lacks symbol, regularMarketTime or price")
+    ts = r.get("timestamp") or []
+    quote = ((r.get("indicators") or {}).get("quote") or [{}])[0] or {}
+    cols = [quote.get(k) or [] for k in ("open", "high", "low", "close", "volume")]
+    rows = []
+    for i, ti in enumerate(ts):
+        vals = [c[i] if i < len(c) else None for c in cols]
+        if vals[3] is not None:
+            rows.append([ti] + vals)
+    prev = meta.get("previousClose", meta.get("chartPreviousClose"))
+    raw = {"meta": meta, "bars_1m": rows[-YAHOO_BARS_KEPT:]}
+    return [Item("%s:%d" % (symbol, t), to_utc(t, "s"), _pct_title(symbol, price, prev), None,
+                 None, None, raw)]
+
+
+def parse_cboe_quote(body):
+    """CBOE delayed quote: one snapshot per last_trade_time (naive values are US Eastern).
+
+    The top-level `timestamp` (server time, new on every request) is not content and is
+    dropped; raw is the `data` block.
+    """
+    j = json.loads(body)
+    d = j.get("data") if isinstance(j, dict) else None
+    if not isinstance(d, dict):
+        raise ValueError("cboe quote: no data block")
+    symbol, price, ltt = _text(d.get("symbol")), d.get("current_price"), \
+        _text(d.get("last_trade_time"))
+    if not symbol or not _num(price) or not ltt:
+        raise ValueError("cboe quote: data lacks symbol, current_price or last_trade_time")
+    return [Item("%s:%s" % (symbol, ltt), to_utc(ltt, "et"),
+                 _pct_title(symbol, price, d.get("prev_day_close")), None, None, None, d)]
+
+
 def parse_hl_meta(body):
     """One snapshot item; the scheduler numbers it universe:<seq> and diffs it."""
     j = json.loads(body)
@@ -357,7 +431,7 @@ def diff_universe(prev, cur, seq, delisted=frozenset()):
     return out
 
 
-# ---- the v1 source table ---------------------------------------------------------------
+# ---- the source table --------------------------------------------------------------------
 
 CMS_URL = "https://www.binance.com/bapi/composite/v1/public/cms/article/list/query"
 # Monitoring-tag notices are published in catalog 161 (Delisting); see README.
@@ -369,6 +443,7 @@ TREE_URL = "https://news.treeofalpha.com/api/news?limit=%d"
 UPBIT_URL = ("https://api-manager.upbit.com/api/v1/announcements"
              "?os=web&page=%d&per_page=20&category=trade")
 OKX_URL = "https://www.okx.com/api/v5/support/announcements?annType=%s"
+CNBC_URL = "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=%d"
 RSS_FEEDS = {
     "rss_coindesk": "https://www.coindesk.com/arc/outboundfeeds/rss",
     "rss_theblock": "https://www.theblock.co/rss.xml",
@@ -376,7 +451,24 @@ RSS_FEEDS = {
     "rss_blockworks": "https://blockworks.com/feed",
     "rss_cointelegraph": "https://cointelegraph.com/rss",
     "rss_fed": "https://www.federalreserve.gov/feeds/press_all.xml",
+    # market-wide headlines (#254); final URLs, since redirects are never followed
+    "rss_cnbc_top": CNBC_URL % 100003114,
+    "rss_cnbc_economy": CNBC_URL % 20910258,
+    "rss_cnbc_finance": CNBC_URL % 10000664,
+    "rss_mw_topstories": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+    "rss_mw_bulletins": "https://feeds.content.dowjones.io/public/rss/mw_bulletins",
+    "rss_wsj_markets": "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain",
+    "rss_ft_markets": "https://www.ft.com/markets?format=rss",
+    "rss_ft_world": "https://www.ft.com/world?format=rss",
+    "rss_bloomberg_markets": "https://www.bloomberg.com/feeds/markets/news.rss",
 }
+# Cross-asset price snapshots (#254), every 5 min. Yahoo for the CME futures and ICE's dollar
+# index; CBOE for the indices it computes (VIX, TNX = 10 x the 10-year yield).
+YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/%s?interval=1m&range=1d"
+YAHOO_SNAPSHOTS = {"px_es": "ES%3DF", "px_nq": "NQ%3DF", "px_dxy": "DX-Y.NYB"}
+CBOE_QUOTE_URL = "https://cdn-api.cboe.com/api/global/delayed_quotes/quotes/%s.json"
+CBOE_SNAPSHOTS = {"px_vix": "_VIX", "px_tnx": "_TNX"}
+PX_INTERVAL_S = 300
 
 
 def _spec(key, url, interval_s, parse, list_feed=True, binance=False, method="GET",
@@ -416,6 +508,12 @@ def _build():
                              6 * 3600, parse_ff_calendar, list_feed=False)
     s["fear_greed"] = _spec("fear_greed", "https://api.alternative.me/fng/?limit=1", 3600,
                             parse_fear_greed, list_feed=False)
+    for key, sym in YAHOO_SNAPSHOTS.items():
+        s[key] = _spec(key, YAHOO_CHART_URL % sym, PX_INTERVAL_S, parse_yahoo_chart,
+                       list_feed=False)
+    for key, sym in CBOE_SNAPSHOTS.items():
+        s[key] = _spec(key, CBOE_QUOTE_URL % sym, PX_INTERVAL_S, parse_cboe_quote,
+                       list_feed=False)
     return s
 
 
