@@ -1,6 +1,7 @@
 """Pure helpers of the operator API-wallet script (#252); no SDK, Keychain or network."""
 import importlib.util
 import os
+import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -41,14 +42,39 @@ def test_env_prefix_refuses_anything_else(prefix):
         hl_agent.env_prefix(prefix)
 
 
-def run_edit(tmp_path, before, new_lines, drops=("HYPERLIQUID_INSIDERS",)):
-    env = tmp_path / ".env"
+REAL_GREP = shutil.which("grep")
+
+
+def sh_env(tmp_path, grep_fails=False):
+    """PATH for the edit script: a no-op flock where the host lacks one (macOS), and
+    optionally a grep whose -v read fails (exit 2) to prove nothing is replaced."""
+    bin_ = tmp_path / "bin"
+    bin_.mkdir(exist_ok=True)
+    if shutil.which("flock") is None:
+        (bin_ / "flock").write_text("#!/bin/sh\nexit 0\n")
+        os.chmod(bin_ / "flock", 0o755)
+    if grep_fails:
+        (bin_ / "grep").write_text(f'#!/bin/sh\n[ "$1" = "-v" ] && exit 2\nexec {REAL_GREP} "$@"\n')
+        os.chmod(bin_ / "grep", 0o755)
+    return {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}"}
+
+
+REMOVE = ["HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS", "HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY",
+          "HYPERLIQUID_INSIDERS_[A-Z0-9_]*"]
+
+
+def run_edit(tmp_path, before, new_lines, remove=REMOVE, grep_fails=False, check=True):
+    d = tmp_path / "stack"
+    d.mkdir(exist_ok=True)
+    env = d / ".env"
     env.write_text(before)
     os.chmod(env, 0o600)
-    script = hl_agent.env_edit_script(str(env), "HYPERLIQUID_UPBIT_FADE", list(drops))
-    out = subprocess.run(["sh", "-c", script], input=new_lines, text=True,
-                         capture_output=True, check=True).stdout
-    return env, out
+    script = hl_agent.env_edit_script(str(env), remove)
+    done = subprocess.run(["sh", "-c", script], input=new_lines, text=True, capture_output=True,
+                          env=sh_env(tmp_path, grep_fails))
+    if check:
+        assert done.returncode == 0, done.stderr
+    return env, done
 
 
 def test_env_edit_replaces_the_prefix_drops_the_old_bot_and_keeps_the_rest(tmp_path):
@@ -60,8 +86,8 @@ def test_env_edit_replaces_the_prefix_drops_the_old_bot_and_keeps_the_rest(tmp_p
               "HYPERLIQUID_INSIDERS_PRIVATE_KEY=0xii\n"
               "HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY=0xstale\n"
               "HYPERLIQUID_UPBIT_FADE_DRY_RUN=true\n")
-    env, out = run_edit(tmp_path, before,
-                        "HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS=0xi\nHYPERLIQUID_UPBIT_FADE_PRIVATE_KEY=0xnew\n")
+    env, done = run_edit(tmp_path, before,
+                         "HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS=0xi\nHYPERLIQUID_UPBIT_FADE_PRIVATE_KEY=0xnew\n")
     assert env.read_text() == (
         "A=1\n"
         "HYPERLIQUID_KILLERS_WALLET_ADDRESS=0xk\n"
@@ -70,21 +96,55 @@ def test_env_edit_replaces_the_prefix_drops_the_old_bot_and_keeps_the_rest(tmp_p
         "HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS=0xi\n"
         "HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY=0xnew\n")
     assert stat.S_IMODE(env.stat().st_mode) == 0o600
-    (backup,) = tmp_path.glob(".env.bak-*")
-    assert backup.read_text() == before
-    assert out.split() == ["HYPERLIQUID_KILLERS_WALLET_ADDRESS", "HYPERLIQUID_KILLERS_PRIVATE_KEY",
-                           "HYPERLIQUID_UPBIT_FADE_DRY_RUN", "HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS",
-                           "HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY"]
-    assert "0x" not in out
+    backup, names = hl_agent.parse_edit_output(done.stdout)
+    assert Path(backup).read_text() == before and stat.S_IMODE(Path(backup).stat().st_mode) == 0o600
+    assert names.split() == ["HYPERLIQUID_KILLERS_WALLET_ADDRESS", "HYPERLIQUID_KILLERS_PRIVATE_KEY",
+                             "HYPERLIQUID_UPBIT_FADE_DRY_RUN", "HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS",
+                             "HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY"]
+    assert "0x" not in done.stdout
+    assert not list(env.parent.glob(".env.new.*")), "staging file left behind"
 
 
 def test_env_edit_never_joins_a_line_when_the_file_lacks_a_final_newline(tmp_path):
-    env, _ = run_edit(tmp_path, "A=1", "HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY=0xnew\n", drops=())
+    env, _ = run_edit(tmp_path, "A=1", "HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY=0xnew\n")
     assert env.read_text() == "A=1\nHYPERLIQUID_UPBIT_FADE_PRIVATE_KEY=0xnew\n"
 
 
+def test_env_edit_aborts_on_a_read_error_and_leaves_the_file_untouched(tmp_path):
+    before = "HYPERLIQUID_KILLERS_PRIVATE_KEY=0xkk\nHYPERLIQUID_INSIDERS_X=1\n"
+    env, done = run_edit(tmp_path, before, "HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY=0xnew\n",
+                         grep_fails=True, check=False)
+    assert done.returncode != 0
+    assert env.read_text() == before
+    assert not list(env.parent.glob(".env.new.*")), "staging file left behind"
+
+
+def test_env_edit_removing_every_line_is_not_an_error(tmp_path):
+    env, _ = run_edit(tmp_path, "HYPERLIQUID_INSIDERS_X=1\n", "B=2\n")
+    assert env.read_text() == "B=2\n"
+
+
+def test_two_edits_keep_two_distinct_backups(tmp_path):
+    env, first = run_edit(tmp_path, "A=1\n", "B=2\n")
+    script = hl_agent.env_edit_script(str(env), ["C"])
+    second = subprocess.run(["sh", "-c", script], input="C=3\n", text=True, capture_output=True,
+                            env=sh_env(tmp_path), check=True)
+    b1, _ = hl_agent.parse_edit_output(first.stdout)
+    b2, _ = hl_agent.parse_edit_output(second.stdout)
+    assert b1 != b2 and Path(b1).read_text() == "A=1\n" and Path(b2).read_text() == "A=1\nB=2\n"
+    assert env.read_text() == "A=1\nB=2\nC=3\n"
+
+
 def test_env_edit_script_carries_no_secret_and_fails_on_a_missing_file(tmp_path):
-    script = hl_agent.env_edit_script(str(tmp_path / "missing"), "HYPERLIQUID_UPBIT_FADE", [])
-    assert "PRIVATE_KEY=" not in script.replace("PRIVATE_KEY)=", "")
-    assert subprocess.run(["sh", "-c", script], input="", text=True,
-                          capture_output=True).returncode != 0
+    script = hl_agent.env_edit_script(str(tmp_path / "missing"), REMOVE)
+    assert "=0x" not in script
+    assert subprocess.run(["sh", "-c", script], input="", text=True, capture_output=True,
+                          env=sh_env(tmp_path)).returncode != 0
+
+
+def test_env_pairs_take_plain_values_and_refuse_secrets():
+    assert hl_agent.env_pairs(["HL_UPBIT_GATEWAY_CLIENT=upbit", "HYPERLIQUID_UPBIT_FADE_DRY_RUN=false"]) == [
+        ("HL_UPBIT_GATEWAY_CLIENT", "upbit"), ("HYPERLIQUID_UPBIT_FADE_DRY_RUN", "false")]
+    for bad in ["NOVALUE", "lower=1", "A=has space", "A=$(x)", "HYPERLIQUID_X_PRIVATE_KEY=0x1"]:
+        with pytest.raises(SystemExit):
+            hl_agent.env_pairs([bad])
