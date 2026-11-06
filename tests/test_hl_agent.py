@@ -206,3 +206,14 @@ def test_verdict_declares_done_only_on_proof(approved, listed, key_ok, done):
     if not done:
         assert "Do not recreate the bot" in msg and "Re-run this same command" in msg
         assert "cp -p" not in msg
+
+
+def test_apply_env_is_env_set_without_its_prompt(monkeypatch, capsys):
+    """go-live.sh asks its own YES once, then calls apply_env (#252)."""
+    calls = []
+    monkeypatch.setattr(hl_agent, "write_env", lambda names, lines: calls.append((names, lines)) or ("/b", "A B"))
+    monkeypatch.setattr(hl_agent, "confirm", lambda prompt: pytest.fail("apply_env must not prompt"))
+    hl_agent.apply_env(hl_agent.env_pairs(["HL_UPBIT_GATEWAY_CLIENT=upbit", "HYPERLIQUID_UPBIT_FADE_DRY_RUN=false"]))
+    assert calls == [(["HL_UPBIT_GATEWAY_CLIENT", "HYPERLIQUID_UPBIT_FADE_DRY_RUN"],
+                      "HL_UPBIT_GATEWAY_CLIENT=upbit\nHYPERLIQUID_UPBIT_FADE_DRY_RUN=false\n")]
+    assert "Backup on the VPS: /b" in capsys.readouterr().out

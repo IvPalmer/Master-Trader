@@ -460,6 +460,24 @@ The agent never creates, sees or handles these values.
 
 ## Part 3: go live
 
+**One command** (operator, from a checkout of this repo on the Mac):
+
+```bash
+research/upbit_fade_live/go-live.sh
+```
+
+It runs steps 1 to 5 and 7 below, with the gateway deploy in between, and asks for a
+literal `YES` once, after read-only checks: the time window, the gateway source and the
+exporter (#261), the breaker, the pilot wallet, key and API wallet, the pilot account flat
+with at least 100 USDC, the bot, trigger and paper monitor, and Killers `running`. Each VPS
+phase runs detached and logs to `~/backups/go-live-<run>/` on the VPS, so a dropped ssh
+session never stops one halfway. Stopping before the gateway recreate restores Killers
+entries. Stopping after it keeps them paused and says so. The pilot trigger stays paused
+(`KILL`) on any stop. After the bot is live it restarts the exporter, so the exporter reads
+the new membership at once instead of at its hourly refresh, and checks that the pilot
+account is valued outside the breaker. It ends by printing `EPOCH_START` and
+`DEPLOYED_COMMIT` for step 6. The manual steps below are what it runs and the fallback.
+
 **Timing rule** (amended; approved by the operator in chat, 2026-11-05 ('Approve it');
 prereg `timing_rule`): admission by t0 + 7 min, checked by the trigger and by the bot under
 its entry lock; submission and fill delay measured for every entry and reported (the
@@ -491,7 +509,7 @@ leverage, with retries, after the admission check, so submission itself is not b
    - `show_config`: `dry_run: false`, `state: running`, `stoploss_on_exchange: true`;
    - `printenv FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private` in the container:
      `http://hl-gateway:8080/upbit`;
-   - `/api/v1/balance`: about 150 USDC on the Insiders account;
+   - `/api/v1/balance`: at least 100 USDC on the Insiders account (108.27 funded on 2026-11-06);
    - `/api/v1/profit`: `profit_closed_coin` 0 (the live database is new);
    - `sudo docker logs ft-upbit-fade-hl --tail 50`: no auth or market errors.
 6. Record the epoch: a PR adding an amendment to `upbit-krw-fade-live-pilot-2026-11` with
