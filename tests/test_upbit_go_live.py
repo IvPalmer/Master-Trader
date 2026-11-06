@@ -43,7 +43,7 @@ def test_scripts_parse_and_lint():
 
 
 # ── fake VPS ─────────────────────────────────────────────────────────────────
-FAKE_CURL = r'''#!/usr/bin/env python3
+FAKE_CURL = r"""#!/usr/bin/env python3
 import json, os, sys
 st_path = os.environ["FAKE_STATE"]
 st = json.load(open(st_path))
@@ -63,69 +63,96 @@ if url.startswith("http://127.0.0.1:8099/api/v1/"):
     elif ep == "trades/0/open-order" and method == "DELETE":
         out = {"error": "Error querying /api/v1/trades/0/open-order: Invalid trade_id."}
     elif ep == "status":
-        out = []
+        out = st["trades"]
 elif url == "http://127.0.0.1:8104/healthz":
-    clients = ["accounting", "killers", "short"] + (["upbit"] if st["gateway_new"] and st["new_has_upbit"] else [])
-    out = {"status": "ok", "faults": 0, "observed_at": 1, "queued": 0,
+    new = st["gateway_new"]
+    clients = ["accounting", "killers", "short"] + (["upbit"] if new and st["new_has_upbit"] else [])
+    status = st["new_status"] if new else "ok"
+    out = {"status": status, "faults": 0 if status == "ok" else 3, "observed_at": 1, "queued": 0,
            "weight_last_minute": st["weight"],
            "clients": {c: {"ok": 5, "cached": 0, "rate_limited": 0, "queue_timeout": 0,
-                           "upstream_error": 0, "transport_error": 0} for c in clients}}
+                           "upstream_error": 0, "transport_error": 0 if status == "ok" else 3}
+                       for c in clients}}
     if "upbit" in clients:
         out["slice_weight_last_minute"] = {"upbit": 0}
 elif url == "https://api.hyperliquid.xyz/info":
     kind = json.loads(data)["type"]
-    out = {"clearinghouseState": {"assetPositions": []}, "frontendOpenOrders": [],
-           "meta": {"universe": []}}[kind]
+    out = {"clearinghouseState": {"assetPositions": st["positions"]}, "frontendOpenOrders": st["orders"],
+           "meta": {"universe": [{"name": "HYPE", "szDecimals": 2}]}}[kind]
 json.dump(st, open(st_path, "w"))
 if out is None:
     sys.exit(f"fake curl: unexpected {method} {url}")
 print(json.dumps(out))
-'''
+"""
 
-FAKE_DOCKER = r'''#!/usr/bin/env python3
+FAKE_DOCKER = r"""#!/usr/bin/env python3
 import json, os, sys
 st_path = os.environ["FAKE_STATE"]
 st = json.load(open(st_path))
 a = sys.argv[1:]
 st["docker"].append(" ".join(a))
-out = ""
+out, rc = "", 0
 if a[0] == "inspect":
     out = {"{{.Config.Image}}": "ft_userdata-hl-gateway:latest", "{{.Image}}": "sha256:old",
            "{{.State.StartedAt}}": "2026-11-06T22:00:00Z"}[a[2]]
 elif a[0] == "compose":
     if a[-1] == "hl-gateway" and "up" in a:
         st["gateway_new"] = True
+elif a[0] == "logs":
+    if a[1] in st["logs_fail"]:
+        rc = 1
+    out = st["logs"].get(a[1], "")
 elif a[0] == "exec":
     rest = a[2:]
     if rest[0] == "printenv":
         out = {"FREQTRADE__API_SERVER__USERNAME": "u", "FREQTRADE__API_SERVER__PASSWORD": "p",
                "FREQTRADE__EXCHANGE__WALLET_ADDRESS": "0xkillers"}[rest[1]]
     elif rest[:2] == ["cat", "/state/portfolio_peak.json"]:
-        out = json.dumps({"triggered": False})
+        out = json.dumps({"triggered": st["killers"] == "paused" and st["trip_after_pause"]})
     elif rest[0] == "python":
         out = "0"
 json.dump(st, open(st_path, "w"))
 if out:
     print(out)
-'''
+sys.exit(rc)
+"""
 
-FAKE_DATE = r'''#!/bin/sh
+FAKE_DATE = r"""#!/bin/sh
 f="$FAKE_CLOCK"
 case "$*" in
   *+%s*) n=$(cat "$f"); echo $((n + 20)) > "$f"; echo "$n" ;;
   *+%H%M*) echo 1000 ;;
   *) /bin/date "$@" ;;
 esac
-'''
+"""
+
+FAKE_STATE_FIELD = r"""#!/usr/bin/env python3
+import json, os, sys
+st = json.load(open(os.environ["FAKE_STATE"]))
+sys.exit(0 if st[sys.argv[0].rsplit("/", 1)[1]] else 1)
+"""
+
+# One open long, its stop resting on Hyperliquid at Freqtrade's own trigger.
+TRADE = {"pair": "HYPE/USDC:USDC", "is_short": False, "amount": 0.44, "stop_loss_abs": 72.0,
+         "liquidation_price": None,
+         "orders": [{"status": "open", "ft_order_side": "stoploss", "order_id": "111"}]}
+POSITION = {"position": {"coin": "HYPE", "szi": "0.44", "positionValue": "17.6"}}
+STOP = {"oid": 111, "coin": "HYPE", "side": "A", "reduceOnly": True, "isTrigger": True,
+        "triggerPx": "72.0", "sz": "0.44"}
 
 
 @pytest.fixture
 def vps(tmp_path):
     bin_ = tmp_path / "bin"
     bin_.mkdir()
-    for name, body in {"curl": FAKE_CURL, "docker": FAKE_DOCKER, "date": FAKE_DATE,
-                       "sudo": '#!/bin/sh\n[ "$1" = -n ] && shift\nexec "$@"\n',
-                       "sleep": "#!/bin/sh\nexit 0\n"}.items():
+    fakes = {"curl": FAKE_CURL, "docker": FAKE_DOCKER, "date": FAKE_DATE,
+             "flock": FAKE_STATE_FIELD.replace('st[sys.argv[0].rsplit("/", 1)[1]]',
+                                               '"-u" in sys.argv or not st["lock_busy"]'),
+             "systemctl": FAKE_STATE_FIELD.replace('st[sys.argv[0].rsplit("/", 1)[1]]',
+                                                   'st["trigger_active"]'),
+             "sudo": '#!/bin/sh\n[ "$1" = -n ] && shift\nexec "$@"\n',
+             "sleep": "#!/bin/sh\nexit 0\n"}
+    for name, body in fakes.items():
         path = bin_ / name
         path.write_text(body)
         path.chmod(0o755)
@@ -136,25 +163,30 @@ def vps(tmp_path):
     monitor.write_text("old\n")
     old = time.time() - 3600
     os.utime(monitor, (old, old))
+    trigger_log = home / "master-trader/research/upbit_fade_live/data/trigger.log"
+    trigger_log.write_text("start\n")
     (tmp_path / "code/ft_userdata").mkdir(parents=True)
     state = tmp_path / "state.json"
     clock = tmp_path / "clock"
     clock.write_text("1800000000")
+    kill = home / "master-trader/research/upbit_fade_live/data/KILL"
 
-    def run(**overrides):
+    def run(phase="gateway", **overrides):
         st = {"killers": "running", "posts": [], "docker": [], "weight": 100,
-              "gateway_new": False, "new_has_upbit": True}
+              "gateway_new": False, "new_has_upbit": True, "new_status": "ok",
+              "trades": [], "positions": [], "orders": [], "logs": {}, "logs_fail": [],
+              "trip_after_pause": False, "lock_busy": False, "trigger_active": True}
         st.update(overrides)
         state.write_text(json.dumps(st))
         env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HOME": str(home),
                "FAKE_STATE": str(state), "FAKE_CLOCK": str(clock),
                "UPBIT_GO_LIVE_CODE": str(tmp_path / "code")}
-        done = subprocess.run(["bash", str(REMOTE), "gateway", "T"], env=env, text=True,
+        done = subprocess.run(["bash", str(REMOTE), phase, "T"], env=env, text=True,
                               capture_output=True, timeout=60)
-        rc = (home / "backups/go-live-T/gateway.rc").read_text().strip()
-        kill = (home / "master-trader/research/upbit_fade_live/data/KILL").exists()
-        return done, int(rc), json.loads(state.read_text()), kill
+        rc = int((home / f"backups/go-live-T/{phase}.rc").read_text().strip())
+        return done, rc, json.loads(state.read_text())
 
+    run.kill = kill
     return run
 
 
@@ -163,37 +195,85 @@ def _recreated(st):
 
 
 def test_gateway_phase_deploys_and_restores_entries(vps):
-    done, rc, st, kill = vps()
+    done, rc, st = vps()
     assert rc == 0 == done.returncode, done.stdout + done.stderr
     assert _recreated(st)
     assert st["posts"] == ["stopentry", "start"]
     assert st["killers"] == "running"
-    assert kill, "the trigger stays paused until the bot phase is done"
-    assert "PROTECTED" in done.stdout
+    assert vps.kill.exists(), "the trigger stays paused until the bot phase is done"
 
 
-def test_stop_before_the_recreate_restores_killers_entries(vps):
-    done, rc, st, kill = vps(weight=450)
-    assert rc == 1
-    assert not _recreated(st), "busy gateway: never recreate"
+def test_open_protected_trade_is_checked_before_and_after(vps):
+    done, rc, st = vps(trades=[TRADE], positions=[POSITION], orders=[STOP])
+    assert rc == 0, done.stdout
+    assert done.stdout.count("HYPE OK") == 2
     assert st["posts"] == ["stopentry", "start"]
-    assert st["killers"] == "running"
-    assert kill
+
+
+@pytest.mark.parametrize("why, overrides", [
+    ("gateway busy", {"weight": 450}),
+    ("stop not at Freqtrade's trigger", {"trades": [TRADE], "positions": [POSITION],
+                                         "orders": [{**STOP, "triggerPx": "71.0"}]}),
+    ("position without a trade", {"positions": [POSITION], "orders": [STOP]}),
+    ("receiver handling a signal", {"logs": {"killers-receiver": 'INFO: x - "POST /event HTTP/1.1" 200 OK'}}),
+    ("receiver log unreadable", {"logs_fail": ["killers-receiver"]}),
+])
+def test_stop_before_the_recreate_restores_killers_entries(vps, why, overrides):
+    done, rc, st = vps(**overrides)
+    assert rc == 1, why
+    assert not _recreated(st), why
+    assert st["posts"] == ["stopentry", "start"], why
+    assert st["killers"] == "running", why
+    assert vps.kill.exists()
     assert "Stopped BEFORE the recreate" in done.stdout
 
 
-def test_stop_after_the_recreate_keeps_killers_paused(vps):
-    done, rc, st, kill = vps(new_has_upbit=False)
-    assert rc == 1
-    assert _recreated(st)
-    assert st["posts"] == ["stopentry"], "never resume entries on an unverified gateway"
+@pytest.mark.parametrize("why, overrides", [
+    ("no upbit client", {"new_has_upbit": False}),
+    ("request failures persist", {"new_status": "warning"}),
+    ("forced exit logged", {"logs": {"ft-killers-scalp": "Exiting the trade forcefully"}}),
+    ("Killers log unreadable", {"logs_fail": ["ft-killers-scalp"]}),
+])
+def test_stop_after_the_recreate_keeps_killers_paused(vps, why, overrides):
+    done, rc, st = vps(**overrides)
+    assert rc == 1, why
+    assert _recreated(st), why
+    assert st["posts"] == ["stopentry"], f"{why}: never resume entries on an unverified gateway"
     assert st["killers"] == "paused"
-    assert kill
+    assert vps.kill.exists()
     assert "Killers entries stay PAUSED" in done.stdout
 
 
+def test_breaker_triggered_since_the_pause_keeps_killers_paused(vps):
+    done, rc, st = vps(trip_after_pause=True)
+    assert rc == 1
+    assert st["posts"] == ["stopentry"]
+    assert "Restoring Killers entries did not confirm" in done.stdout
+
+
 def test_a_paused_killers_is_never_resumed(vps):
-    done, rc, st, kill = vps(killers="paused")
+    done, rc, st = vps(killers="paused")
     assert rc == 1
     assert st["posts"] == [] and not _recreated(st)
-    assert st["killers"] == "paused"
+
+
+def test_a_running_go_live_phase_blocks_another(vps):
+    done, rc, st = vps(lock_busy=True)
+    assert rc == 1
+    assert st["posts"] == [] and st["docker"] == []
+    assert not vps.kill.exists()
+
+
+def test_failed_resume_puts_the_kill_file_back(vps):
+    vps.kill.touch()
+    done, rc, st = vps("resume", trigger_active=False)
+    assert rc == 1
+    assert vps.kill.exists()
+    assert "the KILL file is back" in done.stdout
+
+
+def test_resume_arms_the_trigger(vps):
+    vps.kill.touch()
+    done, rc, st = vps("resume")
+    assert rc == 0, done.stdout
+    assert not vps.kill.exists()

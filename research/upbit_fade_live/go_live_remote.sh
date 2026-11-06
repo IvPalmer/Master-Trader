@@ -3,6 +3,7 @@
 # copies it to the VPS, checks its hash and runs one phase at a time, detached, so a
 # dropped ssh session never stops a phase halfway. Phases:
 #   preflight  read-only checks; changes nothing
+#   pause      pause the pilot trigger (KILL file)
 #   gateway    "Gateway deploy" steps 1-7: pilot trigger paused first, Killers entries
 #              held, open trades checked PROTECTED before and after the recreate
 #   bot        recreate ft-upbit-fade-hl live, verify it, restart the exporter, verify it
@@ -23,6 +24,9 @@ GW=http://127.0.0.1:8104
 STAGE=start
 mkdir -p "$B"
 cd "$B"
+# One go-live phase at a time on this VPS. The detached process holds the lock, so it
+# survives a dropped ssh session and a re-run cannot overlap it.
+exec 9>"$HOME/backups/go-live.lock"
 
 say() { printf '%s\n' "$*"; }
 ok() { say "  ok    $*"; }
@@ -105,13 +109,24 @@ check_protected() {
   [ "$(printf '%s\n' "$out" | tail -1)" = PROTECTED ]
 }
 
-monitor_quiet() { [ -z "$(find "$FWD/data/monitor.log" -mmin -15)" ]; }
+# The paper monitor wrote nothing in 15 min. A missing or unreadable log is not quiet.
+monitor_quiet() {
+  local recent
+  [ -f "$FWD/data/monitor.log" ] && recent=$(find "$FWD/data/monitor.log" -mmin -15) && [ -z "$recent" ]
+}
+# The Killers receiver handled no signal (any request but a GET) in the last 3 min.
+receiver_quiet() {
+  local log
+  log=$(sudo -n docker logs killers-receiver --since 3m 2>&1) || return 1
+  [ -z "$(grep -v '"GET ' <<<"$log")" ]
+}
 
 restore_killers() {  # GO-LIVE step 7; a bot paused before, or a triggered breaker, stays paused
   local b s
-  b=$(breaker)
-  if [ "$(cat killers-state-before.txt)" = running ] && [ "$b" = false ]; then kpost start >/dev/null; fi
-  s=$(k show_config | jq -r .state)
+  STAGE=restoring
+  b=$(breaker) || b=unreadable
+  if [ "$(cat killers-state-before.txt)" = running ] && [ "$b" = false ]; then kpost start >/dev/null || true; fi
+  s=$(k show_config | jq -r .state) || s=UNKNOWN
   say "  Killers state now: $s (before: $(cat killers-state-before.txt); breaker triggered: $b)"
   [ "$s" = "$(cat killers-state-before.txt)" ]
 }
@@ -128,7 +143,13 @@ on_exit() {
         say "Stopped AFTER the recreate started: Killers entries stay PAUSED."
         say "Check the gateway and Killers. If they are fine, restore entries as in GO-LIVE step 7;"
         say "otherwise roll back to $(cat image.txt 2>/dev/null):pre-252 (GO-LIVE.md, Rollback to the old image)." ;;
+      restoring)
+        say "Restoring Killers entries did not confirm; its state is printed above (UNKNOWN if unreadable)."
+        say "Check Killers by hand: GO-LIVE step 7." ;;
     esac
+  fi
+  if [ "$rc" -ne 0 ] && [ "$PHASE" = resume ]; then
+    touch "$LIVE/data/KILL" && say "Resume did not confirm: the KILL file is back, the pilot enters nothing."
   fi
   if [ "$rc" -ne 0 ] && [ -e "$LIVE/data/KILL" ]; then
     say "The pilot trigger stays paused (KILL file), so the pilot enters nothing."
@@ -142,6 +163,8 @@ trap 'say "  FAIL  line $LINENO: $BASH_COMMAND"' ERR
 preflight() {
   local h st v n cfg dry ks gh
   say "Read-only checks; nothing changes."
+  flock -n 9 || fail "another go-live phase is running on the VPS (see ~/backups/go-live-*)"
+  flock -u 9
   h=$((10#$(date -u +%H%M)))
   [ "$h" -lt 1315 ] || [ "$h" -gt 1350 ] || fail "13:15-13:50 UTC is the US open: run it later"
   grep -q "^CLIENTS = {.*'upbit'" "$CODE/services/hl-gateway/app/main.py" ||
@@ -203,7 +226,8 @@ preflight() {
 }
 
 gateway() {
-  local img i r q w gh
+  local img i r q w gh log
+  flock -n 9 || fail "another go-live phase is running on the VPS"
   touch "$LIVE/data/KILL"
   ok "pilot trigger paused (KILL file)"
   say "1. Build the new gateway image; the running gateway is not affected"
@@ -247,11 +271,11 @@ gateway() {
       gh=$(curl -sf -m 10 "$GW/healthz") || fail "hl-gateway healthz unreachable"
       echo "$gh" | jq '{observed_at, weight_last_minute, queued}' > usage-before.json
       w=$(jq .weight_last_minute <<<"$gh")
-      if [ "$w" -lt 300 ] && monitor_quiet; then
-        ok "Killers trades PROTECTED; gateway weight $w/min (< 300); paper monitor quiet"
+      if [ "$w" -lt 300 ] && monitor_quiet && receiver_quiet; then
+        ok "Killers trades PROTECTED; gateway weight $w/min (< 300); paper monitor and receiver quiet"
         break
       fi
-      say "  gateway weight $w/min or paper monitor activity"
+      say "  gateway weight $w/min, or paper monitor or receiver activity"
     fi
     [ "$i" -lt 10 ] || fail "the final checks did not pass in 10 tries (5 min)"
     say "  not yet; trying again in 30 s ($i/10)"
@@ -273,15 +297,23 @@ gateway() {
   [ "$(k show_config | jq -r .state)" = paused ] || fail "Killers is not paused"
   k status | jq -e 'type == "array"' >/dev/null || fail "Killers /status does not answer"
   while [ $(( $(date +%s) - r )) -lt 65 ]; do sleep 5; done
-  gh=$(curl -sf -m 10 "$GW/healthz") || fail "hl-gateway healthz unreachable"
-  echo "$gh" > healthz-after.json
-  jq -e '([.clients[] | .rate_limited + .queue_timeout] | add) == 0
-         and (.clients.killers.ok + .clients.killers.cached) > 0' <<<"$gh" >/dev/null ||
-    fail "gateway since the recreate: $(jq -c '{faults, killers: .clients.killers}' <<<"$gh")"
-  ok "gateway: Killers reads ok, no budget refusals ($(jq -c '{faults, weight_last_minute}' <<<"$gh"))"
-  if sudo -n docker logs ft-killers-scalp --since "$((r - 30))" 2>&1 |
-      grep -E "Unable to place a stoploss order|Exiting the trade forcefully" > killers-log-after.txt; then
-    cat killers-log-after.txt
+  # No request failure of any kind in the new gateway's 5 min window, and Killers reading
+  # through it. A fault right after the start ages out of the window: wait up to 6 min.
+  for i in $(seq 1 12); do
+    gh=$(curl -sf -m 10 "$GW/healthz") || fail "hl-gateway healthz unreachable"
+    echo "$gh" > healthz-after.json
+    if jq -e '.status == "ok" and .faults == 0
+              and (.clients.killers.ok + .clients.killers.cached) > 0' <<<"$gh" >/dev/null; then
+      break
+    fi
+    [ "$i" -lt 12 ] || fail "gateway since the recreate: $(jq -c '{status, faults, killers: .clients.killers}' <<<"$gh")"
+    say "  gateway $(jq -c '{status, faults}' <<<"$gh"); again in 30 s ($i/12)"
+    sleep 30
+  done
+  ok "gateway: no failed requests, Killers reading through it ($(jq -c '{weight_last_minute}' <<<"$gh"))"
+  # An unreadable log never reads as clean.
+  log=$(sudo -n docker logs ft-killers-scalp --since "$((r - 30))" 2>&1) || fail "cannot read the Killers log"
+  if grep -E "Unable to place a stoploss order|Exiting the trade forcefully" <<<"$log"; then
     fail "Killers logged a stop placement failure or a forced exit"
   fi
   ok "Killers log: no stop placement failure, no forced exit"
@@ -300,14 +332,15 @@ gateway() {
 }
 
 bot() {
-  local i cfg bal started commit
+  local i cfg bal started commit log rs
+  flock -n 9 || fail "another go-live phase is running on the VPS"
   [ "$(envcount HL_UPBIT_GATEWAY_CLIENT)" = 1 ] && [ "$(envval HL_UPBIT_GATEWAY_CLIENT)" = upbit ] ||
     fail "the VPS .env does not hold HL_UPBIT_GATEWAY_CLIENT=upbit exactly once"
   [ "$(envcount HYPERLIQUID_UPBIT_FADE_DRY_RUN)" = 1 ] && [ "$(envval HYPERLIQUID_UPBIT_FADE_DRY_RUN)" = false ] ||
     fail "the VPS .env does not hold HYPERLIQUID_UPBIT_FADE_DRY_RUN=false exactly once"
   jq -e '.clients | has("upbit")' <<<"$(curl -sf -m 10 "$GW/healthz")" >/dev/null ||
     fail "hl-gateway has no upbit client"
-  [ -e "$LIVE/data/KILL" ] || fail "the pilot trigger is not paused"
+  touch "$LIVE/data/KILL"
   say "Recreate ft-upbit-fade-hl live"
   dc up -d --no-deps ft-upbit-fade-hl
   cfg=
@@ -335,9 +368,8 @@ bot() {
   [ "$(u status | jq length)" = 0 ] || fail "the live bot reports open trades"
   ok "new live database, no trades"
   started=$(sudo -n docker inspect -f '{{.State.StartedAt}}' ft-upbit-fade-hl)
-  if sudo -n docker logs ft-upbit-fade-hl --since "$started" 2>&1 |
-      grep -iE "AuthenticationError|PermissionDenied|Unauthorized|InvalidNonce|Could not load markets|live mode needs|dry-run needs" > bot-log.txt; then
-    cat bot-log.txt
+  log=$(sudo -n docker logs ft-upbit-fade-hl --since "$started" 2>&1) || fail "cannot read the bot log"
+  if grep -iE "AuthenticationError|PermissionDenied|Unauthorized|InvalidNonce|Could not load markets|live mode needs|dry-run needs" <<<"$log"; then
     fail "authentication or market errors in the bot log"
   fi
   ok "bot log: no authentication or market errors"
@@ -345,11 +377,13 @@ bot() {
   printf 'EPOCH_START=%s\nDEPLOYED_COMMIT=%s\n' "$started" "$commit" | tee epoch.txt
 
   say "Exporter: restart so it reads the new live membership now (it values the pilot outside the breaker)"
+  rs=$(date +%s)
   sudo -n docker restart ft-metrics-exporter >/dev/null
   for i in $(seq 1 24); do
     sleep 10
     if sudo -n docker exec ft-metrics-exporter cat /state/account_health.json 2>/dev/null |
-        jq -e '(.accounts["hyperliquid-upbit-fade"].equity >= 0)
+        jq -e --argjson rs "$rs" '.observed_at > $rs
+               and (.accounts["hyperliquid-upbit-fade"].equity >= 0)
                and (.outside_breaker_accounts | has("hyperliquid-upbit-fade"))
                and (has("unvalued_accounts") | not) and .breaker_complete' >/dev/null; then
       ok "exporter: pilot account valued and outside the breaker; breaker evaluating"
@@ -359,7 +393,14 @@ bot() {
   fail "the exporter does not show the pilot account outside the breaker after 4 min"
 }
 
+pause() {
+  flock -n 9 || fail "another go-live phase is running on the VPS"
+  touch "$LIVE/data/KILL"
+  ok "pilot trigger paused (KILL file)"
+}
+
 resume() {
+  flock -n 9 || fail "another go-live phase is running on the VPS"
   rm -f "$LIVE/data/KILL"
   sleep 20
   [ ! -e "$LIVE/data/KILL" ] || fail "KILL is back: the trigger re-engaged its own switch (see $LIVE/data/trigger.log)"
@@ -369,6 +410,6 @@ resume() {
 }
 
 case $PHASE in
-  preflight|gateway|bot|resume) "$PHASE" ;;
+  preflight|pause|gateway|bot|resume) "$PHASE" ;;
   *) fail "unknown phase $PHASE" ;;
 esac
