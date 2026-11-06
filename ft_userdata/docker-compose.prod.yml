@@ -551,6 +551,8 @@ services:
       TRADE_WEBHOOK_NOTIFY_TOKEN: ${TRADE_WEBHOOK_NOTIFY_TOKEN:-}
       HYPERLIQUID_KILLERS_WALLET_ADDRESS: ${HYPERLIQUID_KILLERS_WALLET_ADDRESS:-}
       HYPERLIQUID_SHORT_KELTNER_WALLET_ADDRESS: ${HYPERLIQUID_SHORT_KELTNER_WALLET_ADDRESS:-}
+      # Values the Upbit pilot account, which stays outside the breaker (#261).
+      HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS: ${HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS:-}
     volumes:
       - ./metrics_exporter.py:/app/metrics_exporter.py:ro
       - ./account_transfers.json:/app/account_transfers.json:ro
