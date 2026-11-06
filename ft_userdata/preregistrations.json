@@ -1624,7 +1624,7 @@
         "kill_latch": "the trigger reads the bot's realized P&L every loop and writes its pause file at -75 USDC or worse; the bot refuses entries at that level by itself",
         "unknown_outcome_pause": "an unobserved /forceenter outcome writes the pause file before the outcome record; while any unknown outcome has no reconciliation record (live_trigger.py reconcile, after the operator checks the bot and Hyperliquid) the trigger stays paused and re-creates the file every loop and at every start; a failure to persist any state stops further entries",
         "gateway": "dry-run: the deployed hl-gateway client short (reads at the background tier, exchange actions refused), so the dry-run deploy does not change the gateway; live: hl-gateway client upbit (reads at the background tier; exchange actions and orderStatus reads in its own slice of 40 weight per minute, outside the fleet's priority capacity), added by one gateway recreate only when Killers is flat (no open positions and no open orders on Hyperliquid) and the trailing-minute usage read just before is under 300; the gateway keeps no budget state",
-        "epoch_start": null
+        "epoch_start": "2026-11-06T23:06:45.445092148Z"
       },
       "rules": [
         "Epoch: the live epoch starts at the first start of ft-upbit-fade-hl with HYPERLIQUID_UPBIT_FADE_DRY_RUN=false, recorded in an amendment (UTC time, source commit) at go-live. Dry-run trades before it are plumbing checks, not results.",
@@ -1642,6 +1642,18 @@
           "reason": "Operator's choice in chat, 2026-11-06 ('vamos usar a do insiders sim'): use the retired Insiders master account rather than open a new one. On 2026-11-06 it was flat (no positions, no open orders, 50.0 USDC in perps) and no container used it (ft-insiders-scalp left the stack in #216). It is not the Killers or ShortKeltner account, and not a subaccount.",
           "changes": "None to the frozen terms. The account still meets frozen.account: a dedicated master account with its own API wallet (no withdrawal rights), topped up to about 150 USDC, traded by no other bot from now on. The 50.0 USDC already there (the Insiders cash reserve kept by the 2026-10-02 correction) becomes part of the pilot's funding. The operator either reuses the existing Insiders API wallet or creates a new one, and removes the HYPERLIQUID_INSIDERS_* lines from the stack env so only this bot holds the account's key. The address is not recorded in this public repository.",
           "rule_note": "Measurement is unchanged: the live epoch starts at the first live start of ft-upbit-fade-hl, and pilot P&L and the -75 USDC kill rule come from the bot's own trade database. Insiders history on this account is outside the epoch."
+        },
+        {
+          "id": "A2-epoch",
+          "date": "2026-11-06",
+          "by": "operator (Palmer) ran research/upbit_fade_live/go-live.sh (run 20261106T230444Z-65661ad5); recorded by Claude",
+          "issue": "#252",
+          "reason": "Go-live. Per the Epoch rule, the live epoch starts at the first start of ft-upbit-fade-hl with HYPERLIQUID_UPBIT_FADE_DRY_RUN=false. That was container StartedAt 2026-11-06T23:06:45.445092148Z, from the Dokploy checkout at vps-deploy caabf3b2906d64db7fcfa1eea7ff7a9ac0f8d64e.",
+          "changes": "Sets frozen.epoch_start to 2026-11-06T23:06:45.445092148Z. No other frozen term changes. Checked after the start: dry_run false, runmode live, strategy UpbitFadeLiveV1, stake 50 USDC, max_open_trades 2, minimal_roi {\"0\": 100, \"1440\": -1}, stoploss -0.6 with stoploss_on_exchange true. Private URL http://hl-gateway:8080/upbit, new database with no trades. Account flat with no open orders. The metrics exporter values the account outside the fleet breaker (#261).",
+          "deviations": [
+            "Gateway. frozen.gateway allowed the recreate that adds the upbit client only when Killers was flat. Go-live recreated it while Killers held 2 open trades. This followed the rule the operator asked for in chat on 2026-11-06 ('nao faz sentido ter que esperar 0 ordens pra subir um bt novo'), written into GO-LIVE.md by #267. Killers entries were paused and drained, and gateway usage was under 300 per minute. Every open Killers trade was PROTECTED: its position matched, with exactly one resting reduce-only stop within 0.1% of the bot's stop and only exit orders besides. The check read PROTECTED before and after the recreate. The Killers log showed no stop placement failure and no forced exit. Its entries were restored. The pilot's measurement does not depend on this. It is recorded so that frozen.gateway is not read as what was done.",
+            "Funding. frozen.account says about 150 USDC. The account held 108.272827 USDC in perps at the epoch start. That covers max_open 2 x 50 USDC at 1x. The stake, the cap and the -75 USDC kill rule are unchanged. The account's older insiders-live API wallet stays approved until it expires on 2026-11-21, but no container holds its key; only ft-upbit-fade-hl holds the account's key (API wallet upbit-fade-live)."
+          ]
         }
       ],
       "resolution": null
