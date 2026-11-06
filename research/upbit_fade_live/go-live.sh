@@ -14,7 +14,8 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 # The same host scripts/hyperliquid/hl_agent.py edits; not overridable.
 VPS=main-instance
-T=$(date -u +%Y%m%dT%H%M%SZ)
+# Unique per invocation: it names the run's claim, logs and results on the VPS.
+T=$(date -u +%Y%m%dT%H%M%SZ)-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')
 REMOTE=/tmp/upbit-go-live-$T.sh
 # shellcheck disable=SC2088  # expanded by the VPS shell, in the ssh commands
 LOGS="~/backups/go-live-$T"

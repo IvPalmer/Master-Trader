@@ -291,10 +291,24 @@ def test_resume_arms_the_trigger(vps):
 def test_a_phase_of_another_run_touches_nothing(vps):
     """Codex R2: run B must not act inside run A's go-live, nor A resume after B intervened."""
     for phase in ("gateway", "bot", "resume"):
-        done, rc, st = vps(phase, owned_by="OTHER")
-        assert rc == 1, phase
-        assert st["posts"] == [] and st["docker"] == [], phase
-        assert "does not own the go-live" in done.stdout
+        for kill in (False, True):
+            vps.kill.unlink(missing_ok=True)
+            if kill:
+                vps.kill.touch()
+            done, rc, st = vps(phase, owned_by="OTHER")
+            assert rc == 1, phase
+            assert st["posts"] == [] and st["docker"] == [], phase
+            assert vps.kill.exists() is kill, f"{phase}: a rejected phase leaves KILL as it was"
+            assert vps.owner.read_text().strip() == "OTHER"
+            assert "does not own the go-live" in done.stdout
+
+
+def test_run_ids_are_unique_per_invocation():
+    script = (LIVE / "go-live.sh").read_text()
+    line = next(line for line in script.splitlines() if line.startswith("T="))
+    ids = {subprocess.run(["bash", "-c", line + '; printf %s "$T"'], capture_output=True, text=True,
+                          check=True).stdout for _ in range(5)}
+    assert len(ids) == 5, "two runs started in the same second must not share an id"
 
 
 def test_pause_claims_the_run_once(vps):

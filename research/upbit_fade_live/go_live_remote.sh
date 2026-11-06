@@ -22,6 +22,7 @@ K=http://127.0.0.1:8099/api/v1
 U=http://127.0.0.1:8105/api/v1
 GW=http://127.0.0.1:8104
 STAGE=start
+OWNED=0  # set once this phase holds the run's claim; cleanup acts only then
 mkdir -p "$B"
 cd "$B"
 # One go-live phase at a time on this VPS. The detached process holds the lock, so it
@@ -134,6 +135,7 @@ claim() { flock -n 9 || fail "another go-live phase is running on the VPS"; }
 owned() {
   claim
   [ "$(cat "$OWNER" 2>/dev/null)" = "$T" ] || fail "this run ($T) does not own the go-live; another run started since"
+  OWNED=1
 }
 
 restore_killers() {  # GO-LIVE step 7; a bot paused before, or a triggered breaker, stays paused
@@ -168,7 +170,7 @@ on_exit() {
         say "Check Killers by hand: GO-LIVE step 7." ;;
     esac
   fi
-  if [ "$rc" -ne 0 ] && [ "$PHASE" = resume ]; then
+  if [ "$rc" -ne 0 ] && [ "$PHASE" = resume ] && [ "$OWNED" = 1 ]; then
     touch "$LIVE/data/KILL" && say "Resume did not confirm: the KILL file is back, the pilot enters nothing."
   fi
   if [ "$rc" -ne 0 ] && [ -e "$LIVE/data/KILL" ]; then
