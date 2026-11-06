@@ -172,8 +172,10 @@ carried over from the #188 restart of Killers itself):
   is logged ("Unable to exit trade", "Cannot query order"), and the next loop retries.
 - Freqtrade only places a stop when none is open or all are cancelled, or when the custom
   stop moved: `handle_trailing_stoploss_on_exchange` cancels and re-creates at most once per
-  `stoploss_on_exchange_interval` (60 s). With every stop already resting at Freqtrade's
-  price, the gap makes no stop call. The stop and the TP rung stay on the exchange and keep
+  `stoploss_on_exchange_interval` (60 s). It replaces a stop whenever its own stop is more
+  protective than the resting trigger, even by one tick (`Exchange.stoploss_adjust`). With
+  every stop resting at a trigger Freqtrade keeps (step 4's check), the gap makes no stop
+  call. The stop and the TP rung stay on the exchange and keep
   working without the gateway.
 - Remaining risk: a receiver stop change landing in the window could cancel a stop and fail
   to re-create it. The trade would then be unprotected until the gateway answers again, when
@@ -268,33 +270,52 @@ curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, qu
   import json, sys
   trades, positions, orders = (json.load(open(p)) for p in sys.argv[1:4])
   held = {p["position"]["coin"]: float(p["position"]["szi"]) for p in positions}
-  ok = len(held) == len(trades)
+  hl = {str(o["oid"]): o for o in orders}
+  known, ok = set(), len(held) == len(trades)
   for t in trades:
-      coin = t["pair"].split("/")[0]
+      coin, short = t["pair"].split("/")[0], t["is_short"]
+      close, exit_side = ("B", "buy") if short else ("A", "sell")
+      liq = t.get("liquidation_price")
+      stop = (min if short else max)(t["stop_loss_abs"], liq) if liq else t["stop_loss_abs"]
       open_ = [o for o in t["orders"] if o["status"] == "open"]
-      stops = [o for o in orders if o["coin"] == coin and o["reduceOnly"] and "Stop" in o["orderType"]]
-      exits = [o for o in open_ if o["ft_order_side"] != "stoploss"]
-      exit_side = "buy" if t["is_short"] else "sell"
-      good = (coin in held and abs(abs(held[coin]) - t["amount"]) < 1e-9
-              and sum(o["ft_order_side"] == "stoploss" for o in open_) == 1
-              and len(stops) == 1 and abs(float(stops[0]["triggerPx"]) / t["stop_loss_abs"] - 1) < 0.001
-              and all(o["ft_order_side"] == exit_side for o in exits))
-      ok &= good
-      print(coin, "OK" if good else "NOT PROTECTED", t["amount"], t["stop_loss_abs"], [s["triggerPx"] for s in stops])
+      sl = [o for o in open_ if o["ft_order_side"] == "stoploss"]
+      hs = hl.get(str(sl[0]["order_id"])) if len(sl) == 1 else None
+      trig = float(hs["triggerPx"]) if hs and hs.get("isTrigger") else None
+      good = (held.get(coin, 0) * (-1 if short else 1) > 0 and abs(abs(held[coin]) - t["amount"]) < 1e-9
+              and trig is not None and hs["coin"] == coin and hs["reduceOnly"] and hs["side"] == close
+              and float(hs["sz"]) >= t["amount"] - 1e-9 and (trig <= stop if short else trig >= stop))
+      for o in open_:
+          h = hl.get(str(o["order_id"]))
+          known.add(str(o["order_id"]))
+          good = good and (h is not None and h["coin"] == coin and h["reduceOnly"] and h["side"] == close
+                           and o["ft_order_side"] in ("stoploss", exit_side))
+      ok = ok and good
+      print(coin, "OK" if good else "NOT PROTECTED", t["amount"], stop, trig)
+  orphans = [o["coin"] + ":" + str(o["oid"]) for o in orders if str(o["oid"]) not in known]
+  ok = ok and not orphans
+  print("orphan orders:", orphans)
   print("PROTECTED" if ok else "DO NOT RECREATE")
   PY
   ```
 
   The last line must be `PROTECTED`. It means:
-  - each Hyperliquid position belongs to an open Killers trade of the same size;
-  - each trade has exactly one open stop order, resting reduce-only on Hyperliquid within
-    0.1% of `stop_loss_abs`;
-  - its other open orders are exits (the TP rung), not an entry.
+  - each Hyperliquid position belongs to an open Killers trade of the same direction and
+    size;
+  - each trade has exactly one open stop order in Freqtrade, and that exact order (same
+    `oid`) rests on Hyperliquid as a reduce-only trigger on the closing side, covering the
+    whole position;
+  - its trigger is one Freqtrade keeps. Freqtrade replaces a stop (cancel, then create)
+    when its stop, `stoploss_or_liquidation` rounded to the price grid, is more protective
+    than the resting trigger (`Exchange.stoploss_adjust`). A resting trigger is already on
+    the grid, so `trigger >= stop` for a long (`<=` for a short) means no replacement is
+    pending;
+  - every open order of the trade rests on Hyperliquid as a reduce-only exit, and every
+    Hyperliquid order belongs to a trade (no orphan entries or stray orders).
 
-  `DO NOT RECREATE` covers three cases: a stop is missing, a stop change is pending
-  (different trigger), or a position has no trade. In any of them, go to step 7 and try
-  again later. Never close a Killers position for this deploy. If Killers is flat, the
-  three counts are `0` and the check prints `PROTECTED`;
+  `DO NOT RECREATE` covers these cases: a stop missing or not matching, a stop change
+  pending, a position or order without a trade, or an open entry. In any of them, go to
+  step 7 and try again later. Never close a Killers position for this deploy. If Killers is
+  flat, the three counts are `0` and the check prints `PROTECTED`;
 - the receiver log shows no signal being handled and the paper monitor's log no event;
   avoid the US open (13:30 UTC) and news;
 - `weight_last_minute` is under 300. If not, wait (it is a rolling minute; entries stay
@@ -323,16 +344,17 @@ hl "{\"type\":\"frontendOpenOrders\",\"user\":\"$KW\"}" | jq 'length'
 
 - `healthz` lists `upbit` and `slice_weight_last_minute`, and `clients.killers` counts `ok`
   reads with no `queue_timeout` or `rate_limited`;
-- Killers `/status` answers with the same trades as `killers-status-before.json`, and
-  `state` is `paused`. Its log may show "Unable to exit trade" or "Cannot query order" from
-  the gap itself, but nothing after the gateway is up, and no "Unable to place a stoploss
-  order" or "Exiting the trade forcefully". The gateway log shows no errors or 429s;
-- on Hyperliquid, Killers has the same positions, and each still has its resting stop
-  (re-run step 4's check against fresh `/status`, `clearinghouseState` and
-  `frontendOpenOrders` files: `PROTECTED`). A TP rung that filled in the meantime is fine.
-  A missing stop is not: keep entries paused and wait one loop, because Freqtrade places a
-  missing stop on its next iteration. If it is still missing, place it before anything else
-  and record it on #252.
+- Killers `/status` answers, and `state` is `paused`. Its log may show "Unable to exit
+  trade" or "Cannot query order" from the gap itself, but nothing after the gateway is up,
+  and no "Unable to place a stoploss order" or "Exiting the trade forcefully". The gateway
+  log shows no errors or 429s;
+- step 4's check prints `PROTECTED` again on fresh `/status`, `clearinghouseState` and
+  `frontendOpenOrders` files. A position may have shrunk or closed in the meantime through
+  its own resting TP or stop. That is not a deploy failure: confirm the fill in the
+  account's Hyperliquid trade history and that Freqtrade booked it, then check the rest.
+  A missing stop is a failure. Keep entries paused and wait one loop, because Freqtrade
+  places a missing stop on its next iteration. If it is still missing, place it before
+  anything else and record it on #252.
 
 If the verification fails, keep Killers paused and roll back (below).
 
