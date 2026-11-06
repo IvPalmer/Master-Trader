@@ -258,6 +258,7 @@ hl() { curl -s https://api.hyperliquid.xyz/info -H 'Content-Type: application/js
 curl -s -u "$KU:$KP" $K/status | tee killers-status-before.json | jq 'length'
 hl "{\"type\":\"clearinghouseState\",\"user\":\"$KW\"}" | jq '.assetPositions' | tee hl-positions-before.json | jq 'length'
 hl "{\"type\":\"frontendOpenOrders\",\"user\":\"$KW\"}" | tee hl-orders-before.json | jq 'length'
+hl '{"type":"meta"}' > hl-meta-before.json
 sudo docker logs killers-receiver --since 10m 2>&1 | tail -20
 journalctl --user -u upbit-fade-forward --since -10min | tail -20
 curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, queued}' | tee usage-before.json
@@ -266,9 +267,17 @@ curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, qu
 - every open Killers trade is protected, checked against the two files just written:
 
   ```bash
-  python3 - killers-status-before.json hl-positions-before.json hl-orders-before.json <<'PY'
-  import json, sys
-  trades, positions, orders = (json.load(open(p)) for p in sys.argv[1:4])
+  python3 - killers-status-before.json hl-positions-before.json hl-orders-before.json hl-meta-before.json <<'PY'
+  import json, math, sys
+  trades, positions, orders, meta = (json.load(open(p)) for p in sys.argv[1:5])
+  szd = {u["name"]: u["szDecimals"] for u in meta["universe"]}
+  mark = {p["position"]["coin"]: float(p["position"]["positionValue"]) / abs(float(p["position"]["szi"]))
+          for p in positions}
+  def coarse(x, coin, up):
+      # The coarsest price grid Freqtrade can round to near here: 5 significant figures one
+      # decade above max(stop, mark), or Hyperliquid's decimal cap, whichever is coarser.
+      tick = max(10.0 ** (math.floor(math.log10(max(x, mark.get(coin, x)))) - 3), 10.0 ** -(6 - szd[coin]))
+      return (math.ceil(x / tick - 1e-9) if up else math.floor(x / tick + 1e-9)) * tick
   held = {p["position"]["coin"]: float(p["position"]["szi"]) for p in positions}
   hl = {str(o["oid"]): o for o in orders}
   known, ok = set(), len(held) == len(trades)
@@ -283,7 +292,8 @@ curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, qu
       trig = float(hs["triggerPx"]) if hs and hs.get("isTrigger") else None
       good = (held.get(coin, 0) * (-1 if short else 1) > 0 and abs(abs(held[coin]) - t["amount"]) < 1e-9
               and trig is not None and hs["coin"] == coin and hs["reduceOnly"] and hs["side"] == close
-              and float(hs["sz"]) >= t["amount"] - 1e-9 and (trig <= stop if short else trig >= stop))
+              and float(hs["sz"]) >= t["amount"] - 1e-9
+              and (trig <= coarse(stop, coin, False) + 1e-12 if short else trig >= coarse(stop, coin, True) - 1e-12))
       for o in open_:
           h = hl.get(str(o["order_id"]))
           known.add(str(o["order_id"]))
@@ -305,10 +315,16 @@ curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, qu
     `oid`) rests on Hyperliquid as a reduce-only trigger on the closing side, covering the
     whole position;
   - its trigger is one Freqtrade keeps. Freqtrade replaces a stop (cancel, then create)
-    when its stop, `stoploss_or_liquidation` rounded to the price grid, is more protective
-    than the resting trigger (`Exchange.stoploss_adjust`). A resting trigger is already on
-    the grid, so `trigger >= stop` for a long (`<=` for a short) means no replacement is
-    pending;
+    when its stop, `stoploss_or_liquidation` rounded to the market's price precision, is
+    more protective than the resting trigger (`Exchange.stoploss_adjust`).
+  - Rounding direction: up for a long, down for a short.
+  - The precision comes from the mark price: 5 significant figures, capped at
+    `6 - szDecimals` decimals. It changes when the mark crosses a power of ten and the
+    markets reload.
+  - So the check rounds the stop on the coarsest grid that can apply. That grid is one
+    decade above `max(stop, mark)`, or the decimal cap if coarser. Because the grids nest,
+    `trigger >= that` for a long (`<=` for a short) keeps `stoploss_adjust` false on every
+    finer grid too. It assumes the mark does not move more than tenfold in the window;
   - every open order of the trade rests on Hyperliquid as a reduce-only exit, and every
     Hyperliquid order belongs to a trade (no orphan entries or stray orders).
 
