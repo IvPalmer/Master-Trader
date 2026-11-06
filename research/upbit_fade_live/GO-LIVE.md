@@ -342,7 +342,8 @@ The agent never creates, sees or handles these values.
    Mac), removing the `HYPERLIQUID_INSIDERS_*` lines. That edit is one locked, atomic step
    with a backup, and it prints the backup path. Last, it approves the wallet with the
    master key, valid for 180 days, and checks that the stored key is the approved one. If
-   it stops with "REJECTED" or "UNKNOWN", do what it prints and do not recreate the bot.
+   it ends any other way than `Done:` (for example `NOT DONE` or an ssh outcome it calls
+   unknown), do not recreate the bot; re-run the same command as it says.
    Set a reminder before the wallet expires; `scripts/hyperliquid/hl-agent.sh status` lists
    every account's API wallets with days left. The old `insiders-live` wallet lapses on its
    own on 2026-11-21.

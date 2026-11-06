@@ -105,17 +105,29 @@ def parse_edit_output(stdout):
 
 
 def write_env(remove, lines):
+    """Run the locked edit. A remote script failure (any exit but ssh's 255) happens before the
+    replace, so the file is unchanged; a transport failure (255) leaves the outcome unknown."""
     remote = "sudo -n sh -c " + shlex.quote(env_edit_script(ENV_FILE, remove))
     done = subprocess.run(["ssh", VPS, remote], input=lines, text=True, capture_output=True)
-    if done.returncode != 0:
-        sys.exit(f"Writing the VPS env failed; it is unchanged: {done.stderr.strip()}")
-    return parse_edit_output(done.stdout)
+    if done.returncode == 0:
+        return parse_edit_output(done.stdout)
+    if "BACKUP=" in done.stdout:
+        sys.exit("The VPS env WAS replaced but the session then failed "
+                 f"({done.stderr.strip()}). Do not recreate any bot; re-run this command.")
+    if done.returncode == 255:
+        sys.exit(f"ssh failed ({done.stderr.strip()}); whether the VPS env changed is UNKNOWN. "
+                 "Do not recreate any bot; re-run this command once ssh works.")
+    sys.exit(f"Writing the VPS env failed before any change; it is unchanged: {done.stderr.strip()}")
 
 
 def stored_line_digest(name):
-    """sha256 of the `name=` line in the VPS env, computed there (the value never leaves)."""
+    """sha256 of the `name=` line in the VPS env, computed there (the value never leaves);
+    None if it cannot be read."""
     cmd = f"sudo -n grep -E {shlex.quote('^' + name + '=')} {shlex.quote(ENV_FILE)} | sha256sum"
-    out = subprocess.run(["ssh", VPS, cmd], text=True, capture_output=True)
+    try:
+        out = subprocess.run(["ssh", VPS, cmd], text=True, capture_output=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        return None
     return out.stdout.split()[0] if out.returncode == 0 and out.stdout else None
 
 
@@ -203,38 +215,52 @@ def approve(info, constants, args):
     backup, names = write_env(remove, f"{prefix}_WALLET_ADDRESS={addr}\n{key_line}\n")
     del key_line
     print("VPS env now has:", names)
-    print("Backup on the VPS:", backup)
-    pending = (f"The VPS env now holds a key that is NOT approved. Do not recreate the bot. "
-               f"Either re-run this command, or restore the backup: "
-               f"sudo cp -p {backup} {ENV_FILE}")
+    print("Backup on the VPS (reference only):", backup)
 
     nonce = get_timestamp_ms()
     action = {"type": "approveAgent", "agentAddress": agent.address, "agentName": full_name,
               "nonce": nonce}
+    approved, why = None, ""
     try:
         result = ex._post_action(action, sign_agent(master, action, True), nonce)
+        approved = isinstance(result, dict) and result.get("status") == "ok"
+        why = f"response {result}"
     except Exception as e:  # network or SDK error: the outcome is unknown
-        sys.exit(f"Approval outcome UNKNOWN ({type(e).__name__}: {e}). Run `hl-agent.sh status` "
-                 f"and look for {agent.address}. If it is listed, the env is correct. If not: {pending}")
-    if not (isinstance(result, dict) and result.get("status") == "ok"):
-        sys.exit(f"Approval REJECTED: {result}. {pending}")
-    print("Approve result:", result)
+        why = f"{type(e).__name__}: {e}"
 
-    found = []
+    listed = None
     for _ in range(5):
         time.sleep(2)
-        found = [a for a in agents(info, addr) if a["address"].lower() == agent.address.lower()]
-        if found:
+        try:
+            listed = any(a["address"].lower() == agent.address.lower() for a in agents(info, addr))
+        except Exception:
+            listed = None
+        if listed:
             break
-    if stored_line_digest(f"{prefix}_PRIVATE_KEY") != digest:
-        sys.exit("The key stored on the VPS is not the one just approved (another edit ran?). "
-                 "Do not recreate the bot; re-run this command.")
-    if not found:
-        sys.exit(f"Approved, but {agent.address} is not listed yet; check `hl-agent.sh status` "
-                 "before recreating any bot.")
-    show(info, label, addr)
-    print("\nDone: the VPS env holds the approved key. The running bot keeps its old env until "
-          "it is recreated (see its runbook).")
+    stored = stored_line_digest(f"{prefix}_PRIVATE_KEY")
+    key_ok = None if stored is None else stored == digest
+
+    problem = verdict(approved, listed, key_ok)
+    if problem is None:
+        show(info, label, addr)
+        print("\nDone: the VPS env holds the approved key. The running bot keeps its old env "
+              "until it is recreated (see its runbook).")
+        return
+    sys.exit(f"{problem} Approval detail: {why}. New wallet: {agent.address}.")
+
+
+def verdict(approved, listed, key_ok):
+    """None when the run is complete: not rejected, the new wallet is listed (which proves the
+    approval even if its response was lost) and the VPS holds exactly the new key. Otherwise
+    the operator message. Each argument is True, False or None (unknown)."""
+    if approved is not False and listed is True and key_ok is True:
+        return None
+    state = {True: "yes", False: "NO", None: "UNKNOWN"}
+    approval = {True: "ok", False: "REJECTED", None: "UNKNOWN"}[approved]
+    return (f"NOT DONE. Approval: {approval}. New wallet listed: {state[listed]}. VPS key is the "
+            f"new one: {state[key_ok]}.\nDo not recreate the bot. Re-run this same command; if "
+            "it says the name exists, add --replace (nothing signs with this new wallet yet). "
+            "Do not copy the backup over the env: another edit may have run since.")
 
 
 def env_set(args):

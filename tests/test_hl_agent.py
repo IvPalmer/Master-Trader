@@ -148,3 +148,47 @@ def test_env_pairs_take_plain_values_and_refuse_secrets():
     for bad in ["NOVALUE", "lower=1", "A=has space", "A=$(x)", "HYPERLIQUID_X_PRIVATE_KEY=0x1"]:
         with pytest.raises(SystemExit):
             hl_agent.env_pairs([bad])
+
+
+class Done:
+    def __init__(self, returncode, stdout="", stderr=""):
+        self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
+
+
+@pytest.mark.parametrize("rc, stdout, says", [
+    (1, "", "unchanged"),
+    (255, "", "UNKNOWN"),
+    (255, "BACKUP=/x/.env.bak-1\n", "WAS replaced"),
+    (1, "BACKUP=/x/.env.bak-1\n", "WAS replaced"),
+])
+def test_write_env_never_claims_unchanged_after_a_possible_replace(monkeypatch, rc, stdout, says):
+    monkeypatch.setattr(hl_agent.subprocess, "run", lambda *a, **k: Done(rc, stdout, "boom"))
+    with pytest.raises(SystemExit) as e:
+        hl_agent.write_env(["X"], "X=1\n")
+    assert says in str(e.value)
+    if says != "unchanged":
+        assert "Do not recreate" in str(e.value)
+
+
+def test_write_env_returns_backup_and_names(monkeypatch):
+    monkeypatch.setattr(hl_agent.subprocess, "run",
+                        lambda *a, **k: Done(0, "BACKUP=/x/b\nNAMES=HYPERLIQUID_A HYPERLIQUID_B \n"))
+    assert hl_agent.write_env(["X"], "X=1\n") == ("/x/b", "HYPERLIQUID_A HYPERLIQUID_B")
+
+
+@pytest.mark.parametrize("approved, listed, key_ok, done", [
+    (True, True, True, True),
+    (None, True, True, True),    # response lost, but the listing proves the approval
+    (False, True, True, False),  # rejected
+    (True, False, True, False),  # not listed yet
+    (True, None, True, False),   # listing unreadable
+    (True, True, False, False),  # another edit replaced the stored key
+    (True, True, None, False),   # stored key unreadable
+    (None, None, None, False),
+])
+def test_verdict_declares_done_only_on_proof(approved, listed, key_ok, done):
+    msg = hl_agent.verdict(approved, listed, key_ok)
+    assert (msg is None) == done
+    if not done:
+        assert "Do not recreate the bot" in msg and "Re-run this same command" in msg
+        assert "cp -p" not in msg
