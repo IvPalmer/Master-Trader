@@ -123,6 +123,8 @@ _live_initial_capital = 0.0  # Sum of starting_capital across LIVE bots
 _live_bots: list[dict] = []  # Subset of BOTS that report dry_run=False
 _capital_refresh_counter = 0
 _membership_complete = False
+# Strategies outside the breaker whose mode could not be read this refresh (#261).
+_outside_unobserved: set[str] = set()
 
 _portfolio_peak = 0.0
 # The live-capital base the peak was recorded against. The peak is an ABSOLUTE
@@ -331,13 +333,19 @@ def refresh_live_capital() -> None:
     """Rebuild the list of LIVE (non-dry-run) bots and sum their starting
     capital. Called on startup and periodically — a config change or a bot
     being added/removed propagates without an exporter restart."""
-    global _live_bots, _live_initial_capital, _membership_complete
+    global _live_bots, _live_initial_capital, _membership_complete, _outside_unobserved
     live = []
     _membership_complete = True
+    _outside_unobserved = set()
     for bot in BOTS:
         meta = fetch_bot_meta(bot["service"])
         if meta is None:
-            _membership_complete = False
+            # A bot outside the breaker cannot change the breaker's scope, so
+            # its unreadable mode does not freeze the breaker (#261).
+            if outside_breaker(bot):
+                _outside_unobserved.add(bot["strategy"])
+            else:
+                _membership_complete = False
             log.warning("Mode unavailable for %s; preserving membership, freezing account checks", bot["strategy"])
             live.extend(b for b in _live_bots if b["service"] == bot["service"])
             continue
@@ -345,12 +353,13 @@ def refresh_live_capital() -> None:
             log.debug("Excluding %s from breaker (dry_run)", bot["strategy"])
             continue
         if not math.isfinite(meta["starting_capital"]):
-            _membership_complete = False
+            if not outside_breaker(bot):
+                _membership_complete = False
             meta["starting_capital"] = 0
         live.append({**bot, "starting_capital": meta["starting_capital"]})
 
     _live_bots = live
-    _live_initial_capital = account_starting_capital(live)
+    _live_initial_capital = account_starting_capital([b for b in live if not outside_breaker(b)])
     log.info(
         "Circuit breaker capital refreshed: %d live bots, $%.2f total starting capital",
         len(_live_bots), _live_initial_capital,
@@ -366,7 +375,31 @@ def refresh_live_capital() -> None:
 # Accounts the exporter can value from a verified source. A live bot on any
 # other account is a configuration error, not a transient gap: it cannot close
 # on the next scrape, so it must not freeze the breaker for every account (#104).
-VALUED_ACCOUNTS = frozenset({"binance-spot", "hyperliquid-killers"})
+VALUED_ACCOUNTS = frozenset({"binance-spot", "hyperliquid-killers", "hyperliquid-upbit-fade"})
+# Valued and monitored, but outside the fleet breaker's drawdown (#261). Each is
+# governed by its own kill switch, so a loss there cannot halt the fleet. A fleet
+# breach still pauses their entries: enforce_halts() covers every live bot.
+OUTSIDE_BREAKER_ACCOUNTS = frozenset({"hyperliquid-upbit-fade"})
+
+
+def outside_breaker(bot: dict) -> bool:
+    return (bot.get("capital_account") or bot["service"]) in OUTSIDE_BREAKER_ACCOUNTS
+
+
+def hyperliquid_account_mark(bot: dict) -> dict:
+    """The bot's own Hyperliquid account, read through the gateway's accounting client."""
+    env_name = bot.get("wallet_env")
+    wallet = os.environ.get(env_name, "").strip() if env_name else ""
+    if not wallet:
+        raise ValueError("wallet not configured")
+    response = requests.post(GATEWAY_URL + "/accounting/info",
+                             json={"type": "clearinghouseState", "user": wallet}, timeout=20)
+    response.raise_for_status()
+    state = response.json()
+    margin = state["marginSummary"]
+    return {"observed_at": time.time(), "equity": float(margin["accountValue"]),
+            "free": float(state["withdrawable"]), "margin": float(margin["totalMarginUsed"]),
+            "notional": float(margin["totalNtlPos"])}
 
 
 def unvalued_live_accounts(live_bots: list[dict]) -> dict[str, list[str]]:
@@ -412,9 +445,11 @@ def observe_accounts() -> dict:
     for bot in _live_bots:
         groups.setdefault(bot.get("capital_account") or bot["service"], []).append(bot)
     unvalued = unvalued_live_accounts(_live_bots)
-    # The breaker's scope: every live account it can value.
-    covered = [account for account in groups if account not in unvalued]
-    for account in covered:
+    valued = [account for account in groups if account not in unvalued]
+    # The breaker's scope: every valued live account it governs (#261).
+    covered = [account for account in valued if account not in OUTSIDE_BREAKER_ACCOUNTS]
+    breaker_ok = result["complete"]
+    for account in valued:
         members = groups[account]
         try:
             owners = [b for b in members if b.get("capital_owner")]
@@ -433,6 +468,8 @@ def observe_accounts() -> dict:
                         "free": sum(float(c.get("free") or 0) for c in bal.get("currencies", [])
                                     if c.get("currency") == bal.get("stake")),
                         "margin": None, "notional": None}
+            elif account == "hyperliquid-upbit-fade":
+                mark = hyperliquid_account_mark(owner)
             else:
                 raise ValueError("no verified account valuation adapter")
             if not math.isfinite(mark["equity"]) or mark["equity"] < 0:
@@ -442,6 +479,7 @@ def observe_accounts() -> dict:
             result["accounts"][account] = mark
         except (KeyError, TypeError, ValueError, requests.RequestException):
             result["complete"] = False
+            breaker_ok = breaker_ok and account not in covered
             result["errors"].append(f"Account equity unavailable: {account}")
     try:
         ledger = json.loads(Path(__file__).with_name("account_transfers.json").read_text())["transfers"]
@@ -457,15 +495,24 @@ def observe_accounts() -> dict:
             raise ValueError("invalid transfer")
     except (OSError, ValueError, KeyError, TypeError):
         result["complete"] = False
+        breaker_ok = False
         result["errors"].append("External cash-flow ledger unavailable or invalid")
     # A transient failure on any covered account still freezes the breaker: a
     # partial total would fake a drawdown. An account with no adapter was never
     # part of the total, so excluding it changes nothing the peak was built on.
-    result["breaker_complete"] = result["complete"] and bool(covered)
+    result["breaker_complete"] = breaker_ok and bool(covered)
     result["breaker_equity"] = (sum(result["accounts"][a]["equity"] for a in covered)
                                 if result["breaker_complete"] else None)
     result["breaker_accounts"] = ({a: {"equity": result["accounts"][a]["equity"], "transfers": transfers[a]}
                                    for a in covered} if result["breaker_complete"] else None)
+    outside = {a: [b.get("strategy", b["service"]) for b in groups[a]]
+               for a in valued if a in OUTSIDE_BREAKER_ACCOUNTS}
+    if outside:
+        result["outside_breaker_accounts"] = outside
+    if _outside_unobserved:
+        result["complete"] = False
+        result["errors"].append(
+            f"Mode unavailable for {', '.join(sorted(_outside_unobserved))} (outside the circuit breaker)")
     if unvalued:
         result["complete"] = False  # the portfolio total itself is not observed
         result["unvalued_accounts"] = unvalued
@@ -773,7 +820,7 @@ def watch_breaker(observation: dict, evaluated: bool, now: float) -> None:
                  + "; ".join(f"{a} ({', '.join(s)})" for a, s in unvalued.items())
                  + " has no valuation adapter. Value the account or return the bot to dry-run.")
         if unvalued else None, now, 0)
-    stalled = (bool(_live_bots) or not _membership_complete) and not evaluated
+    stalled = (any(not outside_breaker(b) for b in _live_bots) or not _membership_complete) and not evaluated
     reason = "; ".join(observation.get("errors") or []) or "no complete account observation"
     BREAKER_STALL_ALERT.update(
         "Circuit breaker not evaluated for {minutes} min; the drawdown halt is not running. "
@@ -1009,7 +1056,7 @@ def main() -> None:
             log.warning("No bots reachable. Sleeping %ds.", SCRAPE_INTERVAL)
 
         _capital_refresh_counter += 1
-        if not _membership_complete or _capital_refresh_counter >= CAPITAL_REFRESH_EVERY:
+        if not _membership_complete or _outside_unobserved or _capital_refresh_counter >= CAPITAL_REFRESH_EVERY:
             _capital_refresh_counter = 0
             refresh_live_capital()
 

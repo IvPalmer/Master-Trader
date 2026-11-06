@@ -505,9 +505,12 @@ leverage, with retries, after the admission check, so submission itself is not b
    with `python3 -B live_trigger.py status` (submitted and filled seconds after t0) and
    report it on #252 with the trade.
 
-Expected alert once live: the exporter has no valuation adapter for the
-`hyperliquid-upbit-fade` account yet, so it pages "Live bot outside the circuit breaker".
-That is a known follow-up, not a fault of the pilot.
+Circuit breaker once live (#261): the exporter values the `hyperliquid-upbit-fade`
+account and shows it on the account health file, but keeps it outside the fleet breaker's
+drawdown, so a pilot loss cannot halt FundingFade, Keltner or Killers. The prereg's own
+−$75 kill switch governs the pilot. A fleet breach still pauses the pilot's entries.
+No "Live bot outside the circuit breaker" page is expected; one means the exporter is
+older than #261 or lacks `HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS`.
 
 ## Kill switch and rollback
 
