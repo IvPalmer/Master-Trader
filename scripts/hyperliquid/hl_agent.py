@@ -94,8 +94,8 @@ def env_edit_script(path, remove):
         'if [ -s "$T" ] && [ -n "$(tail -c1 "$T")" ]; then echo >> "$T"; fi',
         'cat >> "$T"',
         'chmod 600 "$T"',
+        "R=1",  # from here on the replace may have happened
         'mv "$T" "$F"',
-        "R=1",
         'echo "BACKUP=$B"',
         "printf 'NAMES='; grep -oE '^HYPERLIQUID_[A-Z0-9_]+' \"$F\" | tr '\\n' ' '; echo",
     ])
