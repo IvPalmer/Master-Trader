@@ -53,6 +53,7 @@ def sh_env(tmp_path, grep_fails=False):
     if shutil.which("flock") is None:
         (bin_ / "flock").write_text("#!/bin/sh\nexit 0\n")
         os.chmod(bin_ / "flock", 0o755)
+    (bin_ / "grep").unlink(missing_ok=True)
     if grep_fails:
         (bin_ / "grep").write_text(f'#!/bin/sh\n[ "$1" = "-v" ] && exit 2\nexec {REAL_GREP} "$@"\n')
         os.chmod(bin_ / "grep", 0o755)
@@ -155,19 +156,32 @@ class Done:
         self.returncode, self.stdout, self.stderr = returncode, stdout, stderr
 
 
-@pytest.mark.parametrize("rc, stdout, says", [
-    (1, "", "unchanged"),
-    (255, "", "UNKNOWN"),
-    (255, "BACKUP=/x/.env.bak-1\n", "WAS replaced"),
-    (1, "BACKUP=/x/.env.bak-1\n", "WAS replaced"),
+@pytest.mark.parametrize("rc, stdout, stderr, says", [
+    (1, "", "flock: timeout\nHLAGENT_UNCHANGED\n", "unchanged"),
+    (1, "", "boom", "UNKNOWN"),
+    (255, "", "Connection reset", "UNKNOWN"),
+    (255, "BACKUP=/x/.env.bak-1\n", "HLAGENT_UNCHANGED", "UNKNOWN"),
 ])
-def test_write_env_never_claims_unchanged_after_a_possible_replace(monkeypatch, rc, stdout, says):
-    monkeypatch.setattr(hl_agent.subprocess, "run", lambda *a, **k: Done(rc, stdout, "boom"))
+def test_write_env_claims_unchanged_only_on_the_scripts_marker(monkeypatch, rc, stdout, stderr, says):
+    monkeypatch.setattr(hl_agent.subprocess, "run", lambda *a, **k: Done(rc, stdout, stderr))
     with pytest.raises(SystemExit) as e:
         hl_agent.write_env(["X"], "X=1\n")
     assert says in str(e.value)
     if says != "unchanged":
         assert "Do not recreate" in str(e.value)
+
+
+def test_script_marks_unchanged_only_before_the_replace(tmp_path):
+    _, failed = run_edit(tmp_path, "HYPERLIQUID_INSIDERS_X=1\n", "B=2\n", grep_fails=True, check=False)
+    assert failed.returncode != 0 and "HLAGENT_UNCHANGED" in failed.stderr
+    ok_env, ok = run_edit(tmp_path, "A=1\n", "B=2\n")
+    assert "HLAGENT_UNCHANGED" not in ok.stderr
+    # replaced, then the success marker cannot be written (stdout closed): no false marker
+    script = hl_agent.env_edit_script(str(ok_env), ["C"])
+    late = subprocess.run(["sh", "-c", "exec >&-\n" + script], input="C=3\n", text=True,
+                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=sh_env(tmp_path))
+    assert late.returncode != 0 and "HLAGENT_UNCHANGED" not in late.stderr
+    assert ok_env.read_text() == "A=1\nB=2\nC=3\n"
 
 
 def test_write_env_returns_backup_and_names(monkeypatch):

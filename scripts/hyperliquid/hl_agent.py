@@ -79,13 +79,15 @@ def env_edit_script(path, remove):
     return "\n".join([
         "set -eu",
         "umask 077",
+        "R=0 T=",
+        # Only a run that stops before the replace says so; anything else is unknown.
+        "trap 'rm -f \"${T:-}\"; if [ \"$R\" = 0 ]; then echo HLAGENT_UNCHANGED >&2; fi' EXIT",
         f"F={shlex.quote(path)}",
         'test -f "$F"',
         'exec 9>"$F.lock"',
         'flock -w 30 9 || { echo "another env edit holds $F.lock" >&2; exit 1; }',
         'D=$(dirname "$F")',
         'T=$(mktemp "$D/.env.new.XXXXXX")',
-        "trap 'rm -f \"$T\"' EXIT",
         'B=$(mktemp "$F.bak-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")',
         'cp -p "$F" "$B"',
         f'if grep -v -E {shlex.quote(pattern)} "$F" > "$T"; then :; else rc=$?; [ "$rc" -eq 1 ] || exit "$rc"; fi',
@@ -93,7 +95,7 @@ def env_edit_script(path, remove):
         'cat >> "$T"',
         'chmod 600 "$T"',
         'mv "$T" "$F"',
-        "trap - EXIT",
+        "R=1",
         'echo "BACKUP=$B"',
         "printf 'NAMES='; grep -oE '^HYPERLIQUID_[A-Z0-9_]+' \"$F\" | tr '\\n' ' '; echo",
     ])
@@ -105,19 +107,17 @@ def parse_edit_output(stdout):
 
 
 def write_env(remove, lines):
-    """Run the locked edit. A remote script failure (any exit but ssh's 255) happens before the
-    replace, so the file is unchanged; a transport failure (255) leaves the outcome unknown."""
+    """Run the locked edit. Unchanged is reported only on the script's own pre-replace marker;
+    every other failure (ssh, or anything after the replace) is reported as unknown."""
     remote = "sudo -n sh -c " + shlex.quote(env_edit_script(ENV_FILE, remove))
     done = subprocess.run(["ssh", VPS, remote], input=lines, text=True, capture_output=True)
     if done.returncode == 0:
         return parse_edit_output(done.stdout)
-    if "BACKUP=" in done.stdout:
-        sys.exit("The VPS env WAS replaced but the session then failed "
-                 f"({done.stderr.strip()}). Do not recreate any bot; re-run this command.")
-    if done.returncode == 255:
-        sys.exit(f"ssh failed ({done.stderr.strip()}); whether the VPS env changed is UNKNOWN. "
-                 "Do not recreate any bot; re-run this command once ssh works.")
-    sys.exit(f"Writing the VPS env failed before any change; it is unchanged: {done.stderr.strip()}")
+    if "HLAGENT_UNCHANGED" in done.stderr and "BACKUP=" not in done.stdout:
+        sys.exit("Writing the VPS env failed before any change; it is unchanged: "
+                 + done.stderr.replace("HLAGENT_UNCHANGED", "").strip())
+    sys.exit(f"The VPS env edit ended without confirmation ({done.stderr.strip() or 'no detail'}); "
+             "whether it changed is UNKNOWN. Do not recreate any bot; re-run this command.")
 
 
 def stored_line_digest(name):
