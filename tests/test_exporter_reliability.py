@@ -1284,3 +1284,155 @@ def test_non_finite_open_pnl_is_unavailable_not_a_breaker_reading(exporter, monk
     payloads = {"profit": {"profit_closed_coin": -10.0}, "status": [bad], "balance": {"total": 1.0}}
     monkeypatch.setattr(exporter, "fetch_json", lambda service, endpoint: payloads[endpoint])
     assert exporter.scrape_bot(bot) is None
+
+
+# ── #261: the Upbit pilot account is valued but kept outside the breaker ──
+PILOT_WALLET_ENV = "HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS"
+
+
+def _pilot(exporter, monkeypatch, equity=108.27, ok=True, webhook=None):
+    """The pilot account through the gateway's accounting client; other POSTs go to `webhook`."""
+    monkeypatch.setenv(PILOT_WALLET_ENV, "0xpilot")
+    reads = []
+
+    def post(url, **kwargs):
+        if url == exporter.GATEWAY_URL + "/accounting/info":
+            reads.append(kwargs["json"])
+            assert kwargs["json"] == {"type": "clearinghouseState", "user": "0xpilot"}
+            if not ok:
+                raise exporter.requests.ConnectionError("gateway down")
+            body = {"marginSummary": {"accountValue": str(equity), "totalMarginUsed": "0.0",
+                                      "totalNtlPos": "0.0"}, "withdrawable": str(equity)}
+            return types.SimpleNamespace(raise_for_status=lambda: None, json=lambda: body)
+        return (webhook or _Webhook())(url, **kwargs)
+
+    monkeypatch.setattr(exporter.requests, "post", post)
+    return reads
+
+
+def test_pilot_account_is_valued_and_kept_outside_the_breaker(exporter, monkeypatch):
+    pilot = _registry_bot(exporter, "UpbitFadeLiveV1")
+    assert pilot["capital_account"] == "hyperliquid-upbit-fade"
+    assert pilot["wallet_env"] == PILOT_WALLET_ENV
+    exporter._membership_complete = True
+    exporter._live_bots = [FUNDING, KELTNER, KILLERS, pilot]
+    _venues(exporter, monkeypatch)
+    reads = _pilot(exporter, monkeypatch)
+    result = exporter.observe_accounts()
+
+    assert len(reads) == 1
+    assert result["breaker_complete"] is True
+    assert result["breaker_equity"] == 400.0, "the pilot wallet never enters the breaker total"
+    assert set(result["breaker_accounts"]) == {"binance-spot", "hyperliquid-killers"}
+    assert result["accounts"]["hyperliquid-upbit-fade"]["equity"] == pytest.approx(108.27)
+    assert result["complete"] is True
+    assert result["equity"] == pytest.approx(508.27), "the portfolio total is real money, pilot included"
+    assert result["outside_breaker_accounts"] == {"hyperliquid-upbit-fade": ["UpbitFadeLiveV1"]}
+    assert "unvalued_accounts" not in result
+    assert result["errors"] == []
+
+
+def test_pilot_observation_failure_never_freezes_the_breaker(exporter, monkeypatch):
+    exporter._membership_complete = True
+    exporter._live_bots = [FUNDING, KELTNER, KILLERS, _registry_bot(exporter, "UpbitFadeLiveV1")]
+    _venues(exporter, monkeypatch)
+    _pilot(exporter, monkeypatch, ok=False)
+    result = exporter.observe_accounts()
+
+    assert result["breaker_complete"] is True
+    assert result["breaker_equity"] == 400.0
+    assert result["complete"] is False and result["equity"] is None
+    assert "Account equity unavailable: hyperliquid-upbit-fade" in result["errors"]
+
+
+def test_pilot_without_a_wallet_is_reported_not_valued_at_zero(exporter, monkeypatch):
+    exporter._membership_complete = True
+    exporter._live_bots = [FUNDING, KILLERS, _registry_bot(exporter, "UpbitFadeLiveV1")]
+    _venues(exporter, monkeypatch)
+    _pilot(exporter, monkeypatch)
+    monkeypatch.delenv(PILOT_WALLET_ENV)
+    result = exporter.observe_accounts()
+    assert "hyperliquid-upbit-fade" not in result["accounts"]
+    assert result["breaker_complete"] is True
+    assert "Account equity unavailable: hyperliquid-upbit-fade" in result["errors"]
+
+
+def test_pilot_loss_cannot_trip_the_fleet_breaker(exporter, monkeypatch, tmp_path):
+    """End to end: the fleet sits 2.4% under its peak while the pilot loses half its wallet."""
+    exporter._membership_complete = True
+    exporter._live_bots = [FUNDING, KELTNER, KILLERS, _registry_bot(exporter, "UpbitFadeLiveV1")]
+    _venues(exporter, monkeypatch)
+    webhook = _Webhook()
+    _pilot(exporter, monkeypatch, equity=50.0, webhook=webhook)
+    stopped = []
+    monkeypatch.setattr(exporter, "stop_bot", lambda bot: stopped.append(bot) or True)
+    _run_cycles(exporter, monkeypatch, tmp_path, 2, {
+        "peak": 410.0, "equity_basis": "accounts-v1", "account_transfer_total": LEDGER_TOTAL})
+
+    assert stopped == []
+    assert exporter._portfolio_peak == 410.0
+    assert "fleet-breaker-coverage" not in [m[1] for m in webhook.messages()], \
+        "a valued pilot is not paged as outside the breaker"
+    health = json.loads((tmp_path / "account_health.json").read_text())
+    assert health["drawdown_pct"] == pytest.approx(10 / 410 * 100)
+    assert health["accounts"]["hyperliquid-upbit-fade"]["equity"] == 50.0
+
+
+def test_fleet_breach_still_pauses_pilot_entries(exporter, monkeypatch, tmp_path):
+    pilot = _registry_bot(exporter, "UpbitFadeLiveV1")
+    exporter._membership_complete = True
+    exporter._live_bots = [FUNDING, KELTNER, KILLERS, pilot]
+    fleet = _Fleet(exporter, monkeypatch, exporter._live_bots, serve_fetch=False)
+    _venues(exporter, monkeypatch, fleet=fleet)
+    _pilot(exporter, monkeypatch)
+    monkeypatch.setattr(exporter, "send_circuit_breaker_alert", lambda *a: None)
+    _run_cycles(exporter, monkeypatch, tmp_path, 1, {
+        "peak": 500.0, "equity_basis": "accounts-v1", "account_transfer_total": LEDGER_TOTAL})
+    assert fleet.stops == ["FundingFadeV1", "KeltnerBounceV1", "KillersScalpV1", "UpbitFadeLiveV1"], \
+        "the halt is entries-only and still covers every live bot"
+
+
+def test_unreadable_pilot_mode_does_not_freeze_the_breaker(exporter, monkeypatch):
+    pilot = _registry_bot(exporter, "UpbitFadeLiveV1")
+    exporter.BOTS = [FUNDING, pilot]
+    exporter._live_bots = [FUNDING, {**pilot, "starting_capital": 108.0}]
+
+    def fetch(service, endpoint):
+        if service == pilot["service"]:
+            return None
+        return {"dry_run": False} if endpoint == "show_config" else {"starting_capital": 50.0}
+
+    monkeypatch.setattr(exporter, "fetch_json", fetch)
+    exporter.refresh_live_capital()
+    assert exporter._membership_complete is True, "the pilot cannot change the breaker's scope"
+    assert [b["strategy"] for b in exporter._live_bots] == ["FundingFadeV1", "UpbitFadeLiveV1"]
+    assert exporter._live_initial_capital == 50.0, "the pilot's capital is not in the breaker base"
+
+    monkeypatch.setattr(exporter, "fetch_json", lambda service, endpoint:
+                        {"total": 300.0, "stake": "USDC", "currencies": []})
+    monkeypatch.setattr(exporter.requests, "get", lambda url, **kw: (_ for _ in ()).throw(
+        exporter.requests.ConnectionError("no gateway")))
+    _pilot(exporter, monkeypatch)
+    result = exporter.observe_accounts()
+    assert result["breaker_complete"] is True
+    assert result["complete"] is False
+    assert any("UpbitFadeLiveV1" in e and "mode unavailable" in e.lower() for e in result["errors"])
+
+
+def test_breaker_watch_ignores_a_fleet_with_only_the_pilot_live(exporter, monkeypatch):
+    webhook = _Webhook()
+    monkeypatch.setattr(exporter.requests, "post", webhook)
+    exporter._membership_complete = True
+    exporter._live_bots = [_registry_bot(exporter, "UpbitFadeLiveV1")]
+    for t in range(0, 1200, 60):
+        exporter.watch_breaker({"errors": []}, False, t)
+    assert webhook.posts == [], "the breaker has nothing in scope to evaluate"
+
+
+def test_exporter_receives_every_hyperliquid_wallet_it_reads(exporter):
+    yaml = pytest.importorskip("yaml")
+    compose = yaml.safe_load((FT_DIR / "docker-compose.prod.yml").read_text())
+    env = compose["services"]["metrics-exporter"]["environment"]
+    for bot in exporter.BOTS:
+        if bot.get("venue") == "hyperliquid" and bot.get("wallet_env"):
+            assert bot["wallet_env"] in env, f"{bot['strategy']}: exporter cannot read {bot['wallet_env']}"
