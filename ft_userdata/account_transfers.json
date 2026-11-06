@@ -21,6 +21,13 @@
       "observed_at": "2026-10-02T21:06:36Z",
       "amount": 209.734477,
       "note": "Hyperliquid Send from the operator's email account (189.134477 from Binance via Across + 20.60 pre-existing). Moved spot->perps at 21:25:18 by the operator (internal, not a transfer)."
+    },
+    {
+      "id": "2026-11-06-binance-usdc-withdrawal-upbit-pilot",
+      "account": "binance-spot",
+      "observed_at": "2026-11-06T18:37:38Z",
+      "amount": -19.972827,
+      "note": "USDC withdrawal on Arbitrum One to the operator's Hyperliquid email account, funding the Upbit fade pilot (#252): 19.472827 received + 0.50 network fee. Binance history 18:37:38 UTC; success email 18:38:33 UTC. The USDT->USDC conversion before it is internal; its cost stays in P&L. The pilot account is outside the breaker (#261), so there is no matching inflow row."
     }
   ]
 }
