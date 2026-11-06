@@ -1906,6 +1906,12 @@ def _account_health() -> dict | None:
         if time.time() - state["observed_at"] > 180:
             raise ValueError("stale")
         state["warnings"] = list(state.get("errors", []))
+        # Accounts outside the fleet breaker (#261, the Upbit pilot) are not in this
+        # dashboard's fleet: keep their equity out of the wallet total it sets
+        # against fleet P&L. Their marks stay under `accounts`.
+        outside = state.get("outside_breaker_accounts") or {}
+        if state.get("equity") is not None and outside:
+            state["equity"] -= sum(state["accounts"][a]["equity"] for a in outside)
         gateway = state.get("gateway")
         if not gateway or time.time() - gateway.get("observed_at", 0) > 180:
             state["warnings"].append("Hyperliquid request telemetry unavailable")
