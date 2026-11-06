@@ -270,6 +270,11 @@ def env_set(args):
     print(f"VPS {ENV_FILE}: set " + ", ".join(f"{n}={v}" for n, v in pairs) + " (backup first).")
     if not confirm("Go ahead?"):
         sys.exit("Cancelled, nothing changed.")
+    apply_env(pairs)
+
+
+def apply_env(pairs):
+    """The env-set edit without its prompt, for a caller that already asked (go-live.sh)."""
     backup, names = write_env([n for n, _ in pairs], "".join(f"{n}={v}\n" for n, v in pairs))
     print("VPS env now has:", names)
     print("Backup on the VPS:", backup)
