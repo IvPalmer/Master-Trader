@@ -134,7 +134,7 @@ and a dry-run Freqtrade never sends one). The gateway changes only at go-live (P
    - remove `data/KILL` and leave the trigger running until at least one real paper event
      has passed through it (`python3 -B live_trigger.py status`).
 
-## Gateway deploy (go-live only, Killers held flat)
+## Gateway deploy (go-live only, Killers entries held, open positions protected)
 
 Live trading needs the gateway's `upbit` client: reads at the background tier, plus the
 pilot's own slice of 40 weight a minute for exchange actions and `orderStatus`, outside the
@@ -144,14 +144,44 @@ gateway does not have it yet. This is the only step that touches `hl-gateway`.
 Recreating `hl-gateway` cuts every Hyperliquid call of every HL bot, live Killers included,
 for the length of the recreate. The gateway keeps no budget state, so the new one starts
 with an empty rolling minute while Hyperliquid keeps counting the last one. Recreate it
-only when **Killers is flat: no open positions and no open orders on Hyperliquid** (the
-same rule as the #188 flat restart), and only while the trailing-minute usage, read
-immediately before the recreate, is **under 300** (of the gateway's 900 fleet cap;
-Hyperliquid allows 1200 per IP). Killers is not only checked flat but **held** flat: its
-entries are paused and any entry already in flight is drained **before** the final flat
-checks, and they stay paused through the recreate, the verification and the 60 s after the
-recreate that Hyperliquid still counts. Then the previous entry state is restored. If the
-procedure stops anywhere in between, Killers stays paused (the safe side) until step 7.
+only while the trailing-minute usage, read immediately before the recreate, is **under
+300** (of the gateway's 900 fleet cap; Hyperliquid allows 1200 per IP), and only while
+**every open Killers trade is protected on Hyperliquid and has no stop change pending**:
+its Freqtrade stop rests on the exchange as a reduce-only stop at the trigger Freqtrade
+holds (`stop_loss_abs`), and its only other open orders are resting reduce-only exits (the
+TP rung). Killers does not need to be flat. Its entries are paused and any entry already
+in flight is drained **before** the final checks, and they stay paused through the
+recreate, the verification and the 60 s after the recreate that Hyperliquid still counts.
+Then the previous entry state is restored. If the procedure stops anywhere in between,
+Killers stays paused (the safe side) until step 7.
+
+Why open positions are safe through the gap (2026-11-06, Freqtrade 2026.7 and ccxt 4.5.68
+read in the running `ft-killers-scalp` image; the rule replaces "Killers flat", which was
+carried over from the #188 restart of Killers itself):
+
+- What a Killers call sees during the gap: with the container down, a connection error is
+  ccxt `NetworkError`. A gateway refusal is either FastAPI `{"detail": ...}` with
+  400/403/404/503, or the gateway's own 429 `{"error": "fleet request budget busy..."}`.
+  ccxt's status table maps the first to `ExchangeNotAvailable`. Hyperliquid's
+  `handle_errors` maps the second to plain `ExchangeError`: the message matches none of its
+  broad patterns. Freqtrade turns both into `TemporaryError`.
+- `create_stoploss_order` force-exits a trade (`emergency_exit`) only on
+  `InvalidOrderException`. That is ccxt `InvalidOrder`, `BadRequest` or `OperationRejected`,
+  which come from Hyperliquid's own rejection messages, not from a missing gateway. On any
+  other `ExchangeError` it logs and returns. A failed `fetch_stoploss_order` or `fetch_order`
+  is logged ("Unable to exit trade", "Cannot query order"), and the next loop retries.
+- Freqtrade only places a stop when none is open or all are cancelled, or when the custom
+  stop moved: `handle_trailing_stoploss_on_exchange` cancels and re-creates at most once per
+  `stoploss_on_exchange_interval` (60 s). It replaces a stop whenever its own stop is more
+  protective than the resting trigger, even by one tick (`Exchange.stoploss_adjust`). With
+  every stop resting at a trigger Freqtrade keeps (step 4's check), the gap makes no stop
+  call. The stop and the TP rung stay on the exchange and keep
+  working without the gateway.
+- Remaining risk: a receiver stop change landing in the window could cancel a stop and fail
+  to re-create it. The trade would then be unprotected until the gateway answers again, when
+  the next loop places it. The receiver-log check below and step 6's stop check cover this.
+  The new gateway changes only budget lanes and the exchange-client set (`upbit` added). It
+  forwards Killers' signed actions as before.
 Only a restart of `ft-killers-scalp` would resume it (a live config starts `running`), and
 nothing in this procedure restarts it: every recreate here is `--no-deps`.
 
@@ -228,15 +258,83 @@ hl() { curl -s https://api.hyperliquid.xyz/info -H 'Content-Type: application/js
 curl -s -u "$KU:$KP" $K/status | tee killers-status-before.json | jq 'length'
 hl "{\"type\":\"clearinghouseState\",\"user\":\"$KW\"}" | jq '.assetPositions' | tee hl-positions-before.json | jq 'length'
 hl "{\"type\":\"frontendOpenOrders\",\"user\":\"$KW\"}" | tee hl-orders-before.json | jq 'length'
+hl '{"type":"meta"}' > hl-meta-before.json
 sudo docker logs killers-receiver --since 10m 2>&1 | tail -20
 journalctl --user -u upbit-fade-forward --since -10min | tail -20
 curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, queued}' | tee usage-before.json
 ```
 
-- Killers is flat: all three counts are `0` (Killers `/status` is `[]`, no position and no
-  open order, stops and TPs included, on its Hyperliquid account). If anything is open, go
-  to step 7 and try again once it has closed; never close a Killers position for this
-  deploy;
+- every open Killers trade is protected, checked against the two files just written:
+
+  ```bash
+  python3 - killers-status-before.json hl-positions-before.json hl-orders-before.json hl-meta-before.json <<'PY'
+  import json, math, sys
+  from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
+  trades, positions, orders, meta = (json.load(open(p)) for p in sys.argv[1:5])
+  szd = {u["name"]: u["szDecimals"] for u in meta["universe"]}
+  mark = {p["position"]["coin"]: float(p["position"]["positionValue"]) / abs(float(p["position"]["szi"]))
+          for p in positions}
+  def coarse(x, coin, up):
+      # The coarsest price grid Freqtrade can round to near here: 5 significant figures one
+      # decade above max(stop, mark), or Hyperliquid's decimal cap, whichever is coarser.
+      e = max(math.floor(math.log10(max(x, mark.get(coin, x)))) - 3, -(6 - szd[coin]))
+      # Exact decimal of the float's shortest repr (as ccxt's decimal_to_precision reads it),
+      # rounded outward, no tolerance.
+      return float(Decimal(repr(x)).quantize(Decimal(1).scaleb(e), rounding=ROUND_CEILING if up else ROUND_FLOOR))
+  held = {p["position"]["coin"]: float(p["position"]["szi"]) for p in positions}
+  hl = {str(o["oid"]): o for o in orders}
+  known, ok = set(), len(held) == len(trades)
+  for t in trades:
+      coin, short = t["pair"].split("/")[0], t["is_short"]
+      close, exit_side = ("B", "buy") if short else ("A", "sell")
+      liq = t.get("liquidation_price")
+      stop = (min if short else max)(t["stop_loss_abs"], liq) if liq else t["stop_loss_abs"]
+      open_ = [o for o in t["orders"] if o["status"] == "open"]
+      sl = [o for o in open_ if o["ft_order_side"] == "stoploss"]
+      hs = hl.get(str(sl[0]["order_id"])) if len(sl) == 1 else None
+      trig = float(hs["triggerPx"]) if hs and hs.get("isTrigger") else None
+      good = (held.get(coin, 0) * (-1 if short else 1) > 0 and abs(abs(held[coin]) - t["amount"]) < 1e-9
+              and trig is not None and hs["coin"] == coin and hs["reduceOnly"] and hs["side"] == close
+              and float(hs["sz"]) >= t["amount"] - 1e-9
+              and (trig <= coarse(stop, coin, False) if short else trig >= coarse(stop, coin, True)))
+      for o in open_:
+          h = hl.get(str(o["order_id"]))
+          known.add(str(o["order_id"]))
+          good = good and (h is not None and h["coin"] == coin and h["reduceOnly"] and h["side"] == close
+                           and o["ft_order_side"] in ("stoploss", exit_side))
+      ok = ok and good
+      print(coin, "OK" if good else "NOT PROTECTED", t["amount"], stop, trig)
+  orphans = [o["coin"] + ":" + str(o["oid"]) for o in orders if str(o["oid"]) not in known]
+  ok = ok and not orphans
+  print("orphan orders:", orphans)
+  print("PROTECTED" if ok else "DO NOT RECREATE")
+  PY
+  ```
+
+  The last line must be `PROTECTED`. It means:
+  - each Hyperliquid position belongs to an open Killers trade of the same direction and
+    size;
+  - each trade has exactly one open stop order in Freqtrade, and that exact order (same
+    `oid`) rests on Hyperliquid as a reduce-only trigger on the closing side, covering the
+    whole position;
+  - its trigger is one Freqtrade keeps. Freqtrade replaces a stop (cancel, then create)
+    when its stop, `stoploss_or_liquidation` rounded to the market's price precision, is
+    more protective than the resting trigger (`Exchange.stoploss_adjust`).
+  - Rounding direction: up for a long, down for a short.
+  - The precision comes from the mark price: 5 significant figures, capped at
+    `6 - szDecimals` decimals. It changes when the mark crosses a power of ten and the
+    markets reload.
+  - So the check rounds the stop on the coarsest grid that can apply. That grid is one
+    decade above `max(stop, mark)`, or the decimal cap if coarser. Because the grids nest,
+    `trigger >= that` for a long (`<=` for a short) keeps `stoploss_adjust` false on every
+    finer grid too. It assumes the mark does not move more than tenfold in the window;
+  - every open order of the trade rests on Hyperliquid as a reduce-only exit, and every
+    Hyperliquid order belongs to a trade (no orphan entries or stray orders).
+
+  `DO NOT RECREATE` covers these cases: a stop missing or not matching, a stop change
+  pending, a position or order without a trade, or an open entry. In any of them, go to
+  step 7 and try again later. Never close a Killers position for this deploy. If Killers is
+  flat, the three counts are `0` and the check prints `PROTECTED`;
 - the receiver log shows no signal being handled and the paper monitor's log no event;
   avoid the US open (13:30 UTC) and news;
 - `weight_last_minute` is under 300. If not, wait (it is a rolling minute; entries stay
@@ -265,9 +363,17 @@ hl "{\"type\":\"frontendOpenOrders\",\"user\":\"$KW\"}" | jq 'length'
 
 - `healthz` lists `upbit` and `slice_weight_last_minute`, and `clients.killers` counts `ok`
   reads with no `queue_timeout` or `rate_limited`;
-- Killers `/status` answers (still `[]`), `state` is `paused`, and its log has no new
-  errors; the gateway log shows no errors or 429s;
-- Killers still has no position and no open order on Hyperliquid.
+- Killers `/status` answers, and `state` is `paused`. Its log may show "Unable to exit
+  trade" or "Cannot query order" from the gap itself, but nothing after the gateway is up,
+  and no "Unable to place a stoploss order" or "Exiting the trade forcefully". The gateway
+  log shows no errors or 429s;
+- step 4's check prints `PROTECTED` again on fresh `/status`, `clearinghouseState` and
+  `frontendOpenOrders` files. A position may have shrunk or closed in the meantime through
+  its own resting TP or stop. That is not a deploy failure: confirm the fill in the
+  account's Hyperliquid trade history and that Freqtrade booked it, then check the rest.
+  A missing stop is a failure. Keep entries paused and wait one loop, because Freqtrade
+  places a missing stop on its next iteration. If it is still missing, place it before
+  anything else and record it on #252.
 
 If the verification fails, keep Killers paused and roll back (below).
 
@@ -290,7 +396,7 @@ before stays paused, and so does one whose circuit breaker has triggered since (
 `docs/ops/UPDATING-WITHOUT-BREAKING-BOTS.md`.
 
 **Rollback to the old image** follows the same procedure, steps 2 to 7 (entries paused,
-in-flight drained, Killers flat, usage under 300, verify, 60 s, restore), with step 5's
+in-flight drained, open trades `PROTECTED`, usage under 300, verify, 60 s, restore), with step 5's
 command replaced. In step 2 of a rollback, keep the original snapshot: write the current
 state to `killers-state-rollback.txt` instead (`... | jq -r .state | tee killers-state-rollback.txt`)
 and do **not** overwrite `killers-state-before.txt`, because it would now record `paused`.
@@ -363,7 +469,7 @@ an execution defect that pauses the pilot. Freqtrade prepares margin mode and
 leverage, with retries, after the admission check, so submission itself is not bounded.
 
 1. Pause the trigger while you check: `touch /home/ubuntu/master-trader/research/upbit_fade_live/data/KILL`.
-2. Gateway: follow **Gateway deploy (go-live only, Killers held flat)** above, which adds
+2. Gateway: follow **Gateway deploy (go-live only, Killers entries held, open positions protected)** above, which adds
    the `upbit` client. Do not go on until its verification passes and step 7 is done.
 3. Set the two flags in `ft_userdata/.env` on the VPS, from this Mac (one locked, atomic
    edit with a backup; neither value is a secret):
