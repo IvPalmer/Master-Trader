@@ -284,9 +284,12 @@ a second and only around events.
 
 **Gateway restarts.** The gateway keeps no budget state: a recreated gateway starts with
 an empty rolling minute while Hyperliquid keeps counting the last one. The `upbit` client
-is added by one recreate at go-live, done only when Killers is flat (no open positions and
-no open orders on Hyperliquid, the same rule as the #188 flat restart) and the
-trailing-minute usage on `/healthz`, read just before, is under 300; Killers `/status` and
+is added by one recreate at go-live. The recreate is done only with Killers entries paused
+and drained, every open Killers trade protected (its Freqtrade stop resting reduce-only on
+Hyperliquid at `stop_loss_abs`, no stop change pending, only exit orders besides it), and
+the trailing-minute usage on `/healthz`, read just before, under 300. This replaced
+"Killers flat" on 2026-11-06, after reading the pinned Freqtrade and ccxt error paths
+(GO-LIVE.md). Killers `/status` and
 the gateway logs are checked after, and the previous image is kept for rollback
 (GO-LIVE.md).
 
