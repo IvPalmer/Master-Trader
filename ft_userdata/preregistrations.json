@@ -1633,7 +1633,17 @@
         "No sizing, leverage, cap or rule change without an amendment. NO EDGE in upbit-krw-fade-forward-2026-11 stops the pilot."
       ],
       "triggers": [],
-      "amendments": [],
+      "amendments": [
+        {
+          "id": "A1-account",
+          "date": "2026-11-06",
+          "by": "operator (Palmer); recorded by Claude",
+          "issue": "#252",
+          "reason": "Operator's choice in chat, 2026-11-06 ('vamos usar a do insiders sim'): use the retired Insiders master account rather than open a new one. On 2026-11-06 it was flat (no positions, no open orders, 50.0 USDC in perps) and no container used it (ft-insiders-scalp left the stack in #216). It is not the Killers or ShortKeltner account, and not a subaccount.",
+          "changes": "None to the frozen terms. The account still meets frozen.account: a dedicated master account with its own API wallet (no withdrawal rights), topped up to about 150 USDC, traded by no other bot from now on. The 50.0 USDC already there (the Insiders cash reserve kept by the 2026-10-02 correction) becomes part of the pilot's funding. The operator either reuses the existing Insiders API wallet or creates a new one, and removes the HYPERLIQUID_INSIDERS_* lines from the stack env so only this bot holds the account's key. The address is not recorded in this public repository.",
+          "rule_note": "Measurement is unchanged: the live epoch starts at the first live start of ft-upbit-fade-hl, and pilot P&L and the -75 USDC kill rule come from the bot's own trade database. Insiders history on this account is outside the epoch."
+        }
+      ],
       "resolution": null
     },
     {
