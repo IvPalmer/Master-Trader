@@ -650,7 +650,8 @@ def scrape_all() -> tuple[float | None, float | None]:
     live_pnl = 0.0
     reachable = 0
     live_seen = set()
-    live_services = {b["service"] for b in _live_bots}
+    # Out-of-scope bots (#261) feed neither the breaker's P&L nor its completeness.
+    live_services = {b["service"] for b in _live_bots if not outside_breaker(b)}
     for bot in BOTS:
         try:
             pnl = scrape_bot(bot)

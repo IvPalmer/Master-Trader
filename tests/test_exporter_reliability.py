@@ -1436,3 +1436,30 @@ def test_exporter_receives_every_hyperliquid_wallet_it_reads(exporter):
     for bot in exporter.BOTS:
         if bot.get("venue") == "hyperliquid" and bot.get("wallet_env"):
             assert bot["wallet_env"] in env, f"{bot['strategy']}: exporter cannot read {bot['wallet_env']}"
+
+
+def test_pilot_pnl_never_reaches_the_breaker_pnl_or_its_completeness(exporter, monkeypatch):
+    pilot = _registry_bot(exporter, "UpbitFadeLiveV1")
+    exporter.BOTS = [FUNDING, KILLERS, pilot]
+    exporter._live_bots = [FUNDING, KILLERS, pilot]
+    pnl = {"FundingFadeV1": 3.0, "KillersScalpV1": -1.0, "UpbitFadeLiveV1": -50.0}
+    monkeypatch.setattr(exporter, "scrape_bot", lambda bot: pnl[bot["strategy"]])
+    assert exporter.scrape_all() == (pytest.approx(-48.0), pytest.approx(2.0))
+    pnl["UpbitFadeLiveV1"] = None
+    assert exporter.scrape_all()[1] == pytest.approx(2.0), "an unreachable pilot does not blank breaker P&L"
+
+
+def test_legacy_migration_ignores_pilot_losses(exporter, monkeypatch):
+    """Codex #261 R1 repro: fleet at its $400 peak, pilot down $50, still on the legacy basis."""
+    pilot = _registry_bot(exporter, "UpbitFadeLiveV1")
+    exporter.BOTS = [FUNDING, KILLERS, pilot]
+    exporter._live_bots = [FUNDING, KILLERS, pilot]
+    exporter._live_initial_capital = exporter._peak_basis = exporter._portfolio_peak = 400.0
+    exporter._equity_basis = "legacy"
+    monkeypatch.setattr(exporter, "scrape_bot", lambda bot: -50.0 if bot is pilot else 0.0)
+    monkeypatch.setattr(exporter, "_save_peak_state", lambda: None)
+    _, live_pnl = exporter.scrape_all()
+    exporter.check_circuit_breaker(live_pnl, {"binance-spot": {"equity": 300.0, "transfers": 0.0},
+                                              "hyperliquid-killers": {"equity": 100.0, "transfers": 0.0}})
+    assert exporter._portfolio_peak == pytest.approx(400.0)
+    assert exporter._circuit_breaker_triggered is False
