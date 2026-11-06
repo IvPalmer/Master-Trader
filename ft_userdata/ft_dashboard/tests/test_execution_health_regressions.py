@@ -172,3 +172,19 @@ def test_fully_observed_fleet_with_no_live_accounts_stays_green(monkeypatch, tmp
     monkeypatch.setattr(app, 'BOTS', [])
     assert app._account_health()['warnings'] == []
     assert app._fleet_status()['level'] == 'green'
+
+
+def test_wallet_total_leaves_out_accounts_outside_the_fleet_breaker(monkeypatch, tmp_path):
+    """#261: the Upbit pilot is valued by the exporter but is not in this dashboard's fleet."""
+    import json
+    path = tmp_path / 'health.json'
+    path.write_text(json.dumps({'observed_at': time.time(), 'complete': True, 'equity': 508.27,
+       'accounts': {'binance-spot': {'equity': 300.0}, 'hyperliquid-killers': {'equity': 100.0},
+                    'hyperliquid-upbit-fade': {'equity': 108.27}},
+       'outside_breaker_accounts': {'hyperliquid-upbit-fade': ['UpbitFadeLiveV1']}, 'errors': [],
+       'gateway': {'observed_at': time.time(), 'status': 'ok', 'faults': 0}}))
+    monkeypatch.setenv('ACCOUNT_HEALTH_FILE', str(path))
+    state = app._account_health()
+    assert state['equity'] == 400.0
+    assert state['accounts']['hyperliquid-upbit-fade']['equity'] == 108.27
+    assert state['warnings'] == []
