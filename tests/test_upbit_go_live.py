@@ -121,7 +121,7 @@ FAKE_DATE = r"""#!/bin/sh
 f="$FAKE_CLOCK"
 case "$*" in
   *+%s*) n=$(cat "$f"); echo $((n + 20)) > "$f"; echo "$n" ;;
-  *+%H%M*) echo 1000 ;;
+  *+%H%M*) echo "${FAKE_HHMM:-1000}" ;;
   *) /bin/date "$@" ;;
 esac
 """
@@ -170,8 +170,12 @@ def vps(tmp_path):
     clock = tmp_path / "clock"
     clock.write_text("1800000000")
     kill = home / "master-trader/research/upbit_fade_live/data/KILL"
+    owner = home / "backups/go-live.owner"
+    owner.parent.mkdir()
 
-    def run(phase="gateway", **overrides):
+    def run(phase="gateway", owned_by="T", hhmm="1000", **overrides):
+        if owned_by is not None:
+            owner.write_text(owned_by + "\n")
         st = {"killers": "running", "posts": [], "docker": [], "weight": 100,
               "gateway_new": False, "new_has_upbit": True, "new_status": "ok",
               "trades": [], "positions": [], "orders": [], "logs": {}, "logs_fail": [],
@@ -180,13 +184,14 @@ def vps(tmp_path):
         state.write_text(json.dumps(st))
         env = {**os.environ, "PATH": f"{bin_}:{os.environ['PATH']}", "HOME": str(home),
                "FAKE_STATE": str(state), "FAKE_CLOCK": str(clock),
-               "UPBIT_GO_LIVE_CODE": str(tmp_path / "code")}
+               "UPBIT_GO_LIVE_CODE": str(tmp_path / "code"), "FAKE_HHMM": hhmm}
         done = subprocess.run(["bash", str(REMOTE), phase, "T"], env=env, text=True,
                               capture_output=True, timeout=60)
         rc = int((home / f"backups/go-live-T/{phase}.rc").read_text().strip())
         return done, rc, json.loads(state.read_text())
 
     run.kill = kill
+    run.owner = owner
     return run
 
 
@@ -201,6 +206,7 @@ def test_gateway_phase_deploys_and_restores_entries(vps):
     assert st["posts"] == ["stopentry", "start"]
     assert st["killers"] == "running"
     assert vps.kill.exists(), "the trigger stays paused until the bot phase is done"
+    assert vps.owner.read_text().strip() == "T", "the run keeps its claim until resume"
 
 
 def test_open_protected_trade_is_checked_before_and_after(vps):
@@ -217,6 +223,7 @@ def test_open_protected_trade_is_checked_before_and_after(vps):
     ("position without a trade", {"positions": [POSITION], "orders": [STOP]}),
     ("receiver handling a signal", {"logs": {"killers-receiver": 'INFO: x - "POST /event HTTP/1.1" 200 OK'}}),
     ("receiver log unreadable", {"logs_fail": ["killers-receiver"]}),
+    ("the US open began during the checks", {"hhmm": "1320"}),
 ])
 def test_stop_before_the_recreate_restores_killers_entries(vps, why, overrides):
     done, rc, st = vps(**overrides)
@@ -226,6 +233,7 @@ def test_stop_before_the_recreate_restores_killers_entries(vps, why, overrides):
     assert st["killers"] == "running", why
     assert vps.kill.exists()
     assert "Stopped BEFORE the recreate" in done.stdout
+    assert not vps.owner.exists(), "a clean stop releases the run's claim"
 
 
 @pytest.mark.parametrize("why, overrides", [
@@ -242,6 +250,7 @@ def test_stop_after_the_recreate_keeps_killers_paused(vps, why, overrides):
     assert st["killers"] == "paused"
     assert vps.kill.exists()
     assert "Killers entries stay PAUSED" in done.stdout
+    assert vps.owner.exists(), "no new run until someone has looked"
 
 
 def test_breaker_triggered_since_the_pause_keeps_killers_paused(vps):
@@ -277,3 +286,29 @@ def test_resume_arms_the_trigger(vps):
     done, rc, st = vps("resume")
     assert rc == 0, done.stdout
     assert not vps.kill.exists()
+
+
+def test_a_phase_of_another_run_touches_nothing(vps):
+    """Codex R2: run B must not act inside run A's go-live, nor A resume after B intervened."""
+    for phase in ("gateway", "bot", "resume"):
+        done, rc, st = vps(phase, owned_by="OTHER")
+        assert rc == 1, phase
+        assert st["posts"] == [] and st["docker"] == [], phase
+        assert "does not own the go-live" in done.stdout
+
+
+def test_pause_claims_the_run_once(vps):
+    done, rc, st = vps("pause", owned_by=None)
+    assert rc == 0 and vps.kill.exists()
+    assert vps.owner.read_text().strip() == "T"
+    vps.kill.unlink()
+    vps.owner.write_text("OTHER\n")
+    done, rc, st = vps("pause", owned_by=None)
+    assert rc == 1 and not vps.kill.exists()
+    assert "holds" in done.stdout
+
+
+def test_complete_resume_releases_the_claim(vps):
+    vps.kill.touch()
+    done, rc, st = vps("resume")
+    assert rc == 0 and not vps.owner.exists()

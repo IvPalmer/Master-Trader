@@ -71,7 +71,7 @@ echo; echo "== Live flags in the VPS .env"
 python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import hl_agent as h; h.apply_env(h.env_pairs(sys.argv[2:]))' \
   "$HERE/../../scripts/hyperliquid" HL_UPBIT_GATEWAY_CLIENT=upbit HYPERLIQUID_UPBIT_FADE_DRY_RUN=false ||
   die "The .env edit did not confirm (see above). The bot was not recreated; the trigger stays paused.
-Run this script again."
+Check the VPS .env, then remove ~/backups/go-live.owner on the VPS and run this script again."
 
 echo; echo "== Bot live"
 phase bot || die "Stopped at the bot step; the trigger stays paused, so the pilot enters nothing.

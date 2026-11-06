@@ -27,6 +27,10 @@ cd "$B"
 # One go-live phase at a time on this VPS. The detached process holds the lock, so it
 # survives a dropped ssh session and a re-run cannot overlap it.
 exec 9>"$HOME/backups/go-live.lock"
+# One go-live run at a time: `pause` claims this file for run $T; every later phase needs
+# that claim, and only a complete run (or a clean stop before the gateway recreate)
+# releases it. Any other stop keeps it, so no new run starts until someone has looked.
+OWNER=$HOME/backups/go-live.owner
 
 say() { printf '%s\n' "$*"; }
 ok() { say "  ok    $*"; }
@@ -121,6 +125,17 @@ receiver_quiet() {
   [ -z "$(grep -v '"GET ' <<<"$log")" ]
 }
 
+outside_us_open() {
+  local h
+  h=$((10#$(date -u +%H%M)))
+  [ "$h" -lt 1315 ] || [ "$h" -gt 1350 ]
+}
+claim() { flock -n 9 || fail "another go-live phase is running on the VPS"; }
+owned() {
+  claim
+  [ "$(cat "$OWNER" 2>/dev/null)" = "$T" ] || fail "this run ($T) does not own the go-live; another run started since"
+}
+
 restore_killers() {  # GO-LIVE step 7; a bot paused before, or a triggered breaker, stays paused
   local b s
   STAGE=restoring
@@ -138,7 +153,12 @@ on_exit() {
     case $STAGE in
       paused)
         say "Stopped BEFORE the recreate: restoring Killers entries (GO-LIVE step 7)."
-        restore_killers || say "  Killers did not return to its previous state: check it by hand." ;;
+        if restore_killers; then
+          rm -f "$OWNER"
+          say "Nothing else changed; the pilot is still dry-run. Run go-live.sh again later."
+        else
+          say "  Killers did not return to its previous state: check it by hand."
+        fi ;;
       recreating)
         say "Stopped AFTER the recreate started: Killers entries stay PAUSED."
         say "Check the gateway and Killers. If they are fine, restore entries as in GO-LIVE step 7;"
@@ -154,6 +174,9 @@ on_exit() {
   if [ "$rc" -ne 0 ] && [ -e "$LIVE/data/KILL" ]; then
     say "The pilot trigger stays paused (KILL file), so the pilot enters nothing."
   fi
+  if [ "$rc" -ne 0 ] && [ "$PHASE" != preflight ] && [ "$(cat "$OWNER" 2>/dev/null)" = "$T" ]; then
+    say "go-live.sh stays blocked until this is resolved; then remove $OWNER."
+  fi
   echo "$rc" > "$B/$PHASE.rc"
 }
 trap on_exit EXIT
@@ -161,12 +184,12 @@ trap on_exit EXIT
 trap 'say "  FAIL  line $LINENO: $BASH_COMMAND"' ERR
 
 preflight() {
-  local h st v n cfg dry ks gh
+  local st v n cfg dry ks gh
   say "Read-only checks; nothing changes."
   flock -n 9 || fail "another go-live phase is running on the VPS (see ~/backups/go-live-*)"
   flock -u 9
-  h=$((10#$(date -u +%H%M)))
-  [ "$h" -lt 1315 ] || [ "$h" -gt 1350 ] || fail "13:15-13:50 UTC is the US open: run it later"
+  [ ! -e "$OWNER" ] || fail "go-live run $(cat "$OWNER") did not finish: read ~/backups/go-live-$(cat "$OWNER")/, resolve it, then remove $OWNER"
+  outside_us_open || fail "13:15-13:50 UTC is the US open: run it later"
   grep -q "^CLIENTS = {.*'upbit'" "$CODE/services/hl-gateway/app/main.py" ||
     fail "the VPS checkout's gateway source has no upbit client"
   ok "VPS checkout: $(git -C "$CODE" log --oneline -1)"
@@ -227,7 +250,7 @@ preflight() {
 
 gateway() {
   local img i r q w gh log
-  flock -n 9 || fail "another go-live phase is running on the VPS"
+  owned
   touch "$LIVE/data/KILL"
   ok "pilot trigger paused (KILL file)"
   say "1. Build the new gateway image; the running gateway is not affected"
@@ -271,6 +294,7 @@ gateway() {
       gh=$(curl -sf -m 10 "$GW/healthz") || fail "hl-gateway healthz unreachable"
       echo "$gh" | jq '{observed_at, weight_last_minute, queued}' > usage-before.json
       w=$(jq .weight_last_minute <<<"$gh")
+      outside_us_open || fail "the US open (13:15-13:50 UTC) began during the checks"
       if [ "$w" -lt 300 ] && monitor_quiet && receiver_quiet; then
         ok "Killers trades PROTECTED; gateway weight $w/min (< 300); paper monitor and receiver quiet"
         break
@@ -333,7 +357,7 @@ gateway() {
 
 bot() {
   local i cfg bal started commit log rs
-  flock -n 9 || fail "another go-live phase is running on the VPS"
+  owned
   [ "$(envcount HL_UPBIT_GATEWAY_CLIENT)" = 1 ] && [ "$(envval HL_UPBIT_GATEWAY_CLIENT)" = upbit ] ||
     fail "the VPS .env does not hold HL_UPBIT_GATEWAY_CLIENT=upbit exactly once"
   [ "$(envcount HYPERLIQUID_UPBIT_FADE_DRY_RUN)" = 1 ] && [ "$(envval HYPERLIQUID_UPBIT_FADE_DRY_RUN)" = false ] ||
@@ -377,8 +401,9 @@ bot() {
   printf 'EPOCH_START=%s\nDEPLOYED_COMMIT=%s\n' "$started" "$commit" | tee epoch.txt
 
   say "Exporter: restart so it reads the new live membership now (it values the pilot outside the breaker)"
-  rs=$(date +%s)
   sudo -n docker restart ft-metrics-exporter >/dev/null
+  # Only an observation the restarted process wrote counts.
+  rs=$(date -d "$(sudo -n docker inspect -f '{{.State.StartedAt}}' ft-metrics-exporter)" +%s.%N)
   for i in $(seq 1 24); do
     sleep 10
     if sudo -n docker exec ft-metrics-exporter cat /state/account_health.json 2>/dev/null |
@@ -394,19 +419,22 @@ bot() {
 }
 
 pause() {
-  flock -n 9 || fail "another go-live phase is running on the VPS"
+  claim
+  (set -o noclobber; echo "$T" > "$OWNER") 2>/dev/null ||
+    fail "go-live run $(cat "$OWNER") holds $OWNER; resolve it first"
   touch "$LIVE/data/KILL"
   ok "pilot trigger paused (KILL file)"
 }
 
 resume() {
-  flock -n 9 || fail "another go-live phase is running on the VPS"
+  owned
   rm -f "$LIVE/data/KILL"
   sleep 20
   [ ! -e "$LIVE/data/KILL" ] || fail "KILL is back: the trigger re-engaged its own switch (see $LIVE/data/trigger.log)"
   systemctl --user is-active -q upbit-fade-live-trigger || fail "upbit-fade-live-trigger is not active"
   tail -3 "$LIVE/data/trigger.log"
-  ok "pilot trigger armed"
+  rm -f "$OWNER"
+  ok "pilot trigger armed; go-live complete"
 }
 
 case $PHASE in
