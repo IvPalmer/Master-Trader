@@ -269,6 +269,7 @@ curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, qu
   ```bash
   python3 - killers-status-before.json hl-positions-before.json hl-orders-before.json hl-meta-before.json <<'PY'
   import json, math, sys
+  from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
   trades, positions, orders, meta = (json.load(open(p)) for p in sys.argv[1:5])
   szd = {u["name"]: u["szDecimals"] for u in meta["universe"]}
   mark = {p["position"]["coin"]: float(p["position"]["positionValue"]) / abs(float(p["position"]["szi"]))
@@ -276,8 +277,10 @@ curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, qu
   def coarse(x, coin, up):
       # The coarsest price grid Freqtrade can round to near here: 5 significant figures one
       # decade above max(stop, mark), or Hyperliquid's decimal cap, whichever is coarser.
-      tick = max(10.0 ** (math.floor(math.log10(max(x, mark.get(coin, x)))) - 3), 10.0 ** -(6 - szd[coin]))
-      return (math.ceil(x / tick - 1e-9) if up else math.floor(x / tick + 1e-9)) * tick
+      e = max(math.floor(math.log10(max(x, mark.get(coin, x)))) - 3, -(6 - szd[coin]))
+      # Exact decimal of the float's shortest repr (as ccxt's decimal_to_precision reads it),
+      # rounded outward, no tolerance.
+      return float(Decimal(repr(x)).quantize(Decimal(1).scaleb(e), rounding=ROUND_CEILING if up else ROUND_FLOOR))
   held = {p["position"]["coin"]: float(p["position"]["szi"]) for p in positions}
   hl = {str(o["oid"]): o for o in orders}
   known, ok = set(), len(held) == len(trades)
@@ -293,7 +296,7 @@ curl -s http://127.0.0.1:8104/healthz | jq '{observed_at, weight_last_minute, qu
       good = (held.get(coin, 0) * (-1 if short else 1) > 0 and abs(abs(held[coin]) - t["amount"]) < 1e-9
               and trig is not None and hs["coin"] == coin and hs["reduceOnly"] and hs["side"] == close
               and float(hs["sz"]) >= t["amount"] - 1e-9
-              and (trig <= coarse(stop, coin, False) + 1e-12 if short else trig >= coarse(stop, coin, True) - 1e-12))
+              and (trig <= coarse(stop, coin, False) if short else trig >= coarse(stop, coin, True)))
       for o in open_:
           h = hl.get(str(o["order_id"]))
           known.add(str(o["order_id"]))
