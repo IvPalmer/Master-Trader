@@ -326,22 +326,25 @@ The agent never creates, sees or handles these values.
    to the Insiders address (the one `status` prints; it lands in spot), then
    `scripts/hyperliquid/hl-funds.sh to-perps insiders`. The circuit breaker does not watch
    this account, so the exporter does not need to stop for this transfer.
-3. API (agent) wallet: an API wallet can trade but cannot withdraw. Two options.
-   - **Reuse the Insiders one.** It is still in `ft_userdata/.env` on the VPS as
-     `HYPERLIQUID_INSIDERS_PRIVATE_KEY`, used by no container. Check in the Hyperliquid
-     app's API page that it is still valid, and set a reminder before it expires.
-   - **Or create a new one** for the account and revoke the old Insiders one on the same
-     page.
-4. In the Dokploy stack `.env` (the compose's Environment tab, written to
-   `ft_userdata/.env`), set:
+3. API (agent) wallet and env, one command on this Mac (an API wallet trades but cannot
+   withdraw). The old Insiders one (`insiders-live`) expires 2026-11-21, so the pilot gets a
+   new one:
 
-   ```
-   HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS=<the Insiders master account address>
-   HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY=<the API wallet's private key>
+   ```bash
+   scripts/hyperliquid/hl-agent.sh approve insiders upbit-fade-live HYPERLIQUID_UPBIT_FADE --drop HYPERLIQUID_INSIDERS
    ```
 
-   Then delete the three `HYPERLIQUID_INSIDERS_*` lines, so only one bot ever holds this
-   account's key. Never put these values in the repo, an issue, a chat or a log.
+   It shows the account's API wallets and asks for a literal `YES`. Then it generates the new
+   key, backs up `ft_userdata/.env` on the VPS and writes `HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS`
+   and `HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY` into it over ssh stdin (the key is never printed
+   or saved on the Mac), and removes the `HYPERLIQUID_INSIDERS_*` lines. Last, it approves the
+   wallet with the Insiders master key from the Keychain, valid for 180 days. Set a reminder
+   before it expires; `scripts/hyperliquid/hl-agent.sh status` lists every account's API
+   wallets with days left. The old `insiders-live` wallet lapses on its own on 2026-11-21.
+4. The stack's Hyperliquid variables live only in `ft_userdata/.env` on the VPS (root, mode
+   600). The env stored in Dokploy holds none of them, so the Dokploy Environment tab is not
+   where to set them. Never put these values in the repo, an issue, a chat or a log. Running
+   containers keep their old env until Part 3 recreates `ft-upbit-fade-hl`.
 
 ## Part 3: go live
 
@@ -356,8 +359,11 @@ leverage, with retries, after the admission check, so submission itself is not b
 1. Pause the trigger while you check: `touch /home/ubuntu/master-trader/research/upbit_fade_live/data/KILL`.
 2. Gateway: follow **Gateway deploy (go-live only, Killers held flat)** above, which adds
    the `upbit` client. Do not go on until its verification passes and step 7 is done.
-3. In the stack `.env`, set `HL_UPBIT_GATEWAY_CLIENT=upbit` and
-   `HYPERLIQUID_UPBIT_FADE_DRY_RUN=false`, with the keys from Part 2.
+3. In `ft_userdata/.env` on the VPS (where Part 2 wrote the keys), set
+   `HL_UPBIT_GATEWAY_CLIENT=upbit` and `HYPERLIQUID_UPBIT_FADE_DRY_RUN=false`. Neither is a
+   secret: `F=/etc/dokploy/compose/compose-bypass-mobile-port-fbk1m6/code/ft_userdata/.env;
+   sudo cp -p $F $F.bak-$(date -u +%Y%m%dT%H%M%SZ); sudo sed -i -E '/^(HL_UPBIT_GATEWAY_CLIENT|HYPERLIQUID_UPBIT_FADE_DRY_RUN)=/d' $F;
+   printf 'HL_UPBIT_GATEWAY_CLIENT=upbit\nHYPERLIQUID_UPBIT_FADE_DRY_RUN=false\n' | sudo tee -a $F >/dev/null`.
 4. The one command:
 
    ```bash
