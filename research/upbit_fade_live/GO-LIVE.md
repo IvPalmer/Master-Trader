@@ -313,21 +313,35 @@ In step 6 of a rollback, `healthz` has no `upbit` and no `slice_weight_last_minu
 
 The agent never creates, sees or handles these values.
 
-1. Create a **new, dedicated** Hyperliquid master account (a new wallet address, not the
-   Killers or ShortKeltner account; Hyperliquid nets positions per account). Not a
-   subaccount: see the spec addendum.
-2. Deposit about **150 USDC** and make sure it sits in the perps balance.
-3. In the Hyperliquid app's API page, create an **API (agent) wallet** for that account. An
-   API wallet can trade but cannot withdraw. Note its validity period and set a reminder
-   before it expires.
-4. In the Dokploy stack `.env` (the compose's Environment tab), set:
+1. **Account: the retired Insiders master account** (operator's choice, 2026-11-06; prereg
+   amendment `A1-account`). Keychain service `master-trader.hyperliquid.insiders.master`,
+   label `insiders` in `scripts/hyperliquid/hl-funds.sh`. Not the Killers or ShortKeltner
+   account: Hyperliquid nets positions per coin within an account and sets leverage and
+   margin mode per coin per account. Not a subaccount (see the spec addendum). On
+   2026-11-06 it was flat, with no open orders and 50.0 USDC in perps, and no container used
+   it (`ft-insiders-scalp` left the stack in #216). Re-check right before go-live:
+   `scripts/hyperliquid/hl-funds.sh status` must show `positions: 0` on `insiders`, and
+   the Hyperliquid app must show no open orders (the script does not count orders).
+2. Top it up to about **150 USDC** in perps: from the email account, Send about 100 USDC
+   to the Insiders address (the one `status` prints; it lands in spot), then
+   `scripts/hyperliquid/hl-funds.sh to-perps insiders`. The circuit breaker does not watch
+   this account, so the exporter does not need to stop for this transfer.
+3. API (agent) wallet: an API wallet can trade but cannot withdraw. Two options.
+   - **Reuse the Insiders one.** It is still in `ft_userdata/.env` on the VPS as
+     `HYPERLIQUID_INSIDERS_PRIVATE_KEY`, used by no container. Check in the Hyperliquid
+     app's API page that it is still valid, and set a reminder before it expires.
+   - **Or create a new one** for the account and revoke the old Insiders one on the same
+     page.
+4. In the Dokploy stack `.env` (the compose's Environment tab, written to
+   `ft_userdata/.env`), set:
 
    ```
-   HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS=<the master account address>
+   HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS=<the Insiders master account address>
    HYPERLIQUID_UPBIT_FADE_PRIVATE_KEY=<the API wallet's private key>
    ```
 
-   Never put them in the repo, an issue, a chat or a log.
+   Then delete the three `HYPERLIQUID_INSIDERS_*` lines, so only one bot ever holds this
+   account's key. Never put these values in the repo, an issue, a chat or a log.
 
 ## Part 3: go live
 
@@ -358,7 +372,7 @@ leverage, with retries, after the admission check, so submission itself is not b
    - `show_config`: `dry_run: false`, `state: running`, `stoploss_on_exchange: true`;
    - `printenv FREQTRADE__EXCHANGE__CCXT_CONFIG__urls__api__private` in the container:
      `http://hl-gateway:8080/upbit`;
-   - `/api/v1/balance`: about 150 USDC on the new account;
+   - `/api/v1/balance`: about 150 USDC on the Insiders account;
    - `/api/v1/profit`: `profit_closed_coin` 0 (the live database is new);
    - `sudo docker logs ft-upbit-fade-hl --tail 50`: no auth or market errors.
 6. Record the epoch: a PR adding an amendment to `upbit-krw-fade-live-pilot-2026-11` with
