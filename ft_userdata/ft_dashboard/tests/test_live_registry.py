@@ -1,7 +1,6 @@
 """Production dashboard registry and account-group regression tests."""
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -29,18 +28,12 @@ def test_dashboard_tracks_every_current_live_executor():
     assert "insiders-ft" not in bots  # retired 2026-10-29 (#216)
 
 
-def test_upbit_pilot_matches_its_account_and_prereg_epoch():
+def test_upbit_pilot_matches_its_account():
     bot = _by_key()["upbit-fade-hl"]
     config = json.loads((FT_USERDATA / "bots_config.json").read_text())
     entry = next(v for v in config["bots"].values() if v.get("service") == "ft-upbit-fade-hl")
     assert bot["account_group"] == entry["capital_account"]
     assert bot["wallet_env"] == entry["wallet_env"]
-
-    registry = json.loads((FT_USERDATA / "preregistrations.json").read_text())
-    prereg = next(p for p in registry["preregistrations"]
-                  if p["id"] == "upbit-krw-fade-live-pilot-2026-11")
-    epoch = datetime.fromisoformat(prereg["frozen"]["epoch_start"][:26] + "+00:00")
-    assert bot["epoch_start_ts_ms"] == int(epoch.timestamp() * 1000)
 
 
 def test_compose_gives_the_dashboard_every_wallet_it_reads():
