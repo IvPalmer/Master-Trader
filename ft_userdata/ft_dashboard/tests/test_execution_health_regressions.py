@@ -174,8 +174,8 @@ def test_fully_observed_fleet_with_no_live_accounts_stays_green(monkeypatch, tmp
     assert app._fleet_status()['level'] == 'green'
 
 
-def test_wallet_total_leaves_out_accounts_outside_the_fleet_breaker(monkeypatch, tmp_path):
-    """#261: the Upbit pilot is valued by the exporter but is not in this dashboard's fleet."""
+def test_wallet_total_counts_accounts_outside_the_fleet_breaker(monkeypatch, tmp_path):
+    """#272: the Upbit pilot is outside the exporter's breaker but is part of the dashboard's fleet."""
     import json
     path = tmp_path / 'health.json'
     path.write_text(json.dumps({'observed_at': time.time(), 'complete': True, 'equity': 508.27,
@@ -185,6 +185,6 @@ def test_wallet_total_leaves_out_accounts_outside_the_fleet_breaker(monkeypatch,
        'gateway': {'observed_at': time.time(), 'status': 'ok', 'faults': 0}}))
     monkeypatch.setenv('ACCOUNT_HEALTH_FILE', str(path))
     state = app._account_health()
-    assert state['equity'] == 400.0
+    assert state['equity'] == 508.27
     assert state['accounts']['hyperliquid-upbit-fade']['equity'] == 108.27
     assert state['warnings'] == []
