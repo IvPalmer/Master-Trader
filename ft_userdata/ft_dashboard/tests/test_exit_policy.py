@@ -83,7 +83,8 @@ def test_declared_rules_are_reachable_exit_reasons(bot_key):
         assert rule["reason"] in reasons
     # custom_exit and dataframe exit signals only run when use_exit_signal is
     # set; a receiver-driven bot must not hide its own time or signal exits.
-    assert _class_attr(strategy, "use_exit_signal") is (not declared.get("receiver_driven", False))
+    expected = declared.get("exit_signals", not declared.get("receiver_driven", False))
+    assert _class_attr(strategy, "use_exit_signal") is expected
 
 
 def test_policy_normalizes_reported_roi_and_trailing():
