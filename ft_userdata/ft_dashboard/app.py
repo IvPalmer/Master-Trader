@@ -201,6 +201,29 @@ BOTS: list[dict[str, Any]] = [
         "no_baseline": True,
         "baseline": None,
     },
+    {
+        "key": "upbit-fade-hl",
+        "name": "UpbitFadeLiveV1",
+        "label": "upbit-fade-hl",
+        "url": "http://ft-upbit-fade-hl:8080",
+        "container": "ft-upbit-fade-hl",
+        "freqtrade_ui": None,
+        "account_group": "hyperliquid-upbit-fade",
+        # Exchange ledger 2026-11-09: 108.27 USDC funded before the live epoch,
+        # no fills since. Fixed basis, as for Killers.
+        "performance_starting_capital": 108.27,
+        "strategy_kind": "autonomous-quant",
+        "venue": "hyperliquid",
+        "wallet_env": "HYPERLIQUID_UPBIT_FADE_WALLET_ADDRESS",
+        # frozen.epoch_start of prereg upbit-krw-fade-live-pilot-2026-11
+        "epoch_start_ts_ms": 1794006405445,
+        "epoch_label": "live pilot · dedicated account",
+        "strategy_version": "UpbitFadeLiveV1 · live pilot",
+        "entry_gate_label": "Upbit KRW listing notice + 7 min entry window",
+        "observational": True,
+        "no_baseline": True,
+        "baseline": None,
+    },
 ]
 
 # Exits that Freqtrade's API does not report: each strategy's custom_exit()
@@ -228,6 +251,8 @@ STRATEGY_EXIT_RULES: dict[str, dict[str, Any]] = {
          "text": "BTC's 1h close is above its 1h SMA50, or RSI(14) is below 30"},
     ]},
     "killers-ft": {"strategy": "KillersScalpV1", "rules": [], "receiver_driven": True},
+    # Its 24 h time exit is the ROI table, which /show_config reports.
+    "upbit-fade-hl": {"strategy": "UpbitFadeLiveV1", "rules": [], "exit_signals": False},
 }
 
 
@@ -1906,12 +1931,6 @@ def _account_health() -> dict | None:
         if time.time() - state["observed_at"] > 180:
             raise ValueError("stale")
         state["warnings"] = list(state.get("errors", []))
-        # Accounts outside the fleet breaker (#261, the Upbit pilot) are not in this
-        # dashboard's fleet: keep their equity out of the wallet total it sets
-        # against fleet P&L. Their marks stay under `accounts`.
-        outside = state.get("outside_breaker_accounts") or {}
-        if state.get("equity") is not None and outside:
-            state["equity"] -= sum(state["accounts"][a]["equity"] for a in outside)
         gateway = state.get("gateway")
         if not gateway or time.time() - gateway.get("observed_at", 0) > 180:
             state["warnings"].append("Hyperliquid request telemetry unavailable")

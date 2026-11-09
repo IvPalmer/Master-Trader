@@ -1,6 +1,13 @@
 """Production dashboard registry and account-group regression tests."""
 
+import json
+from pathlib import Path
+
+import yaml
+
 from app import BOTS, _bot_links
+
+FT_USERDATA = Path(__file__).resolve().parents[2]
 
 
 def _by_key():
@@ -15,9 +22,24 @@ def test_dashboard_tracks_every_current_live_executor():
         "oi-trend",
         "short-keltner-hl",
         "killers-ft",
+        "upbit-fade-hl",
     }
     assert "cascade" not in bots
     assert "insiders-ft" not in bots  # retired 2026-10-29 (#216)
+
+
+def test_upbit_pilot_matches_its_account():
+    bot = _by_key()["upbit-fade-hl"]
+    config = json.loads((FT_USERDATA / "bots_config.json").read_text())
+    entry = next(v for v in config["bots"].values() if v.get("service") == "ft-upbit-fade-hl")
+    assert bot["account_group"] == entry["capital_account"]
+    assert bot["wallet_env"] == entry["wallet_env"]
+
+
+def test_compose_gives_the_dashboard_every_wallet_it_reads():
+    compose = yaml.safe_load((FT_USERDATA / "docker-compose.prod.yml").read_text())
+    environment = compose["services"]["ft-dashboard"]["environment"]
+    assert {bot["wallet_env"] for bot in BOTS if bot.get("wallet_env")} <= set(environment)
 
 
 def test_short_keltner_points_to_fresh_live_epoch():
