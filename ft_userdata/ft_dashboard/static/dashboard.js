@@ -633,15 +633,19 @@ function dash() {
     get equitySubtitle() {
       const bot = this.selectedEquityBot;
       if (!bot) return 'Cumulative realized P&L · all live epochs, stopped ones included · open P&L shown separately';
-      if (bot.stopped) return 'Realized live equity · epoch ended ' + this.fmtEpochRange(bot);
+      if (bot.stopped) return this.stoppedEquitySubtitle(bot);
       if (bot.lineage) return this.equityExplanation(bot);
       if (bot.baseline?.annual_return_pct) return 'Realized live equity · current equity shown separately';
       return 'Realized live equity · current equity shown separately';
     },
     // The bot detail's equity card. A stopped record has no lineage curve and no open mark (#280).
     detailEquitySubtitle(bot) {
-      if (bot.stopped) return 'Realized live equity · epoch ended ' + this.fmtEpochRange(bot);
+      if (bot.stopped) return this.stoppedEquitySubtitle(bot);
       return bot.lineage ? this.equityExplanation(bot) : 'Realized live equity · current equity shown separately';
+    },
+    // A record keeps its measurement mode: a paper epoch is never labelled live.
+    stoppedEquitySubtitle(bot) {
+      return `Realized ${bot.dry_run === false ? 'live' : 'paper'} equity · epoch ended ${this.fmtEpochRange(bot)}`;
     },
     equityExplanation(bot) {
       const closed = bot?.stats?.closed_trade_count || 0;
