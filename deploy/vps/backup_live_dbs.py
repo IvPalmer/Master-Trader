@@ -9,7 +9,8 @@ installed. Dokploy has no backup or volume-backup configured (checked
 
 What it copies, from the compose project's docker volumes:
 
-  ft_user_data             every tradesv3.live.*.sqlite
+  ft_user_data             every tradesv3.live.*.sqlite, and the ended-epoch
+                           records in epoch-records/ (#277), if any
   killers_receiver_state   every *.sqlite (signal -> trade -> TP-ladder state)
   /home/ubuntu/killers-bot/state.sqlite   observer state, if present
 
@@ -76,6 +77,7 @@ STAMP_FORMAT = "%Y%m%dT%H%M%SZ"
 SOURCES = [
     ("ft_user_data", "tradesv3.live.*.sqlite", "sqlite", True),
     ("killers_receiver_state", "*.sqlite", "sqlite", True),
+    ("ft_user_data", "epoch-records/*.json", "file", False),
 ]
 
 
@@ -92,7 +94,7 @@ def plan(volumes_root: Path, project: str,
         found = sorted(p for p in data.glob(pattern) if p.is_file()) if data.is_dir() else []
         if required and not found:
             raise BackupError(f"no {pattern} in {data}")
-        items += [(f"{volume}/{p.name}", p, kind) for p in found]
+        items += [(f"{volume}/{p.relative_to(data)}", p, kind) for p in found]
     if observer_db is not None and observer_db.is_file():
         items.append((f"killers_bot/{observer_db.name}", observer_db, "sqlite"))
     return items

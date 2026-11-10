@@ -39,6 +39,8 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+import epoch_records
+from epoch_records import trade_identity
 from hyperliquid_reconciliation import reconcile_trades
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -312,6 +314,9 @@ _HL_FILLS_CACHE: dict[str, tuple[float, list[dict]]] = {}
 OVERLAYS_DIR = Path(os.environ.get("OVERLAYS_DIR", "/overlays"))
 KILLERS_DB = Path(os.environ.get("KILLERS_DB", "/var/lib/killers/state.sqlite"))
 LINEAGE_DB_DIR = Path(os.environ.get("LINEAGE_DB_DIR", "/var/lib/freqtrade-history"))
+# Immutable records of ended epochs (#277), written by deploy/vps/archive_bot_epoch.py.
+EPOCH_RECORDS_DIR = LINEAGE_DB_DIR / "epoch-records"
+COVERAGE_INTERVAL_S = 600
 # Live killers-receiver SQLite (target_orders / positions) — separate DB from
 # the observer state.sqlite above. Empty => TP-ladder pill disabled (bar-only).
 KILLERS_RECEIVER_DB = os.environ.get("KILLERS_RECEIVER_DB", "")
@@ -569,6 +574,40 @@ _cache: dict[str, Any] = {
 _trade_cache: dict[str, list[dict]] = {}
 # First dashboard observation of a fill when the API lacks a fill timestamp.
 _fill_seen_at: dict[tuple[str, Any], float] = {}
+# Closed live trades owned by neither a record nor a running epoch; slow cadence.
+_epoch_coverage: dict[str, Any] = {"checked_at": None, "uncovered": [], "unverified": []}
+# What a snapshot withholds when record ownership moved under it (#277): closed
+# history only. Open positions, stop risk and protection evidence stay.
+_HISTORICAL_FIELDS = ("stats", "recent_trades", "per_pair", "expectancy", "concentration",
+                      "realized_events", "equity_realized", "equity_live", "drawdown_realized",
+                      "drawdown_curve", "delta_24h", "gate1", "gate2", "gate3")
+_REALIZED_PNL_FIELDS = ("closed", "closed_trades", "partial_exits", "all_coin", "closed_pct", "all_pct")
+
+
+def _records() -> epoch_records.Records:
+    return epoch_records.load_records(EPOCH_RECORDS_DIR, {b["key"] for b in BOTS})
+
+
+def _cached_bots(owned: frozenset) -> dict:
+    """Cached running snapshots that never count a trade twice, or not at all (#277).
+
+    Each snapshot carries the closed trades it counted and those it left to a
+    record (``_ledger``, built with it). If records changed since, while the
+    bot awaits its next successful poll or stays unreachable on its last
+    measurements, its closed history is withheld until a poll recomputes it.
+    """
+    out = {}
+    for key, snap in _cache.get("bots", {}).items():
+        counted, excluded = snap.get("_ledger") or (frozenset(), frozenset())
+        snap = {k: v for k, v in snap.items() if k != "_ledger"}
+        if counted & owned or excluded - owned:
+            snap.update(dict.fromkeys(_HISTORICAL_FIELDS), measurements_withheld=True)
+            snap["pnl"] = {**(snap.get("pnl") or {}), **dict.fromkeys(_REALIZED_PNL_FIELDS)}
+            snap["history"] = {**(snap.get("history") or {}), "complete": False,
+                               "error": "Epoch records changed since the last successful poll; "
+                                        "closed-trade results return with the next one"}
+        out[key] = snap
+    return out
 
 # ── Events store ──────────────────────────────────────────────────────────────
 # events.yml lives alongside app.py.  We cache in module scope and hot-reload
@@ -1116,6 +1155,7 @@ def _equity_curve_live(
     open_trades: list[dict],
     starting_capital: float,
     bot_start_ts_ms: int,
+    now_ms: int | None = None,
 ) -> list[list]:
     """Return [[ts_ms, equity_usd], ...] from launch onward.
 
@@ -1123,7 +1163,8 @@ def _equity_curve_live(
     even before the first trade closes. Trades from an earlier epoch are
     excluded and the result is kept chronological. Closed trades stack. A
     final synthetic point at 'now' includes unrealized P&L from open trades
-    so the live tip reflects the wallet right now.
+    so the live tip reflects the wallet right now. ``now_ms`` freezes 'now'
+    at a stopped epoch's end.
     """
     out: list[list] = []
     if bot_start_ts_ms:
@@ -1139,7 +1180,8 @@ def _equity_curve_live(
         cum += pnl
         out.append([ts, round(starting_capital + cum, 4)])
     unrealized = sum(float(t.get("profit_abs") or 0) for t in open_trades)
-    now_ms = int(time.time() * 1000)
+    if now_ms is None:
+        now_ms = int(time.time() * 1000)
     if out and now_ms > out[-1][0]:
         # Carry realized P&L forward. The open mark belongs only at now;
         # connecting the last close straight to it fabricates a return path.
@@ -1177,9 +1219,10 @@ def _realized_events(
     return [fill for fill in fills if fill[0] is None or fill[0] >= epoch_start_ts_ms]
 
 
-def _event_rows(events: list[list]) -> list[dict]:
+def _event_rows(events: list[list], now_ms: int | None = None) -> list[dict]:
     """Realized events as the trade-shaped rows the equity curve stacks."""
-    now_ms = int(time.time() * 1000)
+    if now_ms is None:
+        now_ms = int(time.time() * 1000)
     return [{"close_timestamp": ts or now_ms, "profit_abs": pnl} for ts, pnl in events]
 
 
@@ -1577,9 +1620,20 @@ def _equity_annotations(bot_key: str) -> list[dict]:
 
 
 # ── Polling ────────────────────────────────────────────────────────────────
-async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
+async def _poll_bot(client: httpx.AsyncClient, bot: dict, frozen: dict | None = None) -> dict:
+    """One bot's snapshot. ``frozen`` builds a stopped epoch's record instead.
+
+    A frozen build makes no bot API call: the endpoint payloads and the raw
+    closed trades come from ``frozen``, there are no open trades, and 'now' is
+    the epoch's end (``end_ms``). Hyperliquid reconciliation runs here once,
+    at record creation; the dashboard never recomputes a record.
+    """
     paths = ["profit", "status", "balance", "show_config", "whitelist"]
-    results = await asyncio.gather(*[_get(client, bot["url"], p) for p in paths])
+    if frozen is None:
+        results = await asyncio.gather(*[_get(client, bot["url"], p) for p in paths])
+    else:
+        results = [(frozen.get(p), None) for p in paths]
+    now_ms = int(frozen["end_ms"]) if frozen is not None else None
     profit, profit_err = results[0]
     status, status_err = results[1]
     balance, balance_err = results[2]
@@ -1590,7 +1644,7 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     if err:
         return {"key": bot["key"], "error": err, "reachable": False}
 
-    tracked_open_trades = status if isinstance(status, list) else []
+    tracked_open_trades = status if isinstance(status, list) and frozen is None else []
     is_dry_run = bool((cfg or {}).get("dry_run"))
     open_trades, position_issues = _split_open_trade_records(
         tracked_open_trades, is_dry_run
@@ -1600,12 +1654,22 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         or (bot.get("lineage") or {}).get("transition_ts_ms")
         or 0
     )
-    fetched_trades, history_complete, history_error = await _fetch_epoch_trades(
-        client, bot, epoch_start_ts_ms
-    )
-    closed_trades, history_using_cache = _retain_complete_history(
-        bot["key"], fetched_trades, history_complete
-    )
+    if frozen is None:
+        fetched_trades, history_complete, history_error = await _fetch_epoch_trades(
+            client, bot, epoch_start_ts_ms
+        )
+        closed_trades, history_using_cache = _retain_complete_history(
+            bot["key"], fetched_trades, history_complete
+        )
+        # After the cache fallback, so it is filtered too: a trade an epoch
+        # record owns is never counted again by a running bot (#277).
+        owned = _records().owned
+        identities = [trade_identity(t) for t in closed_trades]
+        closed_trades = [t for t, i in zip(closed_trades, identities) if i not in owned]
+        ledger = (frozenset(identities) - owned, frozenset(identities) & owned)
+    else:
+        fetched_trades, history_complete, history_error = list(frozen["trades"]), True, None
+        closed_trades, history_using_cache = fetched_trades, False
     # A trade that closes between the /status and /trades reads is in both;
     # the closed record is the newer one.
     closed_ids = {t.get("trade_id") for t in closed_trades if t.get("trade_id") is not None}
@@ -1614,7 +1678,9 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "status": "not_applicable", "mismatched_trades": 0,
         "overbooked_trades": 0,
     }
-    if bot.get("venue") == "hyperliquid":
+    # Paper orders never reach the exchange: against real userFills every
+    # dry-run exit reads as unfilled and its P&L would be zeroed.
+    if bot.get("venue") == "hyperliquid" and not is_dry_run:
         exchange_fills, fill_error = await _hyperliquid_user_fills(client, bot)
         if exchange_fills is None:
             fill_reconciliation = {
@@ -1639,7 +1705,11 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     all_trades = closed_trades + open_trades
 
     readiness: dict
-    if bot.get("receiver_url"):
+    if frozen is not None:
+        readiness = {"status": "not-applicable", "label": "epoch ended",
+                     "detail": "no running bot · results frozen at the epoch's end",
+                     "gate": bot.get("entry_gate_label"), "healthy": None}
+    elif bot.get("receiver_url"):
         # /healthz stays unauthenticated on purpose (Docker healthcheck), so
         # reachability is still reported even if the token is misconfigured —
         # the ingress error then localises the fault to auth, not the network.
@@ -1678,7 +1748,8 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     bot_start_ts = (
         epoch_start_ts_ms / 1000.0 if epoch_start_ts_ms else runtime_start_ts
     )
-    days_running = (time.time() - bot_start_ts) / 86400.0 if bot_start_ts else 0
+    now_s = now_ms / 1000.0 if now_ms is not None else time.time()
+    days_running = (now_s - bot_start_ts) / 86400.0 if bot_start_ts else 0
 
     per_pair = _per_pair_pnl(closed_trades, epoch_start_ts_ms)
     epoch_pnl, epoch_stats, closed_pnl = _epoch_stats(
@@ -1686,9 +1757,9 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     )
     bot_start_ts_ms = int(bot_start_ts * 1000) if bot_start_ts else 0
     realized_events = _realized_events(closed_trades, open_trades, epoch_start_ts_ms)
-    event_rows = _event_rows(realized_events)
-    realized_equity = _equity_curve_live(event_rows, [], starting_capital, bot_start_ts_ms)
-    live_equity = _equity_curve_live(event_rows, open_trades, starting_capital, bot_start_ts_ms)
+    event_rows = _event_rows(realized_events, now_ms)
+    realized_equity = _equity_curve_live(event_rows, [], starting_capital, bot_start_ts_ms, now_ms)
+    live_equity = _equity_curve_live(event_rows, open_trades, starting_capital, bot_start_ts_ms, now_ms)
     drawdown_curve = _drawdown_curve(live_equity)
 
     # ── New: compute current DD % for dd_breach check ──────────────────────
@@ -1696,9 +1767,11 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
     epoch_stats["max_drawdown"] = current_dd_pct / 100
 
     # ── New: no-baseline bots (killers-scalp) ─────────────────────────────
-    no_baseline = bot.get("no_baseline", False)
+    # A stopped epoch is never gated: gates follow the current epochs only.
+    no_baseline = bot.get("no_baseline", False) or frozen is not None
     baseline = bot.get("baseline") if not no_baseline else None
-    baseline_status = bot.get("baseline_status", "active" if baseline else "none")
+    baseline_status = "none" if frozen is not None else bot.get(
+        "baseline_status", "active" if baseline else "none")
     baseline_comparable = bool(
         baseline
         and baseline_status == "active"
@@ -1707,14 +1780,15 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
 
     tp_ladder = {}
     tp_ledger_error = None
-    if bot.get("key") == "killers-ft":
+    receiver_ledger = bot.get("key") == "killers-ft" and frozen is None
+    if receiver_ledger:
         try:
             tp_ladder = killers_tp_ladder(KILLERS_RECEIVER_DB, strict=True)
         except Exception:
             tp_ledger_error = "receiver target ledger unavailable"
     execution_health = (
         _tp_execution_health(open_trades, tp_ladder, tp_ledger_error)
-        if bot.get("key") == "killers-ft" else None
+        if receiver_ledger else None
     )
 
     open_trades_out = []
@@ -1757,9 +1831,9 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
             }
         open_trades_out.append(row)
 
-    return {
+    snapshot = {
         "key": bot["key"], "name": bot["name"], "label": bot["label"],
-        "reachable": True, "dry_run": is_dry_run, "observed_at": time.time(),
+        "reachable": True, "dry_run": is_dry_run, "observed_at": now_s,
         "bot_start_ts": bot_start_ts, "days_running": round(days_running, 1),
         "wallet": {
             "starting_capital": round(starting_capital, 2),
@@ -1820,7 +1894,8 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "readiness": readiness,
         "execution_health": execution_health,
         "exit_policy": _exit_policy(cfg, bot["key"]),
-        "native_stop": _native_stop_verification(bot, open_trades, closed_trades),
+        "native_stop": (_native_stop_verification(bot, open_trades, closed_trades) if frozen is None
+                        else {"status": "not-applicable", "label": "epoch ended", "expected": False}),
         "position_integrity": {
             "status": "critical" if position_issues else "ok",
             "label": (
@@ -1855,8 +1930,8 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         "drawdown_curve": drawdown_curve,
         "whitelist_size": len((whitelist or {}).get("whitelist", [])) if whitelist else None,
         # ── NEW: additive fields (frontend feature-detects these) ──────────
-        "links": _bot_links(bot, open_trades_out, per_pair),
-        "delta_24h": {
+        "links": _bot_links(bot, open_trades_out, per_pair) if frozen is None else None,
+        "delta_24h": None if frozen is not None else {
             **_delta_24h(
                 closed_trades,
                 current_dd_pct,
@@ -1868,6 +1943,34 @@ async def _poll_bot(client: httpx.AsyncClient, bot: dict) -> dict:
         },
         "equity_annotations": _equity_annotations(bot["key"]),
     }
+    if frozen is not None:
+        # Keyed by record id, so a paper instance of the same bot never collides.
+        snapshot.update(key=frozen["record_id"], bot_key=bot["key"], reachable=False,
+                        stopped=True, epoch_trades=closed_trades)
+        snapshot["epoch"].update(end_ts_ms=now_ms, reason=frozen["reason"], issue=frozen["issue"])
+        # The account balance after the epoch is not this record's to report.
+        snapshot["wallet"].update(bot_owned=None, total=None)
+    else:
+        snapshot["_ledger"] = ledger  # (counted, left to records); never served
+    return snapshot
+
+
+async def _refresh_epoch_coverage(closed_before_ms: int) -> None:
+    """Warn about closed live trades that no record and no running epoch owns.
+
+    The SQLite reads run in a worker thread. Without every running bot's
+    ledger the answer is unknown, so coverage is reported unverified.
+    """
+    missing = [b["key"] for b in BOTS if b["key"] not in _trade_cache]
+    if missing:
+        result = {"uncovered": [], "unverified": [
+            {"db": None, "error": f"running ledger unavailable: {', '.join(missing)}"}]}
+    else:
+        owned = set(_records().owned)
+        owned.update(trade_identity(t) for trades in _trade_cache.values() for t in trades)
+        result = await asyncio.to_thread(
+            epoch_records.coverage, LINEAGE_DB_DIR, owned, closed_before_ms)
+    _epoch_coverage.update(result, checked_at=time.time())
 
 
 async def _poll_loop():
@@ -1914,6 +2017,8 @@ async def _poll_loop():
                             _cache["last_reachable_at"][bot["key"]] = time.time()
                         else:
                             _cache["errors"][bot["key"]] = r.get("error", "unreachable")
+            if time.time() - (_epoch_coverage["checked_at"] or 0) >= COVERAGE_INTERVAL_S:
+                await _refresh_epoch_coverage(int(_cache["last_poll_started_at"] * 1000))
         except Exception as exc:
             log.exception("poll cycle failed: %s", exc)
         _cache["last_poll_finished_at"] = time.time()
@@ -2040,7 +2145,7 @@ from trade_controls import install as install_trade_controls
 install_trade_controls(app, BOTS, _api_auth)
 from widgets import install as install_widgets
 install_widgets(app, lambda: {"last_poll": _cache.get("last_poll_finished_at"),
-                              "bots": _cache.get("bots", {}), "status": _fleet_status(),
+                              "bots": _cached_bots(_records().owned), "status": _fleet_status(),
                               "account_health": _account_health()})
 
 
@@ -2077,12 +2182,17 @@ async def api_state():
       bots[key].gate1/2/3         — null for killers-scalp (no baseline to gate against)
       events_global               — fleet-wide event feed [{ts, label, kind, bot}]
       status                      — {level, summary, stale_bots}
+      bots[record_id]             — a stopped epoch's frozen snapshot (stopped: true, #277)
+      epoch_records               — {errors, coverage}: warnings only, never fleet status
     """
+    records = _records()
     return JSONResponse({
         "last_poll": _cache.get("last_poll_finished_at"),
         "poll_age_s": (time.time() - _cache["last_poll_finished_at"]) if _cache.get("last_poll_finished_at") else None,
-        "bots": _cache.get("bots", {}),
+        "bots": {**_cached_bots(records.owned),
+                 **{rid: record["snapshot"] for rid, record in records.by_id.items()}},
         "errors": _cache.get("errors", {}),
+        "epoch_records": {"errors": records.errors, "coverage": _epoch_coverage},
         # ── NEW ──────────────────────────────────────────────────────────────
         "events_global": _global_events(),
         "status": _fleet_status(),
@@ -2233,10 +2343,14 @@ async def api_equity(bot_key: str):
     Backtest CSV is `timestamp_ms,equity` starting at $200; we rescale to
     bot's actual starting capital so the curves are comparable.
     """
-    snap = _cache["bots"].get(bot_key)
-    meta = _bot_meta(bot_key)
-    if not snap or not meta:
+    records = _records()
+    record = records.by_id.get(bot_key)
+    snap = record["snapshot"] if record else _cached_bots(records.owned).get(bot_key)
+    meta = {} if record else _bot_meta(bot_key)  # a record has no overlay or lineage
+    if not snap or meta is None:
         return JSONResponse({"error": "not found"}, status_code=404)
+    if snap.get("measurements_withheld"):
+        return JSONResponse({"error": "closed-trade results withheld until the next poll"}, status_code=503)
     if not snap.get("wallet"):
         return JSONResponse({"error": "awaiting first successful bot observation"}, status_code=503)
 
@@ -2402,23 +2516,33 @@ async def api_closed_trades():
     """Aggregate closed trades across the fleet for the trades tab.
 
     Uses the server-side complete, paginated epoch ledger. Returns a flat list
-    sorted newest-first with everything a chart card needs.
+    sorted newest-first with everything a chart card needs. A stopped epoch's
+    trades come from its record, under the record key (#277); a running bot
+    never repeats a trade a record owns.
     """
+    records = _records()
+    sources = [(bot["key"], bot["name"], _trade_cache.get(bot["key"]), bot.get("baseline") or {},
+                (_cache["bots"].get(bot["key"]) or {}).get("dry_run"), False) for bot in BOTS]
+    # A record reports no stop placeholder: None instead of a baseline.
+    sources += [(rid, record["snapshot"].get("name"), record["trades"], None,
+                 record["mode"] == "paper", True) for rid, record in records.by_id.items()]
     out: list[dict] = []
-    for bot in BOTS:
-        trades = _trade_cache.get(bot["key"])
+    for key, name, trades, baseline, dry_run, stopped in sources:
         if trades is None:
             continue
-        baseline = bot.get("baseline") or {}
         for t in trades:
             if t.get("is_open") or not t.get("close_timestamp"):
                 continue
+            if not stopped and trade_identity(t) in records.owned:
+                continue
             entry = t.get("open_rate")
-            stoploss_pct = baseline.get("worst_trade_pct", -5.0) / 100.0
-            stop_price = entry * (1 + stoploss_pct) if entry else None
+            stoploss_pct = None if baseline is None else baseline.get("worst_trade_pct", -5.0) / 100.0
+            stop_price = entry * (1 + stoploss_pct) if entry and stoploss_pct is not None else None
             out.append({
-                "bot_key": bot["key"],
-                "bot_name": bot["name"],
+                "bot_key": key,
+                "bot_name": name,
+                "dry_run": dry_run,
+                "stopped": stopped,
                 "pair": t.get("pair"),
                 "open_date": t.get("open_date"),
                 "close_date": t.get("close_date"),
@@ -2427,7 +2551,7 @@ async def api_closed_trades():
                 "open_rate": entry,
                 "close_rate": t.get("close_rate"),
                 "stop_rate": stop_price,
-                "stoploss_pct": stoploss_pct * 100,
+                "stoploss_pct": None if stoploss_pct is None else stoploss_pct * 100,
                 "profit_pct": t.get("profit_pct"),
                 "profit_abs": t.get("profit_abs"),
                 "exit_reason": t.get("exit_reason"),
@@ -2443,7 +2567,8 @@ async def api_trade_candles(bot_key: str, pair: str, timeframe: str = "1h",
                             limit: int = 500, start_ms: int | None = None,
                             end_ms: int | None = None):
     """Fetch candles from the execution venue, with a bounded request window."""
-    bot = _bot_meta(bot_key)
+    # Venue market data outlives a bot, so a stopped epoch's record is served too.
+    bot = _bot_meta(bot_key) or (_records().by_id.get(bot_key) or {}).get("snapshot")
     if not bot:
         return JSONResponse({"error": "unknown bot"}, status_code=404)
     if bot.get("venue") != "hyperliquid":
@@ -2556,6 +2681,9 @@ async def api_candles(bot_key: str, pair: str, timeframe: str = "1h", limit: int
     query params or path traversal into the upstream Freqtrade REST.
     """
     bot = _bot_meta(bot_key)
+    if not bot and bot_key in _records().by_id:
+        return JSONResponse({"error": "Bot candles unavailable: this epoch has stopped and its bot "
+                                      "no longer runs", "unavailable": True}, status_code=410)
     if not bot:
         return JSONResponse({"error": "bot not found"}, status_code=404)
     pair = pair.strip().upper()
