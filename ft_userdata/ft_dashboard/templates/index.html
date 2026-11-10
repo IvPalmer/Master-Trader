@@ -192,9 +192,9 @@
     <!-- ── B: Fleet vitals strip (compact, secondary when incidents exist) ── -->
     <div class="workspace-vitals">
       <div><span>Account equity</span><strong x-text="fmtUsd(hero.walletNow)"></strong><small>Shared accounts counted once</small></div>
-      <div><span>Realized P&amp;L</span><strong :class="hero.totalRealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalRealizedPnl)"></strong><small x-text="hero.closedTrades+' closed trades · live epochs'"></small></div>
-      <div><span>Unrealized P&amp;L</span><strong :class="hero.totalUnrealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)"></strong><small x-text="hero.openCount+' open positions'+(hero.pendingEntries?' · '+hero.pendingEntries+' entry pending':'')"></small></div>
-      <div><span>Loss to bot stops</span><strong x-text="fmtUsd(hero.capitalAtRisk)"></strong><small>Estimate · gaps and fees can increase loss</small></div>
+      <div><span>All-time live realized P&amp;L</span><strong :class="hero.totalRealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalRealizedPnl)"></strong><small x-text="hero.closedTrades+' closed trades · all live epochs'"></small><small x-text="'Win '+(hero.closedTrades?fmtPct(hero.winRate*100,1):'—')+' · PF '+fmtPF(hero.profitFactor)+' · '+fmtUsdSigned(hero.expectancyPerTrade)+' / trade'"></small></div>
+      <div><span>Current unrealized</span><strong :class="hero.totalUnrealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)"></strong><small x-text="hero.openCount+' open positions'+(hero.pendingEntries?' · '+hero.pendingEntries+' entry pending':'')"></small></div>
+      <div><span>Stop risk</span><strong x-text="fmtUsd(hero.capitalAtRisk)"></strong><small>Loss to bot stops · gaps and fees can increase it</small></div>
     </div>
 
     <!-- ── C: Every live bot, one operational scan ── -->
@@ -261,6 +261,43 @@
               </tr>
             </template>
           </tbody>
+          <tbody x-show="stoppedBots.length" x-cloak>
+            <tr><th colspan="9">Stopped · results kept, no trading</th></tr>
+            <template x-for="bot in stoppedBots" :key="'stopped:'+bot.key">
+              <tr @click="setEquityBot(bot.key)" :class="equityBot === bot.key ? 'selected' : ''">
+                <td>
+                  <button class="bot-table-name" @click.stop="setTab('bot:'+bot.key)">
+                    <span class="bot-state" :class="botStatus(bot).cls">
+                      <span class="bot-state-dot"></span>
+                      <span x-text="botStatus(bot).label">stopped</span>
+                    </span>
+                    <strong x-text="bot.label">bot</strong>
+                    <span x-text="bot.epoch?.label || bot.epoch?.version">epoch</span>
+                  </button>
+                </td>
+                <td>
+                  <span class="table-primary" x-text="venueLabel(bot)">venue</span>
+                  <span class="table-secondary" x-text="accountLabel(bot)">account</span>
+                </td>
+                <td class="right">
+                  <span class="table-primary num" x-text="fmtUsd(botCapital(bot))">—</span>
+                  <span class="table-secondary">starting</span>
+                </td>
+                <td class="right">
+                  <span class="table-primary num" :class="(bot.pnl?.closed || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.closed)">—</span>
+                  <span class="table-secondary" x-text="'max DD ' + fmtPct((bot.stats?.max_drawdown ?? 0) * 100, 2)">—</span>
+                </td>
+                <td class="right num">—</td>
+                <td class="right num" x-text="bot.stats?.closed_trade_count || 0">0</td>
+                <td class="right num">—</td>
+                <td>
+                  <span class="table-primary" x-text="fmtEpochRange(bot)">epoch</span>
+                  <span class="table-activity" :title="stoppedReason(bot)" x-text="stoppedReason(bot)">reason</span>
+                </td>
+                <td class="right"><button class="table-open" @click.stop="setTab('bot:'+bot.key)">inspect</button></td>
+              </tr>
+            </template>
+          </tbody>
 
 </table>
       </div>
@@ -279,8 +316,8 @@
           </div>
           <div class="curve-switcher" x-show="liveBots.length" x-cloak aria-label="Select performance curve">
             <button :class="equityBot === 'fleet' ? 'on' : ''" @click="setEquityBot('fleet')">fleet</button>
-            <template x-for="bot in liveBots" :key="'curve:'+bot.key">
-              <button :class="equityBot === bot.key ? 'on' : ''" @click="setEquityBot(bot.key)" x-text="bot.label">bot</button>
+            <template x-for="bot in liveBots.concat(stoppedBots)" :key="'curve:'+bot.key">
+              <button :class="equityBot === bot.key ? 'on' : ''" @click="setEquityBot(bot.key)" x-text="bot.label + (bot.stopped ? ' · stopped' : '')">bot</button>
             </template>
           </div>
         </div>
@@ -371,7 +408,7 @@
         <div class="card-head">
           <div>
             <div class="card-title">Recent trades · live bots</div>
-            <div class="card-sub">last 30 closed across all live bots</div>
+            <div class="card-sub">last 30 closed across all live epochs</div>
           </div>
         </div>
         <div style="max-height: 380px; overflow-y: auto;">
@@ -415,18 +452,18 @@
     </header>
     <section class="workspace-vitals" aria-label="Portfolio performance">
       <div><span>Account equity</span><strong x-text="fmtUsd(hero.walletNow)"></strong><small>Shared accounts counted once</small></div>
-      <div><span>Realized P&amp;L</span><strong :class="hero.totalRealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalRealizedPnl)"></strong><small x-text="hero.closedTrades+' closed trades'"></small></div>
-      <div><span>Unrealized P&amp;L</span><strong :class="hero.totalUnrealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)"></strong><small x-text="hero.openCount+' open positions'+(hero.pendingEntries?' · '+hero.pendingEntries+' entry pending':'')"></small></div>
-      <div><span>Max drawdown</span><strong x-text="fmtPct(-portfolioDrawdownMax,2)"></strong><small>Includes the current open mark</small></div>
+      <div><span>All-time live realized P&amp;L</span><strong :class="hero.totalRealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalRealizedPnl)"></strong><small x-text="hero.closedTrades+' closed trades · all live epochs'"></small></div>
+      <div><span>Current unrealized</span><strong :class="hero.totalUnrealizedPnl>=0?'pos':'neg'" x-text="fmtUsdSigned(hero.totalUnrealizedPnl)"></strong><small x-text="hero.openCount+' open positions'+(hero.pendingEntries?' · '+hero.pendingEntries+' entry pending':'')"></small></div>
+      <div><span>Worst bot drawdown</span><strong x-text="fmtPct(-hero.drawdownMaxPct,2)"></strong><small>Deepest of each live epoch's own drawdown</small></div>
     </section>
     <div class="grid grid-12 performance-primary">
-      <section class="card col-8"><div class="card-head"><div><h2 class="card-title">Equity history</h2><p class="card-sub">Realized equity over time. The current mark is a separate snapshot.</p></div></div><div class="chart tall" id="chart-portfolio-equity"></div></section>
+      <section class="card col-8"><div class="card-head"><div><h2 class="card-title">Realized P&amp;L history</h2><p class="card-sub">Cumulative realized P&amp;L of every live epoch, stopped ones included. The current mark is a separate snapshot.</p></div></div><div class="chart tall" id="chart-portfolio-equity"></div></section>
       <section class="card col-4"><div class="card-head"><div><h2 class="card-title">Exposure &amp; risk</h2><p class="card-sub">Current open positions</p></div></div>
         <dl class="fact-list">
           <div><dt>Open notional</dt><dd x-text="fmtUsd(hero.openNotional)"></dd></div>
           <div><dt>Loss to bot stops</dt><dd x-text="fmtUsd(hero.capitalAtRisk)"></dd></div>
-          <div><dt>Risk / starting capital</dt><dd x-text="fmtPct(hero.capitalAtRiskPct,2)"></dd></div>
-          <div><dt>Current drawdown</dt><dd x-text="fmtPct(portfolioCurrentDrawdown,2)"></dd></div>
+          <div><dt>Risk / account equity</dt><dd x-text="fmtPct(hero.capitalAtRiskPct,2)"></dd></div>
+          <div><dt>Current breaker drawdown · Binance + Killers</dt><dd x-text="raw.account_health?.drawdown_pct != null ? fmtPct(-Math.abs(raw.account_health.drawdown_pct),2) : '—'"></dd></div>
         </dl>
         <p class="panel-note">Stop risk is an estimate. Gaps and fees can increase loss.</p>
         <button class="panel-action" @click="tradesView='open';tradesFilter='all';setTab('trades')">Review open positions →</button>
@@ -441,7 +478,7 @@
       <div><span>Payoff ratio</span><strong x-text="hero.payoff!=null?hero.payoff.toFixed(2):'—'"></strong></div>
     </section>
     <div class="grid grid-12">
-      <section class="card col-7"><div class="card-head"><div><h2 class="card-title">Drawdown</h2><p class="card-sub">Distance below peak equity</p></div></div><div class="chart short" id="chart-portfolio-dd"></div></section>
+      <section class="card col-7"><div class="card-head"><div><h2 class="card-title">Drawdown</h2><p class="card-sub">Dollars below the peak of cumulative P&amp;L · includes the current open mark</p></div></div><div class="chart short" id="chart-portfolio-dd"></div></section>
       <section class="card col-5"><div class="card-head"><div><h2 class="card-title">Funded accounts</h2><p class="card-sub">Shared balances counted once</p></div></div><div class="account-allocation">
         <template x-for="account in portfolioAccounts" :key="account.key"><div class="account-allocation-row"><div><strong x-text="account.label"></strong><span x-text="account.bots.length+' strategies · '+(account.venue==='hyperliquid'?'Hyperliquid':'Binance')"></span></div><strong class="num" x-text="fmtUsd(account.capital)"></strong></div></template>
       </div></section>
@@ -450,7 +487,7 @@
       <section class="card col-6"><div class="card-head"><div><h2 class="card-title">By strategy</h2><p class="card-sub">Realized and open P&amp;L, side by side</p></div></div><div class="chart comparison" id="chart-portfolio-strategy"></div></section>
       <section class="card col-6"><div class="card-head"><div><h2 class="card-title">By market</h2><p class="card-sub">Largest contributions by absolute impact</p></div></div><div class="chart comparison" id="chart-portfolio-pair"></div></section>
     </div>
-    <section class="card"><div class="card-head"><div><h2 class="card-title">Recent closes</h2><p class="card-sub">Last 30 closed trades across live strategies</p></div></div>
+    <section class="card"><div class="card-head"><div><h2 class="card-title">Recent closes</h2><p class="card-sub">Last 30 closed trades across live epochs</p></div></div>
       <div class="portfolio-ledger-wrap"><table class="ledger" x-show="recentLiveTrades.length" x-cloak><thead><tr><th>Closed</th><th>Strategy</th><th>Market</th><th class="right">Return</th><th class="right">P&amp;L</th><th>Exit</th></tr></thead><tbody><template x-for="trade in recentLiveTrades" :key="trade._bot+':'+trade.close_timestamp+':'+trade.pair"><tr><td x-text="fmtDate(trade.close_date)"></td><td style="white-space:nowrap" x-text="trade._botLabel"></td><td x-text="trade.pair"></td><td class="right" :class="trade.profit_pct>=0?'pos':'neg'" x-text="fmtPctSigned(trade.profit_pct)"></td><td class="right" :class="trade.profit_abs>=0?'pos':'neg'"><span x-text="fmtUsdSigned(trade.profit_abs)"></span><small class="pnl-audit" x-show="trade.hyperliquid_fill_mismatch" x-text="'userFills · FT raw ' + fmtUsdSigned(trade.freqtrade_profit_abs)"></small></td><td><span class="reason-pill" x-text="trade.exit_reason"></span></td></tr></template></tbody></table><div class="empty" x-show="!recentLiveTrades.length">No closed trades in the current live history.</div></div>
     </section>
   </main>
@@ -461,7 +498,7 @@
     <!-- Graduation board headline -->
     <div class="grad-board-head">
       <span class="grad-board-title">
-        fleet readiness · <span x-text="dryRunBots.length">0</span> bot<span x-show="dryRunBots.length !== 1">s</span> in dry-run
+        fleet readiness · <span x-text="dryRunBots.filter(b => !b.stopped).length">0</span> bot<span x-show="dryRunBots.filter(b => !b.stopped).length !== 1">s</span> in dry-run
         <span x-show="closestToGate" x-cloak>
           · <span class="pos" x-text="closestToGate?.label || ''"></span> closest to graduation
         </span>
@@ -578,6 +615,7 @@
               <div class="card-title">
                 <span x-text="bot.label"></span>
                 <span class="tag dry">dry-run</span>
+                <span class="tag dry" x-show="bot.stopped" x-cloak>stopped</span>
                 <span class="tag imm" x-show="(bot.stats?.closed_trade_count ?? 0) < 30" x-cloak
                       x-text="'n=' + (bot.stats?.closed_trade_count ?? 0)"></span>
               </div>
@@ -819,11 +857,11 @@
 
     <div class="trades-toolbar">
       <div class="trades-filter">
-        <template x-for="bot in liveBots.concat(dryRunBots)" :key="bot.key">
+        <template x-for="bot in liveBots.concat(stoppedBots, dryRunBots)" :key="bot.key">
           <button class="filter-pill"
                   :class="tradesFilter === bot.key ? 'on' : ''"
                   @click="setTradesFilter(bot.key)"
-                  x-text="bot.label || bot.name">bot</button>
+                  x-text="(bot.label || bot.name) + (bot.stopped ? ' · stopped' : '')">bot</button>
         </template>
         <template x-if="tradesView === 'closed'">
           <button class="filter-pill"
@@ -854,7 +892,7 @@
                     x-text="trade.is_open ? (trade.entry_pending ? 'ENTRY PENDING' : 'OPEN') : (trade.exit_reason || '—')">—</span>
             </div>
           </div>
-          <div class="position-context"><span x-text="trade.bot_name"></span><span x-show="trade.dry_run">Paper trading</span><span x-text="trade.is_short?'Short':'Long'"></span><span x-show="trade.leverage>1" x-text="fmtLeverage(trade.leverage)+' leverage · P&amp;L % is on margin'"></span><span x-show="priceMovePct(trade)!=null&&!trade.entry_pending" title="Price change from entry, before leverage and fees" x-text="'Price '+fmtPctSigned(priceMovePct(trade))+' from entry'"></span><span x-show="trade.tps_total" x-text="trade.tps_hit+' / '+trade.tps_total+' targets filled'"></span><span x-show="trade.booked_pct>0" x-text="Math.round(trade.booked_pct)+'% realized'"></span></div>
+          <div class="position-context"><span x-text="trade.bot_name"></span><span x-show="trade.dry_run">Paper trading</span><span x-show="trade.stopped">Stopped epoch</span><span x-text="trade.is_short?'Short':'Long'"></span><span x-show="trade.leverage>1" x-text="fmtLeverage(trade.leverage)+' leverage · P&amp;L % is on margin'"></span><span x-show="priceMovePct(trade)!=null&&!trade.entry_pending" title="Price change from entry, before leverage and fees" x-text="'Price '+fmtPctSigned(priceMovePct(trade))+' from entry'"></span><span x-show="trade.tps_total" x-text="trade.tps_hit+' / '+trade.tps_total+' targets filled'"></span><span x-show="trade.booked_pct>0" x-text="Math.round(trade.booked_pct)+'% realized'"></span></div>
           <div class="trade-card-detail">
             <span class="trade-entry-price" :class="{pending:trade.entry_pending}" :title="trade.entry_pending?'Limit price of the resting entry order · nothing has filled · dotted line on chart':'Average filled entry price · solid blue line on chart'"><span x-text="trade.entry_pending?'Entry limit':'Entry price'">Entry price</span> <strong x-text="(trade.open_rate||0).toPrecision(5)">—</strong></span>
             <span class="sep">→</span>
@@ -967,7 +1005,7 @@
             <strong x-text="botActivity(bot)">scanning</strong>
           </span>
         </div>
-        <div class="bis-actions"><button class="icon-btn" @click="tradesView='open'; tradesFilter=bot.key; setTab('trades')">Position charts</button>
+        <div class="bis-actions"><button class="icon-btn" @click="tradesView=bot.stopped?'closed':'open'; tradesFilter=bot.key; setTab('trades')" x-text="bot.stopped?'Trade charts':'Position charts'">Position charts</button>
           <button class="icon-btn" @click="setTab('live')">back to overview</button>
           <template x-if="bot.links?.freqtrade_ui">
             <a class="icon-btn" :href="bot.links.freqtrade_ui" target="_blank" rel="noopener">open freqtrade ui</a>
@@ -995,7 +1033,12 @@
           <strong x-text="bot.epoch?.version || bot.name">strategy</strong>
           <span x-text="fmtEpoch(bot)">current epoch</span>
         </div>
-        <div class="obs-item">
+        <div class="obs-item" x-show="bot.stopped" x-cloak>
+          <span class="obs-k">stopped epoch</span>
+          <strong x-text="fmtEpochRange(bot)">—</strong>
+          <span x-text="stoppedReason(bot) + ' · archived record, read-only'">archived record</span>
+        </div>
+        <div class="obs-item" x-show="!bot.stopped">
           <span class="obs-k">signal readiness</span>
           <strong class="readiness-line" :class="readinessTone(bot)">
             <span class="readiness-dot" aria-hidden="true"></span>
@@ -1003,12 +1046,12 @@
           </strong>
           <span x-text="readinessDetail(bot)">waiting for entry conditions</span>
         </div>
-        <div class="obs-item">
+        <div class="obs-item" x-show="!bot.stopped">
           <span class="obs-k">last analysis</span>
           <strong x-text="bot.readiness?.analysis_age_s != null ? fmtAge(bot.readiness.analysis_age_s) + ' ago' : (bot.readiness?.last_signal_ts_ms ? fmtAge(Math.max(0, Math.floor((Date.now()-bot.readiness.last_signal_ts_ms)/1000))) + ' ago' : 'no signal yet')">—</strong>
           <span x-text="bot.readiness?.pair ? bot.readiness.pair + ' · ' + (bot.readiness.timeframe || '—') : ((bot.readiness?.signals_24h || 0) + ' channel events · 24h')">—</span>
         </div>
-        <div class="obs-item" x-show="bot.venue === 'hyperliquid'" x-cloak>
+        <div class="obs-item" x-show="bot.venue === 'hyperliquid' && !bot.stopped" x-cloak>
           <span class="obs-k">venue protection</span>
           <strong class="stop-state" :class="stopTone(bot)" x-text="bot.native_stop?.label || 'checking native stop'">checking native stop</strong>
           <span x-text="bot.native_stop?.detail || 'waiting for venue evidence'">waiting for venue evidence</span>
@@ -1024,7 +1067,7 @@
       <div class="grid grid-12" x-show="botHasHistory(bot)" x-cloak>
 
         <!-- Open trade status -->
-        <div class="card col-12">
+        <div class="card col-12" x-show="!bot.stopped">
           <div class="card-head">
             <div class="card-title">Open trade status</div>
             <div class="card-sub" x-text="openPositionCount(bot) + ' open' + (pendingEntryCount(bot) ? ' · ' + pendingEntryCount(bot) + ' entry pending' : '') + ' · ' + fmtUsd(bot.capital_at_risk?.abs_loss || 0) + ' at risk'">0 open</div>
@@ -1057,7 +1100,7 @@
         <div class="card col-12">
           <div class="card-head">
             <div class="card-title" x-text="bot.baseline_comparable ? 'Live vs backtest' : 'Performance'">performance</div>
-            <div class="card-sub" x-text="bot.baseline_status === 'stale-pre-v2' ? 'fresh v2 epoch · pre-v2 baseline is context only' : (!bot.baseline_comparable ? (bot.strategy_kind === 'copy-trader' ? 'copy-trader · fresh live epoch' : 'autonomous quant · forward live epoch') : 'deviation from expected · all-time')">forward live epoch</div>
+            <div class="card-sub" x-text="bot.stopped ? 'stopped epoch · final results' : bot.baseline_status === 'stale-pre-v2' ? 'fresh v2 epoch · pre-v2 baseline is context only' : (!bot.baseline_comparable ? (bot.strategy_kind === 'copy-trader' ? 'copy-trader · fresh live epoch' : 'autonomous quant · forward live epoch') : 'deviation from expected · all-time')">forward live epoch</div>
           </div>
           <div class="bot-performance-facts">
             <div class="metric-fact"><span class="k">p&l</span><span class="v" :class="(bot.pnl?.all_pct ?? 0) >= 0 ? 'pos' : 'neg'"
@@ -1075,7 +1118,7 @@
         </div>
       </div>
 
-      <div class="bot-waiting" x-show="!botHasHistory(bot)" x-cloak>
+      <div class="bot-waiting" x-show="!botHasHistory(bot) && !bot.stopped" x-cloak>
         <span class="bot-waiting-signal" aria-hidden="true"></span>
         <div class="bot-waiting-copy">
           <strong>live and scanning</strong>
@@ -1182,7 +1225,7 @@
   // expose toMs so Alpine inline expressions can use it
   function toMs(ts) { return !ts ? 0 : ts > 1e12 ? ts : ts * 1000; }
 </script>
-<script src="/static/dashboard.js?v=48"></script>
+<script src="/static/dashboard.js?v=49"></script>
 <div class="chart-attribution"><a href="https://www.tradingview.com/" target="_blank" rel="noopener">Charts by TradingView</a> · <a href="/static/CHART-NOTICE.txt">Notice</a> · <a href="/static/CHART-LICENSE.txt">License</a></div>
 </body>
 </html>

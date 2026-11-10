@@ -64,6 +64,9 @@ def fleet(tmp_path):
     (data["ft_user_data"] / "logs").mkdir()
     (data["ft_user_data"] / "fear_greed_history.json").write_text("{}")
     (data["killers_receiver_state"] / "receiver-hyperliquid.sqlite.before-migration-x").write_text("old")
+    # An ended epoch's record (#277): irreplaceable once its source DB is gone.
+    (data["ft_user_data"] / "epoch-records").mkdir()
+    (data["ft_user_data"] / "epoch-records" / "bot-a.live-r1.json").write_text('{"schema": 1}')
     observer = tmp_path / "killers-bot" / "state.sqlite"
     open_conns.append(_wal_db(observer, 4))
     yield {"vols": vols, "data": data, "observer": observer, "dest": tmp_path / "backups",
@@ -91,10 +94,12 @@ def test_backs_up_every_volume_consistently_while_writers_are_open(bk, fleet, tm
     manifest = json.loads((run / "MANIFEST.json").read_text())
     names = sorted(e["name"] for e in manifest["files"])
     assert names == [
+        "ft_user_data/epoch-records/bot-a.live-r1.json",
         "ft_user_data/tradesv3.live.KillersScalpV1.hyperliquid.sqlite",
         "killers_bot/state.sqlite",
         "killers_receiver_state/receiver-hyperliquid.sqlite",
     ]
+    assert (run / "ft_user_data" / "epoch-records" / "bot-a.live-r1.json").read_text() == '{"schema": 1}'
     expected_rows = {"ft_user_data/tradesv3.live.KillersScalpV1.hyperliquid.sqlite": 5,
                      "killers_receiver_state/receiver-hyperliquid.sqlite": 7,
                      "killers_bot/state.sqlite": 4}
@@ -130,6 +135,11 @@ def test_missing_required_volume_fails_and_leaves_no_partial_run(bk, fleet):
         p.unlink()
     assert bk.main(_args(fleet)) == 1
     assert [p for p in fleet["dest"].iterdir() if p.is_dir()] == []
+
+
+def test_no_epoch_records_yet_does_not_fail_the_run(bk, fleet):
+    shutil.rmtree(fleet["data"]["ft_user_data"] / "epoch-records")
+    assert bk.main(_args(fleet)) == 0
 
 
 def test_removing_the_retired_insiders_volume_does_not_fail_the_run(bk, fleet):
@@ -189,6 +199,7 @@ def test_list_prints_the_plan_and_writes_nothing(bk, fleet, capsys):
     assert "killers_bot/state.sqlite" in out
     assert "tradesv3.live.KillersScalpV1.hyperliquid.sqlite" in out
     assert "tradesv3.dryrun" not in out
+    assert "ft_user_data/epoch-records/bot-a.live-r1.json" in out
     assert "before-migration" not in out and "fear_greed" not in out
     assert not fleet["dest"].exists()
 
