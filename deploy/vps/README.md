@@ -107,7 +107,8 @@ All bulk research data lives only on VPS; backtests run on VPS.
 `/home/ubuntu/killers-bot/state.sqlite` when it exists. The retired
 `insiders_receiver_state` volume (#216) is no longer backed up; its last
 snapshots stay in the backup history. The receiver databases tie each open position to its source signal,
-posted stop and targets and cannot be rebuilt from the exchange. Dry-run
+posted stop and targets and cannot be rebuilt from the exchange. The ended-epoch
+records in `ft_user_data/epoch-records/` (#277) are copied as they are. Dry-run
 databases and unrelated state are intentionally excluded.
 
 Each database is opened read-only and copied with SQLite's online backup API,
@@ -137,3 +138,34 @@ failure can never break this one: root cron at 04:30 UTC, destination
 `/home/ubuntu/backups/news-archive/`, 7 daily plus 8 weekly copies, its own lock and a
 15 GiB free-space floor. Its off-host leg is opt-in and counts only after a remote
 restore drill passes. See [news-archive-backup.md](../../docs/ops/news-archive-backup.md).
+
+## Archive before changing a bot's mode or deleting it
+
+Freqtrade opens one SQLite per mode, and its API serves only the current one. A
+bot moved to dry-run, retired or deleted therefore stops serving its live
+trades, and the dashboard would drop its realized P&L, drawdown and trade count
+from the fleet totals (#277). `archive_bot_epoch.py` freezes the ended epoch
+into `epoch-records/<record id>.json` on the `ft_user_data` volume. The
+dashboard shows it as a stopped bot and keeps counting it; it never recomputes
+a record.
+
+1. Let the bot go flat. The script refuses a database with an open trade.
+2. Change the bot's mode (or stop its container) so that it no longer writes the
+   live database. The script refuses a `tradesv3.*` source that is still the
+   container's `FREQTRADE__DB_URL`. Until the record exists, the dashboard shows
+   an amber warning that the live database has closed trades nobody owns.
+3. As root, from the Dokploy checkout, run the script with the epoch's half-open
+   window `[--start-ms, --end-ms)`. The example is in its docstring. It takes a
+   verified `archive-<record id>.sqlite` backup first, serializes the trades with
+   Freqtrade's own `Trade.to_json()`, and builds the record inside `ft-dashboard`.
+   Hyperliquid fills are reconciled there, once.
+4. Check the printed totals. The Freqtrade raw P&L must already match SQLite; the
+   corrected total is the one the dashboard shows.
+5. Only then remove the bot from the dashboard's `BOTS`. A bot that is no longer
+   there needs `--bot-config`, and a deleted container needs any running FT
+   container as `--ft-container`.
+
+Records are written once, mode 0444, and never replaced. A record that is
+malformed, or that claims a trade another record owns, is rejected whole and
+shown as a warning. To correct one, move the file out of `epoch-records/` and
+archive the epoch again.
