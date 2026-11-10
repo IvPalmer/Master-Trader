@@ -609,6 +609,12 @@ def _cached_bots(owned: frozenset) -> dict:
         out[key] = snap
     return out
 
+def _served_bots(records: epoch_records.Records) -> dict:
+    """Running snapshots plus each stopped epoch's frozen one: /api/state and the widget (#280)."""
+    return {**_cached_bots(records.owned),
+            **{rid: record["snapshot"] for rid, record in records.by_id.items()}}
+
+
 # ── Events store ──────────────────────────────────────────────────────────────
 # events.yml lives alongside app.py.  We cache in module scope and hot-reload
 # when the file modtime changes — no restart required.
@@ -2145,7 +2151,7 @@ from trade_controls import install as install_trade_controls
 install_trade_controls(app, BOTS, _api_auth)
 from widgets import install as install_widgets
 install_widgets(app, lambda: {"last_poll": _cache.get("last_poll_finished_at"),
-                              "bots": _cached_bots(_records().owned), "status": _fleet_status(),
+                              "bots": _served_bots(_records()), "status": _fleet_status(),
                               "account_health": _account_health()})
 
 
@@ -2189,8 +2195,7 @@ async def api_state():
     return JSONResponse({
         "last_poll": _cache.get("last_poll_finished_at"),
         "poll_age_s": (time.time() - _cache["last_poll_finished_at"]) if _cache.get("last_poll_finished_at") else None,
-        "bots": {**_cached_bots(records.owned),
-                 **{rid: record["snapshot"] for rid, record in records.by_id.items()}},
+        "bots": _served_bots(records),
         "errors": _cache.get("errors", {}),
         "epoch_records": {"errors": records.errors, "coverage": _epoch_coverage},
         # ── NEW ──────────────────────────────────────────────────────────────
