@@ -1500,3 +1500,52 @@ def test_retained_account_stays_valued_and_in_scope_with_its_bot_dry(exporter, m
     assert set(health["breaker_accounts"]) == set(scope)
     assert health["equity"] == 400.0
     assert health["drawdown_pct"] == pytest.approx(10 / 410 * 100)
+
+
+# ── #280: which accounts can be retained, and taking one out of the set ──────
+def test_only_an_account_valued_without_a_member_bot_can_be_retained(exporter):
+    """binance-spot reads its balance through a bot's API and the Upbit pilot needs
+    a bot's wallet env: retained with no live bot, either would leave equity
+    incomplete and the breaker suspended, so startup refuses them."""
+    exporter.check_retained_accounts(exporter.RETAINED_ACCOUNTS)
+    for account in ("binance-spot", "hyperliquid-upbit-fade", "some-new-venue"):
+        with pytest.raises(ValueError, match=account):
+            exporter.check_retained_accounts(frozenset({"hyperliquid-killers", account}))
+
+
+def test_exporter_refuses_to_start_with_an_unsupported_retained_account(exporter, monkeypatch):
+    monkeypatch.setattr(exporter, "RETAINED_ACCOUNTS", frozenset({"binance-spot"}))
+    monkeypatch.setattr(exporter, "start_http_server",
+                        lambda *a, **k: pytest.fail("started with an unsupported retained account"))
+    monkeypatch.setattr(exporter, "refresh_live_capital", lambda: None)
+    with pytest.raises(ValueError, match="binance-spot"):
+        exporter.main()
+
+
+def test_removing_a_retained_account_rebases_the_peak_by_its_equity(exporter, monkeypatch, tmp_path):
+    """The README's removal step: the account leaves the breaker's scope, the peak
+    drops by its last equity, the $10 drawdown stays $10 and its percent rises."""
+    exporter._membership_complete = True
+    exporter._live_bots = [FUNDING, KELTNER]  # Killers is dry; its account is retained
+    requested = _venues(exporter, monkeypatch)
+    stopped = []
+    monkeypatch.setattr(exporter, "stop_bot", lambda bot: stopped.append(bot) or True)
+    scope = {"binance-spot": {"equity": 300.0, "transfers": BINANCE_T},
+             "hyperliquid-killers": {"equity": 100.0, "transfers": KILLERS_T}}
+    _run_cycles(exporter, monkeypatch, tmp_path, 1, {
+        "peak": 410.0, "equity_basis": "accounts-v1",
+        "account_transfer_total": LEDGER_TOTAL, "accounts": scope})
+    before = json.loads((tmp_path / "account_health.json").read_text())
+    assert before["drawdown_pct"] == pytest.approx(10 / 410 * 100)
+
+    monkeypatch.setattr(exporter, "RETAINED_ACCOUNTS", frozenset())
+    requested.clear()
+    saved = json.loads((tmp_path / "portfolio_peak.json").read_text())
+    _run_cycles(exporter, monkeypatch, tmp_path, 1, saved)
+    after = json.loads((tmp_path / "account_health.json").read_text())
+    assert exporter.GATEWAY_URL + "/account/killers" not in requested
+    assert set(after["breaker_accounts"]) == {"binance-spot"}
+    assert after["equity"] == 300.0 and after["complete"] is True
+    assert exporter._portfolio_peak == pytest.approx(310.0), "peak shifted by the $100 that left"
+    assert after["drawdown_pct"] == pytest.approx(10 / 310 * 100)
+    assert stopped == [], "a 3.2% drawdown halts nothing"

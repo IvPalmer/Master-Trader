@@ -463,7 +463,7 @@
           <div><dt>Open notional</dt><dd x-text="fmtUsd(hero.openNotional)"></dd></div>
           <div><dt>Loss to bot stops</dt><dd x-text="fmtUsd(hero.capitalAtRisk)"></dd></div>
           <div><dt>Risk / account equity</dt><dd x-text="fmtPct(hero.capitalAtRiskPct,2)"></dd></div>
-          <div><dt>Current breaker drawdown · Binance + Killers</dt><dd x-text="raw.account_health?.drawdown_pct != null ? fmtPct(-Math.abs(raw.account_health.drawdown_pct),2) : '—'"></dd></div>
+          <div><dt x-text="breakerScopeLabel ? 'Current breaker drawdown · ' + breakerScopeLabel : 'Current breaker drawdown'">Current breaker drawdown</dt><dd x-text="raw.account_health?.drawdown_pct != null ? fmtPct(-Math.abs(raw.account_health.drawdown_pct),2) : '—'"></dd></div>
         </dl>
         <p class="panel-note">Stop risk is an estimate. Gaps and fees can increase loss.</p>
         <button class="panel-action" @click="tradesView='open';tradesFilter='all';setTab('trades')">Review open positions →</button>
@@ -994,11 +994,11 @@
           </span>
           <span class="bis-stat">
             <span class="bis-stat-k">open p&l</span>
-            <strong class="num" :class="(bot.pnl?.unrealized || 0) >= 0 ? 'pos' : 'neg'" x-text="fmtUsdSigned(bot.pnl?.unrealized)">—</strong>
+            <strong class="num" :class="bot.stopped ? '' : (bot.pnl?.unrealized || 0) >= 0 ? 'pos' : 'neg'" x-text="bot.stopped ? '—' : fmtUsdSigned(bot.pnl?.unrealized)">—</strong>
           </span>
           <span class="bis-stat">
             <span class="bis-stat-k">open</span>
-            <strong class="num" x-text="openPositionCount(bot)">0</strong>
+            <strong class="num" x-text="bot.stopped ? '—' : openPositionCount(bot)">0</strong>
           </span>
           <span class="bis-stat bis-stat-wide">
             <span class="bis-stat-k">activity</span>
@@ -1106,7 +1106,7 @@
             <div class="metric-fact"><span class="k">p&l</span><span class="v" :class="(bot.pnl?.all_pct ?? 0) >= 0 ? 'pos' : 'neg'"
                     x-text="(bot.pnl?.all_pct ?? 0).toFixed(2) + '%' + (!bot.baseline_comparable ? '' : ' · expected ' + (bot.gate2?.profit?.expected_pct ?? bot.baseline?.annual_return_pct ?? 0).toFixed(2) + '%')">—</span></div>
             <div class="metric-fact"><span class="k">realized / open</span><span class="v" :class="(bot.pnl?.all_coin ?? 0) >= 0 ? 'pos' : 'neg'"
-                    x-text="fmtUsdSigned(bot.pnl?.closed) + ' / ' + fmtUsdSigned(bot.pnl?.unrealized)">—</span></div>
+                    x-text="fmtUsdSigned(bot.pnl?.closed) + ' / ' + (bot.stopped ? '—' : fmtUsdSigned(bot.pnl?.unrealized))">—</span></div>
             <div class="metric-fact"><span class="k">profit factor</span><span class="v" x-text="(bot.stats?.profit_factor?.toFixed(2) ?? '—') + (bot.baseline_comparable && bot.baseline?.profit_factor ? ' · lab ' + bot.baseline.profit_factor : '')">—</span></div>
             <div class="metric-fact"><span class="k">win rate</span><span class="v" x-text="((bot.stats?.winrate ?? 0) * 100).toFixed(1) + '%' + (bot.baseline_comparable && bot.baseline?.win_rate ? ' · lab ' + ((bot.baseline.win_rate ?? 0) * 100).toFixed(1) + '%' : '')">—</span></div>
             <div class="metric-fact"><span class="k">trades / yr pace</span><span class="v" x-text="bot.days_running > 0 ? ((bot.stats?.closed_trade_count ?? 0) / bot.days_running * 365).toFixed(0) + (bot.baseline_comparable && bot.baseline?.trades_per_year ? ' · lab ' + bot.baseline.trades_per_year : '') : '—'">—</span></div>
@@ -1136,14 +1136,14 @@
         <div class="card col-8">
           <div class="card-head">
             <div class="card-title">Equity curve</div>
-            <div class="card-sub" x-text="bot.lineage ? equityExplanation(bot) : (bot.baseline_comparable ? 'Realized live equity · current equity shown separately' : 'Realized live equity · current equity shown separately')">forward live equity</div>
+            <div class="card-sub" x-text="detailEquitySubtitle(bot)">forward live equity</div>
           </div>
           <div class="chart tall" :id="'chart-detail-equity-'+bot.key"></div>
         </div>
         <div class="card col-4">
           <div class="card-head">
             <div class="card-title">Drawdown</div>
-            <div class="card-sub">% below running peak · includes current open mark</div>
+            <div class="card-sub" x-text="bot.stopped ? '% below running peak · realized, final at epoch end' : '% below running peak · includes current open mark'">% below running peak · includes current open mark</div>
           </div>
           <div class="chart short" :id="'chart-detail-dd-'+bot.key"></div>
         </div>
