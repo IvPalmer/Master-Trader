@@ -297,6 +297,7 @@ def _gateway_ok(exporter, monkeypatch):
 
 
 def test_all_dry_run_fleet_is_fully_observed_with_no_equity(exporter, monkeypatch):
+    monkeypatch.setattr(exporter, "RETAINED_ACCOUNTS", frozenset())  # nothing funded to keep (#277)
     exporter._membership_complete = True
     exporter._live_bots = []
     _gateway_ok(exporter, monkeypatch)
@@ -574,6 +575,7 @@ def test_transient_failure_on_a_valued_account_still_freezes_the_breaker(exporte
 
 
 def test_only_unvalued_accounts_live_never_values_the_breaker_at_zero(exporter, monkeypatch):
+    monkeypatch.setattr(exporter, "RETAINED_ACCOUNTS", frozenset())  # nothing funded to keep (#277)
     exporter._membership_complete = True
     exporter._live_bots = [_registry_bot(exporter, "ShortKeltnerV2HL")]
     _venues(exporter, monkeypatch)
@@ -1393,6 +1395,7 @@ def test_fleet_breach_still_pauses_pilot_entries(exporter, monkeypatch, tmp_path
 
 
 def test_unreadable_pilot_mode_does_not_freeze_the_breaker(exporter, monkeypatch):
+    monkeypatch.setattr(exporter, "RETAINED_ACCOUNTS", frozenset())  # nothing funded to keep (#277)
     pilot = _registry_bot(exporter, "UpbitFadeLiveV1")
     exporter.BOTS = [FUNDING, pilot]
     exporter._live_bots = [FUNDING, {**pilot, "starting_capital": 108.0}]
@@ -1463,3 +1466,37 @@ def test_legacy_migration_ignores_pilot_losses(exporter, monkeypatch):
                                               "hyperliquid-killers": {"equity": 100.0, "transfers": 0.0}})
     assert exporter._portfolio_peak == pytest.approx(400.0)
     assert exporter._circuit_breaker_triggered is False
+
+
+def test_retained_account_stays_valued_and_in_scope_with_its_bot_dry(exporter, monkeypatch, tmp_path):
+    """#277: Killers moved to dry-run, its money still in its account. The account
+    stays in the headline equity and the breaker's scope with no live bot, so
+    nothing leaves scope and the peak does not shift across cycles."""
+    assert "hyperliquid-killers" in exporter.RETAINED_ACCOUNTS
+    exporter._membership_complete = True
+    exporter._live_bots = [FUNDING, KELTNER]  # Killers is dry: not a live bot
+    requested = _venues(exporter, monkeypatch)
+    result = exporter.observe_accounts()
+    assert result["accounts"]["hyperliquid-killers"]["equity"] == 100.0
+    assert result["breaker_accounts"] == {
+        "binance-spot": {"equity": 300.0, "transfers": pytest.approx(BINANCE_T)},
+        "hyperliquid-killers": {"equity": 100.0, "transfers": pytest.approx(KILLERS_T)},
+    }
+    assert result["complete"] is True and result["equity"] == 400.0
+    assert result["errors"] == []
+    assert exporter.GATEWAY_URL + "/account/killers" in requested
+
+    scope = {"binance-spot": {"equity": 300.0, "transfers": BINANCE_T},
+             "hyperliquid-killers": {"equity": 100.0, "transfers": KILLERS_T}}
+    stopped = []
+    monkeypatch.setattr(exporter, "stop_bot", lambda bot: stopped.append(bot) or True)
+    _run_cycles(exporter, monkeypatch, tmp_path, 2, {
+        "peak": 410.0, "equity_basis": "accounts-v1",
+        "account_transfer_total": LEDGER_TOTAL, "accounts": scope})
+    assert stopped == []
+    assert exporter._portfolio_peak == 410.0, "no scope change, so no peak shift"
+    assert set(exporter._account_scope) == set(scope)
+    health = json.loads((tmp_path / "account_health.json").read_text())
+    assert set(health["breaker_accounts"]) == set(scope)
+    assert health["equity"] == 400.0
+    assert health["drawdown_pct"] == pytest.approx(10 / 410 * 100)
