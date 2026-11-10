@@ -161,10 +161,50 @@ HERO_BOTS = {name: bot | {"key": name} for name, bot in HERO_BOTS.items()}   # a
 def test_metrics_match_the_hand_computed_dashboard_header():
     assert _metrics(HERO_BOTS) == [
         {"label": "Account equity", "value": "$280.00", "detail": "shared accounts counted once", "tone": "neutral"},
-        {"label": "Realized P&L", "value": "+$8.75", "detail": "17 closed trades · live epochs", "tone": "good"},
+        {"label": "Realized P&L", "value": "+$8.75", "detail": "17 closed trades · all live epochs", "tone": "good"},
         {"label": "Unrealized P&L", "value": "+$5.50", "detail": "3 open positions", "tone": "good"},
         {"label": "24 h P&L", "value": "+$1.20", "detail": "live bots · rolling 24 h", "tone": "good"},
     ]
+
+
+# A stopped live epoch as /api/state serves it: an epoch record's frozen snapshot (#277).
+# It has no open trades and no 24 h delta; its starting capital is not a balance now.
+STOPPED = _bot(key="alpha.live-r1", bot_key="alpha", label="alpha", stopped=True, reachable=False,
+               account_group="acct-s", wallet={"starting_capital": 98.0, "bot_owned": None, "total": None},
+               pnl={"closed": -56.0, "closed_trades": -56.0, "unrealized": None, "all_coin": -50.0},
+               stats={"closed_trade_count": 48}, delta_24h=None,
+               equity_realized=[[1000, 98.0], [2000, 42.0]])
+
+
+def test_a_stopped_live_epoch_counts_in_realized_results_only():
+    """`get hero()` (#280): realized P&L and closed trades cover every live epoch, stopped
+    ones included. Equity, open P&L, positions and 24 h belong to running bots."""
+    assert _metrics(HERO_BOTS | {"alpha.live-r1": STOPPED}) == [
+        # 280.00, not 378.00: a stopped epoch's starting capital is not counted
+        {"label": "Account equity", "value": "$280.00", "detail": "shared accounts counted once", "tone": "neutral"},
+        # 8.75 − 56.00 over 17 + 48 trades
+        {"label": "Realized P&L", "value": "−$47.25", "detail": "65 closed trades · all live epochs", "tone": "bad"},
+        # +5.50, not −0.50: the stopped all_coin − closed is not open P&L
+        {"label": "Unrealized P&L", "value": "+$5.50", "detail": "3 open positions", "tone": "good"},
+        {"label": "24 h P&L", "value": "+$1.20", "detail": "live bots · rolling 24 h", "tone": "good"},
+    ]
+
+
+def test_a_stopped_paper_epoch_stays_out_of_the_live_metrics():
+    paper = STOPPED | {"key": "paper.paper-r1", "dry_run": True}
+    assert _metrics(HERO_BOTS | {"paper.paper-r1": paper}) == _metrics(HERO_BOTS)
+
+
+def test_a_stopped_epoch_is_listed_as_stopped_and_left_out_of_24h_and_spark():
+    s = state()
+    before = widgets.build_bots(s)
+    s["bots"] = s["bots"] | {"alpha.live-r1": STOPPED}
+    data = widgets.build_bots(s)
+    items = data["list"]["groups"][0]["items"]
+    assert [i["key"] for i in items] == ["bot:alpha", "bot:beta", "bot:alpha.live-r1", "bot:gamma"]
+    assert items[2] == {"key": "bot:alpha.live-r1", "title": "alpha",
+                        "subtitle": "stopped · live epoch ended · realized −$56.00"}
+    assert (data["stat"], data["spark"], data["tone"]) == (before["stat"], before["spark"], before["tone"])
 
 
 def test_equity_complete_uses_the_observed_account_health():
@@ -236,14 +276,14 @@ def test_singular_open_position_and_closed_trade():
     bots = {"a": _bot(open_trades=[{"pair": "AAA/USDT", "amount": 1.0}], stats={"closed_trade_count": 1})}
     rows = _metrics(bots)
     assert rows[2]["detail"] == "1 open position"
-    assert rows[1]["detail"] == "1 closed trade · live epochs"
+    assert rows[1]["detail"] == "1 closed trade · all live epochs"
 
 
 def test_dry_run_bots_are_excluded_from_every_row():
     paper = {k: v for k, v in HERO_BOTS.items() if k == "paper"}
     assert _metrics(paper) == [
         {"label": "Account equity", "value": "$0.00", "detail": "shared accounts counted once", "tone": "neutral"},
-        {"label": "Realized P&L", "value": "$0.00", "detail": "0 closed trades · live epochs", "tone": "neutral"},
+        {"label": "Realized P&L", "value": "$0.00", "detail": "0 closed trades · all live epochs", "tone": "neutral"},
         {"label": "Unrealized P&L", "value": "$0.00", "detail": "0 open positions", "tone": "neutral"},
         {"label": "24 h P&L", "value": "$0.00", "detail": "live bots · rolling 24 h", "tone": "neutral"},
     ]
@@ -283,3 +323,22 @@ def test_app_feeds_the_widget_the_dashboard_account_health(monkeypatch):
     monkeypatch.setattr(dashboard, "_account_health", lambda: {"complete": True, "equity": 1234.56})
     body = TestClient(dashboard.app).get("/widgets/bots", headers=AUTH).json()
     assert body["metrics"]["rows"][0]["value"] == "$1,234.56"
+
+
+def test_the_widget_counts_epoch_records_exactly_as_api_state(monkeypatch):
+    """#280: the widget read running bots only, so its realized P&L left out every
+    stopped epoch the dashboard header counts."""
+    import app as dashboard
+    import epoch_records
+    monkeypatch.setenv("WIDGETS_TOKEN", TOKEN)
+    monkeypatch.setitem(dashboard._cache, "last_poll_finished_at", STATE["last_poll"])
+    monkeypatch.setitem(dashboard._cache, "bots", HERO_BOTS)
+    monkeypatch.setattr(dashboard, "_account_health", lambda: None)
+    records = epoch_records.Records({"alpha.live-r1": {"snapshot": STOPPED}}, frozenset(), [])
+    monkeypatch.setattr(dashboard, "_records", lambda: records)
+    client = TestClient(dashboard.app)
+    served = client.get("/api/state").json()["bots"]
+    assert served["alpha.live-r1"]["stopped"] is True
+    rows = client.get("/widgets/bots", headers=AUTH).json()["metrics"]["rows"]
+    assert rows == widgets.build_metrics({"bots": served})["rows"]
+    assert (rows[1]["value"], rows[1]["detail"]) == ("−$47.25", "65 closed trades · all live epochs")

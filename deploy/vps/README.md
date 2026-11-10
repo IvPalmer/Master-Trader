@@ -158,7 +158,8 @@ a record.
    window `[--start-ms, --end-ms)`. The example is in its docstring. It takes a
    verified `archive-<record id>.sqlite` backup first, serializes the trades with
    Freqtrade's own `Trade.to_json()`, and builds the record inside `ft-dashboard`.
-   Hyperliquid fills are reconciled there, once.
+   Hyperliquid fills are reconciled there, once. If that backup file already
+   exists, the script reuses it and takes no new one (see below).
 4. Check the printed totals. The Freqtrade raw P&L must already match SQLite; the
    corrected total is the one the dashboard shows.
 5. Only then remove the bot from the dashboard's `BOTS`. A bot that is no longer
@@ -169,3 +170,73 @@ Records are written once, mode 0444, and never replaced. A record that is
 malformed, or that claims a trade another record owns, is rejected whole and
 shown as a warning. To correct one, move the file out of `epoch-records/` and
 archive the epoch again.
+
+**After an aborted run.** A run that stopped after step 3 leaves
+`archive-<record id>.sqlite` on the volume, and the next run reuses that snapshot
+instead of taking a new one. If the bot traded or went flat since, the record
+would be built from the old state: the script refuses a snapshot with an open
+trade, and trades closed after it would belong to no epoch (the dashboard's amber
+warning). Before you run the script again, delete that file as root, unless it is
+a backup you made on purpose.
+
+**An earlier epoch of a bot that keeps running live** (as for
+`fundingfade.live-v1`). When the bot still writes the database the epoch is in,
+step 2 cannot hold. Make the backup yourself while the bot is flat (the script
+refuses a backup with an open trade), with the SQLite backup API the script uses:
+
+```bash
+sudo python3 -c 'import sys; sys.path.insert(0, "deploy/vps"); from pathlib import Path; from backup_live_dbs import backup_sqlite; backup_sqlite(Path(sys.argv[1]), Path(sys.argv[2]))' \
+    /var/lib/docker/volumes/compose-bypass-mobile-port-fbk1m6_ft_user_data/_data/tradesv3.live.<strategy>.sqlite \
+    /var/lib/docker/volumes/compose-bypass-mobile-port-fbk1m6_ft_user_data/_data/archive-<record id>.sqlite
+```
+
+Pass that file name as `--source-db`. An `archive-*` source is treated as a
+backup already, so the script skips its "bot is off this DB" check, and nothing
+else enforces it. Two things are then up to you: end the window (`--end-ms`)
+where the running epoch starts, so the record takes none of the running bot's
+trades, and keep the bot in `BOTS` (skip step 5).
+
+## Funded accounts with no live bot (`RETAINED_ACCOUNTS`)
+
+Demoting the last live bot on an account leaves its money there. Accounts in
+`RETAINED_ACCOUNTS` (`ft_userdata/metrics_exporter.py`) stay valued, in the
+dashboard's account equity and in the fleet breaker's scope with no live bot
+(#277). Today that is `hyperliquid-killers`, read through the gateway's
+`/account/killers`.
+
+**A valuation failure suspends the breaker for every live bot.** If the exporter
+cannot value a retained account (the request fails, or the mark is older than
+90 s), the breaker's equity is incomplete and it is not evaluated at all, for the
+Binance bots too: a partial total would look like a drawdown. This fails closed
+and is the same behaviour as when Killers was live. After 15 minutes
+`fleet-breaker-watch` pages "Circuit breaker not evaluated"; fix the valuation
+(gateway, Hyperliquid API) rather than removing the account to get the breaker
+back.
+
+**Only an account valued without a bot can be retained.** `binance-spot` reads
+its balance through a bot's API, and `hyperliquid-upbit-fade` needs a bot's
+wallet. With no live bot their equity cannot be read. The exporter refuses to
+start when `RETAINED_ACCOUNTS` holds an account outside `VALUED_WITHOUT_A_BOT`
+(#280). Supporting another account means writing and testing an adapter that
+needs no member bot first.
+
+**Removing an account once its funds have moved:**
+
+1. Move the funds and record each leg in `ft_userdata/account_transfers.json`
+   (see [HYPERLIQUID-REQUESTS-AND-RECOVERY.md](../../docs/ops/HYPERLIQUID-REQUESTS-AND-RECOVERY.md)).
+   A recorded withdrawal shifts the peak by the cash flow, so it is not a loss.
+2. Check that the account is empty: its equity in `account_health.json` or on the
+   dashboard's Portfolio tab.
+3. Check the breaker is evaluating (`fleet-breaker-watch` is not firing). The
+   leaving account's equity is the one from the last evaluated cycle.
+4. Remove the account from `RETAINED_ACCOUNTS` in a PR and deploy the exporter
+   with `--no-deps`.
+5. On its first cycle the exporter logs `Breaker scope changed (left
+   hyperliquid-killers ...)` and lowers the peak by the account's last equity.
+   The dollar drawdown is unchanged. The percentage rises, because the same
+   dollars are measured against a smaller peak: $10 is 2.4% of $410 but 3.2% of
+   $310. Check it against the 10% threshold before you deploy. Money still in the
+   account would leave the breaker and the account equity with it.
+
+The account then drops out of the dashboard's account equity. The stopped
+epoch's record keeps counting in realized P&L.

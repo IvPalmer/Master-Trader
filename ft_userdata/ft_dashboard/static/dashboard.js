@@ -638,6 +638,11 @@ function dash() {
       if (bot.baseline?.annual_return_pct) return 'Realized live equity · current equity shown separately';
       return 'Realized live equity · current equity shown separately';
     },
+    // The bot detail's equity card. A stopped record has no lineage curve and no open mark (#280).
+    detailEquitySubtitle(bot) {
+      if (bot.stopped) return 'Realized live equity · epoch ended ' + this.fmtEpochRange(bot);
+      return bot.lineage ? this.equityExplanation(bot) : 'Realized live equity · current equity shown separately';
+    },
     equityExplanation(bot) {
       const closed = bot?.stats?.closed_trade_count || 0;
       return `Historical dry-run + rebased live returns · comparison scale, not account balance. ${closed ? closed + ' closed live trades' : 'No closed live trades: solid line stays flat'}; current equity snapshot includes open P&L.`;
@@ -752,11 +757,13 @@ function dash() {
         current.bots.push(bot.label);
         accounts.set(key, current);
       }
-      // A funded account whose bots all stopped is still capital (#277).
+      // A funded account whose bots all stopped is still capital (#277). Its venue
+      // and name come from a bot on it (dry-run or a stopped record), never a guess (#280).
       for (const key of Object.keys(this.raw.account_health?.accounts || {})) {
         if (!accounts.has(key)) {
-          const venue = this.bots.find(b => b.account_group === key)?.venue || 'binance';
-          accounts.set(key, { key, venue, capital: 0, pnl: 0, atRisk: 0, open: 0, bots: [] });
+          const owner = this.bots.find(b => b.account_group === key);
+          accounts.set(key, { key, venue: owner?.venue ?? null, capital: 0, pnl: 0, atRisk: 0, open: 0, bots: [],
+            idle: true, ownerLabel: owner?.label });
         }
       }
       return [...accounts.values()]
@@ -767,18 +774,30 @@ function dash() {
           notional: this.raw.account_health?.accounts?.[account.key]?.notional,
           capital: this.raw.account_health?.accounts?.[account.key]?.equity
             ?? (this.raw.account_health ? null : account.capital),
-          label: account.key === 'binance-spot'
-            ? 'Binance spot'
-            : (account.bots.length === 1 ? account.bots[0] : account.key),
+          name: this.accountName(account),
+          label: this.accountName(account) + (account.idle ? ' · no live bot' : ''),
           weight: this.hero.walletNow ? (this.raw.account_health?.accounts?.[account.key]?.equity ?? account.capital) / this.hero.walletNow * 100 : 0,
         }))
         .sort((a, b) => b.capital - a.capital);
     },
 
+    // The accounts the exporter's breaker measured, as it reported them (#280).
+    // Unknown while the breaker's equity is incomplete: no fixed list stands in.
+    get breakerScopeLabel() {
+      const keys = Object.keys(this.raw.account_health?.breaker_accounts || {});
+      return keys.map(key => this.portfolioAccounts.find(a => a.key === key)?.name ?? key).join(' + ');
+    },
+
+    accountName(account) {
+      if (account.key === 'binance-spot') return 'Binance spot';
+      return account.bots.length === 1 ? account.bots[0] : account.ownerLabel ?? account.key;
+    },
+
     get portfolioVenues() {
       const venues = new Map();
       for (const account of this.portfolioAccounts) {
-        const key = account.venue === 'hyperliquid' ? 'Hyperliquid perps' : 'Binance spot';
+        const key = account.venue === 'hyperliquid' ? 'Hyperliquid perps'
+          : account.venue === 'binance' ? 'Binance spot' : 'Venue unknown';
         const current = venues.get(key) || { label: key, capital: 0, pnl: 0, accounts: 0, bots: 0 };
         current.capital += account.capital;
         current.pnl += account.pnl;
