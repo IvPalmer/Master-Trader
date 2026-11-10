@@ -380,6 +380,10 @@ VALUED_ACCOUNTS = frozenset({"binance-spot", "hyperliquid-killers", "hyperliquid
 # governed by its own kill switch, so a loss there cannot halt the fleet. A fleet
 # breach still pauses their entries: enforce_halts() covers every live bot.
 OUTSIDE_BREAKER_ACCOUNTS = frozenset({"hyperliquid-upbit-fade"})
+# Funded accounts kept valued, in the headline equity and in the breaker's scope
+# even with no live bot on them, until verified empty (#277): demoting the last
+# bot leaves the money in the account. Halt targets stay bot-based.
+RETAINED_ACCOUNTS = frozenset({"hyperliquid-killers"})
 
 
 def outside_breaker(bot: dict) -> bool:
@@ -444,6 +448,8 @@ def observe_accounts() -> dict:
     transfers = {}
     for bot in _live_bots:
         groups.setdefault(bot.get("capital_account") or bot["service"], []).append(bot)
+    for account in sorted(RETAINED_ACCOUNTS):
+        groups.setdefault(account, [])
     unvalued = unvalued_live_accounts(_live_bots)
     valued = [account for account in groups if account not in unvalued]
     # The breaker's scope: every valued live account it governs (#261).
@@ -455,7 +461,9 @@ def observe_accounts() -> dict:
             owners = [b for b in members if b.get("capital_owner")]
             if len(members) > 1 and len(owners) != 1:
                 raise ValueError("ambiguous account representative")
-            owner = owners[0] if owners else members[0]
+            # A retained account may have no member; an adapter that needs one
+            # then fails into the except below instead of guessing.
+            owner = owners[0] if owners else (members[0] if members else {})
             if account == "hyperliquid-killers":
                 response = requests.get(GATEWAY_URL + "/account/killers", timeout=20)
                 response.raise_for_status()

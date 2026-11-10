@@ -195,13 +195,19 @@ function dash() {
 
     // ─── derived ───
     get bots() { return Object.values(this.raw.bots || {}); },
+    // Running live bots. A stopped bot is an archived epoch record (#277): its
+    // realized results still count, but it has no position, risk or controls.
     get liveBots() {
-      return this.bots.filter(b => b.dry_run === false)
+      return this.bots.filter(b => b.dry_run === false && !b.stopped)
         .sort((a, b) => (a.label||'').localeCompare(b.label||''));
+    },
+    get stoppedBots() {
+      return this.bots.filter(b => b.dry_run === false && b.stopped)
+        .sort((a, b) => (b.epoch?.end_ts_ms || 0) - (a.epoch?.end_ts_ms || 0));
     },
     get dryRunBots() {
       return this.bots.filter(b => b.dry_run === true)
-        .sort((a, b) => (a.label||'').localeCompare(b.label||''));
+        .sort((a, b) => (!!a.stopped - !!b.stopped) || (a.label||'').localeCompare(b.label||''));
     },
     get allBots() {
       return [...this.bots].sort((a, b) => {
@@ -214,7 +220,9 @@ function dash() {
       return this.raw.bots?.[this.tab.slice(4)] || null;
     },
     get liveAccountCount() {
-      return new Set(this.liveBots.map(b => b.account_group || b.key)).size;
+      // A funded account keeps counting after its last bot stops (#277).
+      return new Set([...this.liveBots.map(b => b.account_group || b.key),
+        ...Object.keys(this.raw.account_health?.accounts || {})]).size;
     },
     get liveVenueCount() {
       return new Set(this.liveBots.map(b => b.venue || 'binance')).size;
@@ -229,6 +237,9 @@ function dash() {
     // ─── fleet-aggregated hero stats (Bug fix B2: defensive chaining throughout) ───
     get hero() {
       const live = this.liveBots;
+      // Realized results cover every live epoch, stopped ones included (#277);
+      // exposure, open P&L and stop risk belong to running bots only.
+      const epochs = [...live, ...this.stoppedBots];
       // Several strategies may share one exchange account. Count deployable
       // capital once per account_group while still adding every strategy's P&L.
       // Without this, Funding/Keltner/OI triple-count the same Binance wallet.
@@ -242,41 +253,31 @@ function dash() {
       const walletNow = observed?.complete
         ? observed.equity
         : (observed ? null : [...accounts.values()].reduce((s, v) => s + v, 0));
-      const totalPnl = live.reduce((s, b) => s + (b.pnl?.all_coin ?? 0), 0);
-      const totalRealizedPnl = live.reduce((s, b) => s + (b.pnl?.closed ?? 0), 0);
+      const totalRealizedPnl = epochs.reduce((s, b) => s + (b.pnl?.closed ?? 0), 0);
       const totalUnrealizedPnl = live.reduce((s, b) => s + (b.pnl?.unrealized ?? ((b.pnl?.all_coin ?? 0) - (b.pnl?.closed ?? 0))), 0);
-      const start = walletNow == null ? null : walletNow - totalPnl;
-      const closedTrades = live.reduce((s, b) => s + (b.stats?.closed_trade_count ?? 0), 0);
-      const totalWins = live.reduce((s, b) => s + (b.stats?.winning_trades ?? 0), 0);
-      const totalLosses = live.reduce((s, b) => s + (b.stats?.losing_trades ?? 0), 0);
+      const closedTrades = epochs.reduce((s, b) => s + (b.stats?.closed_trade_count ?? 0), 0);
+      const totalWins = epochs.reduce((s, b) => s + (b.stats?.winning_trades ?? 0), 0);
+      const totalLosses = epochs.reduce((s, b) => s + (b.stats?.losing_trades ?? 0), 0);
       const winRate = (totalWins + totalLosses) ? totalWins / (totalWins + totalLosses) : 0;
-      const aggregateClosed = this.closedTrades;
-      const grossProfit = live.reduce((s, b) => s + Number(b.stats?.gross_profit || 0), 0);
-      const grossLoss = live.reduce((s, b) => s + Number(b.stats?.gross_loss || 0), 0);
+      // Live trades only: paper results never enter the live averages.
+      const aggregateClosed = this.closedTrades.filter(t => t.dry_run === false);
+      const grossProfit = epochs.reduce((s, b) => s + Number(b.stats?.gross_profit || 0), 0);
+      const grossLoss = epochs.reduce((s, b) => s + Number(b.stats?.gross_loss || 0), 0);
       const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : null;
       // Per closed trade: booked partial exits of open trades are realized but belong to no closed trade yet.
-      const closedTradePnl = live.reduce((s, b) => s + (b.pnl?.closed_trades ?? b.pnl?.closed ?? 0), 0);
+      const closedTradePnl = epochs.reduce((s, b) => s + (b.pnl?.closed_trades ?? b.pnl?.closed ?? 0), 0);
       const expectancyPerTrade = closedTrades > 0 ? closedTradePnl / closedTrades : null;
-      const ddMax = live.length ? Math.max(...live.map(b => (b.stats?.max_drawdown ?? 0) * 100)) : 0;
-      const ddCurrentPerBot = live.map(b => {
-        const dd = b.drawdown_curve;
-        return dd && dd.length ? dd[dd.length - 1][1] : 0;
-      });
-      const ddCurrent = ddCurrentPerBot.length ? Math.min(...ddCurrentPerBot) : 0;
-      const ddBacktest = live.length
-        ? Math.max(...live.map(b => b.baseline?.max_dd_pct || 0))
-        : 0;
-      const ddCap = ddBacktest * 1.5;
+      const ddMax = epochs.length ? Math.max(...epochs.map(b => (b.stats?.max_drawdown ?? 0) * 100)) : 0;
       // An unfilled entry order is not a position or exposure; its stake is only requested.
       const isPendingEntry = t => t.entry?.state === 'pending' && !(Number(t.amount) > 0);
       const pendingEntries = live.reduce((s, b) => s + (b.open_trades || []).filter(isPendingEntry).length, 0);
       const open = live.reduce((s, b) => s + (b.open_trades || []).length, 0) - pendingEntries;
       const openNotional = live.reduce((s, b) => s + (b.open_trades || []).reduce((a, t) => a + (isPendingEntry(t) ? 0 : (t.stake_amount || 0)), 0), 0);
       const car = live.reduce((s, b) => s + (b.capital_at_risk?.abs_loss || 0), 0);
-      const carPct = start ? (car / start * 100) : 0;
+      const carPct = walletNow ? (car / walletNow * 100) : null;
 
       const pairMap = {};
-      for (const b of live) {
+      for (const b of epochs) {
         for (const pp of (b.per_pair || [])) {
           if (!pairMap[pp.pair]) pairMap[pp.pair] = { pnl: 0, trades: 0 };
           pairMap[pp.pair].pnl += Number(pp.pnl || 0);
@@ -304,13 +305,11 @@ function dash() {
       const payoff = avgLoss && avgLoss !== 0 ? Math.abs(avgWin / avgLoss) : null;
 
       return {
-        walletNow, walletStart: start, totalPnl, totalRealizedPnl, totalUnrealizedPnl,
-        totalPct: start ? (totalPnl / start * 100) : 0,
+        walletNow, totalRealizedPnl, totalUnrealizedPnl,
         closedTrades,
         winRate, profitFactor, expectancyPerTrade,
         expectancySample: closedTrades,
-        drawdownMaxPct: ddMax, drawdownCurrentPct: ddCurrent,
-        drawdownBacktest: ddBacktest, drawdownCap: ddCap,
+        drawdownMaxPct: ddMax,
         openCount: open, pendingEntries, openNotional,
         capitalAtRisk: car, capitalAtRiskPct: carPct,
         concentration, avgWin, avgLoss, payoff,
@@ -325,6 +324,26 @@ function dash() {
       for (const warning of (this.raw.account_health?.warnings || [])) {
         items.push({color: 'amber', icon: '!', subject: warning,
           reason: 'Live request handling or account valuation needs attention.',
+          cta: 'view portfolio', action: () => this.setTab('portfolio'), detailTab: 'portfolio'});
+      }
+      // Ended-epoch records (#277): a rejected record or an unarchived live
+      // trade means the all-time totals are incomplete, not that money is at risk.
+      const epochRecords = this.raw.epoch_records || {};
+      for (const error of (epochRecords.errors || [])) {
+        items.push({color: 'amber', icon: '!', subject: error,
+          reason: 'This stopped epoch is left out of the all-time totals until its record is fixed.',
+          cta: 'view portfolio', action: () => this.setTab('portfolio'), detailTab: 'portfolio'});
+      }
+      for (const db of (epochRecords.coverage?.uncovered || [])) {
+        items.push({color: 'amber', icon: '!',
+          subject: `${db.count} closed live trade${db.count === 1 ? '' : 's'} in ${db.db} belong to no epoch`,
+          reason: 'Neither a running bot nor an epoch record counts them. Archive the ended epoch (deploy/vps/README.md).',
+          cta: 'view portfolio', action: () => this.setTab('portfolio'), detailTab: 'portfolio'});
+      }
+      for (const db of (epochRecords.coverage?.unverified || [])) {
+        items.push({color: 'amber', icon: '?',
+          subject: `${db.db || 'Live trade history'} could not be checked for unarchived trades`,
+          reason: db.error || 'Coverage check unavailable',
           cta: 'view portfolio', action: () => this.setTab('portfolio'), detailTab: 'portfolio'});
       }
 
@@ -435,7 +454,7 @@ function dash() {
       return items;
     },
     get observationNotices() {
-      return this.dryRunBots.filter(b => b.observational && !b.baseline?.profit_factor);
+      return this.dryRunBots.filter(b => b.observational && !b.stopped && !b.baseline?.profit_factor);
     },
     get attentionItems() {
       return this._rawIncidents.filter(item => !this._dismissedIncidents.has(item.subject));
@@ -492,7 +511,7 @@ function dash() {
       return Math.max(0, Math.floor((Date.now() - toMs(ts)) / 1000));
     },
     get recentLiveTrades() {
-      const live = this.liveBots;
+      const live = [...this.liveBots, ...this.stoppedBots];
       return live.flatMap(bot => (bot.recent_trades || []).map(trade => ({
         ...trade,
         _bot: bot.key,
@@ -530,12 +549,14 @@ function dash() {
       return stale.some(item => (typeof item === 'string' ? item : (item.key || item.bot_key)) === bot.key);
     },
     botStatus(bot) {
+      if (bot?.stopped) return { label: 'stopped', cls: 'stopped' };
       if (!bot?.reachable) return { label: 'unreachable', cls: 'offline' };
       if (this.isBotStale(bot)) return { label: 'stale', cls: 'stale' };
       if (bot.position_integrity?.status === 'critical') return { label: 'position fault', cls: 'offline' };
       return { label: 'running', cls: 'running' };
     },
     botActivity(bot) {
+      if (bot?.stopped) return 'Epoch ended · ' + this.fmtEpochRange(bot);
       if (!bot?.reachable) return 'Last known state · reconnecting';
       const open = bot?.open_trades?.length || 0;
       if (open) return `managing ${open} open position${open === 1 ? '' : 's'}`;
@@ -564,8 +585,18 @@ function dash() {
     },
     fmtEpoch(bot) {
       const ts = bot?.epoch?.start_ts_ms;
+      if (bot?.stopped) return `${bot.epoch?.label || 'Epoch label unavailable'} · ${this.fmtEpochRange(bot)}`;
       if (!ts) return bot?.epoch?.label || 'current epoch';
       return `${bot.epoch.label || 'Epoch label unavailable'} · since ${new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' })}`;
+    },
+    // A stopped epoch's half-open window; the end is the first instant after it.
+    fmtEpochRange(bot) {
+      const day = ts => ts ? new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '—';
+      return `${day(bot?.epoch?.start_ts_ms)} → ${day(bot?.epoch?.end_ts_ms)}`;
+    },
+    stoppedReason(bot) {
+      const issue = bot?.epoch?.issue;
+      return (bot?.epoch?.reason || 'Reason not recorded') + (issue ? ' · #' + issue : '');
     },
     venueLabel(bot) {
       return bot?.venue === 'hyperliquid' ? 'Hyperliquid perps' : 'Binance spot';
@@ -577,6 +608,7 @@ function dash() {
       return bot?.strategy_kind === 'copy-trader' ? 'copy-trader' : 'autonomous quant';
     },
     botCapitalLabel(bot) {
+      if (bot?.stopped) return 'starting capital';
       return bot?.account_group === 'binance-spot' ? 'shared capital' : 'bot capital';
     },
     botHasHistory(bot) {
@@ -589,16 +621,19 @@ function dash() {
       return this.selectedEquityBot?.label || 'fleet';
     },
     botCapital(bot) {
+      // A stopped epoch owns no balance now; show what it started with.
+      if (bot.stopped) return bot.wallet?.starting_capital;
       const account = this.raw.account_health?.accounts?.[bot.account_group];
       if (!bot.dry_run && bot.account_group !== 'binance-spot' && account) return account.equity;
       return bot.wallet?.bot_owned;
     },
     get equityTitle() {
-      return this.selectedEquityBot ? `${this.selectedEquityBot.label} equity` : 'Portfolio equity';
+      return this.selectedEquityBot ? `${this.selectedEquityBot.label} equity` : 'Fleet realized P&L';
     },
     get equitySubtitle() {
       const bot = this.selectedEquityBot;
-      if (!bot) return 'Realized equity over time · current equity shown separately';
+      if (!bot) return 'Cumulative realized P&L · all live epochs, stopped ones included · open P&L shown separately';
+      if (bot.stopped) return 'Realized live equity · epoch ended ' + this.fmtEpochRange(bot);
       if (bot.lineage) return this.equityExplanation(bot);
       if (bot.baseline?.annual_return_pct) return 'Realized live equity · current equity shown separately';
       return 'Realized live equity · current equity shown separately';
@@ -613,9 +648,6 @@ function dash() {
           || (this.selectedEquityBot.open_trades?.length || 0) > 0
         : this.hero.closedTrades > 0 || this.hero.openCount > 0;
     },
-    get selectedPnl() {
-      return this.selectedEquityBot?.pnl?.all_coin ?? this.hero.totalPnl;
-    },
     get selectedRealizedPnl() {
       return this.selectedEquityBot?.pnl?.closed ?? this.hero.totalRealizedPnl;
     },
@@ -624,9 +656,6 @@ function dash() {
       return bot
         ? (bot.pnl?.unrealized ?? ((bot.pnl?.all_coin ?? 0) - (bot.pnl?.closed ?? 0)))
         : this.hero.totalUnrealizedPnl;
-    },
-    get selectedReturn() {
-      return this.selectedEquityBot ? this.selectedEquityBot.pnl?.all_pct : this.hero.totalPct;
     },
     get selectedMaxDrawdown() {
       return this.selectedEquityBot
@@ -668,39 +697,39 @@ function dash() {
       };
     },
     get fleetPerformanceData() {
-      // Realized P&L of live bots by fill time: closed-trade exits plus booked
-      // partial exits (TP rungs) of open trades. null = booked by now, time unknown.
+      // Cumulative realized P&L of every live epoch, stopped ones included, by
+      // fill time: closed-trade exits plus booked partial exits (TP rungs) of
+      // open trades. Zero-based, so wallet transfers never move it (#277).
+      // null = booked by now, time unknown. Drawdown is dollars below the peak.
       const now = Date.now();
-      const realizedEvents = this.liveBots
+      const epochs = [...this.liveBots, ...this.stoppedBots];
+      const realizedEvents = epochs
         .flatMap(bot => (bot.realized_events || []).map(([ts, pnl]) => [ts ? toMs(ts) : now, Number(pnl || 0)]))
         .sort((a, b) => a[0] - b[0]);
-      const start = this.hero.walletStart || this.hero.walletNow || 0;
-      let equity = start;
-      const epochStarts = this.liveBots.map(bot => toMs(bot.epoch?.start_ts_ms || 0)).filter(Boolean);
+      let equity = 0;
+      const epochStarts = epochs.map(bot => toMs(bot.epoch?.start_ts_ms || 0)).filter(Boolean);
       const openStarts = this.openPositions.map(position => toMs(position.open_timestamp || 0)).filter(Boolean);
       const firstTs = realizedEvents.length
         ? realizedEvents[0][0]
         : Math.min(...[...epochStarts, ...openStarts, now]);
-      const live = [[Math.max(0, firstTs - 1000), Number(start.toFixed(4))]];
+      const live = [[Math.max(0, firstTs - 1000), 0]];
       const drawdown = [[Math.max(0, firstTs - 1000), 0]];
-      let peak = start;
+      let peak = 0;
       for (const [ts, pnl] of realizedEvents) {
         equity += pnl;
         peak = Math.max(peak, equity);
-        const dd = peak > 0 ? (equity - peak) / peak * 100 : 0;
         live.push([ts, Number(equity.toFixed(4))]);
-        drawdown.push([ts, Number(dd.toFixed(4))]);
+        drawdown.push([ts, Number((equity - peak).toFixed(4))]);
       }
       const realized = live.map(point => [...point]);
       const drawdownRealized = drawdown.map(point => [...point]);
       if (this.hero.openCount > 0) {
         equity += this.hero.totalUnrealizedPnl;
         peak = Math.max(peak, equity);
-        const dd = peak > 0 ? (equity - peak) / peak * 100 : 0;
         live.push([now, Number(equity.toFixed(4))]);
-        drawdown.push([now, Number(dd.toFixed(4))]);
+        drawdown.push([now, Number((equity - peak).toFixed(4))]);
       }
-      return { live, realized, drawdown, drawdownRealized, hasOpenMark: this.hero.openCount > 0 };
+      return { live, realized, drawdown, drawdownRealized, hasOpenMark: this.hero.openCount > 0, zeroBased: true };
     },
 
     get portfolioAccounts() {
@@ -722,6 +751,13 @@ function dash() {
         current.open += bot.open_trades?.length || 0;
         current.bots.push(bot.label);
         accounts.set(key, current);
+      }
+      // A funded account whose bots all stopped is still capital (#277).
+      for (const key of Object.keys(this.raw.account_health?.accounts || {})) {
+        if (!accounts.has(key)) {
+          const venue = this.bots.find(b => b.account_group === key)?.venue || 'binance';
+          accounts.set(key, { key, venue, capital: 0, pnl: 0, atRisk: 0, open: 0, bots: [] });
+        }
       }
       return [...accounts.values()]
         .map(account => ({
@@ -754,9 +790,9 @@ function dash() {
     },
 
     get portfolioStrategyRows() {
-      return this.liveBots.map(bot => ({
+      return [...this.liveBots, ...this.stoppedBots].map(bot => ({
         key: bot.key,
-        label: bot.label,
+        label: bot.stopped ? bot.label + ' · stopped' : bot.label,
         realized: Number(bot.pnl?.closed || 0),
         unrealized: Number(bot.pnl?.unrealized ?? ((bot.pnl?.all_coin || 0) - (bot.pnl?.closed || 0))),
         pnl: Number(bot.pnl?.all_coin || 0),
@@ -767,7 +803,7 @@ function dash() {
 
     get portfolioPairRows() {
       const pairs = new Map();
-      for (const bot of this.liveBots) {
+      for (const bot of [...this.liveBots, ...this.stoppedBots]) {
         for (const row of bot.per_pair || []) {
           const current = pairs.get(row.pair) || { pair: row.pair, realized: 0, unrealized: 0, pnl: 0, trades: 0 };
           current.realized += Number(row.realized ?? row.pnl ?? 0);
@@ -784,16 +820,6 @@ function dash() {
       return [...pairs.values()]
         .map(row => ({ ...row, pnl: row.realized + row.unrealized }))
         .sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
-    },
-
-    get portfolioDrawdownMax() {
-      const values = this.fleetPerformanceData.drawdown.map(point => Number(point[1] || 0));
-      return values.length ? Math.abs(Math.min(...values, 0)) : 0;
-    },
-
-    get portfolioCurrentDrawdown() {
-      const rows = this.fleetPerformanceData.drawdown;
-      return rows.length ? Number(rows[rows.length - 1][1] || 0) : 0;
     },
 
     // ─── last closed trade for a bot ───
@@ -825,6 +851,7 @@ function dash() {
 
     // ─── dry-run graduation board helpers ───
     dryBotVerdict(bot) {
+      if (bot.stopped) return { text: 'stopped', cls: '' };
       if (bot.no_baseline || bot.observational) return { text: 'observational', cls: 'obs' };
       const g1 = bot.gate1 ? Object.values(bot.gate1).every(x => x.ok) : false;
       const g2 = bot.gate2 ? ['profit', 'pf', 'dd'].every(k =>
@@ -835,6 +862,7 @@ function dash() {
       return { text: 'not ready', cls: '' };
     },
     dryBotBlocker(bot) {
+      if (bot.stopped) return 'epoch ended · ' + this.fmtEpochRange(bot);
       if (bot.no_baseline || bot.observational) return 'observational · monitoring only';
       if (!bot.gate1) return '—';
       const t = bot.gate1.trades;
@@ -1272,6 +1300,7 @@ function dash() {
       // blank charts when a fetch failed or was still in flight).
       const cached = this._tradeCandles[cacheKey];
       let candles = null;
+      let unavailable = null;
       if (cached) {
         if (!trade.is_open) candles = cached.candles;
         else if (Date.now() - cached.ts < 60000) candles = cached.candles;
@@ -1285,12 +1314,16 @@ function dash() {
           const startMs = Math.max(toMs(trade.open_ts) - padCandles * tfMs, endMs - 499 * tfMs);
           const url = `/api/trade_candles/${encodeURIComponent(trade.bot_key)}?pair=${encodeURIComponent(trade.pair)}&timeframe=${tf}&limit=500&start_ms=${startMs}&end_ms=${endMs}`;
           const r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(95000) });
-          if (!r.ok) throw new Error('Candles unavailable');
+          if (!r.ok) {
+            const body = await r.json().catch(() => null);
+            unavailable = body?.unavailable ? body.error : null;
+            throw new Error('Candles unavailable');
+          }
           const data = await r.json();
           candles = data.candles || [];
           this._tradeCandles[cacheKey] = { ts: Date.now(), candles };
         } catch {
-          if (this._tradeChartRequest[chartId] === request) this._tradeChartState[chartId] = { error: 'Price chart unavailable. Retry shortly.' };
+          if (this._tradeChartRequest[chartId] === request) this._tradeChartState[chartId] = { error: unavailable || 'Price chart unavailable. Retry shortly.' };
           return;
         }
       }
@@ -1395,9 +1428,10 @@ function dash() {
       const marked = lineage?.live || data?.live || [];
       const closed = closedEquityThroughMark(lineage?.realized || data?.realized || [], marked);
       const series = [];
+      const zero = data?.zeroBased;
       if (lineage?.legacy?.length) series.push({label: lineage.legacy_label || 'Historical paper', data: lineage.legacy, color: COLORS.text3});
-      series.push({label: lineage ? `${lineage.live_label || 'Live'} · realized` : 'Realized equity', data: closed, color: COLORS.accent, step: true});
-      const snapshot = hasOpen && marked.length ? {label:lineage?'Current rebased value · includes open P&L':'Current equity · includes open P&L', value:marked[marked.length-1][1]} : null;
+      series.push({label: lineage ? `${lineage.live_label || 'Live'} · realized` : (zero ? 'Cumulative realized P&L' : 'Realized equity'), data: closed, color: COLORS.accent, step: true});
+      const snapshot = hasOpen && marked.length ? {label:lineage?'Current rebased value · includes open P&L':(zero?'Current P&L · includes open P&L':'Current equity · includes open P&L'), value:marked[marked.length-1][1]} : null;
       this._ensureChart(id)?.lines(series, {snapshot, note: lineage?.transition?.label || bot?.epoch?.label || '', empty:'Equity history not available yet'});
     },
 
@@ -1411,11 +1445,14 @@ function dash() {
     async renderDrawdown() {
       const key = this.equityBot || 'fleet';
       const data = key === 'fleet' ? this.fleetPerformanceData : this._equityData[key] || await this._fetchEquity(key);
-      this._drawdownView('chart-drawdown', data, key === 'fleet' ? this.hero.drawdownBacktest : this.raw.bots[key]?.baseline?.max_dd_pct);
+      this._drawdownView('chart-drawdown', data, key === 'fleet' ? null : this.raw.bots[key]?.baseline?.max_dd_pct);
     },
 
+    // The fleet curve is zero-based, so its drawdown is dollars below the peak.
     _drawdownView(id, data, reference) {
-      this._ensureChart(id)?.lines([{label:'Drawdown',data:data?.lineage?.drawdown || data?.drawdown || [],color:COLORS.neg,step:true}], {percent:true, note:reference ? `Historical reference: −${Math.abs(reference).toFixed(2)}% · limit: −${(Math.abs(reference)*1.5).toFixed(2)}%` : '', empty:'Drawdown history not available yet'});
+      const zero = data?.zeroBased;
+      const label = !zero ? 'Drawdown' : data.hasOpenMark ? 'Below peak · includes open P&L' : 'Below peak realized P&L';
+      this._ensureChart(id)?.lines([{label,data:data?.lineage?.drawdown || data?.drawdown || [],color:COLORS.neg,step:true}], {percent:!zero, note:reference && !zero ? `Historical reference: −${Math.abs(reference).toFixed(2)}% · limit: −${(Math.abs(reference)*1.5).toFixed(2)}%` : '', empty:'Drawdown history not available yet'});
     },
 
     _pairRows(bots) {
@@ -1435,7 +1472,7 @@ function dash() {
     },
 
     renderPerPair() {
-      this._ensureChart('chart-perpair')?.comparison(this._pairRows(this.selectedEquityBot ? [this.selectedEquityBot] : this.liveBots));
+      this._ensureChart('chart-perpair')?.comparison(this._pairRows(this.selectedEquityBot ? [this.selectedEquityBot] : [...this.liveBots, ...this.stoppedBots]));
     },
 
     renderPortfolioCharts() {
