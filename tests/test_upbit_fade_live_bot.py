@@ -452,7 +452,12 @@ def test_prereg_freezes_what_the_code_runs():
     S, c = strategy(), config()
     assert e["status"] == "open" and e["bot"] == "UpbitFadeLiveV1" and e["issue"] == "#252"
     assert e["parent"] == "upbit-krw-fade-forward-2026-11" and e["resolution"] is None
-    assert fr["measurement"] == "live" and fr["epoch_start"] is None
+    assert fr["measurement"] == "live"
+    # The epoch is set once, at go-live, by amendment A2-epoch (#252).
+    a2 = [a for a in e["amendments"] if a["id"] == "A2-epoch"]
+    assert len(a2) == 1 and fr["epoch_start"] == "2026-11-06T23:06:45.445092148Z"
+    assert fr["epoch_start"] in a2[0]["reason"] and fr["epoch_start"] in a2[0]["changes"]
+    assert "caabf3b2906d64db7fcfa1eea7ff7a9ac0f8d64e" in a2[0]["reason"]
     assert fr["direction"] == lt.SIDE == "short"
     assert fr["stake_usdc"] == lt.STAKE_USDC == c["stake_amount"] == 50
     assert fr["leverage"] == lt.LEVERAGE == 1
