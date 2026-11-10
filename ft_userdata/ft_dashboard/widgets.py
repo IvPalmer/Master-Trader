@@ -7,6 +7,8 @@ bot has a series, so never a partial total), and the fleet status
 as an alert when it is yellow or red, and a `metrics` view that repeats the dashboard
 header (account equity, realized, unrealized and 24 h P&L of the live bots; the math is
 `get hero()` in static/dashboard.js). Paper and live are never mixed in a number.
+A stopped epoch (an epoch record's frozen snapshot, `stopped: true`, #277) counts in
+realized P&L and closed trades only, and is listed as stopped.
 
 Its own bearer (WIDGETS_TOKEN) guards /widgets* only; every other route and the
 Cloudflare Access edge are unchanged. Unset token => 503, never open.
@@ -58,8 +60,18 @@ def _bot_tone(bot: dict) -> str:
     return "neutral"
 
 
+def _running_live(bot: dict) -> bool:
+    return bot.get("dry_run") is False and not bot.get("stopped")
+
+
 def _row(bot: dict) -> dict:
     mode = "dry-run" if bot.get("dry_run", True) else "live"
+    if bot.get("stopped"):
+        # A record has no bot to reach, no open trades and no 24 h delta.
+        closed = _num((bot.get("pnl") or {}).get("closed"))
+        return {"key": _clip(f"bot:{bot['key']}"),
+                "title": _clip(bot.get("label") or bot.get("name") or bot["key"]),
+                "subtitle": _clip(f"stopped · {mode} epoch ended · realized {usd(round(closed, 2))}")}
     prefix = "" if bot.get("reachable") else "unreachable · "
     opened = len(bot.get("open_trades") or [])
     item = {
@@ -98,7 +110,7 @@ def build_bots(state: dict) -> dict:
     """The `bots` payload from an /api/state subset. Pure. Needs last_poll;
     account_health is optional (only the equity row reads it)."""
     bots = list((state.get("bots") or {}).values())
-    live = [b for b in bots if not b.get("dry_run", True)]
+    live = [b for b in bots if _running_live(b)]
     pnl = sum(_pnl(b) for b in live)
     trades = sum(int((b.get("delta_24h") or {}).get("new_trades") or 0) for b in live)
     stat_tone = "good" if pnl > 0 else "bad" if pnl < 0 else "neutral"
@@ -109,7 +121,8 @@ def build_bots(state: dict) -> dict:
                  "delta": f"{trades} trade{'' if trades == 1 else 's'} closed", "tone": stat_tone},
         "metrics": build_metrics(state),
     }
-    ordered = sorted(bots, key=lambda b: (bool(b.get("dry_run", True)), str(b.get("label") or b.get("key"))))
+    ordered = sorted(bots, key=lambda b: (bool(b.get("dry_run", True)), bool(b.get("stopped")),
+                                          str(b.get("label") or b.get("key"))))
     if ordered:
         data["list"] = {"groups": [{"title": "Bots", "items": [_row(b) for b in ordered[:100]]}]}
     # Only when every live bot has a series: a missing one would make the total partial.
@@ -155,9 +168,12 @@ def _count(n: int, noun: str) -> str:
 
 def build_metrics(state: dict) -> dict:
     """The `metrics` view: the dashboard header, `get hero()` in static/dashboard.js,
-    for the live bots only (`dry_run === false`). Pure."""
-    fleet = {name: b for name, b in (state.get("bots") or {}).items() if b.get("dry_run") is False}
+    for the live bots only (`dry_run === false`). Pure. Realized P&L and closed trades
+    cover every live epoch, stopped ones included; the rest covers running bots only."""
+    bots = state.get("bots") or {}
+    fleet = {name: b for name, b in bots.items() if _running_live(b)}
     live = list(fleet.values())
+    epochs = [b for b in bots.values() if b.get("dry_run") is False]
     # Bots sharing one exchange account count its capital once: the largest wallet.
     accounts: dict = {}
     for name, b in fleet.items():
@@ -172,11 +188,11 @@ def build_metrics(state: dict) -> dict:
         equity = sum(accounts.values())
     else:
         equity = observed.get("equity") if observed.get("complete") else None
+    realized = sum(_num((b.get("pnl") or {}).get("closed")) for b in epochs)
     pnls = [b.get("pnl") or {} for b in live]
-    realized = sum(_num(p.get("closed")) for p in pnls)
     unrealized = sum(_num(p["unrealized"]) if p.get("unrealized") is not None
                      else _num(p.get("all_coin")) - _num(p.get("closed")) for p in pnls)
-    closed = sum(int(_num((b.get("stats") or {}).get("closed_trade_count"))) for b in live)
+    closed = sum(int(_num((b.get("stats") or {}).get("closed_trade_count"))) for b in epochs)
     trades = [t for b in live for t in b.get("open_trades") or []]
     positions = sum(1 for t in trades if not _is_pending_entry(t))
     day = sum(_pnl(b) for b in live)
@@ -185,7 +201,7 @@ def build_metrics(state: dict) -> dict:
                       else ("−" if float(equity) < 0 else "") + f"${abs(float(equity)):,.2f}",
              "detail": "shared accounts counted once" if equity is not None else "valuation incomplete",
              "tone": "neutral" if equity is not None else "warn"}]
-    for label, value, detail in (("Realized P&L", realized, f"{_count(closed, 'closed trade')} · live epochs"),
+    for label, value, detail in (("Realized P&L", realized, f"{_count(closed, 'closed trade')} · all live epochs"),
                                  ("Unrealized P&L", unrealized, _count(positions, "open position")),
                                  ("24 h P&L", day, "live bots · rolling 24 h")):
         text, tone = _signed(value)

@@ -383,7 +383,21 @@ OUTSIDE_BREAKER_ACCOUNTS = frozenset({"hyperliquid-upbit-fade"})
 # Funded accounts kept valued, in the headline equity and in the breaker's scope
 # even with no live bot on them, until verified empty (#277): demoting the last
 # bot leaves the money in the account. Halt targets stay bot-based.
+# Remove an account once its funds have moved: deploy/vps/README.md.
 RETAINED_ACCOUNTS = frozenset({"hyperliquid-killers"})
+# Accounts valued with no member bot: the Killers account is read through the
+# gateway. binance-spot reads its balance through a bot's API and the Upbit pilot
+# needs a bot's wallet env, so retaining either with no live bot would leave
+# equity incomplete and the breaker suspended (#280).
+VALUED_WITHOUT_A_BOT = frozenset({"hyperliquid-killers"})
+
+
+def check_retained_accounts(retained: frozenset) -> None:
+    """Refuse at startup to retain an account no adapter can value without a bot."""
+    unsupported = sorted(set(retained) - VALUED_WITHOUT_A_BOT)
+    if unsupported:
+        raise ValueError(f"RETAINED_ACCOUNTS has {', '.join(unsupported)}, which cannot be "
+                         "valued without a live bot; supported: " + ", ".join(sorted(VALUED_WITHOUT_A_BOT)))
 
 
 def outside_breaker(bot: dict) -> bool:
@@ -461,8 +475,8 @@ def observe_accounts() -> dict:
             owners = [b for b in members if b.get("capital_owner")]
             if len(members) > 1 and len(owners) != 1:
                 raise ValueError("ambiguous account representative")
-            # A retained account may have no member; an adapter that needs one
-            # then fails into the except below instead of guessing.
+            # A retained account may have no member. check_retained_accounts()
+            # admits only adapters that need none; any other fails below.
             owner = owners[0] if owners else (members[0] if members else {})
             if account == "hyperliquid-killers":
                 response = requests.get(GATEWAY_URL + "/account/killers", timeout=20)
@@ -1031,6 +1045,7 @@ def main() -> None:
     global _capital_refresh_counter
 
     log.info("Starting Freqtrade metrics exporter on :9090")
+    check_retained_accounts(RETAINED_ACCOUNTS)
     _load_peak_state()
     refresh_live_capital()
     log.info(
