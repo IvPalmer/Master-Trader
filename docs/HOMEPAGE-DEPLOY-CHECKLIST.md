@@ -38,7 +38,7 @@ compose redeploys.
 
 ## 2. Cloudflare Access app + policy (manual, ~10 min)
 
-Reuse the canonical walkthrough at `~/Work/Dev/ocdj/docs/CLOUDFLARE-ACCESS-SETUP.md`.
+Reuse the canonical walkthrough at `~/Dev/music/research/ocdj/docs/CLOUDFLARE-ACCESS-SETUP.md`.
 Differences for master-trader:
 
 | Field | Value |
@@ -76,7 +76,7 @@ local-port (127.0.0.1:3030) access during the verify window.)
 ## 4. Merge → trigger redeploy
 
 ```bash
-cd ~/Work/Dev/master-trader
+cd ~/Dev/finance/trading/master-trader
 git checkout vps-deploy
 git merge --ff-only feat/homepage-option-a-prep
 git push origin vps-deploy
@@ -127,7 +127,7 @@ After that redeploy: `docker port ft-grafana` on VPS shows nothing — Traefik o
 ## Rollback (if any step fails)
 
 ```bash
-cd ~/Work/Dev/master-trader
+cd ~/Dev/finance/trading/master-trader
 git checkout vps-deploy
 git revert <merge-commit>
 git push origin vps-deploy

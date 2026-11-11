@@ -37,8 +37,9 @@ import pandas as pd
 from scipy.stats import norm
 
 
-DATA_DIR = Path("/Users/palmer/Work/Dev/master-trader/ft_userdata/user_data/data/binance")
-CACHE_DIR = Path("/Users/palmer/Work/Dev/master-trader/ft_userdata/analysis/vpin_cache")
+ANALYSIS_DIR = Path(__file__).resolve().parent
+DATA_DIR = ANALYSIS_DIR.parent / "user_data/data/binance"
+CACHE_DIR = ANALYSIS_DIR / "vpin_cache"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 

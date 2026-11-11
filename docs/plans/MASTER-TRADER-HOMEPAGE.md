@@ -81,7 +81,7 @@ Static Vite/Next page at `master-trader.grooveops.dev/`. Hero with live KPIs (Po
 
 ### Phase 3 — Cloudflare Access policy (10 min)
 
-Reuse the click-walkthrough at `~/Work/Dev/ocdj/docs/CLOUDFLARE-ACCESS-SETUP.md` (10-step setup). Differences:
+Reuse the click-walkthrough at `~/Dev/music/research/ocdj/docs/CLOUDFLARE-ACCESS-SETUP.md` (10-step setup). Differences:
 - Application name: `master-trader`.
 - Domain: `master-trader.grooveops.dev` (full host, no path filter — gate everything).
 - Policy 1 (Allow): emails-include `raphaelpalmer@gmail.com`. Add a second email later if needed.

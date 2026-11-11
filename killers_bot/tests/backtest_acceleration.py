@@ -22,17 +22,18 @@ import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+REPO = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(REPO))
 
 from killers_bot.strict_open import is_strict_killers_open  # noqa: E402
 
 CORPUS_LOCATIONS = [
     "/home/ubuntu/master-trader/ft_userdata/insiders_bridge/_local/killers_messages.json",
-    "/Users/palmer/Work/Dev/master-trader/ft_userdata/insiders_bridge/_local/killers_messages.json",
+    str(REPO / "ft_userdata/insiders_bridge/_local/killers_messages.json"),
 ]
 CLASSIFICATIONS_GLOB = [
     "/home/ubuntu/master-trader/ft_userdata/insiders_bridge/out/classifications_killers_chunk*.jsonl",
-    "/Users/palmer/Work/Dev/master-trader/ft_userdata/insiders_bridge/out/classifications_killers_chunk*.jsonl",
+    str(REPO / "ft_userdata/insiders_bridge/out/classifications_killers_chunk*.jsonl"),
 ]
 
 
