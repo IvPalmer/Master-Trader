@@ -132,12 +132,15 @@ def replay_at_notional(trades_doc: dict, info: dict, marks: dict, notional_usd: 
     }
 
 
+REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--replay-dir",
-                    default="/Users/palmer/Work/Dev/master-trader/docs/insiders-signals/replay")
+                    default=os.path.join(REPO, "docs/insiders-signals/replay"))
     ap.add_argument("--probe-dir",
-                    default="/Users/palmer/Work/Dev/master-trader/weex_probe")
+                    default=os.path.join(REPO, "weex_probe"))
     ap.add_argument("--notional", type=float, nargs="+", default=[25.0, 50.0, 100.0])
     args = ap.parse_args()
 

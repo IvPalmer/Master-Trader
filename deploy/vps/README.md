@@ -97,7 +97,7 @@ full report is read in `research/logs/health_report.log`.
 
 ## Mac side
 
-`~/Work/Dev/master-trader/` holds code + tracked configs/strategies only (~20 MB).
+`~/Dev/finance/trading/master-trader/` holds code + tracked configs/strategies only (~20 MB).
 All bulk research data lives only on VPS; backtests run on VPS.
 
 ## Backups

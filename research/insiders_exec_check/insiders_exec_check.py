@@ -11,7 +11,8 @@ Reuses proper_backtest's event-walk so PnL accounting is identical; only the
 entry fill changes.
 """
 import sys, json, copy
-sys.path.insert(0, "/Users/palmer/Work/Dev/master-trader/weex_probe")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "weex_probe"))
 import proper_backtest as pb
 
 WINDOW_H = 6
