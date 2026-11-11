@@ -1,5 +1,9 @@
 # `master-trader.grooveops.dev` go-live checklist
 
+> Historical prep (2026-05). Its merge, push and rollback steps predate the release-PR
+> flow and the manual deploys (Dokploy auto-deploy is off): follow `AGENTS.md`
+> (Shipping) and `docs/ops/UPDATING-WITHOUT-BREAKING-BOTS.md` instead of running them.
+
 Status: **PREPPED — awaiting user gate.** Branch `feat/homepage-option-a-prep` carries
 Phase 2 hardening + Traefik labels. Nothing is live until the steps below run, in
 order, after merging to `vps-deploy`.

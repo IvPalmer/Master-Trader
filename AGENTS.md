@@ -39,9 +39,11 @@ and missing telemetry or mark-to-market history is never fabricated.
   running until someone deploys it. Deploys are manual and targeted; follow
   `docs/ops/UPDATING-WITHOUT-BREAKING-BOTS.md` (blast-radius tiers, pre-flight checks,
   recovery).
-- On this stack always pass `--no-deps` to `docker compose up`: without it Compose
-  recreates sibling bots mid-trade. Freqtrade configs are read-only bind mounts, so a
-  config change needs `up -d --force-recreate --no-deps <service>`.
+- Use the smallest tier in the runbook. A Freqtrade JSON config change can be picked up
+  with `/reload_config` (the configs directory is mounted read-only, so host edits are
+  visible); env, mount, image or strategy code changes need a recreate. On this stack
+  always pass `--no-deps` to `docker compose up`: without it Compose recreates sibling
+  bots mid-trade. Prefer a flat book before reloading or restarting a copy-trader bot.
 - `killers-observer` (systemd user unit) and `trade-webhook` run from the VPS host
   checkout, not from Dokploy; after a release, that checkout is pulled too, or the
   fleet snapshot reports `host_checkout_drift`.
@@ -57,10 +59,12 @@ and missing telemetry or mark-to-market history is never fabricated.
   Operator scripts such as `scripts/hyperliquid/hl-funds.sh` stay operator-run.
 - Backtests always run with `--timeframe-detail 1m`; 1h-only results hide intra-candle
   stops and have shown profits that turned into losses at 1m.
-- Calibration against live results uses the strategy's `<Strategy>Viability.py` wrapper
-  (dynamic pairlist and historical Fear and Greed), not a raw static-pairlist backtest.
-- Fix pairlists systemically (7-day volume lookback plus volatility and range-stability
-  filters); never blacklist a coin after a loss.
+- Calibration and research reproduce the deployed epoch: the live bots run fixed
+  `StaticPairList` universes, so use the live pair list, protections and fees as the
+  preregistration states. The `<Strategy>Viability.py` wrappers model a dynamic pairlist
+  and fit only a bot that runs one.
+- Never blacklist a coin after a loss; a universe change is a preregistered decision,
+  not a reaction.
 - Dry-run configs keep `stoploss_on_exchange: false`: dry-run exchange stops live only in
   memory and vanish on restart.
 - Copy-trader bots (Killers, Insiders) are judged on whether the plumbing works, not on

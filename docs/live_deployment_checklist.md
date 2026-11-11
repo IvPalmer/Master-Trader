@@ -1,5 +1,8 @@
 # Live Deployment Checklist — FundingFadeV1 First
 
+> Historical: the 2026-04 go-live, run when the bots still ran on the Mac. Production
+> and its keys now live only on the VPS (`RUNTIME.md`); do not follow the Mac steps.
+
 > Target: migrate FundingFadeV1 from dry-run to live with small real-money stake.
 > Codex thesis: FundingFade is the faster measurement instrument (~2.5 trades/wk vs
 > Keltner ~1/wk). Keltner stays dry-run until FundingFade completes 30 live trades.
