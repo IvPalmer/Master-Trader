@@ -35,7 +35,7 @@ def _load_dotenv() -> None:
     """Load .env from repo root so rotated FREQTRADE__ creds propagate when the
     script is invoked without the shell having sourced .env first (cron, ad-hoc,
     double-click). setdefault preserves any explicit shell-level overrides."""
-    for root in (Path.home() / "Work/Dev/master-trader", Path(__file__).resolve().parent.parent):
+    for root in (Path(__file__).resolve().parent.parent,):
         env_file = root / ".env"
         if env_file.exists():
             for line in env_file.read_text().splitlines():

@@ -6,7 +6,10 @@ import sys, json
 import harness as h
 import t1_exit_test as t1x
 
-FEE = 0.0004
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[3]))
+from ft_userdata.analysis.costs import fee_fraction  # noqa: E402
+FEE = fee_fraction("binance", "perp", "taker")  # shared cost model (issue #1)
 
 
 def fee_R(entry, sl):

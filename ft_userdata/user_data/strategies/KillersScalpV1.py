@@ -249,6 +249,16 @@ class KillersScalpV1(IStrategy):
         self._schedule_stop_refresh(trade_id)
         if sl_price is None:
             return None
+        # #181: Freqtrade also calls this with after_fill=True after a TP fill
+        # and lets that call widen the stop. A stale cache or the entry-tag
+        # fallback (restart while the receiver is down) would then undo a stop
+        # the receiver had raised. Widening is only meant for the entry fill.
+        held = getattr(trade, "stop_loss", None)
+        if after_fill and getattr(trade, "nr_of_successful_exits", 0) and held:
+            if (not trade.is_short and sl_price < held) or (
+                trade.is_short and sl_price > held
+            ):
+                return None
         if (not trade.is_short and sl_price >= current_rate) or (
             trade.is_short and sl_price <= current_rate
         ):

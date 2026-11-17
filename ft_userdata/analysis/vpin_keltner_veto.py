@@ -24,11 +24,12 @@ import numpy as np
 import pandas as pd
 
 
-BACKTEST_ZIP = Path(
-    "/Users/palmer/Work/Dev/master-trader/ft_userdata/user_data/backtest_results/"
+ANALYSIS_DIR = Path(__file__).resolve().parent
+BACKTEST_ZIP = (
+    ANALYSIS_DIR.parent / "user_data/backtest_results/"
     "backtest-result-2026-04-20_22-46-25.zip"
 )
-CACHE_DIR = Path("/Users/palmer/Work/Dev/master-trader/ft_userdata/analysis/vpin_cache")
+CACHE_DIR = ANALYSIS_DIR / "vpin_cache"
 
 
 def load_trades() -> pd.DataFrame:
@@ -268,7 +269,7 @@ def main():
     print(json.dumps(oos_bot, indent=2, default=str))
 
     # Save artifacts
-    out = Path("/Users/palmer/Work/Dev/master-trader/ft_userdata/analysis/vpin_keltner_results")
+    out = ANALYSIS_DIR / "vpin_keltner_results"
     out.mkdir(exist_ok=True)
     t2.to_parquet(out / "trades_with_vpin.parquet", index=False)
     q.to_csv(out / "quintile.csv", index=False)

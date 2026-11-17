@@ -57,7 +57,10 @@ POLL_S = 60
 TICK_S = 5                 # scheduler wake cadence
 HL_META_TTL = 3600         # cache HL perp universe 1h
 RETENTION_DAYS = 120
-FEE = 0.00045              # taker, 4.5 bps
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[2]))
+from ft_userdata.analysis.costs import fee_fraction  # noqa: E402
+FEE = fee_fraction("hyperliquid", "perp", "taker")  # 4.5 bps base tier
 NOTIONAL = 1000.0
 
 # --- horizon schedule (seconds, relative to release_ts) ---
