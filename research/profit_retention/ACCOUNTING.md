@@ -30,8 +30,11 @@ adjusting for any difference in reported versus settled funding. Funding
 mismatches remain visible in `executor_funding_discrepancies`; actual exchange
 funding is retained in every score. This is necessary: initial validation found a
 closed trade whose executor funding field was zero despite settled funding paid.
-The difference explained its approximately one-cent net P&L discrepancy. Raw
-trade and ledger details remain private.
+The difference explained its approximately one-cent net P&L discrepancy. The
+cause is Freqtrade leaving `funding_fees` at 0 on a trade closed by its exchange
+stop; see "Account equity and capital flows" in
+`docs/ops/HYPERLIQUID-REQUESTS-AND-RECOVERY.md` (#88). Raw trade and ledger
+details remain private.
 
 Authoritative schemas: [fills and fees](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint)
 and [settled funding](https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/info-endpoint/perpetuals).

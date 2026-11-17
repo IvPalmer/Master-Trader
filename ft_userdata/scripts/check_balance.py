@@ -14,7 +14,7 @@ Safety:
     the key so logs don't leak the full credential.
 
 Usage:
-    cd ~/Work/Dev/master-trader
+    cd ~/Dev/finance/trading/master-trader
     python3 ft_userdata/scripts/check_balance.py
 """
 import hashlib

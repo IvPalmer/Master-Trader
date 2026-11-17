@@ -27,8 +27,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LLM = os.path.join(HERE, "causal_replay/runs/full_may/llm.json")
 TRUTH = os.path.join(HERE, "trades_may.json")
 
-TAKER = 0.0005
-SLIP = 0.0005
+import sys as _sys, pathlib as _pl
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parents[3]))
+from ft_userdata.analysis.costs import DEFAULT_SLIPPAGE_BPS, fee_fraction  # noqa: E402
+TAKER = fee_fraction("binance", "perp", "taker")
+SLIP = DEFAULT_SLIPPAGE_BPS / 1e4
 RISK_PCT = 5.0  # linear translation R -> account-% (same as RESULTS_MAY.md)
 
 def sl_dist_pct_for(opener, truth_by_src):
