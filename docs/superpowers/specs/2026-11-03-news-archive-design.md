@@ -292,7 +292,7 @@ Each study runs in two phases. Phase 1 builds an **outcome-blind event manifest*
   - **Delisting study (short):** Hyperliquid perp only. Binance spot cannot short.
   - **Upbit study (long):** a Hyperliquid perp, else Binance spot. Tokens that trade only on Binance futures are excluded.
   - **Upbit fade (short):** Hyperliquid perp only, under the same eligibility rule below. Spot-only tokens are excluded and counted, because Binance spot cannot short.
-- **Hyperliquid eligibility needs positive pre-entry evidence (changed after both rounds).** A token qualifies only if Hyperliquid candles exist for it in the 24 h before t0, including at least one in the last hour before t0. Nothing after t0 is used for eligibility; using it would exclude exactly the tokens that become untradeable right after the event. Tokens no longer in today's `meta` are looked up by name through `candleSnapshot`. The builder confirms in Phase 1 that this works for delisted coins and documents it.
+- **Hyperliquid eligibility needs positive pre-entry evidence (changed after both rounds; evidence source changed by §11 call 14).** A token qualifies only if Hyperliquid hourly funding records (`fundingHistory`, by coin name) exist for it in the 24 h before t0, including at least one in the last hour before t0. Candles cannot serve: `candleSnapshot` returns only the most recent ~5,000 candles, which at 1 h reach back to about 2026-04 (probe on #229). Nothing after t0 is used for eligibility; using it would exclude exactly the tokens that become untradeable right after the event. Tokens no longer in today's `meta` are looked up by name through `fundingHistory`. The builder confirms in Phase 1 that this works for delisted coins and documents it.
   - Eligibility that cannot be verified is `unknown`. Unknown events are excluded and counted. An earliest daily candle alone is not enough.
 - **Completeness evidence (changed after round 2).**
   - **Pagination (changed after round 3):** each Binance catalog (48 and 161, plus monitoring if separate) and the Upbit list are harvested **in full**, every page. The harvested count must equal the API's reported `total`.
@@ -416,3 +416,8 @@ These were decided without the operator; each can be overridden before the plan 
     - maximum adverse excursion reported, not a criterion.
 
     With fewer than 20 Hyperliquid-eligible announcements, the fade is INCONCLUSIVE-by-data under the existing rule.
+14. **Hyperliquid eligibility from hourly funding records, not candles (2026-11-04, before any Phase 1 run).** Probes on #229 ([comment](https://github.com/IvPalmer/Master-Trader/issues/229#issuecomment-6621474026)) found:
+    - `candleSnapshot` BTC 1h reaches back only to 2026-04-09, a rolling ~5,000-candle retention. Verbatim, nearly every event before then would be `unknown`, and all three studies would fail the coverage gate;
+    - `fundingHistory` BTC starts at 2023-05-12, a fixed date rather than a rolling floor, and a delisted coin (`AI`) returns records by name.
+
+    So eligibility uses hourly funding records, under the same 24 h / last-hour rule (§6.2). A name absent from today's `meta` answers HTTP 500 with body `null`; for such a name only, that counts as no records. Any other failed response stops the build and is never read as absence.

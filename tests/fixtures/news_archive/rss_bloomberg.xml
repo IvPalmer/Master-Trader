@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+    <channel>
+        <title><![CDATA[Bloomberg Markets]]></title>
+        <description><![CDATA[Bloomberg Markets]]></description>
+        <link>http://bloomberg.com/markets/</link>
+        <image>
+            <url>http://www.bloomberg.com/feeds/static/images/bloomberg_logo_blue.png</url>
+            <title>Bloomberg Markets</title>
+            <link>http://bloomberg.com/markets/</link>
+        </image>
+        <generator>RSS for Node</generator>
+        <lastBuildDate>Thu, 05 Nov 2026 19:45:33 GMT</lastBuildDate>
+        <atom:link href="https://www.bloomberg.com/feeds/markets/news.rss" rel="self" type="application/rss+xml"/>
+        <copyright><![CDATA[Copyright 2026 BLOOMBERG L.P. ALL RIGHTS RESERVED]]></copyright>
+        <language><![CDATA[en]]></language>
+        <item>
+            <title><![CDATA[CCC's Stress Relatively Well-Contained: Gomez-Bravo]]></title>
+            <description><![CDATA[Pilar Gomez-Bravo, fixed income portfolio manager at MFS Investment Management, and Andrzej Skiba, head of BlueBay US fixed income at RBC Global Asset Management join Scarlet Fu on "Bloomberg Real Yield." Junk bonds tied to data center developers traded weaker after elected Texas Democratic Governor Gina Hinojosa called for an immediate moratorium on development for the AI projects. (Source: Bloomberg)]]></description>
+            <link>https://www.bloomberg.com/news/videos/2026-11-05/ccc-s-stress-relatively-well-contained-gomez-bravo-video</link>
+            <guid isPermaLink="false">TO1O1WKIP3K800</guid>
+            <pubDate>Thu, 05 Nov 2026 19:41:56 GMT</pubDate>
+        </item>
+<item>
+            <title><![CDATA[How to Get Exposure to Anthropic Through ETFs Before and After the IPO]]></title>
+            <description><![CDATA[We’re looking at two distinct waves of products.]]></description>
+            <link>https://www.bloomberg.com/news/newsletters/2026-11-05/how-to-get-exposure-to-anthropic-through-etfs-before-and-after-the-ipo</link>
+            <guid isPermaLink="false">TO1NFMKIP3IM00</guid>
+            <dc:creator><![CDATA[Isabelle Lee]]></dc:creator>
+            <pubDate>Thu, 05 Nov 2026 19:28:34 GMT</pubDate>
+        </item>
+    </channel>
+</rss>

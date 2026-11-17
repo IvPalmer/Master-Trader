@@ -1,0 +1,41 @@
+{
+  "code": "000000",
+  "message": null,
+  "messageDetail": null,
+  "data": {
+    "catalogs": [
+      {
+        "catalogId": 161,
+        "parentCatalogId": null,
+        "catalogName": "Delisting",
+        "catalogType": 1,
+        "total": 3,
+        "articles": [
+          {
+            "id": 900003,
+            "code": "fixture0003",
+            "title": "Binance Will Delist AAA, BBB on 2024-03-08",
+            "type": 1,
+            "releaseDate": 1709294430000
+          },
+          {
+            "id": 900002,
+            "code": "fixture0002",
+            "title": "Binance Will Extend the Monitoring Tag to Include CCC on 2024-02-20",
+            "type": 1,
+            "releaseDate": 1708416000000
+          },
+          {
+            "id": 900001,
+            "code": "fixture0001",
+            "title": "Notice of Removal of Spot Trading Pairs - 2024-02-01",
+            "type": 1,
+            "releaseDate": 1706745600000
+          }
+        ],
+        "catalogs": []
+      }
+    ]
+  },
+  "success": true
+}

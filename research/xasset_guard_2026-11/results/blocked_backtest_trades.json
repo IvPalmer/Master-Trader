@@ -1,0 +1,1572 @@
+[
+ {
+  "list": "FF_V2_current",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "SUI/USDT",
+  "entry_utc": "2025-04-23 14:00",
+  "ratio": 0.029997971269943424,
+  "abs": 0.44896333,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-07-30 14:00",
+  "ratio": 0.020194570427037897,
+  "abs": 0.3013875,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 03:00",
+  "ratio": 0.07995409912326655,
+  "abs": 1.1952589,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-03-02 17:00",
+  "ratio": 0.04993906085587325,
+  "abs": 0.7454497,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 03:00",
+  "ratio": 0.07995409912326655,
+  "abs": 1.1952589,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 15:00",
+  "ratio": -0.04634880846732134,
+  "abs": -0.69494926,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-03-02 17:00",
+  "ratio": 0.04993906085587325,
+  "abs": 0.7454497,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "TRX/USDT",
+  "entry_utc": "2026-03-04 03:00",
+  "ratio": 0.023071943212230776,
+  "abs": 0.34572361,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 03:00",
+  "ratio": 0.07995409912326655,
+  "abs": 1.1952589,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-03-02 17:00",
+  "ratio": 0.04993906085587325,
+  "abs": 0.7454497,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 03:00",
+  "ratio": 0.07995409912326655,
+  "abs": 1.1952589,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 15:00",
+  "ratio": -0.04634880846732134,
+  "abs": -0.69494926,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "SUI/USDT",
+  "entry_utc": "2025-04-23 14:00",
+  "ratio": 0.029997971269943424,
+  "abs": 0.44896333,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-03-02 17:00",
+  "ratio": 0.04993906085587325,
+  "abs": 0.7454497,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "TRX/USDT",
+  "entry_utc": "2026-03-04 03:00",
+  "ratio": 0.023071943212230776,
+  "abs": 0.34572361,
+  "short": false
+ },
+ {
+  "list": "FF_V2_current",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-07-30 14:00",
+  "ratio": 0.020194570427037897,
+  "abs": 0.3013875,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "TAO/USDT",
+  "entry_utc": "2025-04-23 14:00",
+  "ratio": 0.04986997955490764,
+  "abs": 0.74759262,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "SUI/USDT",
+  "entry_utc": "2025-04-23 14:00",
+  "ratio": 0.029997971269943424,
+  "abs": 0.44896333,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-07-30 14:00",
+  "ratio": 0.020194570427037897,
+  "abs": 0.3013875,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 03:00",
+  "ratio": 0.07995409912326655,
+  "abs": 1.1952589,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 07:00",
+  "ratio": 0.08002356430638748,
+  "abs": 1.19598423,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "ARB/USDT",
+  "entry_utc": "2025-04-22 02:00",
+  "ratio": 0.0299109277313538,
+  "abs": 0.4483778,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-03-02 17:00",
+  "ratio": 0.04993906085587325,
+  "abs": 0.7454497,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 03:00",
+  "ratio": 0.07995409912326655,
+  "abs": 1.1952589,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 07:00",
+  "ratio": 0.08002356430638748,
+  "abs": 1.19598423,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 09:00",
+  "ratio": -0.0514129619221532,
+  "abs": -0.76803127,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 10:00",
+  "ratio": -0.05136000718893222,
+  "abs": -0.76832266,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 15:00",
+  "ratio": -0.05139174293760713,
+  "abs": -0.7705625,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "ARB/USDT",
+  "entry_utc": "2025-04-22 02:00",
+  "ratio": 0.0299109277313538,
+  "abs": 0.4483778,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "ETH/USDT",
+  "entry_utc": "2025-04-22 08:00",
+  "ratio": 0.04999867156901614,
+  "abs": 0.74537082,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "LTC/USDT",
+  "entry_utc": "2025-04-22 15:00",
+  "ratio": 0.02997879922563459,
+  "abs": 0.44932082,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "TAO/USDT",
+  "entry_utc": "2025-04-22 15:04",
+  "ratio": -0.05120842804442096,
+  "abs": -0.76753665,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-03-02 17:00",
+  "ratio": 0.04993906085587325,
+  "abs": 0.7454497,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "TRX/USDT",
+  "entry_utc": "2026-03-04 01:00",
+  "ratio": 0.029983781983971104,
+  "abs": 0.44972407,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 03:00",
+  "ratio": 0.07995409912326655,
+  "abs": 1.1952589,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 07:00",
+  "ratio": 0.08002356430638748,
+  "abs": 1.19598423,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "ARB/USDT",
+  "entry_utc": "2025-04-22 02:00",
+  "ratio": 0.0299109277313538,
+  "abs": 0.4483778,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-03-02 17:00",
+  "ratio": 0.04993906085587325,
+  "abs": 0.7454497,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 03:00",
+  "ratio": 0.07995409912326655,
+  "abs": 1.1952589,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 07:00",
+  "ratio": 0.08002356430638748,
+  "abs": 1.19598423,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 09:00",
+  "ratio": -0.0514129619221532,
+  "abs": -0.76803127,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 10:00",
+  "ratio": -0.05136000718893222,
+  "abs": -0.76832266,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "HBAR/USDT",
+  "entry_utc": "2024-11-16 15:00",
+  "ratio": -0.05139174293760713,
+  "abs": -0.7705625,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "ARB/USDT",
+  "entry_utc": "2025-04-22 02:00",
+  "ratio": 0.0299109277313538,
+  "abs": 0.4483778,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "ETH/USDT",
+  "entry_utc": "2025-04-22 08:00",
+  "ratio": 0.04999867156901614,
+  "abs": 0.74537082,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "LTC/USDT",
+  "entry_utc": "2025-04-22 15:00",
+  "ratio": 0.02997879922563459,
+  "abs": 0.44932082,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "TAO/USDT",
+  "entry_utc": "2025-04-22 15:04",
+  "ratio": -0.05120842804442096,
+  "abs": -0.76753665,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "TAO/USDT",
+  "entry_utc": "2025-04-23 14:00",
+  "ratio": 0.04986997955490764,
+  "abs": 0.74759262,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "SUI/USDT",
+  "entry_utc": "2025-04-23 14:00",
+  "ratio": 0.029997971269943424,
+  "abs": 0.44896333,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-03-02 17:00",
+  "ratio": 0.04993906085587325,
+  "abs": 0.7454497,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "TRX/USDT",
+  "entry_utc": "2026-03-04 01:00",
+  "ratio": 0.029983781983971104,
+  "abs": 0.44972407,
+  "short": false
+ },
+ {
+  "list": "FF_PreV2_sens",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "NEAR/USDT",
+  "entry_utc": "2026-07-30 14:00",
+  "ratio": 0.020194570427037897,
+  "abs": 0.3013875,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 4,
+  "pair": "CRV",
+  "entry_utc": "2025-04-08 21:48",
+  "ratio": 0.18,
+  "abs": 0.18,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 4,
+  "pair": "ONE",
+  "entry_utc": "2025-04-22 19:52",
+  "ratio": 0.43,
+  "abs": 0.43,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 4,
+  "pair": "LTC",
+  "entry_utc": "2025-12-17 16:34",
+  "ratio": 0.2004,
+  "abs": 0.2004,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 12,
+  "pair": "SSV",
+  "entry_utc": "2025-03-05 09:04",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 12,
+  "pair": "CRV",
+  "entry_utc": "2025-04-08 21:48",
+  "ratio": 0.18,
+  "abs": 0.18,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 12,
+  "pair": "ADA",
+  "entry_utc": "2025-04-10 12:41",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 12,
+  "pair": "ONE",
+  "entry_utc": "2025-04-22 19:52",
+  "ratio": 0.43,
+  "abs": 0.43,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 12,
+  "pair": "TIA",
+  "entry_utc": "2025-05-23 16:27",
+  "ratio": 0.0575,
+  "abs": 0.0575,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 12,
+  "pair": "LTC",
+  "entry_utc": "2025-12-17 16:34",
+  "ratio": 0.2004,
+  "abs": 0.2004,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "RLC",
+  "entry_utc": "2024-08-02 07:50",
+  "ratio": 0.11349999999999999,
+  "abs": 0.11349999999999999,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "OXT",
+  "entry_utc": "2024-08-07 09:01",
+  "ratio": 1.386,
+  "abs": 1.386,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "METIS",
+  "entry_utc": "2025-02-13 08:14",
+  "ratio": 1.1235,
+  "abs": 1.1235,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "SSV",
+  "entry_utc": "2025-03-05 09:04",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "DOGE",
+  "entry_utc": "2025-04-05 12:07",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "ONDO",
+  "entry_utc": "2025-04-08 09:35",
+  "ratio": 0.502,
+  "abs": 0.502,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "CRV",
+  "entry_utc": "2025-04-08 21:48",
+  "ratio": 0.18,
+  "abs": 0.18,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "ADA",
+  "entry_utc": "2025-04-10 12:41",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "ONE",
+  "entry_utc": "2025-04-22 19:52",
+  "ratio": 0.43,
+  "abs": 0.43,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "CELR",
+  "entry_utc": "2025-04-23 12:26",
+  "ratio": 0.316,
+  "abs": 0.316,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "TIA",
+  "entry_utc": "2025-05-23 16:27",
+  "ratio": 0.0575,
+  "abs": 0.0575,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "ETH",
+  "entry_utc": "2025-09-06 08:43",
+  "ratio": 0.8390000000000001,
+  "abs": 0.8390000000000001,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "SOL",
+  "entry_utc": "2025-11-21 08:03",
+  "ratio": 0.9484999999999999,
+  "abs": 0.9484999999999999,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "LTC",
+  "entry_utc": "2025-12-17 16:34",
+  "ratio": 0.2004,
+  "abs": 0.2004,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "ES60",
+  "hours": 24,
+  "pair": "ARB",
+  "entry_utc": "2026-04-02 18:28",
+  "ratio": 1.528,
+  "abs": 1.528,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 4,
+  "pair": "TIA",
+  "entry_utc": "2025-05-23 16:27",
+  "ratio": 0.0575,
+  "abs": 0.0575,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 4,
+  "pair": "WLD",
+  "entry_utc": "2025-08-01 16:11",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 4,
+  "pair": "AI16Z",
+  "entry_utc": "2025-08-01 16:15",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 4,
+  "pair": "DOGE",
+  "entry_utc": "2026-03-03 12:29",
+  "ratio": 0.5,
+  "abs": 0.5,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "TIA",
+  "entry_utc": "2025-05-23 16:27",
+  "ratio": 0.0575,
+  "abs": 0.0575,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "WLD",
+  "entry_utc": "2025-08-01 16:11",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "AI16Z",
+  "entry_utc": "2025-08-01 16:15",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "IMX",
+  "entry_utc": "2025-10-17 07:57",
+  "ratio": 0.95,
+  "abs": 0.95,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 12,
+  "pair": "DOGE",
+  "entry_utc": "2026-03-03 12:29",
+  "ratio": 0.5,
+  "abs": 0.5,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "CELO",
+  "entry_utc": "2024-07-25 18:41",
+  "ratio": 1.8155000000000001,
+  "abs": 1.8155000000000001,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "CHR",
+  "entry_utc": "2024-09-04 08:04",
+  "ratio": 0.46299999999999997,
+  "abs": 0.46299999999999997,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "MAGIC",
+  "entry_utc": "2024-11-16 10:42",
+  "ratio": 4.29,
+  "abs": 4.29,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "CHR",
+  "entry_utc": "2025-02-04 08:27",
+  "ratio": 1.0490000000000002,
+  "abs": 1.0490000000000002,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "NKN",
+  "entry_utc": "2025-03-11 10:20",
+  "ratio": 0.8865000000000001,
+  "abs": 0.8865000000000001,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "AVAX",
+  "entry_utc": "2025-03-11 12:20",
+  "ratio": 0.207,
+  "abs": 0.207,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "BTC",
+  "entry_utc": "2025-04-04 09:53",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "NEAR",
+  "entry_utc": "2025-04-22 16:50",
+  "ratio": 2.568,
+  "abs": 2.568,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "TIA",
+  "entry_utc": "2025-05-23 16:27",
+  "ratio": 0.0575,
+  "abs": 0.0575,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "WLD",
+  "entry_utc": "2025-08-01 16:11",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "AI16Z",
+  "entry_utc": "2025-08-01 16:15",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "IMX",
+  "entry_utc": "2025-10-17 07:57",
+  "ratio": 0.95,
+  "abs": 0.95,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "SOL",
+  "entry_utc": "2025-10-17 18:47",
+  "ratio": 0.535,
+  "abs": 0.535,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "DOGE",
+  "entry_utc": "2026-03-03 12:29",
+  "ratio": 0.5,
+  "abs": 0.5,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIX20",
+  "hours": 24,
+  "pair": "HYPE",
+  "entry_utc": "2026-03-04 01:36",
+  "ratio": 2.5,
+  "abs": 2.5,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 4,
+  "pair": "CRV",
+  "entry_utc": "2025-04-08 21:48",
+  "ratio": 0.18,
+  "abs": 0.18,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 4,
+  "pair": "ONE",
+  "entry_utc": "2025-04-22 19:52",
+  "ratio": 0.43,
+  "abs": 0.43,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 4,
+  "pair": "TIA",
+  "entry_utc": "2025-05-23 16:27",
+  "ratio": 0.0575,
+  "abs": 0.0575,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 4,
+  "pair": "WLD",
+  "entry_utc": "2025-08-01 16:11",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 4,
+  "pair": "AI16Z",
+  "entry_utc": "2025-08-01 16:15",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 4,
+  "pair": "LTC",
+  "entry_utc": "2025-12-17 16:34",
+  "ratio": 0.2004,
+  "abs": 0.2004,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 4,
+  "pair": "DOGE",
+  "entry_utc": "2026-03-03 12:29",
+  "ratio": 0.5,
+  "abs": 0.5,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "SSV",
+  "entry_utc": "2025-03-05 09:04",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "CRV",
+  "entry_utc": "2025-04-08 21:48",
+  "ratio": 0.18,
+  "abs": 0.18,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "ADA",
+  "entry_utc": "2025-04-10 12:41",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "ONE",
+  "entry_utc": "2025-04-22 19:52",
+  "ratio": 0.43,
+  "abs": 0.43,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "TIA",
+  "entry_utc": "2025-05-23 16:27",
+  "ratio": 0.0575,
+  "abs": 0.0575,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "WLD",
+  "entry_utc": "2025-08-01 16:11",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "AI16Z",
+  "entry_utc": "2025-08-01 16:15",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "IMX",
+  "entry_utc": "2025-10-17 07:57",
+  "ratio": 0.95,
+  "abs": 0.95,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "LTC",
+  "entry_utc": "2025-12-17 16:34",
+  "ratio": 0.2004,
+  "abs": 0.2004,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 12,
+  "pair": "DOGE",
+  "entry_utc": "2026-03-03 12:29",
+  "ratio": 0.5,
+  "abs": 0.5,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "CELO",
+  "entry_utc": "2024-07-25 18:41",
+  "ratio": 1.8155000000000001,
+  "abs": 1.8155000000000001,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "RLC",
+  "entry_utc": "2024-08-02 07:50",
+  "ratio": 0.11349999999999999,
+  "abs": 0.11349999999999999,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "OXT",
+  "entry_utc": "2024-08-07 09:01",
+  "ratio": 1.386,
+  "abs": 1.386,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "CHR",
+  "entry_utc": "2024-09-04 08:04",
+  "ratio": 0.46299999999999997,
+  "abs": 0.46299999999999997,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "MAGIC",
+  "entry_utc": "2024-11-16 10:42",
+  "ratio": 4.29,
+  "abs": 4.29,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "CHR",
+  "entry_utc": "2025-02-04 08:27",
+  "ratio": 1.0490000000000002,
+  "abs": 1.0490000000000002,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "METIS",
+  "entry_utc": "2025-02-13 08:14",
+  "ratio": 1.1235,
+  "abs": 1.1235,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "SSV",
+  "entry_utc": "2025-03-05 09:04",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "NKN",
+  "entry_utc": "2025-03-11 10:20",
+  "ratio": 0.8865000000000001,
+  "abs": 0.8865000000000001,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "AVAX",
+  "entry_utc": "2025-03-11 12:20",
+  "ratio": 0.207,
+  "abs": 0.207,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "BTC",
+  "entry_utc": "2025-04-04 09:53",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "DOGE",
+  "entry_utc": "2025-04-05 12:07",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "ONDO",
+  "entry_utc": "2025-04-08 09:35",
+  "ratio": 0.502,
+  "abs": 0.502,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "CRV",
+  "entry_utc": "2025-04-08 21:48",
+  "ratio": 0.18,
+  "abs": 0.18,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "ADA",
+  "entry_utc": "2025-04-10 12:41",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "NEAR",
+  "entry_utc": "2025-04-22 16:50",
+  "ratio": 2.568,
+  "abs": 2.568,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "ONE",
+  "entry_utc": "2025-04-22 19:52",
+  "ratio": 0.43,
+  "abs": 0.43,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "CELR",
+  "entry_utc": "2025-04-23 12:26",
+  "ratio": 0.316,
+  "abs": 0.316,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "TIA",
+  "entry_utc": "2025-05-23 16:27",
+  "ratio": 0.0575,
+  "abs": 0.0575,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "WLD",
+  "entry_utc": "2025-08-01 16:11",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "AI16Z",
+  "entry_utc": "2025-08-01 16:15",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "ETH",
+  "entry_utc": "2025-09-06 08:43",
+  "ratio": 0.8390000000000001,
+  "abs": 0.8390000000000001,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "IMX",
+  "entry_utc": "2025-10-17 07:57",
+  "ratio": 0.95,
+  "abs": 0.95,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "SOL",
+  "entry_utc": "2025-10-17 18:47",
+  "ratio": 0.535,
+  "abs": 0.535,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "SOL",
+  "entry_utc": "2025-11-21 08:03",
+  "ratio": 0.9484999999999999,
+  "abs": 0.9484999999999999,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "LTC",
+  "entry_utc": "2025-12-17 16:34",
+  "ratio": 0.2004,
+  "abs": 0.2004,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "DOGE",
+  "entry_utc": "2026-03-03 12:29",
+  "ratio": 0.5,
+  "abs": 0.5,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "HYPE",
+  "entry_utc": "2026-03-04 01:36",
+  "ratio": 2.5,
+  "abs": 2.5,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "OR",
+  "hours": 24,
+  "pair": "ARB",
+  "entry_utc": "2026-04-02 18:28",
+  "ratio": 1.528,
+  "abs": 1.528,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "CELO",
+  "entry_utc": "2024-07-25 18:41",
+  "ratio": 1.8155000000000001,
+  "abs": 1.8155000000000001,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "NMR",
+  "entry_utc": "2024-08-06 08:11",
+  "ratio": 4.2345,
+  "abs": 4.2345,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "HOT",
+  "entry_utc": "2024-08-06 08:35",
+  "ratio": 0.1225,
+  "abs": 0.1225,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "CHR",
+  "entry_utc": "2024-09-04 08:04",
+  "ratio": 0.46299999999999997,
+  "abs": 0.46299999999999997,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "STEEM",
+  "entry_utc": "2025-01-28 10:57",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "CELO",
+  "entry_utc": "2025-01-28 16:51",
+  "ratio": 1.9469999999999998,
+  "abs": 1.9469999999999998,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "BTC",
+  "entry_utc": "2025-04-04 09:53",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "DOGE",
+  "entry_utc": "2025-04-05 12:07",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "BTC",
+  "entry_utc": "2025-08-02 18:54",
+  "ratio": 0.0,
+  "abs": 0.0,
+  "short": true
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "IMX",
+  "entry_utc": "2025-10-17 07:57",
+  "ratio": 0.95,
+  "abs": 0.95,
+  "short": false
+ },
+ {
+  "list": "Killers_channel",
+  "guard": "VIXD",
+  "hours": 24,
+  "pair": "SOL",
+  "entry_utc": "2025-10-17 18:47",
+  "ratio": 0.535,
+  "abs": 0.535,
+  "short": false
+ }
+]
