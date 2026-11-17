@@ -1,0 +1,6 @@
+{"universe": [
+  {"name": "BTC", "szDecimals": 5, "maxLeverage": 40},
+  {"name": "kPEPE", "szDecimals": 0, "maxLeverage": 10},
+  {"name": "OLD", "szDecimals": 0, "maxLeverage": 3, "isDelisted": true},
+  {"name": "xyz:ABC", "szDecimals": 0, "maxLeverage": 3}
+]}

@@ -1,0 +1,51 @@
+{
+  "success": true,
+  "data": {
+    "total_pages": 1,
+    "total_count": 3,
+    "notices": [
+      {
+        "listed_at": "2024-03-01T21:00:30+09:00",
+        "first_listed_at": "2024-03-01T21:00:30+09:00",
+        "id": 9003,
+        "uuid": "900000003",
+        "title": "테스트(TST) KRW 마켓 디지털 자산 추가",
+        "category": "거래",
+        "need_new_badge": false,
+        "need_update_badge": false
+      },
+      {
+        "listed_at": "2024-02-20T18:10:00+09:00",
+        "first_listed_at": "2024-02-20T17:00:00+09:00",
+        "id": 9002,
+        "uuid": "900000002",
+        "title": "샘플(SMP) 거래 유의 종목 지정 안내",
+        "category": "거래",
+        "need_new_badge": false,
+        "need_update_badge": false
+      },
+      {
+        "listed_at": "2024-02-01T10:00:00+09:00",
+        "first_listed_at": "2024-02-01T10:00:00+09:00",
+        "id": 9001,
+        "uuid": "900000001",
+        "title": "예시(EXM) 거래지원 종료 안내",
+        "category": "거래",
+        "need_new_badge": false,
+        "need_update_badge": false
+      }
+    ],
+    "fixed_notices": [
+      {
+        "listed_at": "2023-06-01T09:00:00+09:00",
+        "first_listed_at": "2023-06-01T09:00:00+09:00",
+        "id": 8000,
+        "uuid": "800000000",
+        "title": "고정 공지",
+        "category": "거래",
+        "need_new_badge": false,
+        "need_update_badge": false
+      }
+    ]
+  }
+}

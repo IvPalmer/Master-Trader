@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:media="http://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0"
+>
+<channel>
+<title>WSJ.com: Markets</title>
+<description>Markets</description>
+<link>https://www.wsj.com/finance</link>
+<language>en-us</language>
+<copyright>Copyright &#169; Dow Jones &amp; Company, Inc. All rights reserved.</copyright>
+<lastBuildDate>Thu, 05 Nov 2026 19:45:07 GMT</lastBuildDate>
+<image>
+<title>WSJ.com: Markets</title>
+<url>http://online.wsj.com/img/wsj_sm_logo.gif</url>
+<link>https://www.wsj.com/finance</link>
+</image>
+<item>
+<guid isPermaLink="false">lc-wsj-stock-market-today-dow-sp-500-nasdaq-11-05-2026</guid>
+<title>Stock Market Today: Nasdaq Plunges 5% as Investors Retreat From AI Trade After Election</title>
+<description>Tech-heavy index enters correction territory; Dow drops more than 1,500 points</description>
+<link>https://www.wsj.com/livecoverage/stock-market-today-dow-sp-500-nasdaq-11-05-2026?mod=rss_markets_main</link>
+<pubDate>Thu, 05 Nov 2026 09:25:53 GMT</pubDate>
+<media:content url="https://images.wsj.net/im-925349" medium="image" type="image/jpeg">
+</media:content>
+</item>
+<item>
+<guid isPermaLink="false">WP-WSJ-0004038294</guid>
+<title>Goldman&#x2019;s Exclusive Club of Partners Welcomes Its Biggest Class Since 2010</title>
+<description>In a shift from previous years, the bank didn&#x2019;t provide a gender or racial breakdown of the class.</description>
+<link>https://www.wsj.com/finance/banking/goldmans-exclusive-club-of-partners-welcomes-an-influx-from-wealth-management-ebe2e32a?mod=rss_markets_main</link>
+<pubDate>Thu, 05 Nov 2026 18:54:00 GMT</pubDate>
+<dc:creator>Jasmine Li</dc:creator>
+<media:content url="https://images.wsj.net/im-14342786" medium="image" type="image/jpeg">
+<media:credit>Michael Nagle/Bloomberg News</media:credit>
+</media:content>
+</item>
+</channel>
+</rss>

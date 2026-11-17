@@ -30,7 +30,7 @@ Creds + URLs live at `/home/ubuntu/master-trader/.bot-secrets/freqtrade.env` (ch
 
 ```bash
 set -a; . /home/ubuntu/master-trader/.bot-secrets/freqtrade.env; set +a
-curl -s -u "$FT_API_USER:$FT_API_PASS" "$FT_FUNDING_FADE_URL/api/v1/profit"
+curl -s -u "$FT_FUNDING_FADE_USER:$FT_FUNDING_FADE_PASS" "$FT_FUNDING_FADE_URL/api/v1/profit"
 ```
 
-Both bots share the same creds.
+Each bot has its own pair: `FT_KELTNER_USER`/`FT_KELTNER_PASS` for Keltner, `FT_FUNDING_FADE_USER`/`FT_FUNDING_FADE_PASS` for FundingFade. A pair used on the wrong bot gets 401.
